@@ -522,6 +522,23 @@ window.saveTypeGroups = function() {
     }).catch(function(e){window.showDbError(e);});
 };
 
+// ── TARGET NUMBER FORMAT HELPERS ──
+window._tgtNumFocus = function(el) {
+  el.value = el.value.replace(/,/g, '');
+};
+window._tgtNumBlur = function(el) {
+  var n = parseFloat(el.value.replace(/,/g, ''));
+  el.value = (!isNaN(n) && n > 0)
+    ? new Intl.NumberFormat('th-TH', {minimumFractionDigits: 2, maximumFractionDigits: 2}).format(n)
+    : '';
+};
+function _tgtFmtVal(v) {
+  var n = Number(v);
+  return (!isNaN(n) && n > 0)
+    ? new Intl.NumberFormat('th-TH', {minimumFractionDigits: 2, maximumFractionDigits: 2}).format(n)
+    : '';
+}
+
 // ── TARGET MODAL ──
 window.openTargetModal = function(yr) {
   var targets = window.YEAR_TARGETS || [];
@@ -545,7 +562,8 @@ window.openTargetModal = function(yr) {
     return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">' +
       '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + (t.color || '#4361ee') + ';flex-shrink:0;"></span>' +
       '<span style="flex:1;font-size:13px;font-weight:600;color:var(--txt);">' + esc(t.label) + '</span>' +
-      '<input type="number" id="tgt-inp-' + t.id + '" value="' + cur + '" min="0" placeholder="0" ' +
+      '<input type="text" inputmode="numeric" id="tgt-inp-' + t.id + '" value="' + _tgtFmtVal(cur) + '" placeholder="0.00" ' +
+        'onfocus="window._tgtNumFocus(this)" onblur="window._tgtNumBlur(this)" ' +
         'style="width:160px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--txt);font-size:13px;text-align:right;">' +
       '<span style="font-size:12px;color:var(--txt3);">บาท</span>' +
     '</div>';
@@ -580,7 +598,7 @@ window.saveAnnualTargets = function() {
   (window.PTYPES || []).forEach(function(t) {
     var inp = document.getElementById('tgt-inp-' + t.id);
     if (inp) {
-      var val = parseFloat(inp.value);
+      var val = parseFloat(inp.value.replace(/,/g, ''));
       if (!isNaN(val) && val > 0) byType[t.id] = val;
     }
   });
@@ -625,8 +643,8 @@ window.renderTargets = function() {
   groups.forEach(function(g){(g.typeIds||[]).forEach(function(tid){groupedIds.add(tid);});});
 
   function _tgtInput(id, val, readOnly) {
-    return '<input type="number" id="tpg-'+id+'" value="'+(val||'')+'" min="0" placeholder="0" '+
-      (readOnly?'disabled ':'')+
+    return '<input type="text" inputmode="numeric" id="tpg-'+id+'" value="'+_tgtFmtVal(val)+'" placeholder="0.00" '+
+      (readOnly ? 'disabled ' : 'onfocus="window._tgtNumFocus(this)" onblur="window._tgtNumBlur(this)" ')+
       'style="width:180px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:'+(readOnly?'var(--surface2)':'var(--surface)')+';color:var(--txt);font-size:13px;text-align:right;'+(readOnly?'opacity:.7;':'')+'">';
   }
 
@@ -696,7 +714,7 @@ window.saveTargetsPage = function() {
   // ทุกประเภท (ทั้งในกลุ่มและไม่ในกลุ่ม) — save per-type
   (window.PTYPES||[]).forEach(function(t){
     var inp = document.getElementById('tpg-inp-'+t.id);
-    if (inp) { var v=parseFloat(inp.value); if(!isNaN(v)&&v>0) byType[t.id]=v; }
+    if (inp) { var v=parseFloat(inp.value.replace(/,/g,'')); if(!isNaN(v)&&v>0) byType[t.id]=v; }
   });
   var targets = (window.YEAR_TARGETS||[]).filter(function(t){return String(t.year)!==String(yr);});
   if (Object.keys(byType).length>0) targets.push({year:Number(yr),byType:byType});

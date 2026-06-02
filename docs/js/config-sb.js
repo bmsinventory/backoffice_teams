@@ -1,5 +1,5 @@
-// config-pb.js — เหมือน config.js แต่ใช้ PocketBase แทน Firebase
-// pb-adapter.js โหลดก่อนไฟล์นี้และตั้งค่า window.getColRef / window.getDocRef แล้ว
+// config-sb.js — เหมือน config.js แต่ใช้ Supabase แทน Firebase
+// supabase-adapter.js โหลดก่อนไฟล์นี้และตั้งค่า window.getColRef / window.getDocRef แล้ว
 
 // ── Global data stores ──
 window.STAGES = [];
@@ -19,6 +19,9 @@ window.LEAVES = [];
 window.TIMESHEETS = [];
 window.COSTS = [];
 window.NOTIFY_TOKEN = '';
+window.NOTIFY_ADVANCE_TOKEN = '';
+window.NOTIFY_PROJECT_TOKEN = '';
+window.NOTIFY_PROXY_URL = '';
 
 window.AFLW=[
   {id:'draft',label:'Draft',color:'#9ba3b8'},
@@ -308,15 +311,24 @@ window.showLoader=function(txt){
 window.hideLoader=function(){document.getElementById('sys-loader').classList.remove('on');};
 
 window.showDbError=function(err){
-  console.error('PocketBase Error:',err);
-  var msg='<div style="color:var(--coral);font-weight:bold;font-size:16px;margin-bottom:8px;">❌ ไม่สามารถเชื่อมต่อ PocketBase ได้</div>';
-  msg+='<div style="font-size:13px;color:var(--txt);text-align:left;background:var(--surface2);padding:12px;border-radius:8px;border:1px solid var(--border);max-width:500px;line-height:1.6;">';
-  msg+='<strong>ตรวจสอบ:</strong><br>';
-  msg+='1. PocketBase service รันอยู่หรือไม่ (<code>systemctl status pocketbase</code>)<br>';
-  msg+='2. URL ใน <code>pb-adapter.js</code> ถูกต้องหรือไม่<br>';
-  msg+='3. Firewall อนุญาต port 8090 หรือไม่<br>';
-  if(err&&err.message) msg+='<br><code style="font-size:11px;color:var(--coral)">'+err.message+'</code>';
+  console.error('Supabase Error:',err);
+  var errMsg=err&&err.message?window.esc(err.message):'';
+  var isNoTable=errMsg.includes('does not exist')||errMsg.includes('relation')||errMsg.includes('42P01');
+  var msg='<div style="color:var(--coral);font-weight:bold;font-size:16px;margin-bottom:10px;">❌ ไม่สามารถเชื่อมต่อ Supabase ได้</div>';
+  msg+='<div style="font-size:13px;color:var(--txt);text-align:left;background:var(--surface2);padding:14px;border-radius:8px;border:1px solid var(--border);max-width:520px;line-height:1.7;">';
+  if(isNoTable){
+    msg+='<strong style="color:var(--coral);">⚠ ตารางยังไม่ถูกสร้างใน Supabase</strong><br><br>';
+    msg+='กรุณารัน <code>supabase-schema.sql</code> ใน Supabase SQL Editor ก่อน:<br>';
+    msg+='<a href="https://supabase.com/dashboard/project/zsxllqiygochmldmtpgc/sql/new" target="_blank" style="color:var(--violet);font-weight:600;">→ เปิด SQL Editor</a><br><br>';
+  } else {
+    msg+='<strong>ตรวจสอบ:</strong><br>';
+    msg+='1. รัน <code>supabase-schema.sql</code> ใน SQL Editor แล้วหรือไม่<br>';
+    msg+='2. <code>SUPABASE_URL</code> และ <code>SUPABASE_ANON_KEY</code> ถูกต้อง<br>';
+    msg+='3. RLS policy อนุญาต <code>anon</code> หรือไม่<br>';
+  }
+  if(errMsg) msg+='<code style="font-size:11px;color:var(--coral);word-break:break-all;">'+errMsg+'</code>';
   msg+='</div>';
+  msg+='<button onclick="location.reload()" style="margin-top:14px;padding:8px 20px;background:var(--violet);color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">🔄 ลองใหม่</button>';
   document.getElementById('sys-loader-text').innerHTML=msg;
   var pulse=document.querySelector('#sys-loader .pulse');if(pulse)pulse.style.display='none';
   document.getElementById('sys-loader').classList.add('on');

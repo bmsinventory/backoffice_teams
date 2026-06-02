@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Firebase → Supabase Migration</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Segoe UI',sans-serif;background:#0f1117;color:#e2e8f0;min-height:100vh;padding:32px 24px;}
+  h1{font-size:22px;font-weight:700;margin-bottom:4px;color:#a78bfa;}
+  .sub{font-size:13px;color:#94a3b8;margin-bottom:28px;}
+  .card{background:#1e2230;border:1px solid #2d3348;border-radius:14px;padding:20px;margin-bottom:16px;}
+  .card h2{font-size:14px;font-weight:700;color:#c4b5fd;margin-bottom:14px;}
+  label{font-size:12px;color:#94a3b8;display:block;margin-bottom:4px;}
+  input{width:100%;padding:9px 12px;background:#0f1117;border:1px solid #2d3348;border-radius:8px;color:#e2e8f0;font-size:12px;font-family:monospace;outline:none;margin-bottom:10px;}
+  input:focus{border-color:#7c5cfc;}
+  .btn{padding:10px 22px;border:none;border-radius:9px;cursor:pointer;font-size:13px;font-weight:600;transition:all .2s;}
+  .btn-pri{background:#7c5cfc;color:#fff;}
+  .btn-pri:hover{background:#6d4ef0;}
+  .btn-pri:disabled{background:#3d3566;color:#7c72a0;cursor:not-allowed;}
+  .btn-ghost{background:#2d3348;color:#94a3b8;}
+  .btn-ghost:hover{background:#363d55;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;margin-top:12px;}
+  .col-item{background:#0f1117;border:1px solid #2d3348;border-radius:8px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;font-size:12px;}
+  .col-name{font-weight:600;color:#e2e8f0;}
+  .col-status{font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;white-space:nowrap;}
+  .s-wait{background:#2d3348;color:#94a3b8;}
+  .s-running{background:#1e3a5f;color:#60a5fa;}
+  .s-ok{background:#14532d;color:#4ade80;}
+  .s-err{background:#450a0a;color:#f87171;}
+  .s-skip{background:#292524;color:#78716c;}
+  #log{background:#0a0c10;border:1px solid #1e2230;border-radius:10px;padding:14px;height:380px;overflow-y:auto;font-family:monospace;font-size:12px;line-height:1.7;}
+  .log-ok{color:#4ade80;} .log-err{color:#f87171;} .log-info{color:#64748b;}
+  .log-warn{color:#fbbf24;} .log-head{color:#c4b5fd;font-weight:bold;}
+  .progress-bar{height:6px;background:#2d3348;border-radius:3px;overflow:hidden;margin:12px 0 0;}
+  .progress-fill{height:100%;background:linear-gradient(90deg,#7c5cfc,#06d6a0);border-radius:3px;transition:width .4s;width:0%;}
+  .summary{display:none;gap:12px;flex-wrap:wrap;margin-top:12px;}
+  .sum-item{font-size:12px;background:#0f1117;border:1px solid #2d3348;border-radius:8px;padding:8px 16px;text-align:center;}
+  .sum-item b{font-size:20px;display:block;}
+  .c-ok b{color:#4ade80;} .c-err b{color:#f87171;} .c-skip b{color:#94a3b8;} .c-total b{color:#a78bfa;}
+</style>
+</head>
+<body>
+
+<h1>🔄 Firebase → Supabase Migration</h1>
+<p class="sub">ใช้ Firebase SDK โดยตรง — sign in anonymously ก่อน อ่านข้อมูล → แปลงชื่อ field → upsert Supabase</p>
+
+<div class="card">
+  <h2>⚡ Supabase</h2>
+  <label>URL</label>
+  <input id="sb-url" value="https://zsxllqiygochmldmtpgc.supabase.co">
+  <label>Anon Key</label>
+  <input id="sb-key" value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpzeGxscWl5Z29jaG1sZG10cGdjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MDcwODcsImV4cCI6MjA5NTk4MzA4N30.UOJCTHO0jjMRW21unnB3xUqlBjRp-S2s-JMYZuzkWOw">
+</div>
+
+<div class="card">
+  <h2>📦 Collections</h2>
+  <div class="grid" id="col-grid"></div>
+  <div class="progress-bar"><div class="progress-fill" id="prog"></div></div>
+  <div class="summary" id="summary">
+    <div class="sum-item c-total"><b id="s-total">0</b>ทั้งหมด</div>
+    <div class="sum-item c-ok"><b id="s-ok">0</b>สำเร็จ</div>
+    <div class="sum-item c-err"><b id="s-err">0</b>ผิดพลาด</div>
+    <div class="sum-item c-skip"><b id="s-skip">0</b>ว่าง</div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>📋 Log</h2>
+  <div style="display:flex;gap:8px;margin-bottom:10px;">
+    <button class="btn btn-pri" id="btn-run">▶ เริ่ม Migrate</button>
+    <button class="btn btn-ghost" onclick="document.getElementById('log').innerHTML=''">🗑 ล้าง</button>
+  </div>
+  <div id="log"><span class="log-info">กด "เริ่ม Migrate" เพื่อเริ่มโอนข้อมูล...</span></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+
+<script type="module">
+// ─── Firebase SDK ───────────────────────────────────────────────────────────
+import { initializeApp }              from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+import { getFirestore, collection, getDocs } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+
+// ─── Firebase config ────────────────────────────────────────────────────────
+const FB_CONFIG = {
+  apiKey:            'AIzaSyDTQe8s5FCelKcXzkQdWb7Ur0R-HGq6t98',
+  authDomain:        'bms-backoffice-teams.firebaseapp.com',
+  projectId:         'bms-backoffice-teams',
+  storageBucket:     'bms-backoffice-teams.firebasestorage.app',
+  messagingSenderId: '248142210178',
+  appId:             '1:248142210178:web:f459bdb838550bf23c809b',
+};
+const FB_APP_ID = 'backoffice-teams-app';
+
+// ─── Collections ────────────────────────────────────────────────────────────
+const COLLECTIONS = [
+  'STAGES','PTYPES','PGROUPS','POSITIONS','DEPARTMENTS',
+  'STAFF','USERS','PROJECTS','ADVANCES','LODGINGS',
+  'HOLIDAYS','LEAVES','TIMESHEETS','COSTS','CONTRACTS',
+  'HSP_PRODUCTS','HOSPITALS','SETTINGS','WORK_LOGS',
+];
+const COL_MAP = {
+  STAGES:'stages',PTYPES:'ptypes',PGROUPS:'pgroups',POSITIONS:'positions',
+  DEPARTMENTS:'departments',STAFF:'staff',USERS:'users',PROJECTS:'projects',
+  ADVANCES:'advances',LODGINGS:'lodgings',HOLIDAYS:'holidays',LEAVES:'leaves',
+  TIMESHEETS:'timesheets',COSTS:'costs',CONTRACTS:'contracts',
+  HSP_PRODUCTS:'hsp_products',HOSPITALS:'hospitals',SETTINGS:'settings',
+  WORK_LOGS:'work_logs',
+};
+
+// ─── Supabase valid columns (whitelist) ─────────────────────────────────────
+const VALID_COLS = {
+  stages:      new Set(['id','stage_id','label_th','label','color_hex','color','order','auto_rule','auto_offset','set_progress']),
+  ptypes:      new Set(['id','type_id','label_th','label','color_hex','color']),
+  pgroups:     new Set(['id','group_id','label_th','label','color_hex','color']),
+  positions:   new Set(['id','position_id','label_th','label','daily_rate']),
+  departments: new Set(['id','dept_id','label_th','label']),
+  staff:       new Set(['id','staff_id','full_name','nickname','department','position','email','phone','is_active','start_date','birth_date','remark','daily_rate']),
+  users:       new Set(['id','user_id','username','password','name','display_name','role','is_active','staff_id']),
+  projects:    new Set(['id','project_id','project_name','group_id','site_owner','installer_name','type_id','stage_id','budget','start_date','end_date','revisit_1','revisit_2','parent_project_id','revisit_round','progress_pct','note','status','pm_staff_id','team','members','is_border','contract_id','visits']),
+  advances:    new Set(['id','advance_id','project_id','purpose','amount_requested','amount_cleared','request_date','due_date','status','note','advance_no','expense_items','labor_items']),
+  lodgings:    new Set(['id','lodging_id','project_id','lodging_name','map_url','phone','check_in','check_out','ds_qty','ds_rate','dd_qty','dd_rate','d_total','d_wifi','d_pillow','d_blanket','d_appliance','d_parking','d_ac','d_fridge','d_washer','d_tv','d_shower','d_breakfast','d_towel','d_custom','d_deposit','d_deposit_note','ms_qty','ms_rate','md_qty','md_rate','m_total','m_wifi','m_pillow','m_blanket','m_appliance','m_parking','m_ac','m_fridge','m_washer','m_tv','m_shower','m_breakfast','m_bedsheet','m_towel','m_custom','m_deposit','m_deposit_note','m_water','m_electric','m_extras','m_incl_util','grand_total','note','approved','approved_at','approved_by','approved_daily','approved_monthly']),
+  holidays:    new Set(['id','holiday_id','name','date','type']),
+  leaves:      new Set(['id','leave_id','staff_id','leave_type','start_date','end_date','substitute_id','note','status','approved_by']),
+  timesheets:  new Set(['id','timesheet_id','project_id','staff_id','work_date','visit_start','visit_end','hours','category','description','source']),
+  costs:       new Set(['id','cost_id','project_id','staff_id','category','amount','cost_date','description','receipt_no','source','advance_id']),
+  contracts:   new Set(['id','contract_id','project_name','customer_name','total_contract_value','contract_sign_date','contract_start_date','end_date','note','status']),
+  hsp_products:new Set(['id','product_id','name','color','note','group']),
+  hospitals:   new Set(['id','hospital_id','code','name','type','beds','province','district','tambon','address','tel','website','affiliation','note','contacts','products']),
+  settings:    new Set(['id','notify_token','notify_advance_token','notify_project_token','year_targets','tgt_grouped','allowance_weekday_normal','allowance_holiday_normal','allowance_weekday_border','allowance_holiday_border','admin','pm','viewer']),
+  work_logs:   new Set(['id','uid','staff_id','type','scope','date','start_date','end_date','total_days','category','location_type','destination','title','detail','participants','created_at']),
+};
+
+// ─── Field aliases: Firebase shorthand / camelCase → Supabase column ────────
+const ALIASES = {
+  projects:  { name:'project_name', stage:'stage_id', cost:'budget', start:'start_date',
+               end:'end_date', revisit1:'revisit_1', revisit2:'revisit_2',
+               pm:'pm_staff_id', progress:'progress_pct' },
+  advances:  { pid:'project_id', amount:'amount_requested', cleared:'amount_cleared',
+               rdate:'request_date', ddate:'due_date', advno:'advance_no' },
+  lodgings:  { pid:'project_id', name:'lodging_name', total:'grand_total' },
+  staff:     { name:'full_name', dept:'department', role:'position', active:'is_active' },
+  users:     { active:'is_active' },
+  timesheets:{ pid:'project_id' },
+  costs:     { pid:'project_id' },
+  work_logs: { staffId:'staff_id', startDate:'start_date', endDate:'end_date',
+               totalDays:'total_days', locationType:'location_type', createdAt:'created_at' },
+};
+
+// ─── Transform raw Firebase doc → Supabase row ───────────────────────────────
+function transformRow(table, docId, rawData) {
+  const aliases = ALIASES[table] || {};
+  const validCols = VALID_COLS[table];
+
+  // Step 1: normalize all keys
+  const normalized = {};
+  for (const k of Object.keys(rawData)) {
+    // apply explicit alias first
+    const aliased = aliases[k] || k;
+    // then camelCase → snake_case
+    const snake = aliased.replace(/([A-Z])/g, '_$1').toLowerCase();
+    // first-write wins (snake_case from explicit alias takes priority)
+    if (normalized[snake] === undefined) {
+      normalized[snake] = rawData[k];
+    }
+  }
+  normalized.id = docId;
+
+  // Step 2: filter to only valid Supabase columns
+  if (!validCols) return normalized;
+  const result = {};
+  for (const col of validCols) {
+    if (normalized[col] !== undefined) result[col] = normalized[col];
+  }
+  return result;
+}
+
+// ─── UI helpers ──────────────────────────────────────────────────────────────
+function setStatus(col, cls, txt) {
+  const el = document.getElementById('st-' + col);
+  if (el) { el.className = 'col-status ' + cls; el.textContent = txt; }
+}
+function log(msg, type = 'info') {
+  const el = document.getElementById('log');
+  const t  = new Date().toTimeString().slice(0,8);
+  el.innerHTML += `<span class="log-${type}">[${t}] ${msg}</span>\n`;
+  el.scrollTop  = el.scrollHeight;
+}
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ─── Build grid ───────────────────────────────────────────────────────────────
+const grid = document.getElementById('col-grid');
+COLLECTIONS.forEach(col => {
+  grid.innerHTML += `<div class="col-item">
+    <span class="col-name">${col}</span>
+    <span class="col-status s-wait" id="st-${col}">รอ</span>
+  </div>`;
+});
+
+// ─── Main migration ──────────────────────────────────────────────────────────
+document.getElementById('btn-run').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-run');
+  btn.disabled = true; btn.textContent = '⏳ กำลัง Migrate...';
+  document.getElementById('summary').style.display = 'none';
+  COLLECTIONS.forEach(c => setStatus(c, 's-wait', 'รอ'));
+  document.getElementById('prog').style.width = '0%';
+
+  let ok = 0, err = 0, skip = 0;
+
+  try {
+    // ── Init Firebase ──
+    log('🔥 เชื่อมต่อ Firebase...', 'head');
+    const fbApp = initializeApp(FB_CONFIG);
+    const auth  = getAuth(fbApp);
+    const db    = getFirestore(fbApp);
+    await signInAnonymously(auth);
+    log('  ✓ Firebase auth สำเร็จ', 'ok');
+
+    // ── Init Supabase ──
+    const sbUrl = document.getElementById('sb-url').value.trim();
+    const sbKey = document.getElementById('sb-key').value.trim();
+    const sb    = window.supabase.createClient(sbUrl, sbKey);
+    log('⚡ Supabase client พร้อม', 'ok');
+
+    // ── Migrate each collection ──
+    for (let i = 0; i < COLLECTIONS.length; i++) {
+      const col   = COLLECTIONS[i];
+      const table = COL_MAP[col];
+      document.getElementById('prog').style.width = Math.round(i / COLLECTIONS.length * 100) + '%';
+      setStatus(col, 's-running', '...');
+      log(`── ${col} ─────────────────`, 'head');
+
+      try {
+        const snap   = await getDocs(collection(db, 'artifacts', FB_APP_ID, 'public', 'data', col));
+        const fbDocs = snap.docs;
+        log(`  Firebase: ${fbDocs.length} รายการ`, 'info');
+
+        if (!fbDocs.length) {
+          setStatus(col, 's-skip', 'ว่าง');
+          log(`  ข้าม (ไม่มีข้อมูล)`, 'warn');
+          skip++; continue;
+        }
+
+        // transform each doc
+        const rows = fbDocs.map(d => transformRow(table, d.id, d.data()));
+
+        // upsert 100 rows at a time
+        for (let j = 0; j < rows.length; j += 100) {
+          const chunk = rows.slice(j, j + 100);
+          const res   = await sb.from(table).upsert(chunk, { onConflict: 'id' });
+          if (res.error) throw res.error;
+        }
+
+        setStatus(col, 's-ok', '✓ ' + rows.length);
+        log(`  Supabase: upsert ${rows.length} รายการ ✓`, 'ok');
+        ok++;
+
+      } catch(e) {
+        setStatus(col, 's-err', 'Error');
+        log(`  ❌ ${e.message || JSON.stringify(e)}`, 'err');
+        err++;
+      }
+
+      if (i < COLLECTIONS.length - 1) await sleep(200);
+    }
+
+  } catch(e) {
+    log(`❌ Fatal: ${e.message}`, 'err');
+  }
+
+  document.getElementById('prog').style.width = '100%';
+  document.getElementById('s-total').textContent = ok + err + skip;
+  document.getElementById('s-ok').textContent    = ok;
+  document.getElementById('s-err').textContent   = err;
+  document.getElementById('s-skip').textContent  = skip;
+  document.getElementById('summary').style.display = 'flex';
+
+  log('', 'info');
+  log(`═══════════════════════════════════════`, 'info');
+  log(`เสร็จสิ้น  ✓ ${ok}  ✗ ${err}  ว่าง ${skip}`, !err ? 'ok' : 'warn');
+  if (!err) log(`เปิด index.html ได้เลย! 🎉`, 'ok');
+
+  btn.disabled = false; btn.textContent = '▶ Migrate อีกครั้ง';
+});
+</script>
+</body>
+</html>

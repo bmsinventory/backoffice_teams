@@ -282,7 +282,7 @@ window.checkDailyNotifications=async function(){
       if(newStatus){
         adv.status=newStatus;
         try{
-          await setDoc(getDocRef('ADVANCES',adv.id),{status:newStatus,stage_auto:true},{merge:true});
+          await setDoc(getDocRef('ADVANCES',adv.id),{status:newStatus},{merge:true});
           await window.sendAdvanceSavedNotify(adv,false);
         }catch(e){console.warn('Auto advance status error:',e);}
       }

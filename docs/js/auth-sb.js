@@ -1,15 +1,19 @@
-// auth-pb.js — ใช้ PocketBase แทน Firebase Auth
-// window.getColRef, getDocRef, setDoc, deleteDoc, writeBatch, getDocs, onSnapshot
-// ถูก expose โดย pb-adapter.js ก่อนแล้ว
+// auth-sb.js — ใช้ Supabase แทน Firebase Auth
+// window.getColRef, getDocRef, setDoc, updateDoc, deleteDoc, writeBatch, getDocs, onSnapshot
+// ถูก expose โดย supabase-adapter.js ก่อนแล้ว
+
 const { esc, fd, fc, fca, pd, gS, gT, gG, gSt, gC, avC, uid, getFY, getYearBE,
         getStaffOverlaps, overlapWarnText, getStaffLeaveConflicts,
         getColRef, getDocRef } = window;
 
-// ── expose Firestore-compat functions สำหรับ JS อื่นที่ใช้ window.* ──
-// (pb-adapter ตั้งค่าไว้แล้ว แต่ auth.js เดิม export บน window ด้วย — คงไว้)
-window.auth = { currentUser: true }; // dummy เพื่อ backward-compat กับโค้ดที่ check window.auth.currentUser
+// auth.currentUser reflects actual login state (backward-compat with module files)
+window.auth = {};
+Object.defineProperty(window.auth, 'currentUser', {
+  get: function () { return window.cu || null; },
+  configurable: true,
+});
 
-// ── Seed ข้อมูลเริ่มต้นถ้า PocketBase ว่างเปล่า ──
+// ── Seed ข้อมูลเริ่มต้นถ้า Supabase ว่างเปล่า ──
 async function seedDatabaseIfEmpty() {
   try {
     const deptsSnap = await window.getDocs(getColRef('DEPARTMENTS'));
@@ -44,7 +48,7 @@ async function seedDatabaseIfEmpty() {
   }
 }
 
-// ── Realtime listeners (ใช้ window.onSnapshot จาก pb-adapter) ──
+// ── Realtime listeners ──
 function setupRealtimeListeners() {
   const colls = ['STAGES','PTYPES','PGROUPS','STAFF','USERS','PROJECTS','ADVANCES',
                  'LODGINGS','POSITIONS','HOLIDAYS','LEAVES','TIMESHEETS','COSTS','DEPARTMENTS'];
@@ -55,14 +59,15 @@ function setupRealtimeListeners() {
     if (loadCount === colls.length) {
       window.isDbLoaded = true;
       window.hideLoader();
-      if (window.cu) { window.setupUser(); window.renderAll(); window.startAutoStageLoop();
+      if (window.cu) {
+        window.setupUser(); window.renderAll(); window.startAutoStageLoop();
         if(window.checkDailyNotifications && window._settingsLoaded) window.checkDailyNotifications();
         else window._pendingDailyCheck = true;
         window._handleDeepLink && window._handleDeepLink();
       }
     } else if (loadCount > colls.length) {
-      if (window.cu && window.kbPid===null) window.renderAll();
-      if (window.cu) window.runAutoStage(true);
+      // ไม่ render และไม่เรียก runAutoStage ที่นี่
+      // runAutoStage รันบน timer (ทุก 60 นาที) จาก startAutoStageLoop อยู่แล้ว
     }
   };
 
@@ -107,14 +112,14 @@ function setupRealtimeListeners() {
       return{id:d.project_id||d.id,name:d.project_name||d.name||'',groupId:d.group_id||'',siteOwner:d.site_owner||'',installer:d.installer_name||'',typeId:d.type_id||'',stage:d.stage_id||d.stage||'init',cost:Number(d.budget||d.cost)||0,start:rawStart,end:rawEnd,revisit1:rawR1,revisit2:rawR2,parentProjectId:d.parent_project_id||'',revisitRound:Number(d.revisit_round)||0,progress:Number(d.progress_pct||d.progress)||0,note:d.note||'',status:d.status||'active',pm:d.pm_staff_id||d.pm||'',team:d.team||[],members:d.members||[],isBorder:d.is_border===true||d.is_border==='TRUE',contractId:d.contract_id||'',visits:(d.visits||[]).map(function(v){return{id:v.id||('V'+Math.random().toString(36).slice(2,7)),no:v.no||1,start:v.start||v.start_date||'',end:v.end||v.end_date||'',purpose:v.purpose||'',team:v.team||[],status:v.status||'planned',note:v.note||''};})};
     });
     checkLoaded();
-    if(window.cu){
+    if(window.cu && window.isDbLoaded){
       var _von=function(id){var el=document.getElementById(id);return el&&el.classList.contains('on');};
-      if(_von('view-overview'))  window.renderOverview&&window.renderOverview();
-      if(_von('view-kanban'))    window.renderKanban&&window.renderKanban();
-      if(_von('view-projects'))  window.renderProjects&&window.renderProjects();
-      if(_von('view-workload'))  window.renderWorkload&&window.renderWorkload();
-      if(_von('view-calendar'))  window.renderCalendar&&window.renderCalendar();
-      if(_von('view-availability')) window.renderAvailability&&window.renderAvailability();
+      if(_von('view-overview'))     window.renderOverview&&window.renderOverview();
+      else if(_von('view-kanban'))  window.renderKanban&&window.renderKanban();
+      else if(_von('view-projects'))window.renderProjects&&window.renderProjects();
+      else if(_von('view-workload'))window.renderWorkload&&window.renderWorkload();
+      else if(_von('view-calendar'))window.renderCalendar&&window.renderCalendar();
+      else if(_von('view-availability'))window.renderAvailability&&window.renderAvailability();
     }
   }, e=>window.showDbError(e));
 
@@ -151,28 +156,28 @@ function setupRealtimeListeners() {
     function _holNorm(raw){if(!raw)return'';var m=raw.match(/^(\d{4})(-.+)$/);if(!m)return raw;var y=Number(m[1]);return(y>=2500?(y-543):y)+m[2];}
     window.HOLIDAYS = s.docs.map(doc=>{let d=doc.data();return{id:d.holiday_id||d.id,name:d.name||'',date:_holNorm(d.date||''),type:d.type||'national'};}).sort(function(a,b){return(a.date||'').localeCompare(b.date||'');});
     checkLoaded();
-    if(window.cu&&document.getElementById('view-holidays')&&document.getElementById('view-holidays').classList.contains('on'))window.renderHolidays&&window.renderHolidays();
-    if(window.cu&&window.calTime==='month')window.renderCalendar&&window.renderCalendar();
+    if(window.cu&&window.isDbLoaded&&document.getElementById('view-holidays')&&document.getElementById('view-holidays').classList.contains('on'))window.renderHolidays&&window.renderHolidays();
+    if(window.cu&&window.isDbLoaded&&window.calTime==='month')window.renderCalendar&&window.renderCalendar();
   }, e=>window.showDbError(e));
 
   window.onSnapshot(getColRef('LEAVES'), s => {
     window.LEAVES = s.docs.map(doc=>{let d=doc.data();return{id:d.leave_id||d.id,staffId:d.staff_id||'',leaveType:d.leave_type||'other',startDate:d.start_date||'',endDate:d.end_date||'',substituteId:d.substitute_id||'',note:d.note||'',status:d.status||'pending',approvedBy:d.approved_by||''};});
     checkLoaded();
-    if(window.cu&&document.getElementById('view-leave')&&document.getElementById('view-leave').classList.contains('on'))window.renderLeave&&window.renderLeave();
-    if(window.cu&&document.getElementById('view-calendar')&&document.getElementById('view-calendar').classList.contains('on'))window.renderCalendar&&window.renderCalendar();
+    if(window.cu&&window.isDbLoaded&&document.getElementById('view-leave')&&document.getElementById('view-leave').classList.contains('on'))window.renderLeave&&window.renderLeave();
+    if(window.cu&&window.isDbLoaded&&document.getElementById('view-calendar')&&document.getElementById('view-calendar').classList.contains('on'))window.renderCalendar&&window.renderCalendar();
   }, e=>window.showDbError(e));
 
   window.onSnapshot(getColRef('TIMESHEETS'), s => {
     window.TIMESHEETS = s.docs.map(doc=>{let d=doc.data();return{id:d.timesheet_id||d.id,pid:d.project_id||d.pid||'',staffId:d.staff_id||'',workDate:d.work_date||'',visitStart:d.visit_start||'',visitEnd:d.visit_end||'',hours:Number(d.hours)||0,category:d.category||'other',description:d.description||'',source:d.source||''};});
     checkLoaded();
-    if(window.cu&&document.getElementById('view-timesheet')&&document.getElementById('view-timesheet').classList.contains('on'))window.renderTimesheet&&window.renderTimesheet();
-    if(window.cu&&document.getElementById('view-cost')&&document.getElementById('view-cost').classList.contains('on'))window.renderCost&&window.renderCost();
+    if(window.cu&&window.isDbLoaded&&document.getElementById('view-timesheet')&&document.getElementById('view-timesheet').classList.contains('on'))window.renderTimesheet&&window.renderTimesheet();
+    if(window.cu&&window.isDbLoaded&&document.getElementById('view-cost')&&document.getElementById('view-cost').classList.contains('on'))window.renderCost&&window.renderCost();
   }, e=>window.showDbError(e));
 
   window.onSnapshot(getColRef('COSTS'), s => {
     window.COSTS = s.docs.map(doc=>{let d=doc.data();return{id:d.cost_id||d.id,pid:d.project_id||d.pid||'',staffId:d.staff_id||'',category:d.category||'other',amount:Number(d.amount)||0,costDate:d.cost_date||'',description:d.description||'',receiptNo:d.receipt_no||'',source:d.source||'',advanceId:d.advance_id||''};});
     checkLoaded();
-    if(window.cu&&document.getElementById('view-cost')&&document.getElementById('view-cost').classList.contains('on'))window.renderCost&&window.renderCost();
+    if(window.cu&&window.isDbLoaded&&document.getElementById('view-cost')&&document.getElementById('view-cost').classList.contains('on'))window.renderCost&&window.renderCost();
   }, e=>window.showDbError(e));
 
   window.onSnapshot(getColRef('DEPARTMENTS'), s => {
@@ -181,7 +186,19 @@ function setupRealtimeListeners() {
     checkLoaded();
   }, e=>window.showDbError(e));
 
-  // CONTRACTS — background (ไม่บล็อก app load)
+  // WORK_LOGS — background
+  window.onSnapshot(getColRef('WORK_LOGS'), s => {
+    window.WORK_LOGS = s.docs.map(doc=>{
+      let d=doc.data();
+      return{id:d.id||doc.id,uid:d.uid||'',staffId:d.staffId||d.staff_id||'',type:d.type||'daily',scope:d.scope||'personal',date:d.date||'',startDate:d.start_date||d.startDate||'',endDate:d.end_date||d.endDate||'',totalDays:Number(d.total_days||d.totalDays)||1,category:d.category||'other',locationType:d.location_type||d.locationType||'local',destination:d.destination||'',title:d.title||'',detail:d.detail||'',participants:d.participants||[],createdAt:d.created_at||d.createdAt||''};
+    }).sort(function(a,b){var da=a.type==='daily'?a.date:a.startDate;var db=b.type==='daily'?b.date:b.startDate;return(db||'').localeCompare(da||'');});
+    var _von=function(id){var el=document.getElementById(id);return el&&el.classList.contains('on');};
+    if(window.cu&&_von('view-worklog'))    window.renderWorkLog&&window.renderWorkLog();
+    if(window.cu&&_von('view-calendar'))   window.renderCalendar&&window.renderCalendar();
+    if(window.cu&&_von('view-availability')) window.renderAvailability&&window.renderAvailability();
+  }, e=>window.showDbError(e));
+
+  // CONTRACTS — background
   window.onSnapshot(getColRef('CONTRACTS'), s => {
     window.CONTRACTS = s.docs.map(doc=>{let d=doc.data();return{id:d.contract_id||doc.id,name:d.project_name||'',customer:d.customer_name||'',value:Number(d.total_contract_value||d.value)||0,signDate:d.contract_sign_date||'',startDate:d.contract_start_date||'',endDate:d.end_date||'',note:d.note||'',status:d.status||'active'};});
     if(window.cu&&document.getElementById('view-contract')&&document.getElementById('view-contract').classList.contains('on'))window.renderContract&&window.renderContract();
@@ -201,9 +218,10 @@ function setupRealtimeListeners() {
   window.onSnapshot(getColRef('HOSPITALS'), s => {
     window.HOSPITALS = s.docs.map(doc=>{let d=doc.data();return{id:d.hospital_id||doc.id,code:d.code||'',name:d.name||'',type:d.type||'other',beds:Number(d.beds)||0,province:d.province||'',district:d.district||'',tambon:d.tambon||'',address:d.address||'',tel:d.tel||'',website:d.website||'',affiliation:d.affiliation||'',note:d.note||'',contacts:Array.isArray(d.contacts)?d.contacts:[],products:Array.isArray(d.products)?d.products:[]};});
     if(window.cu&&document.getElementById('view-hospital')&&document.getElementById('view-hospital').classList.contains('on')){
-      window._hspPopulateFilters&&window._hspPopulateFilters();
-      if(window._hspViewMode==='analysis')window.renderHspAnalysis&&window.renderHspAnalysis();
-      else window.renderHospital&&window.renderHospital();
+      var _vm=window._hspViewMode||'dashboard';
+      if(_vm==='dashboard')window.renderHspDashboard&&window.renderHspDashboard();
+      else if(_vm==='analysis'){window._hspPopulateFilters&&window._hspPopulateFilters();window.renderHspAnalysis&&window.renderHspAnalysis();}
+      else{window._hspPopulateFilters&&window._hspPopulateFilters();window.renderHospital&&window.renderHospital();}
     }
   }, e=>window.showDbError(e));
 
@@ -250,12 +268,13 @@ function setupRealtimeListeners() {
   });
 }
 
-// ── เริ่ม load ข้อมูลทันทีเมื่อ page โหลด (ไม่รอ Firebase Auth) ──
-window.showLoader('กำลังเชื่อมต่อ PocketBase...');
+// ── เริ่ม load ข้อมูลใน background ทันที (ไม่แสดง loader จนกว่าจะ login) ──
+var _loadTimeout = null;
+
 seedDatabaseIfEmpty().then(function() {
   setupRealtimeListeners();
 }).catch(function(e) {
-  window.showDbError(e);
+  console.warn('[auth-sb] init error:', e.message);
 });
 
 // ─────────────────────────────────────────────────────────
@@ -294,9 +313,15 @@ function doLoginNow(u, p) {
     window.setupUser();window.renderAll();
     window._handleDeepLink&&window._handleDeepLink();
   } else {
+    // ข้อมูลยังโหลดไม่เสร็จ — แสดง loader หลัง login
+    window.showLoader('กำลังโหลดข้อมูล...');
     window.setupUser();
     var waitRender=setInterval(function(){
-      if(window.isDbLoaded){clearInterval(waitRender);window.renderAll();window._handleDeepLink&&window._handleDeepLink();}
+      if(window.isDbLoaded){
+        clearInterval(waitRender);
+        window.renderAll();
+        window._handleDeepLink&&window._handleDeepLink();
+      }
     },300);
     setTimeout(function(){clearInterval(waitRender);window.renderAll();window._handleDeepLink&&window._handleDeepLink();},15000);
   }
@@ -324,7 +349,7 @@ window.doLogout=function(){
 };
 
 // ─────────────────────────────────────────────────────────
-//  setupUser / goView / renderAll (เหมือน auth.js เดิม)
+//  setupUser / goView / renderAll
 // ─────────────────────────────────────────────────────────
 window.setupUser=function(){
   var roleColors={admin:'linear-gradient(135deg,#ff6b6b,#ffa62b)',pm:'linear-gradient(135deg,#7c5cfc,#4cc9f0)',viewer:'linear-gradient(135deg,#06d6a0,#4cc9f0)'};
@@ -401,7 +426,13 @@ window.goView=function(id,el){
   if(id==='leave') window.renderLeave();
   if(id==='timesheet') window.renderTimesheet();
   if(id==='cost') window.renderCost();
-  if(id==='hospital'){window._hspPopulateFilters&&window._hspPopulateFilters();window.renderHospital&&window.renderHospital();}
+  if(id==='budget') window.renderBudget&&window.renderBudget();
+  if(id==='hospital'){
+    var _vm=window._hspViewMode||'dashboard';
+    if(_vm==='dashboard')window.renderHspDashboard&&window.renderHspDashboard();
+    else if(_vm==='analysis'){window._hspPopulateFilters&&window._hspPopulateFilters();window.renderHspAnalysis&&window.renderHspAnalysis();}
+    else{window._hspPopulateFilters&&window._hspPopulateFilters();window.renderHospital&&window.renderHospital();}
+  }
   if(id==='contract') window.renderContract&&window.renderContract();
 };
 
@@ -438,9 +469,52 @@ window.renderAll=function(){
   window.renderTimesheet&&window.renderTimesheet();
   window.renderCost&&window.renderCost();
   window.renderTargets&&window.renderTargets();
+  window.renderBudget&&window.renderBudget();
   var hv=document.getElementById('view-hospital');
   if(hv&&hv.classList.contains('on')){window._hspPopulateFilters&&window._hspPopulateFilters();window.renderHospital&&window.renderHospital();}
   window.renderContract&&window.renderContract();
+};
+
+// forceSync — re-fetch ทุก collection แล้ว render ใหม่ (ใช้กับปุ่ม Realtime ใน topbar)
+window.forceSync = async function() {
+  if (!window.cu || !window.isDbLoaded) return;
+  var badge = document.getElementById('tp-status');
+  if (badge) badge.innerHTML = '<span class="pulse warn"></span> Syncing...';
+  var colls = ['STAGES','PTYPES','PGROUPS','STAFF','USERS','PROJECTS','ADVANCES',
+               'LODGINGS','POSITIONS','HOLIDAYS','LEAVES','TIMESHEETS','COSTS',
+               'DEPARTMENTS','CONTRACTS','WORK_LOGS','HSP_PRODUCTS','HOSPITALS'];
+  try {
+    await Promise.all(colls.map(function(col) {
+      return window.getDocs(window.getColRef(col)).then(function(snap) {
+        // trigger onSnapshot callbacks via manual re-fetch
+        if (col === 'STAGES') window.STAGES = snap.docs.map(doc=>{let d=doc.data();return{id:d.stage_id||d.id,label:d.label_th||d.label,color:d.color_hex||d.color,order:d.order||99,autoRule:d.auto_rule||'',autoOffset:Number(d.auto_offset||0),setProgress:Number(d.set_progress||-1)};}).sort((a,b)=>a.order-b.order);
+        if (col === 'PTYPES') window.PTYPES = snap.docs.map(doc=>{let d=doc.data();return{id:d.type_id||d.id,label:d.label_th||d.label,color:d.color_hex||d.color};});
+        if (col === 'PGROUPS') window.PGROUPS = snap.docs.map(doc=>{let d=doc.data();return{id:d.group_id||d.id,label:d.label_th||d.label,color:d.color_hex||d.color};});
+        if (col === 'STAFF') window.STAFF = snap.docs.map(doc=>{let d=doc.data();return{id:d.staff_id||d.id,name:d.full_name||d.name||'',nickname:d.nickname||(d.full_name||d.name||'').split(' ')[0],dept:d.department||d.dept,role:d.position||d.role,email:d.email,phone:d.phone,active:d.is_active!==false&&d.is_active!=='FALSE',start_date:d.start_date,birth_date:d.birth_date,remark:d.remark,dailyRate:d.daily_rate!=null?Number(d.daily_rate):null};});
+        if (col === 'USERS') window.USERS = snap.docs.map(doc=>{let d=doc.data();return{id:d.user_id||d.id,username:d.username,password:d.password,name:d.name||d.display_name||'',role:d.role,active:d.is_active!==false&&d.is_active!=='FALSE',staffId:d.staff_id||''};});
+        if (col === 'PROJECTS') window.PROJECTS = snap.docs.map(doc=>{let d=doc.data();var rawStart=d.start_date||d.start||'';var rawEnd=d.end_date||d.end||'';return{id:d.project_id||d.id,name:d.project_name||d.name||'',groupId:d.group_id||'',siteOwner:d.site_owner||'',typeId:d.type_id||'',stage:d.stage_id||d.stage||'init',cost:Number(d.budget||d.cost)||0,start:rawStart,end:rawEnd,revisit1:d.revisit_1||'',revisit2:d.revisit_2||'',progress:Number(d.progress_pct||d.progress)||0,note:d.note||'',status:d.status||'active',pm:d.pm_staff_id||d.pm||'',team:d.team||[],members:d.members||[],isBorder:d.is_border===true,contractId:d.contract_id||'',visits:(d.visits||[]).map(function(v){return{id:v.id||window.uid(),no:v.no||1,start:v.start||'',end:v.end||'',purpose:v.purpose||'',team:v.team||[],status:v.status||'planned',note:v.note||''};})};});
+        if (col === 'ADVANCES') window.ADVANCES = snap.docs.map(doc=>{let d=doc.data();return{id:d.advance_id||d.id,pid:d.project_id||d.pid,purpose:d.purpose||'',amount:Number(d.amount_requested||d.amount)||0,cleared:Number(d.amount_cleared||d.cleared)||0,rdate:d.request_date||d.rdate||'',ddate:d.due_date||d.ddate||'',status:d.status||'draft',note:d.note||'',advno:d.advance_no||d.advno||'',expenseItems:d.expense_items||[],laborItems:d.labor_items||[]};});
+        if (col === 'LODGINGS') window.LODGINGS = snap.docs.map(doc=>{let d=doc.data();function bv(k){return d[k]===true||d[k]==='TRUE';}return{id:d.lodging_id||d.id,pid:d.project_id||d.pid,name:d.lodging_name||d.name||'',mapUrl:d.map_url||'',phone:d.phone||'',checkIn:d.check_in||'',checkOut:d.check_out||'',dsQty:Number(d.ds_qty)||0,dsRate:Number(d.ds_rate)||0,ddQty:Number(d.dd_qty)||0,ddRate:Number(d.dd_rate)||0,dTotal:Number(d.d_total)||0,dWifi:bv('d_wifi'),dPillow:bv('d_pillow'),dBlanket:bv('d_blanket'),dApp:bv('d_appliance'),dPark:bv('d_parking'),dAc:bv('d_ac'),dFridge:bv('d_fridge'),dWasher:bv('d_washer'),dTv:bv('d_tv'),dShower:bv('d_shower'),dBreakfast:bv('d_breakfast'),dTowel:bv('d_towel'),dCustom:d.d_custom||'',dDeposit:Number(d.d_deposit)||0,dDepositNote:d.d_deposit_note||'',msQty:Number(d.ms_qty)||0,msRate:Number(d.ms_rate)||0,mdQty:Number(d.md_qty)||0,mdRate:Number(d.md_rate)||0,mTotal:Number(d.m_total)||0,mWifi:bv('m_wifi'),mPillow:bv('m_pillow'),mBlanket:bv('m_blanket'),mApp:bv('m_appliance'),mPark:bv('m_parking'),mAc:bv('m_ac'),mFridge:bv('m_fridge'),mWasher:bv('m_washer'),mTv:bv('m_tv'),mShower:bv('m_shower'),mBreakfast:bv('m_breakfast'),mBedsheet:bv('m_bedsheet'),mTowel:bv('m_towel'),mCustom:d.m_custom||'',mDeposit:Number(d.m_deposit)||0,mDepositNote:d.m_deposit_note||'',mWater:d.m_water||'',mElectric:d.m_electric||'',mExtras:d.m_extras||'',mInclUtil:bv('m_incl_util'),total:Number(d.grand_total||d.total)||0,note:d.note||'',approved:d.approved||'',approvedAt:d.approved_at||'',approvedBy:d.approved_by||'',approvedDaily:d.approved_daily||'',approvedMonthly:d.approved_monthly||''};});
+        if (col === 'POSITIONS') window.POSITIONS = snap.docs.map(doc=>{let d=doc.data();return{id:d.position_id||d.id,label:d.label_th||d.label,dailyRate:Number(d.daily_rate)||0};});
+        if (col === 'HOLIDAYS') { function _holNorm(raw){if(!raw)return'';var m=raw.match(/^(\d{4})(-.+)$/);if(!m)return raw;var y=Number(m[1]);return(y>=2500?(y-543):y)+m[2];} window.HOLIDAYS = snap.docs.map(doc=>{let d=doc.data();return{id:d.holiday_id||d.id,name:d.name||'',date:_holNorm(d.date||''),type:d.type||'national'};}).sort((a,b)=>(a.date||'').localeCompare(b.date||'')); }
+        if (col === 'LEAVES') window.LEAVES = snap.docs.map(doc=>{let d=doc.data();return{id:d.leave_id||d.id,staffId:d.staff_id||'',leaveType:d.leave_type||'other',startDate:d.start_date||'',endDate:d.end_date||'',substituteId:d.substitute_id||'',note:d.note||'',status:d.status||'pending',approvedBy:d.approved_by||''};});
+        if (col === 'TIMESHEETS') window.TIMESHEETS = snap.docs.map(doc=>{let d=doc.data();return{id:d.timesheet_id||d.id,pid:d.project_id||d.pid||'',staffId:d.staff_id||'',workDate:d.work_date||'',visitStart:d.visit_start||'',visitEnd:d.visit_end||'',hours:Number(d.hours)||0,category:d.category||'other',description:d.description||'',source:d.source||''};});
+        if (col === 'COSTS') window.COSTS = snap.docs.map(doc=>{let d=doc.data();return{id:d.cost_id||d.id,pid:d.project_id||d.pid||'',staffId:d.staff_id||'',category:d.category||'other',amount:Number(d.amount)||0,costDate:d.cost_date||'',description:d.description||'',receiptNo:d.receipt_no||'',source:d.source||'',advanceId:d.advance_id||''};});
+        if (col === 'DEPARTMENTS') { window.DEPT_LIST = snap.docs.map(doc=>{let d=doc.data();return{id:d.dept_id||d.id,label:d.label_th||d.label||''};}).sort((a,b)=>a.label.localeCompare(b.label,'th')); if(window.DEPT_LIST.length>0)window.DEPARTMENTS=window.DEPT_LIST.map(d=>d.label); }
+        if (col === 'CONTRACTS') window.CONTRACTS = snap.docs.map(doc=>{let d=doc.data();return{id:d.contract_id||doc.id,name:d.project_name||'',customer:d.customer_name||'',value:Number(d.total_contract_value||d.value)||0,signDate:d.contract_sign_date||'',startDate:d.contract_start_date||'',endDate:d.end_date||'',note:d.note||'',status:d.status||'active'};});
+        if (col === 'WORK_LOGS') window.WORK_LOGS = snap.docs.map(doc=>{let d=doc.data();return{id:d.id||doc.id,uid:d.uid||'',staffId:d.staffId||d.staff_id||'',type:d.type||'daily',scope:d.scope||'personal',date:d.date||'',startDate:d.start_date||'',endDate:d.end_date||'',totalDays:Number(d.total_days)||1,category:d.category||'other',locationType:d.location_type||'local',destination:d.destination||'',title:d.title||'',detail:d.detail||'',participants:d.participants||[],createdAt:d.created_at||''};}).sort((a,b)=>(b.type==='daily'?b.date:b.startDate||'').localeCompare(a.type==='daily'?a.date:a.startDate||''));
+        if (col === 'HSP_PRODUCTS') window.HSP_PRODUCTS = snap.docs.map(doc=>{let d=doc.data();return{id:d.product_id||doc.id,name:d.name||'',color:d.color||'#7c3aed',note:d.note||'',group:d.group||''};}).sort((a,b)=>a.name.localeCompare(b.name,'th'));
+        if (col === 'HOSPITALS') window.HOSPITALS = snap.docs.map(doc=>{let d=doc.data();return{id:d.hospital_id||doc.id,code:d.code||'',name:d.name||'',type:d.type||'other',beds:Number(d.beds)||0,province:d.province||'',district:d.district||'',tambon:d.tambon||'',address:d.address||'',tel:d.tel||'',website:d.website||'',affiliation:d.affiliation||'',note:d.note||'',contacts:Array.isArray(d.contacts)?d.contacts:[],products:Array.isArray(d.products)?d.products:[]};});
+      });
+    }));
+    window.renderAll && window.renderAll();
+    window.showAlert && window.showAlert('ซิงค์ข้อมูลเรียบร้อย ✓', 'success');
+  } catch(e) {
+    console.error('forceSync error:', e);
+    window.showAlert && window.showAlert('ซิงค์ไม่สำเร็จ: ' + e.message, 'warn');
+  } finally {
+    if (badge) badge.innerHTML = '<span class="pulse ok"></span> Realtime';
+  }
 };
 
 window._handleDeepLink=function(){
