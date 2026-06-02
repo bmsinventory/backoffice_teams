@@ -59,6 +59,7 @@ function setupRealtimeListeners() {
     if (loadCount === colls.length) {
       window.isDbLoaded = true;
       window.hideLoader();
+      window._mobileInit && window._mobileInit();
       if (window.cu) {
         window.setupUser(); window.renderAll(); window.startAutoStageLoop();
         if(window.checkDailyNotifications && window._settingsLoaded) window.checkDailyNotifications();

@@ -21,6 +21,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/responsive.css">
+<script src="js/mobile.js"></script>
 </head>
 <body>
 
@@ -251,6 +253,31 @@
   <!-- Mobile sidebar overlay backdrop -->
   <div id="mob-sb-overlay" onclick="window.closeMobSidebar()"></div>
 
+  <!-- Bottom Navigation (mobile only) -->
+  <nav id="bottom-nav" role="navigation" aria-label="เมนูหลัก">
+    <button class="bottom-nav-item active" data-view="overview" onclick="window.goView('overview',this)">
+      <span class="bottom-nav-icon">📊</span>
+      <span class="bottom-nav-label">Overview</span>
+    </button>
+    <button class="bottom-nav-item" data-view="projects" onclick="window.goView('projects',this)">
+      <span class="bottom-nav-icon">📁</span>
+      <span class="bottom-nav-label">โครงการ</span>
+    </button>
+    <button class="bottom-nav-item" data-view="advance" onclick="window.goView('advance',this)">
+      <span class="bottom-nav-icon">💳</span>
+      <span class="bottom-nav-label">Advance</span>
+      <span class="bottom-nav-badge" id="bnav-adv-badge" style="display:none">0</span>
+    </button>
+    <button class="bottom-nav-item" data-view="hospital" onclick="window.goView('hospital',this)">
+      <span class="bottom-nav-icon">🏥</span>
+      <span class="bottom-nav-label">รพ.</span>
+    </button>
+    <button class="bottom-nav-item" onclick="window.toggleMobSidebar()">
+      <span class="bottom-nav-icon">☰</span>
+      <span class="bottom-nav-label">เพิ่มเติม</span>
+    </button>
+  </nav>
+
   <div id="main">
     <div id="topbar">
       <button id="mob-menu-btn" class="btn btn-ghost btn-sm" onclick="window.toggleMobSidebar()" style="display:none;" aria-label="เมนู">☰</button>
@@ -261,6 +288,7 @@
       <div class="tp-badge warn" id="tp-overdue" style="display:none"><span class="pulse warn"></span><span id="tp-overdue-txt"></span></div>
       <div id="tp-actions"></div>
       <button class="btn btn-ghost btn-sm admin-only" id="btn-import-top" style="display:none" onclick="window.openImportModal()">📥 นำเข้า</button>
+      <button id="dm-toggle" onclick="window.toggleDarkMode()" title="Dark/Light Mode" aria-label="สลับธีม">🌙</button>
       <button class="btn btn-ghost btn-sm" onclick="window.openChangePassword()" title="เปลี่ยนรหัสผ่าน">🔒</button>
       <button class="btn btn-ghost btn-sm" onclick="window.doLogout()">ออกจากระบบ</button>
     </div>
