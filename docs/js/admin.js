@@ -528,9 +528,10 @@ window.saveRolePerms = async function() {
 
 window.resetRolePerms = function() {
   if(!window.canEdit('admin')) return;
-  if(!confirm('รีเซ็ตสิทธิ์ทั้งหมดเป็นค่าเริ่มต้น?')) return;
-  window.ROLE_PERMISSIONS = {};
-  window.admTab('roles');
+  window.showConfirm('รีเซ็ตสิทธิ์ทั้งหมดเป็นค่าเริ่มต้น?',function(){
+    window.ROLE_PERMISSIONS = {};
+    window.admTab('roles');
+  },{icon:'⚠️',title:'ยืนยันการรีเซ็ต',okColor:'var(--amber)',okText:'รีเซ็ต'});
 };
 
 // ── CHANGE PASSWORD ──

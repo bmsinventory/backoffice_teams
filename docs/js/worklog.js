@@ -407,7 +407,7 @@ window.saveWorkLog = async function(){
 // ── DELETE ──
 window.deleteWorkLog = async function(){
   if(!_wlEditId) return;
-  if(!confirm('ต้องการลบบันทึกงานนี้?')) return;
+  if(!await window.confirmAsync('ต้องการลบบันทึกงานนี้?',{icon:'🗑️',title:'ลบบันทึกงาน'})) return;
   try {
     await window.deleteDoc(window.getDocRef('WORK_LOGS', _wlEditId));
     window.closeM('m-worklog');

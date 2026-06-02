@@ -1309,7 +1309,7 @@ window.saveHospital = async function() {
 window.deleteHospital = async function(id) {
   var h = (window.HOSPITALS || []).find(x => x.id === id);
   if (!h) return;
-  if (!confirm(`ลบ "${h.name}" ออกจากระบบ?`)) return;
+  if (!await window.confirmAsync('ลบ "'+h.name+'" ออกจากระบบ?',{icon:'🗑️',title:'ลบโรงพยาบาล'})) return;
   try {
     await window.deleteDoc(getDocRef('HOSPITALS', id));
     window.showAlert('ลบข้อมูลแล้ว', 'success');

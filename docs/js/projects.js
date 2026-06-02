@@ -162,10 +162,16 @@ window.showConfirm=function(msg,onOk,opts){
     +'<button id="sc-cancel" style="flex:1;padding:9px;background:var(--surface2);color:var(--txt2);border:1px solid var(--border);border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">ยกเลิก</button>'
     +'<button id="sc-ok" style="flex:1;padding:9px;background:'+okColor+';color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">'+okText+'</button>'
     +'</div></div>';
-  ov.querySelector('#sc-cancel').onclick=function(){ov.remove();};
+  ov.querySelector('#sc-cancel').onclick=function(){ov.remove();if(cfg.onCancel)cfg.onCancel();};
   ov.querySelector('#sc-ok').onclick=function(){ov.remove();if(onOk)onOk();};
-  ov.addEventListener('click',function(e){if(e.target===ov)ov.remove();});
+  ov.addEventListener('click',function(e){if(e.target===ov){ov.remove();if(cfg.onCancel)cfg.onCancel();}});
   document.body.appendChild(ov);
+};
+
+window.confirmAsync=function(msg,opts){
+  return new Promise(function(resolve){
+    window.showConfirm(msg,function(){resolve(true);},Object.assign({},opts,{onCancel:function(){resolve(false);}}));
+  });
 };
 
 window.showOverlapPopup=function(htmlMsg){
