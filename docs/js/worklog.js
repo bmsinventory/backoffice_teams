@@ -378,7 +378,7 @@ window.saveWorkLog = async function(){
 
   var data = {
     uid:           myUid,
-    staffId:       myStaffId,
+    staff_id:      myStaffId,
     type:          typeVal,
     scope:         participants.length > 0 ? 'group' : 'personal',
     date:          typeVal==='daily' ? dateVal : '',
