@@ -28,26 +28,132 @@
 
 <!-- ── LOGIN ── -->
 <div id="login" style="display:flex">
-  <div class="login-box">
-    <div class="login-head">
-      <div class="login-logo" style="background:#fff;padding:4px;"><img src="img/BMS_T.png" style="width:100%;height:100%;object-fit:contain;display:block;border-radius:12px;"></div>
-      <div class="login-t">Backoffice Teams</div>
-      <div class="login-s">Project Intelligence Platform</div>
+
+  <!-- LEFT: Hero -->
+  <div class="lhero">
+    <div class="lhero-content">
+      <div class="lhero-badge">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Secure Access
+      </div>
+      <h1 class="lhero-t1">Backoffice<br>Management System</h1>
+      <p class="lhero-t2">ระบบบริหารจัดการข้อมูลหลังบ้าน</p>
+      <p class="lhero-t3">กรุณาเข้าสู่ระบบเพื่อจัดการข้อมูลหลังบ้าน</p>
+      <!-- Dashboard illustration -->
+      <div class="lmock">
+        <div class="lmock-top">
+          <div style="display:flex;gap:5px">
+            <div style="width:8px;height:8px;border-radius:50%;background:#ef4444"></div>
+            <div style="width:8px;height:8px;border-radius:50%;background:#f59e0b"></div>
+            <div style="width:8px;height:8px;border-radius:50%;background:#22c55e"></div>
+          </div>
+          <div class="lmock-titlebar"></div>
+          <div class="lmock-avatar"></div>
+        </div>
+        <div class="lmock-body">
+          <div class="lmock-sb">
+            <div class="lmock-logo-mini"></div>
+            <div class="lmock-menu on"></div>
+            <div class="lmock-menu"></div>
+            <div class="lmock-menu"></div>
+            <div class="lmock-menu"></div>
+            <div class="lmock-menu"></div>
+          </div>
+          <div class="lmock-main">
+            <div class="lmock-kpi-row">
+              <div class="lmock-kpi" style="--kc:#60a5fa">
+                <div class="lmock-kpi-ic"></div>
+                <div><div class="lmock-kpi-n"></div><div class="lmock-kpi-l"></div></div>
+                <div class="lmock-kpi-trend up"></div>
+              </div>
+              <div class="lmock-kpi" style="--kc:#34d399">
+                <div class="lmock-kpi-ic"></div>
+                <div><div class="lmock-kpi-n"></div><div class="lmock-kpi-l"></div></div>
+                <div class="lmock-kpi-trend up"></div>
+              </div>
+              <div class="lmock-kpi" style="--kc:#f472b6">
+                <div class="lmock-kpi-ic"></div>
+                <div><div class="lmock-kpi-n"></div><div class="lmock-kpi-l"></div></div>
+                <div class="lmock-kpi-trend"></div>
+              </div>
+            </div>
+            <div class="lmock-chart-area">
+              <div class="lmock-chart-title"></div>
+              <div class="lmock-bars">
+                <div class="lmock-bar" style="--bh:40%"></div>
+                <div class="lmock-bar" style="--bh:65%"></div>
+                <div class="lmock-bar" style="--bh:50%"></div>
+                <div class="lmock-bar" style="--bh:80%"></div>
+                <div class="lmock-bar" style="--bh:55%"></div>
+                <div class="lmock-bar hi" style="--bh:90%"></div>
+                <div class="lmock-bar" style="--bh:70%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="login-body">
-      <div class="f-group">
-        <label class="f-label">Username</label>
-        <input id="lu" class="f-input" placeholder="Enter username" autocomplete="off">
+  </div>
+
+  <!-- RIGHT: Login Card -->
+  <div class="lform">
+    <div class="lcard">
+      <div class="lcard-head">
+        <div class="lcard-logo"><img src="img/BMS_T.png" alt="BMS Logo"></div>
+        <h2 class="lcard-t1">Backoffice Management System</h2>
+        <p class="lcard-t2">ระบบบริหารจัดการข้อมูลสำหรับผู้ดูแลระบบ</p>
       </div>
-      <div class="f-group" style="margin-bottom:0">
-        <label class="f-label">Password</label>
-        <input id="lp" type="text" class="f-input" placeholder="••••••••" autocomplete="off" data-form-type="other" style="-webkit-text-security:disc;font-family:monospace;">
+
+      <div class="login-err" id="lerr">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span id="lerr-msg">ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง</span>
       </div>
-      <div class="login-err" id="lerr">⚠ ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง</div>
       <div class="login-info" id="linfo"></div>
-      <button class="btn btn-pri" id="login-btn" style="width:100%;margin-top:16px;justify-content:center;padding:11px 18px">
-        เข้าสู่ระบบ →
+
+      <div class="lf-grp">
+        <label class="lf-lbl">Username / Email</label>
+        <div class="lf-wrap">
+          <svg class="lf-ico" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <input id="lu" class="lf-inp" type="text" placeholder="กรอก Username" autocomplete="username">
+        </div>
+      </div>
+      <div class="lf-grp">
+        <label class="lf-lbl">รหัสผ่าน</label>
+        <div class="lf-wrap">
+          <svg class="lf-ico" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <input id="lp" class="lf-inp" type="password" placeholder="กรอกรหัสผ่าน" autocomplete="current-password">
+          <button class="lf-eye" type="button" onclick="window.toggleLoginPw()" tabindex="-1">
+            <svg id="eye-show" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            <svg id="eye-hide" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="lf-opt">
+        <label class="lf-chk">
+          <input type="checkbox" id="l-rem">
+          <span class="lf-chk-box"></span>
+          <span>จดจำการเข้าสู่ระบบ</span>
+        </label>
+        <a href="#" class="lf-forgot" onclick="return false">ลืมรหัสผ่าน?</a>
+      </div>
+
+      <button class="lbtn" id="login-btn">
+        <span id="lbtn-txt">เข้าสู่ระบบ</span>
+        <span id="lbtn-spin" style="display:none;align-items:center;gap:6px">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="l-spin"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+          กำลังเข้าสู่ระบบ...
+        </span>
       </button>
+
+      <div class="lf-div"><span>หรือ</span></div>
+
+      <button class="lbtn-sso" type="button" onclick="window.showAlert&&window.showAlert('ยังไม่รองรับ SSO ในขณะนี้','info')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        เข้าสู่ระบบด้วย SSO
+      </button>
+
+      <p class="lcard-foot">© 2026 Backoffice System · All rights reserved</p>
     </div>
   </div>
 </div>

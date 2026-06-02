@@ -286,18 +286,30 @@ var DEFAULT_USERS = [
   {id:'U3', username:'viewer', password:'view1234', role:'viewer', name:'Viewer User',       active:true},
 ];
 
-function doLoginNow(u, p) {
+function _loginBtnReset(){
   var btn=document.getElementById('login-btn');
+  var txt=document.getElementById('lbtn-txt');
+  var spin=document.getElementById('lbtn-spin');
+  if(btn)btn.disabled=false;
+  if(txt)txt.style.display='';
+  if(spin)spin.style.display='none';
+}
+function doLoginNow(u, p) {
   var errEl=document.getElementById('lerr');
+  var errMsg=document.getElementById('lerr-msg');
   var infoEl=document.getElementById('linfo');
   var searchList=(window.USERS&&window.USERS.length>0)?window.USERS:DEFAULT_USERS;
   var usr=searchList.find(function(x){return x.username===u&&x.password===p&&x.active!==false;});
   if(!usr){
-    errEl.textContent='⚠ ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';
-    errEl.style.display='block';infoEl.style.display='none';
-    if(btn){btn.textContent='เข้าสู่ระบบ →';btn.disabled=false;}
+    if(errMsg)errMsg.textContent='ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง';
+    errEl.style.display='flex';infoEl.style.display='none';
+    _loginBtnReset();
     return;
   }
+  // Remember me
+  var remEl=document.getElementById('l-rem');
+  if(remEl&&remEl.checked){localStorage.setItem('_bms_rem',usr.username);}
+  else{localStorage.removeItem('_bms_rem');}
   window.cu=usr;
   document.getElementById('login').style.display='none';
   document.getElementById('wrap').style.display='flex';
@@ -330,11 +342,45 @@ function doLoginNow(u, p) {
 window.doLogin=function(){
   var u=document.getElementById('lu').value.trim();
   var p=document.getElementById('lp').value;
-  if(!u||!p){document.getElementById('lerr').textContent='⚠ กรุณากรอก Username และ Password';document.getElementById('lerr').style.display='block';return;}
-  doLoginNow(u,p);
+  var errEl=document.getElementById('lerr');
+  var errMsg=document.getElementById('lerr-msg');
+  if(!u||!p){
+    if(errMsg)errMsg.textContent='กรุณากรอก Username และ Password';
+    errEl.style.display='flex';return;
+  }
+  errEl.style.display='none';
+  // Show loading state
+  var btn=document.getElementById('login-btn');
+  var txt=document.getElementById('lbtn-txt');
+  var spin=document.getElementById('lbtn-spin');
+  if(btn)btn.disabled=true;
+  if(txt)txt.style.display='none';
+  if(spin)spin.style.display='flex';
+  setTimeout(function(){doLoginNow(u,p);},280);
 };
+window.toggleLoginPw=function(){
+  var inp=document.getElementById('lp');
+  var showIco=document.getElementById('eye-show');
+  var hideIco=document.getElementById('eye-hide');
+  if(!inp)return;
+  var isHidden=inp.type==='password';
+  inp.type=isHidden?'text':'password';
+  if(showIco)showIco.style.display=isHidden?'none':'';
+  if(hideIco)hideIco.style.display=isHidden?'':'none';
+};
+// Load saved username (remember me)
+(function(){
+  var rem=localStorage.getItem('_bms_rem');
+  if(rem){
+    var luEl=document.getElementById('lu');
+    var remEl=document.getElementById('l-rem');
+    if(luEl)luEl.value=rem;
+    if(remEl)remEl.checked=true;
+  }
+})();
 document.getElementById('login-btn').addEventListener('click',window.doLogin);
 document.getElementById('lp').addEventListener('keydown',function(e){if(e.key==='Enter')window.doLogin();});
+document.getElementById('lu').addEventListener('keydown',function(e){if(e.key==='Enter')document.getElementById('lp').focus();});
 
 window.doLogout=function(){
   window.cu=null;
@@ -344,8 +390,7 @@ window.doLogout=function(){
   document.getElementById('lp').value='';
   document.getElementById('lerr').style.display='none';
   document.getElementById('linfo').style.display='none';
-  var btn=document.getElementById('login-btn');
-  if(btn){btn.textContent='เข้าสู่ระบบ →';btn.disabled=false;}
+  _loginBtnReset();
 };
 
 // ─────────────────────────────────────────────────────────
