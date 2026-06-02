@@ -4,11 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=5.0">
 <title>Backoffice Teams</title>
-<meta name="theme-color" content="#7c5cfc">
+<meta name="theme-color" content="#1e3a8a">
+<meta name="description" content="ระบบบริหารจัดการข้อมูลหลังบ้าน Backoffice Management System">
+<!-- PWA: Android -->
+<link rel="manifest" href="manifest.json">
+<!-- PWA: iOS -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Backoffice">
-<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-title" content="BMS">
+<link rel="apple-touch-icon" href="img/icon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="img/icon-192.png">
+<link rel="apple-touch-startup-image" href="img/BMS_T.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+Thai:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
@@ -146,14 +152,11 @@
         </span>
       </button>
 
-      <div class="lf-div"><span>หรือ</span></div>
-
-      <button class="lbtn-sso" type="button" onclick="window.showAlert&&window.showAlert('ยังไม่รองรับ SSO ในขณะนี้','info')">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-        เข้าสู่ระบบด้วย SSO
-      </button>
-
       <p class="lcard-foot">© 2026 Backoffice System · All rights reserved</p>
+      <p class="lcard-ios-tip" id="ios-tip" style="display:none">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v13M5 9l7-7 7 7"/><path d="M3 17h18v4H3z"/></svg>
+        ติดตั้งแอปบน iPhone: กด <strong>Share</strong> แล้วเลือก <strong>Add to Home Screen</strong>
+      </p>
     </div>
   </div>
 </div>
@@ -1971,4 +1974,68 @@
 <script type="module" src="js/worklog.js"></script>
 <script src="js/budget.js"></script>
 <script src="js/export.js"></script>
+
+<!-- PWA Install Bar (Android) -->
+<div id="pwa-bar" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:9998;
+  background:#1e3a8a;color:#fff;padding:14px 20px;
+  display:none;align-items:center;gap:12px;
+  box-shadow:0 -4px 24px rgba(0,0,0,.25);font-family:inherit;">
+  <div style="width:36px;height:36px;border-radius:10px;overflow:hidden;flex-shrink:0;">
+    <img src="img/BMS_T.png" style="width:100%;height:100%;object-fit:contain;">
+  </div>
+  <div style="flex:1;min-width:0;">
+    <div style="font-size:13px;font-weight:700;line-height:1.3;">Backoffice Management System</div>
+    <div style="font-size:11px;color:rgba(255,255,255,.65);margin-top:1px;">ติดตั้งแอปเพื่อประสบการณ์ที่ดีกว่า</div>
+  </div>
+  <button id="pwa-install-btn" style="background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.35);
+    color:#fff;padding:7px 16px;border-radius:8px;font-size:13px;font-weight:600;
+    cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0;
+    transition:background .15s;">ติดตั้ง</button>
+  <button onclick="document.getElementById('pwa-bar').style.display='none'" style="background:none;border:none;
+    color:rgba(255,255,255,.5);cursor:pointer;font-size:18px;padding:0 4px;flex-shrink:0;line-height:1;">✕</button>
+</div>
+
+<script>
+// ── PWA: Service Worker ──
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('sw.js').catch(function(e) {
+      console.warn('[SW] register failed:', e);
+    });
+  });
+}
+
+// ── PWA: Android install prompt ──
+var _pwaPrompt = null;
+window.addEventListener('beforeinstallprompt', function(e) {
+  e.preventDefault();
+  _pwaPrompt = e;
+  var bar = document.getElementById('pwa-bar');
+  if (bar) bar.style.display = 'flex';
+});
+document.getElementById('pwa-install-btn').addEventListener('click', function() {
+  if (!_pwaPrompt) return;
+  _pwaPrompt.prompt();
+  _pwaPrompt.userChoice.then(function(r) {
+    if (r.outcome === 'accepted') {
+      document.getElementById('pwa-bar').style.display = 'none';
+    }
+    _pwaPrompt = null;
+  });
+});
+window.addEventListener('appinstalled', function() {
+  document.getElementById('pwa-bar').style.display = 'none';
+  _pwaPrompt = null;
+});
+
+// ── PWA: iOS install tip ──
+(function() {
+  var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  var isStandalone = window.navigator.standalone === true;
+  if (isIOS && !isStandalone) {
+    var tip = document.getElementById('ios-tip');
+    if (tip) tip.style.display = 'flex';
+  }
+})();
+</script>
 </body>
