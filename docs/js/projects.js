@@ -297,7 +297,7 @@ window.openProjModal=function(id){
     +'<div class="f-group"><label class="f-label">ชื่อผู้ติดตั้ง *</label><select class="f-input" id="pf-installer" '+ceA+'>'+installerOpts+'</select></div>'
     +'<div class="f-group"><label class="f-label">วันเริ่ม *</label><input type="date" class="f-input" id="pf-start" value="'+(p?p.start:'')+'" onchange="window.updateAllMemDates();window.updateTeamTabVisibility();" '+ceA+'></div>'
     +'<div class="f-group"><label class="f-label">วันสิ้นสุด *</label><input type="date" class="f-input" id="pf-end" value="'+(p?p.end:'')+'" onchange="window.updateAllMemDates();window.updateTeamTabVisibility();" '+ceA+'></div>'
-    +'<div class="f-group" id="pf-has-revisit-grp" style="display:none;grid-column:1/-1;"><label class="f-label">Revisit</label><div style="display:flex;align-items:center;gap:10px;padding:10px 14px;height:40px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);box-sizing:border-box;"><input type="checkbox" id="pf-has-revisit" '+(p&&(p.revisit1||p.revisit2)?'checked ':'')+ceA+' style="width:16px;height:16px;accent-color:var(--violet);cursor:pointer;" onchange="window._pfToggleRevisit()"><label for="pf-has-revisit" style="font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;">📅 ต้องมี Revisit</label></div></div>'
+    +'<div class="f-group" id="pf-no-revisit-grp" style="display:none;grid-column:1/-1;"><label class="f-label">Revisit</label><div style="display:flex;align-items:center;gap:10px;padding:10px 14px;height:40px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);box-sizing:border-box;"><input type="checkbox" id="pf-no-revisit" '+ceA+' style="width:16px;height:16px;accent-color:var(--coral);cursor:pointer;" onchange="window._pfToggleRevisit()"><label for="pf-no-revisit" style="font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;">📅 ไม่ต้อง Revisit</label></div></div>'
     +'<div class="f-group" id="pf-revisit1-grp"><label class="f-label">Revisit 1</label><input type="date" class="f-input" id="pf-revisit1" value="'+(p?p.revisit1:'')+'" '+ceA+'></div>'
     +'<div class="f-group" id="pf-revisit2-grp"><label class="f-label">Revisit 2</label><input type="date" class="f-input" id="pf-revisit2" value="'+(p?p.revisit2:'')+'" '+ceA+'></div>'
     +'</div>'
@@ -414,11 +414,11 @@ var _PF_NO_BUDGET_GRPS = ['GRP17733355541905','GRP17733355541906'];
 var _PF_REVISIT_CHK_GRPS = ['GRP17733355541901','GRP17733355541903'];
 
 window._pfToggleRevisit=function(){
-  var chk=document.getElementById('pf-has-revisit');var show=chk&&chk.checked;
+  var chk=document.getElementById('pf-no-revisit');var noRev=chk&&chk.checked;
   var r1g=document.getElementById('pf-revisit1-grp');var r2g=document.getElementById('pf-revisit2-grp');
-  if(r1g)r1g.style.display=show?'':'none';
-  if(r2g)r2g.style.display=show?'':'none';
-  if(!show){var i1=document.getElementById('pf-revisit1');var i2=document.getElementById('pf-revisit2');if(i1)i1.value='';if(i2)i2.value='';}
+  if(r1g)r1g.style.display=noRev?'none':'';
+  if(r2g)r2g.style.display=noRev?'none':'';
+  if(noRev){var i1=document.getElementById('pf-revisit1');var i2=document.getElementById('pf-revisit2');if(i1)i1.value='';if(i2)i2.value='';}
 };
 
 window.updateProjFormByGroup=function(initialParentId){
@@ -427,9 +427,9 @@ window.updateProjFormByGroup=function(initialParentId){
   var showRev=(gType==='onsite'||!grpId);
   var useRevChk=_PF_REVISIT_CHK_GRPS.includes(grpId);
   var r1g=document.getElementById('pf-revisit1-grp');var r2g=document.getElementById('pf-revisit2-grp');
-  var rChkGrp=document.getElementById('pf-has-revisit-grp');
+  var rChkGrp=document.getElementById('pf-no-revisit-grp');
   if(rChkGrp)rChkGrp.style.display=useRevChk?'':'none';
-  if(useRevChk){var chk=document.getElementById('pf-has-revisit');var chkOn=chk&&chk.checked;if(r1g)r1g.style.display=chkOn?'':'none';if(r2g)r2g.style.display=chkOn?'':'none';}
+  if(useRevChk){var chk=document.getElementById('pf-no-revisit');var noRev=chk&&chk.checked;if(r1g)r1g.style.display=noRev?'none':'';if(r2g)r2g.style.display=noRev?'none':'';}
   else{if(r1g)r1g.style.display=showRev?'':'none';if(r2g)r2g.style.display=showRev?'':'none';}
   var pWrap=document.getElementById('pf-revisit-parent-wrap');
   if(pWrap)pWrap.style.display=(gType==='revisit')?'':'none';
