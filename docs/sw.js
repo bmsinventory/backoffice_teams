@@ -1,11 +1,12 @@
-const CACHE = 'bms-v1';
+const CACHE = 'bms-v3';
 const STATIC = [
   './',
   './index.html',
   './css/style.css',
+  './css/responsive.css',
   './manifest.json',
   './img/BMS_T.png',
-  './img/icon-192.png',
+  './img/icon_app.png',
 ];
 
 // Install: pre-cache static assets

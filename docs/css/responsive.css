@@ -56,6 +56,13 @@
 /* ── 2. BASE GLOBAL IMPROVEMENTS ──────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
 
+/* Responsive media */
+img, video { max-width: 100%; }
+
+/* Prevent horizontal overflow at the root */
+html { overflow-x: hidden; max-width: 100%; }
+body { overflow-x: hidden; }
+
 /* Momentum scroll on iOS */
 .sb-nav, .m-body, .dtable-wrap, .kb-body, .kb-board-inner,
 .view, [class*="overflow-y"], #content, .ov-grid {
@@ -77,6 +84,18 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   outline: 2px solid var(--violet);
   outline-offset: 2px;
 }
+
+/* ── Utility classes ── */
+.text-wrap {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  line-height: 1.4;
+}
+.text-nowrap { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.w-full { width: 100%; max-width: 100%; }
+/* Hide on small mobile (≤480px) */
+.btn-lbl { /* text label inside small-screen buttons — hidden via media query below */ }
 
 /* ── 3. DARK MODE TOGGLE BUTTON ────────────────────────────── */
 #dm-toggle {
@@ -238,8 +257,11 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   .t-search input {
     width: 100% !important; min-width: 0; font-size: 14px;
   }
-  .t-search { flex: 1; min-width: 120px; }
-  .t-sel { font-size: 13px; max-width: 100%; }
+  .t-search { flex: 1 1 140px; min-width: 120px; }
+  .t-sel { font-size: 13px; max-width: 100%; min-width: 0; flex-shrink: 1; }
+  /* Multi-filter rows: wrap neatly */
+  .toolbar > .t-sel { flex: 1 1 120px; }
+  .toolbar > .btn { flex-shrink: 0; }
 
   /* ── Stat row: 2 cols on mobile ── */
   .stat-row,
@@ -474,7 +496,36 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   .adv-stepper, .lmock { overflow-x: auto; }
 }
 
-/* ── 12. PRINT (bonus) ────────────────────────────────────── */
+/* ── 12. SMALL PHONE: ≤ 480px ─────────────────────────────── */
+@media (max-width: 480px) {
+  /* Topbar: hide long button text, keep icons */
+  .btn-lbl { display: none !important; }
+  #topbar { gap: 4px; padding: 0 8px; }
+
+  /* Search: fill available space */
+  .t-search { flex: 1 1 auto; min-width: 0; }
+  .t-search input { width: 100% !important; min-width: 0; }
+
+  /* Toolbar selects take full row on very small */
+  .toolbar .t-sel { min-width: 0; flex: 1; font-size: 12px; }
+
+  /* Stat cards: still 2-col but tighter padding */
+  .stat-c { padding: 12px 10px; }
+  .stat-v { font-size: 17px; }
+  .stat-k { font-size: 9px; }
+
+  /* Modal form: single column, full-width buttons */
+  .f-grid { grid-template-columns: 1fr !important; }
+  .m-foot .btn { flex: 1 1 100%; justify-content: center; }
+
+  /* Card labels: slightly smaller */
+  table.m-card-table td::before { font-size: 9px; }
+
+  /* Login card: tighter */
+  .lcard { padding: 28px 0 0 !important; }
+}
+
+/* ── 13. PRINT ────────────────────────────────────────────── */
 @media print {
   #bottom-nav, #sidebar, #topbar, .tp-btn, .toolbar { display: none !important; }
   #main { margin: 0; }

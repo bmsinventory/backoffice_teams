@@ -1,4 +1,6 @@
 *{margin:0;padding:0;box-sizing:border-box;}
+img{max-width:100%;}
+td,th{overflow-wrap:break-word;}
 :root{
   --bg: #f4f5f7;
   --surface: #ffffff;
@@ -851,9 +853,9 @@ select.f-input{appearance:none;cursor:pointer;}
   div[style*="padding:16px 24px"]{padding:10px 12px!important;}
   div[style*="padding:12px 24px"]{padding:8px 12px!important;}
 
-  /* ── Projects table ── */
+  /* ── Data tables ── */
   .dtable-inner{overflow-x:auto;}
-  table{min-width:560px;}
+  .dtable-inner table:not(.m-card-table){min-width:560px;}
 
   /* ── Cards grid ── */
   div[style*="grid-template-columns:repeat(auto-fill,minmax(340px"]{

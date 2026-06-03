@@ -48,13 +48,12 @@ window.initMobileTable = function (scope) {
   if (window.innerWidth > 768) return;
   var tables = (scope || document).querySelectorAll('.dtable-inner table, .m-tbl');
   tables.forEach(function (table) {
-    if (table.dataset.mobileCard) return;
-    table.dataset.mobileCard = '1';
     var headers = [];
     table.querySelectorAll('thead th').forEach(function (th) {
       headers.push(th.textContent.trim());
     });
     if (!headers.length) return;
+    // Always re-apply data-label to all rows (handles re-renders)
     table.querySelectorAll('tbody tr').forEach(function (tr) {
       var tds = tr.querySelectorAll('td');
       tds.forEach(function (td, i) {
