@@ -93,7 +93,7 @@ window.renderProjects=function(){
     var _ctInfo='';
     if(p.contractId){var _ctObj=(window.CONTRACTS||[]).find(function(c){return c.id===p.contractId;});if(_ctObj){_ctInfo='<div style="font-size:10px;color:var(--indigo);margin-top:3px;line-height:1.5;">📃 <span style="font-weight:700;">'+esc(_ctObj.id)+'</span> '+esc(_ctObj.name)+(_ctObj.startDate||_ctObj.endDate?' <span style="color:var(--txt3);">'+(_ctObj.startDate?fd(_ctObj.startDate):'?')+'–'+(_ctObj.endDate?fd(_ctObj.endDate):'?')+'</span>':'')+'</div>';}}
     var _dynR1=p.revisit1,_dynR2=p.revisit2,_revDone=false;
-    if(showRevisit){var _revKids=(window.PROJECTS||[]).filter(function(rp){return rp.groupId==='GRP17733355541904'&&rp.parentProjectId===p.id;});if(_revKids.length>0){var _rk1=_revKids.find(function(rp){return rp.revisitRound==1;});var _rk2=_revKids.find(function(rp){return rp.revisitRound==2;});if(_rk1)_dynR1=_rk1.end;if(_rk2)_dynR2=_rk2.end;if(_revKids.length===1){_revDone=true;_dynR1=_revKids[0].end;_dynR2=_revKids[0].end;}}}
+    if(showRevisit){var _revKids=(window.PROJECTS||[]).filter(function(rp){return rp.groupId==='GRP17733355541904'&&rp.parentProjectId===p.id;});if(_revKids.length>0){var _rkD=_revKids.find(function(rp){return rp.revisitRound==99;});var _rk1=_revKids.find(function(rp){return rp.revisitRound==1;});var _rk2=_revKids.find(function(rp){return rp.revisitRound==2;});if(_rkD){_revDone=true;_dynR1=_rkD.end;_dynR2=_rkD.end;}else{if(_rk1)_dynR1=_rk1.end;if(_rk2)_dynR2=_rk2.end;if(_revKids.length===1){_revDone=true;_dynR1=_revKids[0].end;_dynR2=_revKids[0].end;}}}}
     var revisitCell=showRevisit?('<td style="font-size:11px;color:var(--txt2);line-height:1.6">'+(_revDone?'<span style="display:inline-block;font-size:9px;background:rgba(32,201,151,.1);color:var(--teal);padding:1px 7px;border-radius:10px;font-weight:700;border:1px solid rgba(32,201,151,.3);margin-bottom:3px;">✅ Revisit ครบแล้ว</span><br>':'')+'📅 '+(_dynR1?fd(_dynR1):'<span style="color:var(--txt3)">-</span>')+'<br>📅 '+(_dynR2?fd(_dynR2):'<span style="color:var(--txt3)">-</span>')+'</td>'):'';
     var advCells=showAdv?`<td style="font-size:11px;color:var(--txt2);line-height:1.6">📅 ${advRdate}<br>⏰ ${advDdate}</td><td>${advStatHtml}</td>`:'';
     var hasLinked=window.ADVANCES.some(function(adv){return adv.pid===p.id;})||window.LODGINGS.some(function(l){return l.pid===p.id;});
@@ -326,7 +326,7 @@ window.openProjModal=function(id){
     +'<span id="pf-parent-clear" onclick="window.ppSearchClear()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--txt3);font-size:14px;display:none;">✕</span>'
     +'<div id="pf-parent-drop" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:200;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.14);max-height:220px;overflow-y:auto;margin-top:3px;"></div>'
     +'</div></div>'
-    +'<div class="f-group"><label class="f-label">ครั้งที่</label><select class="f-input" id="pf-revisit-round" '+(ce?'':' disabled')+'><option value="1"'+(p&&p.revisitRound==1?' selected':'')+'>ครั้งที่ 1</option><option value="2"'+(p&&p.revisitRound==2?' selected':'')+'>ครั้งที่ 2</option></select></div>'
+    +'<div class="f-group"><label class="f-label">ครั้งที่</label><select class="f-input" id="pf-revisit-round" '+(ce?'':' disabled')+'><option value="1"'+(p&&p.revisitRound==1?' selected':'')+'>ครั้งที่ 1</option><option value="2"'+(p&&p.revisitRound==2?' selected':'')+'>ครั้งที่ 2</option><option value="99"'+(p&&p.revisitRound==99?' selected':'')+'>✅ Revisit ครบแล้ว</option></select></div>'
     +'</div></div>'
     +'<div class="f-group"><label class="f-label">หมายเหตุ</label><textarea class="f-input" id="pf-note" '+ceA+'>'+esc(p?p.note:'')+'</textarea></div>'
     +(p&&p.start&&p.end?(function(){var hcnt=window.getProjectHolidayCount(p);return hcnt>0?'<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(255,107,107,.07);border-radius:8px;border:1px solid rgba(255,107,107,.2);font-size:12px;"><span>🎌</span><span style="color:var(--coral);font-weight:600;">มีวันหยุด '+hcnt+' วัน</span><span style="color:var(--txt2);">ในช่วงโครงการนี้</span><a href="#" onclick="event.preventDefault();window.showProjHolidaysPopup(\''+p.id+'\');" style="margin-left:auto;font-size:11px;color:var(--violet);">ดูวันหยุด</a></div>':'';})():'')
@@ -737,7 +737,7 @@ window.saveProject=async function(){
     if(typeof window.tsSyncProject==='function') await window.tsSyncProject(pid, members);
     if(_saveGrpId==='GRP17733355541904'&&dbProj.parent_project_id&&dbProj.end_date){
       var _rvSibs=(window.PROJECTS||[]).filter(function(rp){return rp.groupId==='GRP17733355541904'&&rp.parentProjectId===dbProj.parent_project_id&&rp.id!==pid;});
-      var _rvUpd=_rvSibs.length===0?{revisit_1:dbProj.end_date,revisit_2:dbProj.end_date}:(dbProj.revisit_round===2?{revisit_2:dbProj.end_date}:{revisit_1:dbProj.end_date});
+      var _rvUpd=dbProj.revisit_round===99?{revisit_1:dbProj.end_date,revisit_2:dbProj.end_date}:(dbProj.revisit_round===2?{revisit_2:dbProj.end_date}:{revisit_1:dbProj.end_date});
       await window.updateDoc(getDocRef('PROJECTS',dbProj.parent_project_id),_rvUpd);
     }
   } catch(e){ window.showDbError(e); }
