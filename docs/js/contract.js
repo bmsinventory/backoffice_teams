@@ -2,6 +2,8 @@ const { esc, fd, fca, pd, uid, getYearBE, getColRef, getDocRef } = window;
 const setDoc    = (...a) => window.setDoc(...a);
 const deleteDoc = (...a) => window.deleteDoc(...a);
 
+var _ctPendingTxns = [];
+
 var CT_STATUS = [
   {id:'active',    label:'มีผลบังคับ', color:'#06d6a0'},
   {id:'completed', label:'สิ้นสุดแล้ว', color:'#4361ee'},
@@ -38,8 +40,6 @@ window._ctCalcEndDate = function(){
 };
 
 // ── linked-project financial breakdown per contract ───────────────────────────
-// "done" = progress 100% (stage forces 100) OR explicit status='completed'
-// Note: saveProject always saves status:'active' — completion is tracked via progress_pct
 function _ctFinance(c){
   var linked = (window.PROJECTS||[]).filter(function(p){ return p.contractId === c.id; });
   var closed = 0, open = 0;
@@ -54,10 +54,108 @@ function _ctFinance(c){
     closed = c.status === 'completed' ? c.value : 0;
     open   = c.status === 'active'    ? c.value : 0;
   }
-  var tot = closed + open;
-  var pct = tot > 0 ? Math.min(100, Math.round(closed / tot * 100)) : (c.status==='completed'?100:0);
+  (c.transactions||[]).forEach(function(t){ closed += (t.amount||0); });
+  var base = c.value > 0 ? c.value : (closed + open);
+  var pct  = base > 0 ? Math.min(100, Math.round(closed / base * 100)) : (c.status==='completed'?100:0);
   return { linked: linked.length, closed: closed, open: open, pct: pct };
 }
+
+// ── render transaction list inside contract modal ────────────────────────────
+function _ctRenderTxns(c){
+  var list    = document.getElementById('ct-txn-list');
+  var totalEl = document.getElementById('ct-txn-total');
+  if(!list) return;
+
+  var autoRows = (window.PROJECTS||[]).filter(function(p){
+    return p.contractId === c.id && (p.stage === 'close' || p.status === 'completed');
+  });
+  var autoTotal   = autoRows.reduce(function(s,p){ return s+(p.cost||0); }, 0);
+  var manualTotal = _ctPendingTxns.reduce(function(s,t){ return s+(t.amount||0); }, 0);
+  if(totalEl) totalEl.textContent = fca(autoTotal + manualTotal);
+
+  var today  = new Date().toISOString().slice(0,10);
+  var safeId = c.id.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+
+  var autoHtml = autoRows.map(function(p){
+    var dateStr = p.end ? fd(p.end) : (p.start ? fd(p.start) : '—');
+    return '<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--indigo)08;border:1px solid var(--indigo)25;border-radius:8px;">'
+      +'<span style="font-size:15px;flex-shrink:0;">📁</span>'
+      +'<div style="flex:1;min-width:0;overflow:hidden;">'
+        +'<div style="font-size:12px;font-weight:600;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(p.name||p.id)+'</div>'
+        +'<div style="font-size:10px;color:var(--indigo);opacity:.8;">stage: close · อัตโนมัติ</div>'
+      +'</div>'
+      +'<div style="font-size:11px;color:var(--txt2);white-space:nowrap;flex-shrink:0;">'+dateStr+'</div>'
+      +'<div style="font-size:13px;font-weight:700;color:var(--indigo);white-space:nowrap;flex-shrink:0;">'+fca(p.cost||0)+'</div>'
+      +'<span style="font-size:9px;background:var(--indigo)15;color:var(--indigo);padding:2px 7px;border-radius:8px;border:1px solid var(--indigo)25;white-space:nowrap;flex-shrink:0;">🔒 Auto</span>'
+    +'</div>';
+  }).join('');
+
+  var manualHtml = _ctPendingTxns.map(function(t,i){
+    return '<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;">'
+      +'<span style="font-size:15px;flex-shrink:0;">📝</span>'
+      +'<div style="flex:1;min-width:0;overflow:hidden;">'
+        +'<div style="font-size:12px;font-weight:600;color:var(--txt);">'+esc(t.name||'รายการชำระ')+'</div>'
+      +'</div>'
+      +'<div style="font-size:11px;color:var(--txt2);white-space:nowrap;flex-shrink:0;">'+(t.date?fd(t.date):'—')+'</div>'
+      +'<div style="font-size:13px;font-weight:700;color:var(--teal);white-space:nowrap;flex-shrink:0;">'+fca(t.amount||0)+'</div>'
+      +'<button class="btn btn-ghost btn-sm ce-only" style="color:var(--coral);flex-shrink:0;" onclick="window._ctDelManualTxn('+i+',\''+safeId+'\')">🗑</button>'
+    +'</div>';
+  }).join('');
+
+  var addRowHtml = '<div id="ct-txn-new-row" style="display:none;padding:10px 12px;background:var(--bg);border:1px dashed var(--border);border-radius:8px;">'
+    +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+      +'<span style="font-size:15px;">📝</span>'
+      +'<input type="text" id="ct-txn-new-name" placeholder="คำอธิบาย (ไม่บังคับ)" class="f-input" style="flex:1;min-width:100px;height:32px;font-size:12px;padding:4px 8px;">'
+      +'<input type="date" id="ct-txn-new-date" value="'+today+'" class="f-input" style="width:145px;height:32px;font-size:12px;padding:4px 6px;flex-shrink:0;">'
+      +'<input type="number" id="ct-txn-new-amount" placeholder="มูลค่า (฿)" min="0" class="f-input" style="width:110px;height:32px;font-size:12px;padding:4px 8px;flex-shrink:0;">'
+      +'<button class="btn btn-pri btn-sm" style="height:32px;flex-shrink:0;" onclick="window._ctConfirmTxn(\''+safeId+'\')">✓ เพิ่ม</button>'
+      +'<button class="btn btn-ghost btn-sm" style="height:32px;flex-shrink:0;" onclick="window._ctCancelTxn()">✕</button>'
+    +'</div>'
+  +'</div>';
+
+  var hasData = autoRows.length > 0 || _ctPendingTxns.length > 0;
+  list.innerHTML = (hasData ? autoHtml + manualHtml : '<div style="text-align:center;padding:12px;color:var(--txt3);font-size:12px;">ยังไม่มี Transaction</div>') + addRowHtml;
+}
+
+window._ctAddTxn = function(){
+  var row = document.getElementById('ct-txn-new-row');
+  if(row){
+    row.style.display = '';
+    var el = document.getElementById('ct-txn-new-name');
+    if(el) el.focus();
+  }
+};
+
+window._ctCancelTxn = function(){
+  var row = document.getElementById('ct-txn-new-row');
+  if(row) row.style.display = 'none';
+};
+
+window._ctConfirmTxn = function(contractId){
+  var nameEl   = document.getElementById('ct-txn-new-name');
+  var dateEl   = document.getElementById('ct-txn-new-date');
+  var amountEl = document.getElementById('ct-txn-new-amount');
+  var amount   = Number((amountEl||{}).value)||0;
+  if(!amount){ window.showAlert('กรุณาระบุมูลค่า','warn'); return; }
+  _ctPendingTxns.push({
+    name:   ((nameEl||{}).value||'').trim() || 'รายการชำระ',
+    date:   (dateEl||{}).value || new Date().toISOString().slice(0,10),
+    amount: amount
+  });
+  var c = (window.CONTRACTS||[]).find(function(x){ return x.id === contractId; });
+  if(c) _ctRenderTxns(c);
+  if(nameEl)   nameEl.value   = '';
+  if(amountEl) amountEl.value = '';
+  if(dateEl)   dateEl.value   = new Date().toISOString().slice(0,10);
+  var row = document.getElementById('ct-txn-new-row');
+  if(row) row.style.display = 'none';
+};
+
+window._ctDelManualTxn = function(idx, contractId){
+  _ctPendingTxns.splice(idx, 1);
+  var c = (window.CONTRACTS||[]).find(function(x){ return x.id === contractId; });
+  if(c) _ctRenderTxns(c);
+};
 
 // ── card section helpers ──────────────────────────────────────────────────────
 function _ctDBox(label, value, color, bold){
@@ -123,7 +221,7 @@ window.renderContract = function(){
   var yr       = (document.getElementById('ct-yr')||{}).value||'';
   var status   = (document.getElementById('ct-status')||{}).value||'';
   var custFilt = (document.getElementById('ct-customer')||{}).value||'';
-  var sortV    = (document.getElementById('ct-sort')||{}).value||'sign_desc';
+  var sortV    = (document.getElementById('ct-sort')||{}).value||'id_asc';
 
   // ── filter ──
   var rows = window.CONTRACTS.filter(function(c){
@@ -349,6 +447,15 @@ window.openContractModal = function(id){
       +'<button class="btn btn-ghost" onclick="window.closeM(\'m-contract\')">ยกเลิก</button>'
       +(canEdit ? '<button class="btn btn-pri" onclick="window.saveContract()">💾 บันทึก</button>' : '');
   }
+
+  // transactions section (edit mode only)
+  _ctPendingTxns = isNew ? [] : (c.transactions||[]).map(function(t){ return Object.assign({},t); });
+  var txnSec = document.getElementById('ct-txn-section');
+  if(txnSec){
+    txnSec.style.display = isNew ? 'none' : '';
+    if(!isNew) _ctRenderTxns(c);
+  }
+
   window.openM('m-contract');
 };
 
@@ -385,6 +492,7 @@ window.saveContract = async function(){
     end_date:             endVal,
     note:                 noteVal,
     status:               statVal,
+    transactions:         _ctPendingTxns,
   };
 
   try {

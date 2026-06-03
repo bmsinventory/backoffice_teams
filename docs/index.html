@@ -852,7 +852,7 @@
           <select class="t-sel" id="ct-sort" onchange="window.renderContract()">
             <option value="sign_desc">วันลงนาม ↓</option>
             <option value="sign_asc">วันลงนาม ↑</option>
-            <option value="id_asc">รหัสสัญญา ↑</option>
+            <option value="id_asc" selected>รหัสสัญญา ↑</option>
             <option value="id_desc">รหัสสัญญา ↓</option>
             <option value="end_asc">วันสิ้นสุด (ใกล้สุด)</option>
             <option value="end_desc">วันสิ้นสุด (ไกลสุด)</option>
@@ -1350,7 +1350,7 @@
 
 <!-- CONTRACT MODAL -->
 <div class="overlay" id="m-contract">
-  <div class="modal lg" style="max-width:680px">
+  <div class="modal lg" style="max-width:720px">
     <div class="m-head">
       <div class="m-icon" style="background:rgba(67,97,238,.12)">📄</div>
       <div class="m-title" id="m-contract-title">เพิ่มสัญญา</div>
@@ -1424,6 +1424,17 @@
           <label class="f-label">หมายเหตุ</label>
           <textarea class="f-input" id="ctf-note" rows="3" placeholder="รายละเอียดเพิ่มเติม..."></textarea>
         </div>
+      </div>
+
+      <!-- TRANSACTIONS SECTION (แสดงเฉพาะตอนแก้ไข) -->
+      <div id="ct-txn-section" style="display:none;margin-top:18px;padding-top:16px;border-top:1px solid var(--border);">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+          <span style="font-size:13px;font-weight:700;color:var(--txt);">💳 Transactions การจ่ายเงิน</span>
+          <span style="font-size:11px;color:var(--txt3);">ยอดรวม: <b id="ct-txn-total" style="color:var(--indigo);">฿0</b></span>
+          <div style="flex:1;"></div>
+          <button class="btn btn-ghost btn-sm ce-only" style="font-size:11px;" onclick="window._ctAddTxn()">+ เพิ่ม Transaction</button>
+        </div>
+        <div id="ct-txn-list" style="display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto;"></div>
       </div>
     </div>
     <div class="m-foot" id="m-contract-foot">

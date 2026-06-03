@@ -277,8 +277,11 @@ CREATE TABLE IF NOT EXISTS contracts (
   end_date              TEXT DEFAULT '',
   note                  TEXT DEFAULT '',
   status                TEXT DEFAULT 'active',
+  transactions          JSONB DEFAULT '[]',
   created_at            TIMESTAMPTZ DEFAULT NOW()
 );
+-- migration for existing DB:
+-- ALTER TABLE contracts ADD COLUMN IF NOT EXISTS transactions JSONB DEFAULT '[]';
 
 -- ── HSP_PRODUCTS ────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS hsp_products (
