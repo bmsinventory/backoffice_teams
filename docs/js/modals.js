@@ -41,6 +41,15 @@ window.updateImportPreview=function(){
   const formatBox=document.getElementById('import-format-preview');
   const templateBtn=document.getElementById('import-template-btn');
   const titleEl=document.getElementById('import-modal-title');
+  if(type==='CONTRACTS'){
+    if(fileInput)fileInput.accept='.csv';
+    if(fileLabel)fileLabel.textContent='2. เลือกไฟล์ CSV';
+    if(msgEl)msgEl.innerHTML='1 แถว = 1 สัญญา · <b>วันที่รองรับ:</b> YYYY-MM-DD · DD/MM/YYYY · DD/MM/พ.ศ. · contract_id ถ้าไม่ระบุจะ generate อัตโนมัติ · status: active / completed / cancelled';
+    if(formatBox)formatBox.textContent='contract_id, project_name, customer_name, total_contract_value, contract_sign_date, contract_start_date, end_date, status, note';
+    if(templateBtn)templateBtn.textContent='📥 โหลดไฟล์ Template (.csv)';
+    if(titleEl)titleEl.textContent='นำเข้าข้อมูลสัญญา (CSV)';
+    return;
+  }
   if(type==='HOSPITALS'){
     if(fileInput)fileInput.accept='.xlsx,.xls,.csv';
     if(fileLabel)fileLabel.textContent='2. เลือกไฟล์ Excel (.xlsx / .xls / .csv)';
@@ -71,7 +80,7 @@ window.openImportModal=function(){
   document.getElementById('import-file').value='';
   var activeView=document.querySelector('.view.on');
   var viewId=activeView?activeView.id.replace('view-',''):'';
-  var typeMap={hospital:'HOSPITALS',staff:'STAFF',advance:'ADVANCES'};
+  var typeMap={hospital:'HOSPITALS',staff:'STAFF',advance:'ADVANCES',contract:'CONTRACTS'};
   document.getElementById('import-type').value=typeMap[viewId]||'PROJECTS';
   window.updateImportPreview();
   window.openM('m-import');
@@ -86,6 +95,44 @@ window.downloadTemplate=function(){
 window.execImport=async function(){
   const fileInput=document.getElementById('import-file');const selType=document.getElementById('import-type').value;const schema=window.IMPORT_SCHEMAS[selType];const isClearFirst=document.getElementById('import-clear-first').checked;
   if(!fileInput.files.length){document.getElementById('import-msg').innerHTML='<span style="color:var(--coral)">⚠ กรุณาเลือกไฟล์ก่อน</span>';return;}
+  if(selType==='CONTRACTS'){
+    if(!window.auth.currentUser){document.getElementById('import-msg').innerHTML='<span style="color:var(--coral)">⚠ กรุณาเชื่อมต่อก่อน</span>';return;}
+    const file=fileInput.files[0];const reader=new FileReader();
+    reader.onload=async function(e){
+      let text=e.target.result;if(text.charCodeAt(0)===0xFEFF)text=text.substring(1);
+      function parseCSV2(str){var arr=[];var quote=false;for(var row=0,col=0,c=0;c<str.length;c++){var cc=str[c],nc=str[c+1];arr[row]=arr[row]||[];arr[row][col]=arr[row][col]||'';if(cc=='"'&&quote&&nc=='"'){arr[row][col]+=cc;++c;continue;}if(cc=='"'){quote=!quote;continue;}if(cc==','&&!quote){++col;continue;}if(cc=='\r'&&nc=='\n'&&!quote){++row;col=0;++c;continue;}if(cc=='\n'&&!quote){++row;col=0;continue;}if(cc=='\r'&&!quote){++row;col=0;continue;}arr[row][col]+=cc;}return arr.filter(r=>r.join('').trim()!=='');}
+      // normalize date to YYYY-MM-DD; accepts YYYY-MM-DD / DD/MM/YYYY / Buddhist year
+      function _normDate(v){if(!v)return'';v=v.trim();if(!v)return'';if(/^\d{4}-\d{2}-\d{2}$/.test(v))return v;var m=v.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/);if(m){var y=parseInt(m[3]);if(y>=2500)y-=543;return y+'-'+String(parseInt(m[2])).padStart(2,'0')+'-'+String(parseInt(m[1])).padStart(2,'0');}var d=new Date(v);if(!isNaN(d))return d.toISOString().slice(0,10);return'';}
+      const CT_DATE_FIELDS=['contract_sign_date','contract_start_date','end_date'];
+      const lines=parseCSV2(text);if(lines.length<=1){document.getElementById('import-msg').innerHTML='<span style="color:var(--coral)">⚠ ไม่พบข้อมูลในไฟล์</span>';return;}
+      const headers=lines[0].map(h=>h.trim());
+      document.getElementById('import-msg').innerHTML='<span style="color:var(--teal)">⏳ กำลังประมวลผล...</span>';
+      const ctSchema=window.IMPORT_SCHEMAS['CONTRACTS'];
+      try{
+        let batch=writeBatch();let opCount=0;
+        const commitBatchIfNeeded=async()=>{if(opCount>=400){await batch.commit();batch=writeBatch();opCount=0;}};
+        if(isClearFirst){const existingDocs=await getDocs(getColRef('CONTRACTS'));for(let docSnap of existingDocs.docs){batch.delete(docSnap.ref);opCount++;await commitBatchIfNeeded();}}
+        var curYear=new Date().getFullYear();var yrPrefix=curYear+'-';
+        var autoNum=(window.CONTRACTS||[]).reduce(function(m,c){if(c.id&&c.id.startsWith(yrPrefix)){var n=parseInt(c.id.slice(yrPrefix.length));return isNaN(n)?m:Math.max(m,n);}return m;},0);
+        for(let i=1;i<lines.length;i++){
+          const values=lines[i].map(v=>v.trim());let rowObj={};
+          headers.forEach((h,idx)=>{
+            if(values[idx]!==undefined&&ctSchema.headers.includes(h)){
+              let val=values[idx];
+              if(h==='total_contract_value')val=Number(val)||0;
+              else if(CT_DATE_FIELDS.includes(h))val=_normDate(val);
+              rowObj[h]=val;
+            }
+          });
+          let docId=rowObj['contract_id'];
+          if(!docId){autoNum++;docId=curYear+'-'+String(autoNum).padStart(4,'0');rowObj['contract_id']=docId;}
+          batch.set(getDocRef('CONTRACTS',docId),rowObj);opCount++;await commitBatchIfNeeded();
+        }
+        if(opCount>0)await batch.commit();
+        window.closeM('m-import');window.showAlert(`นำเข้าสัญญาสำเร็จ ${lines.length-1} รายการ`,'success');
+      }catch(err){document.getElementById('import-msg').innerHTML='<span style="color:var(--coral)">❌ เกิดข้อผิดพลาด: '+err.message+'</span>';}
+    };reader.readAsText(file);return;
+  }
   if(selType==='HOSPITALS'){window.closeM('m-import');await window.importHospitalsFromFile(fileInput.files[0]);return;}
   if(selType==='HOSPITAL_CONTACTS'){window.closeM('m-import');await window.importHospitalContactsFromFile(fileInput.files[0]);return;}
   if(selType==='HOSPITAL_PRODUCTS'){window.closeM('m-import');await window.importHospitalProductsFromFile(fileInput.files[0]);return;}

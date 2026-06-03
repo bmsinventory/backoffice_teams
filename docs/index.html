@@ -848,31 +848,25 @@
             <option value="completed">สิ้นสุดแล้ว</option>
             <option value="cancelled">ยกเลิก</option>
           </select>
+          <select class="t-sel" id="ct-customer" onchange="window.renderContract()"><option value="">ทุกลูกค้า</option></select>
+          <select class="t-sel" id="ct-sort" onchange="window.renderContract()">
+            <option value="sign_desc">วันลงนาม ↓</option>
+            <option value="sign_asc">วันลงนาม ↑</option>
+            <option value="id_asc">รหัสสัญญา ↑</option>
+            <option value="id_desc">รหัสสัญญา ↓</option>
+            <option value="end_asc">วันสิ้นสุด (ใกล้สุด)</option>
+            <option value="end_desc">วันสิ้นสุด (ไกลสุด)</option>
+            <option value="start_desc">วันเริ่มต้น ↓</option>
+            <option value="start_asc">วันเริ่มต้น ↑</option>
+            <option value="value_desc">มูลค่า (มาก→น้อย)</option>
+            <option value="value_asc">มูลค่า (น้อย→มาก)</option>
+          </select>
           <div style="flex:1"></div>
           <button class="btn btn-xls btn-sm" onclick="window.exportContracts()" title="Export Excel">📥 Excel</button>
           <button class="btn btn-pri btn-sm ce-only" onclick="window.openContractModal(null)">+ เพิ่มสัญญา</button>
         </div>
         <div id="ct-summary-bar" style="display:flex;gap:12px;padding:12px 24px;background:var(--bg);flex-wrap:wrap;"></div>
-        <div style="padding:0 24px 28px;">
-          <div class="ov-card" style="padding:0;overflow:hidden;">
-            <div style="overflow-x:auto;">
-              <table class="t-table" style="min-width:900px;">
-                <thead><tr>
-                  <th style="width:120px">รหัสสัญญา</th>
-                  <th>ชื่อโครงการ</th>
-                  <th>ลูกค้า / คู่สัญญา</th>
-                  <th style="text-align:right">มูลค่าสัญญา (฿)</th>
-                  <th>วันลงนาม</th>
-                  <th>วันเริ่ม</th>
-                  <th>วันสิ้นสุด</th>
-                  <th>สถานะ</th>
-                  <th style="width:80px"></th>
-                </tr></thead>
-                <tbody id="ct-rows"></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+        <div id="ct-rows" style="padding:12px 24px 32px;"></div>
       </div>
 
     </div>
@@ -1366,10 +1360,11 @@
     <div class="m-body">
       <input type="hidden" id="ctf-id">
       <div class="f-grid" style="grid-template-columns:repeat(3,1fr)">
-        <!-- แถว 1: รหัสสัญญา | สถานะ | วันที่ลงนาม -->
+        <!-- แถว 1: รหัสสัญญา (auto) | สถานะ | วันที่ลงนาม -->
         <div class="f-group">
-          <label class="f-label">รหัสสัญญา *</label>
-          <input class="f-input" id="ctf-code" placeholder="เช่น CT-2026-001">
+          <label class="f-label">รหัสสัญญา <span style="font-size:10px;color:var(--teal);font-weight:600;margin-left:4px;">🔄 อัตโนมัติ</span></label>
+          <input class="f-input" id="ctf-code" readonly
+            style="background:var(--surface2);color:var(--txt2);cursor:default;font-family:'JetBrains Mono',monospace;letter-spacing:.5px;">
         </div>
         <div class="f-group">
           <label class="f-label">สถานะ</label>
@@ -1398,18 +1393,31 @@
             <div id="ctf-customer-dd" style="display:none;position:absolute;top:calc(100% + 2px);left:0;right:0;z-index:200;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--sh-sm);max-height:220px;overflow-y:auto;"></div>
           </div>
         </div>
-        <!-- แถว 4: มูลค่า | วันเริ่ม | วันสิ้นสุด -->
+        <!-- แถว 4: มูลค่า | วันเริ่มต้น | วันสิ้นสุด -->
         <div class="f-group">
           <label class="f-label">มูลค่าสัญญารวม (฿) *</label>
           <input type="number" class="f-input" id="ctf-value" min="0" step="0.01" placeholder="0.00">
         </div>
         <div class="f-group">
           <label class="f-label">วันที่เริ่มต้นสัญญา</label>
-          <input type="date" class="f-input" id="ctf-start">
+          <input type="date" class="f-input" id="ctf-start" oninput="window._ctCalcEndDate()">
         </div>
         <div class="f-group">
           <label class="f-label">วันที่สิ้นสุดสัญญา</label>
           <input type="date" class="f-input" id="ctf-end">
+        </div>
+        <!-- ระยะสัญญา helper: คำนวณวันสิ้นสุดอัตโนมัติ -->
+        <div style="grid-column:2/span 2;display:flex;align-items:center;gap:8px;margin-top:-6px;padding-bottom:8px;">
+          <span style="font-size:11px;color:var(--txt3);white-space:nowrap;">⏱ ระยะสัญญา:</span>
+          <input type="number" class="f-input" id="ctf-duration" min="1" max="240" placeholder="จำนวน"
+            oninput="window._ctCalcEndDate()"
+            style="width:72px;height:30px;font-size:12px;padding:4px 8px;flex-shrink:0;">
+          <select class="f-input" id="ctf-duration-unit" onchange="window._ctCalcEndDate()"
+            style="width:80px;height:30px;font-size:12px;padding:4px 6px;flex-shrink:0;">
+            <option value="month">เดือน</option>
+            <option value="year">ปี</option>
+          </select>
+          <span style="font-size:11px;color:var(--teal);white-space:nowrap;">→ คำนวณวันสิ้นสุดอัตโนมัติ</span>
         </div>
         <!-- แถว 5: หมายเหตุ -->
         <div class="f-group" style="grid-column:span 3">
@@ -1564,6 +1572,7 @@
           <option value="PTYPES">🏷 ประเภทงาน (Types)</option>
           <option value="POSITIONS">💼 ตำแหน่งงาน (Positions)</option>
           <option value="DEPARTMENTS">🏢 แผนก (Departments)</option>
+          <option value="CONTRACTS">📄 สัญญา (Contracts)</option>
           <option value="HOSPITALS">🏥 รายชื่อโรงพยาบาล (Excel)</option>
           <option value="HOSPITAL_CONTACTS">📋 ผู้ติดต่อโรงพยาบาล (Excel)</option>
           <option value="HOSPITAL_PRODUCTS">📦 Products ที่ รพ. ใช้งาน (Excel)</option>

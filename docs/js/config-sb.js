@@ -48,7 +48,8 @@ window.IMPORT_SCHEMAS = {
   'POSITIONS': { idField:'position_id',prefix:'POS', headers:["label_th"], example:["Project Manager"] },
   'DEPARTMENTS': { idField:'dept_id',prefix:'DEPT', headers:["label_th"], example:["ฝ่ายไอที"] },
   'TIMESHEETS': { idField:'timesheet_id',prefix:'TS', headers:["project_id","staff_id","work_date","hours","category","description"], example:["P001","S001","2026-04-01","8","fieldwork","สำรวจพื้นที่โครงการ"] },
-  'COSTS': { idField:'cost_id',prefix:'CST', headers:["project_id","staff_id","category","amount","cost_date","description","receipt_no"], example:["P001","S001","travel","1500","2026-04-01","ค่าเดินทางไปพื้นที่","RCT-001"] }
+  'COSTS': { idField:'cost_id',prefix:'CST', headers:["project_id","staff_id","category","amount","cost_date","description","receipt_no"], example:["P001","S001","travel","1500","2026-04-01","ค่าเดินทางไปพื้นที่","RCT-001"] },
+  'CONTRACTS': { idField:'contract_id',prefix:'CT', headers:["contract_id","project_name","customer_name","total_contract_value","contract_sign_date","contract_start_date","end_date","status","note"], example:["2026-0001","โครงการตัวอย่าง","โรงพยาบาลตัวอย่าง","500000","2026-01-01","2026-01-01","2026-12-31","active","หมายเหตุ"] }
 };
 
 window.isDbLoaded = false;
