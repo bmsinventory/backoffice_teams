@@ -116,9 +116,11 @@ CREATE TABLE IF NOT EXISTS projects (
   members            JSONB DEFAULT '[]',
   is_border          BOOLEAN DEFAULT false,
   contract_id        TEXT DEFAULT '',
+  no_revisit         BOOLEAN DEFAULT false,
   visits             JSONB DEFAULT '[]',
   created_at         TIMESTAMPTZ DEFAULT NOW()
 );
+-- ALTER TABLE projects ADD COLUMN IF NOT EXISTS no_revisit BOOLEAN DEFAULT false;
 
 -- ── ADVANCES ────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS advances (
