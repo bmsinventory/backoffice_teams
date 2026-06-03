@@ -1357,84 +1357,108 @@
       <span id="m-contract-id-badge" style="display:none;font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--txt3);background:var(--surface2);border:1px solid var(--border);padding:3px 8px;border-radius:6px;margin-left:auto;margin-right:8px;white-space:nowrap;"></span>
       <button class="m-x" onclick="window.closeM('m-contract')">✕</button>
     </div>
-    <div class="m-body">
+    <div class="m-body" style="padding-top:0;">
       <input type="hidden" id="ctf-id">
-      <div class="f-grid" style="grid-template-columns:repeat(3,1fr)">
-        <!-- แถว 1: รหัสสัญญา (auto) | สถานะ | วันที่ลงนาม -->
-        <div class="f-group">
-          <label class="f-label">รหัสสัญญา <span style="font-size:10px;color:var(--teal);font-weight:600;margin-left:4px;">🔄 อัตโนมัติ</span></label>
-          <input class="f-input" id="ctf-code" readonly
-            style="background:var(--surface2);color:var(--txt2);cursor:default;font-family:'JetBrains Mono',monospace;letter-spacing:.5px;">
-        </div>
-        <div class="f-group">
-          <label class="f-label">สถานะ</label>
-          <select class="f-input" id="ctf-status">
-            <option value="active">มีผลบังคับ</option>
-            <option value="completed">สิ้นสุดแล้ว</option>
-            <option value="cancelled">ยกเลิก</option>
-          </select>
-        </div>
-        <div class="f-group">
-          <label class="f-label">วันที่ลงนามสัญญา</label>
-          <input type="date" class="f-input" id="ctf-sign">
-        </div>
-        <!-- แถว 2: ชื่อโครงการ -->
-        <div class="f-group" style="grid-column:span 3">
-          <label class="f-label">ชื่อโครงการ *</label>
-          <input class="f-input" id="ctf-name" placeholder="ชื่อโครงการตามสัญญา...">
-        </div>
-        <!-- แถว 3: ชื่อลูกค้า smart search -->
-        <div class="f-group" style="grid-column:span 3">
-          <label class="f-label">ชื่อลูกค้า / คู่สัญญา *</label>
-          <div style="position:relative;">
-            <input class="f-input" id="ctf-customer" autocomplete="off" placeholder="พิมพ์เพื่อค้นหาโรงพยาบาล หรือพิมพ์ชื่อเอง..."
-              oninput="window._ctCustomerSearch(this.value)"
-              onblur="setTimeout(function(){var d=document.getElementById('ctf-customer-dd');if(d)d.style.display='none';},200)">
-            <div id="ctf-customer-dd" style="display:none;position:absolute;top:calc(100% + 2px);left:0;right:0;z-index:200;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--sh-sm);max-height:220px;overflow-y:auto;"></div>
+
+      <!-- TAB BAR (ซ่อนตอนเพิ่มใหม่) -->
+      <div id="ct-modal-tabs" style="display:none;flex-direction:row;border-bottom:2px solid var(--border);margin-bottom:18px;gap:0;">
+        <button id="ct-tab-info" onclick="window._ctSwitchTab('info')"
+          style="padding:12px 22px;background:none;border:none;border-bottom:2px solid var(--violet);color:var(--violet);font-size:13px;font-weight:700;cursor:pointer;margin-bottom:-2px;transition:all .15s;white-space:nowrap;">
+          📄 ข้อมูลสัญญา
+        </button>
+        <button id="ct-tab-txn" onclick="window._ctSwitchTab('txn')"
+          style="padding:12px 22px;background:none;border:none;border-bottom:2px solid transparent;color:var(--txt3);font-size:13px;font-weight:600;cursor:pointer;margin-bottom:-2px;transition:all .15s;white-space:nowrap;">
+          💳 Transactions
+        </button>
+      </div>
+
+      <!-- PANE 1: ข้อมูลสัญญา -->
+      <div id="ct-pane-info">
+        <div class="f-grid" style="grid-template-columns:repeat(3,1fr)">
+          <!-- แถว 1: รหัสสัญญา (auto) | สถานะ | วันที่ลงนาม -->
+          <div class="f-group">
+            <label class="f-label">รหัสสัญญา <span style="font-size:10px;color:var(--teal);font-weight:600;margin-left:4px;">🔄 อัตโนมัติ</span></label>
+            <input class="f-input" id="ctf-code" readonly
+              style="background:var(--surface2);color:var(--txt2);cursor:default;font-family:'JetBrains Mono',monospace;letter-spacing:.5px;">
           </div>
-        </div>
-        <!-- แถว 4: มูลค่า | วันเริ่มต้น | วันสิ้นสุด -->
-        <div class="f-group">
-          <label class="f-label">มูลค่าสัญญารวม (฿) *</label>
-          <input type="number" class="f-input" id="ctf-value" min="0" step="0.01" placeholder="0.00">
-        </div>
-        <div class="f-group">
-          <label class="f-label">วันที่เริ่มต้นสัญญา</label>
-          <input type="date" class="f-input" id="ctf-start" oninput="window._ctCalcEndDate()">
-        </div>
-        <div class="f-group">
-          <label class="f-label">วันที่สิ้นสุดสัญญา</label>
-          <input type="date" class="f-input" id="ctf-end">
-        </div>
-        <!-- ระยะสัญญา helper: คำนวณวันสิ้นสุดอัตโนมัติ -->
-        <div style="grid-column:2/span 2;display:flex;align-items:center;gap:8px;margin-top:-6px;padding-bottom:8px;">
-          <span style="font-size:11px;color:var(--txt3);white-space:nowrap;">⏱ ระยะสัญญา:</span>
-          <input type="number" class="f-input" id="ctf-duration" min="1" max="240" placeholder="จำนวน"
-            oninput="window._ctCalcEndDate()"
-            style="width:72px;height:30px;font-size:12px;padding:4px 8px;flex-shrink:0;">
-          <select class="f-input" id="ctf-duration-unit" onchange="window._ctCalcEndDate()"
-            style="width:80px;height:30px;font-size:12px;padding:4px 6px;flex-shrink:0;">
-            <option value="month">เดือน</option>
-            <option value="year">ปี</option>
-          </select>
-          <span style="font-size:11px;color:var(--teal);white-space:nowrap;">→ คำนวณวันสิ้นสุดอัตโนมัติ</span>
-        </div>
-        <!-- แถว 5: หมายเหตุ -->
-        <div class="f-group" style="grid-column:span 3">
-          <label class="f-label">หมายเหตุ</label>
-          <textarea class="f-input" id="ctf-note" rows="3" placeholder="รายละเอียดเพิ่มเติม..."></textarea>
+          <div class="f-group">
+            <label class="f-label">สถานะ</label>
+            <select class="f-input" id="ctf-status">
+              <option value="active">มีผลบังคับ</option>
+              <option value="completed">สิ้นสุดแล้ว</option>
+              <option value="cancelled">ยกเลิก</option>
+            </select>
+          </div>
+          <div class="f-group">
+            <label class="f-label">วันที่ลงนามสัญญา</label>
+            <input type="date" class="f-input" id="ctf-sign">
+          </div>
+          <!-- แถว 2: ชื่อโครงการ -->
+          <div class="f-group" style="grid-column:span 3">
+            <label class="f-label">ชื่อโครงการ *</label>
+            <input class="f-input" id="ctf-name" placeholder="ชื่อโครงการตามสัญญา...">
+          </div>
+          <!-- แถว 3: ชื่อลูกค้า smart search -->
+          <div class="f-group" style="grid-column:span 3">
+            <label class="f-label">ชื่อลูกค้า / คู่สัญญา *</label>
+            <div style="position:relative;">
+              <input class="f-input" id="ctf-customer" autocomplete="off" placeholder="พิมพ์เพื่อค้นหาโรงพยาบาล หรือพิมพ์ชื่อเอง..."
+                oninput="window._ctCustomerSearch(this.value)"
+                onblur="setTimeout(function(){var d=document.getElementById('ctf-customer-dd');if(d)d.style.display='none';},200)">
+              <div id="ctf-customer-dd" style="display:none;position:absolute;top:calc(100% + 2px);left:0;right:0;z-index:200;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--sh-sm);max-height:220px;overflow-y:auto;"></div>
+            </div>
+          </div>
+          <!-- แถว 4: มูลค่า | วันเริ่มต้น | วันสิ้นสุด -->
+          <div class="f-group">
+            <label class="f-label">มูลค่าสัญญารวม (฿) *</label>
+            <input type="number" class="f-input" id="ctf-value" min="0" step="0.01" placeholder="0.00">
+          </div>
+          <div class="f-group">
+            <label class="f-label">วันที่เริ่มต้นสัญญา</label>
+            <input type="date" class="f-input" id="ctf-start" oninput="window._ctCalcEndDate()">
+          </div>
+          <div class="f-group">
+            <label class="f-label">วันที่สิ้นสุดสัญญา</label>
+            <input type="date" class="f-input" id="ctf-end">
+          </div>
+          <!-- ระยะสัญญา helper -->
+          <div style="grid-column:2/span 2;display:flex;align-items:center;gap:8px;margin-top:-6px;padding-bottom:8px;">
+            <span style="font-size:11px;color:var(--txt3);white-space:nowrap;">⏱ ระยะสัญญา:</span>
+            <input type="number" class="f-input" id="ctf-duration" min="1" max="240" placeholder="จำนวน"
+              oninput="window._ctCalcEndDate()"
+              style="width:72px;height:30px;font-size:12px;padding:4px 8px;flex-shrink:0;">
+            <select class="f-input" id="ctf-duration-unit" onchange="window._ctCalcEndDate()"
+              style="width:80px;height:30px;font-size:12px;padding:4px 6px;flex-shrink:0;">
+              <option value="month">เดือน</option>
+              <option value="year">ปี</option>
+            </select>
+            <span style="font-size:11px;color:var(--teal);white-space:nowrap;">→ คำนวณวันสิ้นสุดอัตโนมัติ</span>
+          </div>
+          <!-- แถว 5: หมายเหตุ -->
+          <div class="f-group" style="grid-column:span 3">
+            <label class="f-label">หมายเหตุ</label>
+            <textarea class="f-input" id="ctf-note" rows="3" placeholder="รายละเอียดเพิ่มเติม..."></textarea>
+          </div>
         </div>
       </div>
 
-      <!-- TRANSACTIONS SECTION (แสดงเฉพาะตอนแก้ไข) -->
-      <div id="ct-txn-section" style="display:none;margin-top:18px;padding-top:16px;border-top:1px solid var(--border);">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-          <span style="font-size:13px;font-weight:700;color:var(--txt);">💳 Transactions การจ่ายเงิน</span>
-          <span style="font-size:11px;color:var(--txt3);">ยอดรวม: <b id="ct-txn-total" style="color:var(--indigo);">฿0</b></span>
+      <!-- PANE 2: Transactions (ซ่อนตอนแรก) -->
+      <div id="ct-pane-txn" style="display:none;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+          <div>
+            <div style="font-size:13px;font-weight:700;color:var(--txt);">รายการ Transactions</div>
+            <div style="font-size:11px;color:var(--txt3);margin-top:1px;">📁 Auto = โครงการที่ปิดแล้ว · 📝 Manual = เพิ่มเอง</div>
+          </div>
           <div style="flex:1;"></div>
-          <button class="btn btn-ghost btn-sm ce-only" style="font-size:11px;" onclick="window._ctAddTxn()">+ เพิ่ม Transaction</button>
+          <div style="text-align:right;">
+            <div style="font-size:10px;color:var(--txt3);">ยอดรวม</div>
+            <div style="font-size:16px;font-weight:800;color:var(--indigo);" id="ct-txn-total">฿0</div>
+          </div>
         </div>
-        <div id="ct-txn-list" style="display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto;"></div>
+        <div id="ct-txn-list" style="display:flex;flex-direction:column;gap:6px;min-height:60px;max-height:320px;overflow-y:auto;"></div>
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+          <button class="btn btn-ghost btn-sm ce-only" style="font-size:12px;width:100%;justify-content:center;" onclick="window._ctAddTxn()">＋ เพิ่ม Transaction</button>
+        </div>
       </div>
     </div>
     <div class="m-foot" id="m-contract-foot">

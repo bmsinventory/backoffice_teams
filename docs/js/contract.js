@@ -157,6 +157,21 @@ window._ctDelManualTxn = function(idx, contractId){
   if(c) _ctRenderTxns(c);
 };
 
+window._ctSwitchTab = function(tab){
+  var pInfo = document.getElementById('ct-pane-info');
+  var pTxn  = document.getElementById('ct-pane-txn');
+  var bInfo = document.getElementById('ct-tab-info');
+  var bTxn  = document.getElementById('ct-tab-txn');
+  if(pInfo) pInfo.style.display = tab === 'info' ? '' : 'none';
+  if(pTxn)  pTxn.style.display  = tab === 'txn'  ? '' : 'none';
+  [bInfo, bTxn].forEach(function(b){ if(!b) return;
+    var active = (b.id === 'ct-tab-'+tab);
+    b.style.color        = active ? 'var(--violet)' : 'var(--txt3)';
+    b.style.borderBottom = active ? '2px solid var(--violet)' : '2px solid transparent';
+    b.style.fontWeight   = active ? '700' : '600';
+  });
+};
+
 // ── card section helpers ──────────────────────────────────────────────────────
 function _ctDBox(label, value, color, bold){
   return '<div style="padding:10px 14px;text-align:center;min-width:88px;flex:1;">'
@@ -448,13 +463,12 @@ window.openContractModal = function(id){
       +(canEdit ? '<button class="btn btn-pri" onclick="window.saveContract()">💾 บันทึก</button>' : '');
   }
 
-  // transactions section (edit mode only)
+  // tabs + transactions (edit mode only)
+  var tabBar = document.getElementById('ct-modal-tabs');
+  if(tabBar) tabBar.style.display = isNew ? 'none' : 'flex';
+  window._ctSwitchTab('info');
   _ctPendingTxns = isNew ? [] : (c.transactions||[]).map(function(t){ return Object.assign({},t); });
-  var txnSec = document.getElementById('ct-txn-section');
-  if(txnSec){
-    txnSec.style.display = isNew ? 'none' : '';
-    if(!isNew) _ctRenderTxns(c);
-  }
+  if(!isNew) _ctRenderTxns(c);
 
   window.openM('m-contract');
 };
