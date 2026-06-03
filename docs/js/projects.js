@@ -90,7 +90,11 @@ window.renderProjects=function(){
       var parentName=parentProj?esc(parentProj.name):'<span style="color:var(--txt3)">-</span>';
       parentCells=`<td style="font-size:11px;color:var(--txt2);">${parentName}</td><td style="font-size:11px;font-weight:600;color:var(--violet);text-align:center;">${p.revisitRound?'ครั้งที่ '+p.revisitRound:'<span style="color:var(--txt3)">-</span>'}</td>`;
     }
-    var revisitCell=showRevisit?`<td style="font-size:11px;color:var(--txt2);line-height:1.6">📅 ${p.revisit1?fd(p.revisit1):'<span style="color:var(--txt3)">-</span>'}<br>📅 ${p.revisit2?fd(p.revisit2):'<span style="color:var(--txt3)">-</span>'}</td>`:'';
+    var _ctInfo='';
+    if(p.contractId){var _ctObj=(window.CONTRACTS||[]).find(function(c){return c.id===p.contractId;});if(_ctObj){_ctInfo='<div style="font-size:10px;color:var(--indigo);margin-top:3px;line-height:1.5;">📃 <span style="font-weight:700;">'+esc(_ctObj.id)+'</span> '+esc(_ctObj.name)+(_ctObj.startDate||_ctObj.endDate?' <span style="color:var(--txt3);">'+(_ctObj.startDate?fd(_ctObj.startDate):'?')+'–'+(_ctObj.endDate?fd(_ctObj.endDate):'?')+'</span>':'')+'</div>';}}
+    var _dynR1=p.revisit1,_dynR2=p.revisit2,_revDone=false;
+    if(showRevisit){var _revKids=(window.PROJECTS||[]).filter(function(rp){return rp.groupId==='GRP17733355541904'&&rp.parentProjectId===p.id;});if(_revKids.length>0){var _rk1=_revKids.find(function(rp){return rp.revisitRound==1;});var _rk2=_revKids.find(function(rp){return rp.revisitRound==2;});if(_rk1)_dynR1=_rk1.end;if(_rk2)_dynR2=_rk2.end;if(_revKids.length===1){_revDone=true;_dynR1=_revKids[0].end;_dynR2=_revKids[0].end;}}}
+    var revisitCell=showRevisit?('<td style="font-size:11px;color:var(--txt2);line-height:1.6">'+(_revDone?'<span style="display:inline-block;font-size:9px;background:rgba(32,201,151,.1);color:var(--teal);padding:1px 7px;border-radius:10px;font-weight:700;border:1px solid rgba(32,201,151,.3);margin-bottom:3px;">✅ Revisit ครบแล้ว</span><br>':'')+'📅 '+(_dynR1?fd(_dynR1):'<span style="color:var(--txt3)">-</span>')+'<br>📅 '+(_dynR2?fd(_dynR2):'<span style="color:var(--txt3)">-</span>')+'</td>'):'';
     var advCells=showAdv?`<td style="font-size:11px;color:var(--txt2);line-height:1.6">📅 ${advRdate}<br>⏰ ${advDdate}</td><td>${advStatHtml}</td>`:'';
     var hasLinked=window.ADVANCES.some(function(adv){return adv.pid===p.id;})||window.LODGINGS.some(function(l){return l.pid===p.id;});
     var _exLd=['GRP17733355541905','GRP17733355541906'];
@@ -98,7 +102,7 @@ window.renderProjects=function(){
     if(!_exLd.includes(p.groupId)){var _pLds=window.LODGINGS.filter(function(l){return l.pid===p.id;});if(!_pLds.length){ldStatusCell='<td style="font-size:11px;color:var(--txt3);">—</td>';}else{var _appD=_pLds.some(function(l){return l.approvedDaily==='yes';});var _appM=_pLds.some(function(l){return l.approvedMonthly==='yes';});if(_appD&&_appM){ldStatusCell='<td><div style="display:flex;flex-direction:column;gap:2px;"><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:#4361ee18;color:var(--indigo);border:1px solid #4361ee30;white-space:nowrap;">✅ รายวัน</span><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:var(--coral)18;color:var(--coral);border:1px solid var(--coral)30;white-space:nowrap;">✅ รายเดือน</span></div></td>';}else if(_appD){ldStatusCell='<td><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:#4361ee18;color:var(--indigo);border:1px solid #4361ee30;white-space:nowrap;">✅ รายวัน</span></td>';}else if(_appM){ldStatusCell='<td><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:var(--coral)18;color:var(--coral);border:1px solid var(--coral)30;white-space:nowrap;">✅ รายเดือน</span></td>';}else{ldStatusCell='<td><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:var(--amber)18;color:var(--amber);border:1px solid var(--amber)30;white-space:nowrap;">⏳ รออนุมัติ</span></td>';}}}
 
     return`<tr class="fade" onclick="window.openProjModal('${p.id}')">
-      <td><div style="font-weight:600;font-size:13px">${esc(p.name)}</div>${p.siteOwner?`<div style="font-size:10px;color:var(--txt3);margin-top:2px;">🏢 ${esc(p.siteOwner)}</div>`:''}<div style="display:flex;align-items:center;gap:6px;margin-top:4px;">${pgHtml}<span class="tag" style="background:${pt.color}18;color:${pt.color};font-size:9px;padding:2px 6px">${esc(pt.label)}</span><span class="tag" style="background:${sg.color}18;color:${sg.color};font-size:9px;padding:2px 6px">${sg.label}</span><span style="font-size:10px;font-weight:700;color:${sg.color}">${p.progress}%</span></div><div style="font-size:11px;color:var(--violet);margin-top:6px;font-weight:600;">👥 ${nicknames}</div>${p.note?`<div style="font-size:11px;color:var(--amber);margin-top:4px;">⚠ ${esc(p.note)}</div>`:''}</td>
+      <td><div style="font-weight:600;font-size:13px">${esc(p.name)}</div>${p.siteOwner?`<div style="font-size:10px;color:var(--txt3);margin-top:2px;">🏢 ${esc(p.siteOwner)}</div>`:''}<div style="display:flex;align-items:center;gap:6px;margin-top:4px;">${pgHtml}<span class="tag" style="background:${pt.color}18;color:${pt.color};font-size:9px;padding:2px 6px">${esc(pt.label)}</span><span class="tag" style="background:${sg.color}18;color:${sg.color};font-size:9px;padding:2px 6px">${sg.label}</span><span style="font-size:10px;font-weight:700;color:${sg.color}">${p.progress}%</span></div><div style="font-size:11px;color:var(--violet);margin-top:6px;font-weight:600;">👥 ${nicknames}</div>${p.note?`<div style="font-size:11px;color:var(--amber);margin-top:4px;">⚠ ${esc(p.note)}</div>`:''}${_ctInfo}</td>
       ${parentCells}
       <td style="font-size:11px;color:var(--txt2);line-height:1.6">📅 ${p.start?fd(p.start):'<span style="color:var(--txt3)">-</span>'}<br>⏰ ${p.end?fd(p.end):'<span style="color:var(--txt3)">-</span>'}</td>
       ${revisitCell}
@@ -731,6 +735,11 @@ window.saveProject=async function(){
   try {
     await setDoc(getDocRef('PROJECTS',pid),dbProj);
     if(typeof window.tsSyncProject==='function') await window.tsSyncProject(pid, members);
+    if(_saveGrpId==='GRP17733355541904'&&dbProj.parent_project_id&&dbProj.end_date){
+      var _rvSibs=(window.PROJECTS||[]).filter(function(rp){return rp.groupId==='GRP17733355541904'&&rp.parentProjectId===dbProj.parent_project_id&&rp.id!==pid;});
+      var _rvUpd=_rvSibs.length===0?{revisit_1:dbProj.end_date,revisit_2:dbProj.end_date}:(dbProj.revisit_round===2?{revisit_2:dbProj.end_date}:{revisit_1:dbProj.end_date});
+      await window.updateDoc(getDocRef('PROJECTS',dbProj.parent_project_id),_rvUpd);
+    }
   } catch(e){ window.showDbError(e); }
 }
 
