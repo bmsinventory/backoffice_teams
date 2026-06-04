@@ -1,0 +1,117 @@
+/* ================================================================
+   SIDEBAR.CSS — Navigation Sidebar Component
+   #sidebar, .sb-*, .nav-btn, .user-row, .sb-toggle
+================================================================ */
+
+#sidebar {
+  width: 228px;
+  min-width: 228px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  transition: width .3s cubic-bezier(.4,0,.2,1), min-width .3s cubic-bezier(.4,0,.2,1);
+  position: relative;
+  z-index: 30;
+  box-shadow: 2px 0 12px rgba(0,0,0,.04);
+}
+#sidebar.slim { width: 64px; min-width: 64px; }
+
+/* ── Brand / Logo ── */
+.sb-brand {
+  height: 60px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.sb-logo {
+  width: 34px; height: 34px; min-width: 34px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--violet), var(--coral));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 800; color: #fff;
+  box-shadow: 0 4px 12px rgba(124,92,252,.35);
+  flex-shrink: 0;
+}
+.sb-title { font-size: 15px; font-weight: 800; color: var(--txt); letter-spacing: -.3px; white-space: nowrap; }
+.sb-sub   { font-size: 10px; color: var(--txt3); font-family: 'JetBrains Mono', monospace; letter-spacing: .5px; }
+
+/* ── Navigation ── */
+.sb-nav { flex: 1; overflow-y: auto; padding: 10px 8px; }
+.sb-sec {
+  font-size: 9px; font-weight: 700; letter-spacing: 1.2px;
+  text-transform: uppercase; color: var(--txt3);
+  padding: 14px 8px 6px; white-space: nowrap; overflow: hidden;
+}
+
+/* ── Nav Button ── */
+.nav-btn {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px; border-radius: 10px; cursor: pointer;
+  transition: all .18s; white-space: nowrap; overflow: hidden;
+  margin-bottom: 2px; position: relative;
+}
+.nav-btn:hover { background: var(--surface2); }
+.nav-btn.on { background: linear-gradient(135deg, rgba(124,92,252,.12), rgba(255,107,107,.08)); }
+.nav-btn.on .ni {
+  background: linear-gradient(135deg, var(--violet), var(--coral));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.nav-btn.on .nl { color: var(--violet); font-weight: 600; }
+.nav-btn.on::before {
+  content: ''; position: absolute; left: 0; top: 20%; bottom: 20%;
+  width: 3px; background: linear-gradient(180deg, var(--violet), var(--coral));
+  border-radius: 0 3px 3px 0;
+}
+
+/* ── Nav Icons & Labels ── */
+.ni { font-size: 16px; min-width: 20px; text-align: center; color: var(--txt3); transition: all .18s; }
+.nl { font-size: 13px; color: var(--txt2); font-weight: 500; transition: color .18s; }
+.nb {
+  margin-left: auto; background: var(--coral); color: #fff;
+  font-size: 9px; font-weight: 700; padding: 2px 6px;
+  border-radius: 20px; min-width: 18px; text-align: center;
+  box-shadow: 0 2px 6px rgba(255,107,107,.4);
+}
+
+/* ── Footer ── */
+.sb-foot { border-top: 1px solid var(--border); padding: 10px 8px; flex-shrink: 0; }
+.user-row {
+  display: flex; align-items: center; gap: 9px; padding: 8px 10px;
+  border-radius: 10px; cursor: pointer; transition: background .18s;
+}
+.user-row:hover { background: var(--surface2); }
+.u-av {
+  width: 30px; height: 30px; min-width: 30px; border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; color: #fff; flex-shrink: 0;
+}
+.u-name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.u-role { font-size: 10px; color: var(--txt3); font-family: 'JetBrains Mono', monospace; }
+
+/* ── Toggle Button ── */
+.sb-toggle {
+  position: absolute; right: -13px; top: 72px;
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--surface); border: 1.5px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 9px; color: var(--txt3);
+  transition: all .18s; z-index: 31; box-shadow: var(--sh-sm);
+}
+.sb-toggle:hover {
+  background: var(--violet); border-color: var(--violet);
+  color: #fff; transform: scale(1.1);
+}
+
+/* ── Slim Mode: hide text ── */
+#sidebar.slim .sb-title, #sidebar.slim .sb-sub,
+#sidebar.slim .nl,       #sidebar.slim .sb-sec,
+#sidebar.slim .nb,       #sidebar.slim .u-name,
+#sidebar.slim .u-role { display: none !important; }
+#sidebar.slim .nav-btn  { justify-content: center; padding: 10px; }
+#sidebar.slim .nav-btn::before { display: none; }

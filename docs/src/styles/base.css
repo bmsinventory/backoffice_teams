@@ -1,0 +1,64 @@
+/* ================================================================
+   BASE.CSS — Reset & Base HTML Element Styles
+   ครอบคลุม reset พื้นฐาน, scrollbar, และ global styles
+================================================================ */
+
+/* ── Reset ── */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+img, video { max-width: 100%; }
+td, th { overflow-wrap: break-word; }
+
+/* ── Base Document ── */
+html {
+  height: 100%;
+  overflow-x: hidden;
+  max-width: 100%;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--txt);
+  overflow: hidden;
+  overflow-x: hidden;
+}
+
+/* ── Custom Scrollbar ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: var(--txt3); }
+
+/* ── Momentum scroll (iOS) ── */
+.sb-nav, .m-body, .dtable-wrap, .kb-body,
+.view, #content, .ov-grid {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── Remove tap highlight ── */
+* { -webkit-tap-highlight-color: transparent; }
+
+/* ── Focus ring (accessible) ── */
+button:focus-visible, input:focus-visible, select:focus-visible {
+  outline: 2px solid var(--violet);
+  outline-offset: 2px;
+}
+
+/* ── Cursor ── */
+button, [role="button"], .nav-btn, .kb-card, tbody tr,
+.stat-c, .tp-btn, .btn { cursor: pointer; }
+
+/* ── Animations ── */
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 currentColor; }
+  50% { box-shadow: 0 0 0 5px transparent; }
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes lspin { to { transform: rotate(360deg); } }
+
+.fade { animation: fadeUp .22s ease forwards; }
+.l-spin { animation: lspin .75s linear infinite; }

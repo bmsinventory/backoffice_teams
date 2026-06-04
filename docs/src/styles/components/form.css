@@ -1,0 +1,29 @@
+/* ================================================================
+   FORM.CSS — Form Elements Component
+   .f-group, .f-label, .f-input, .f-grid, .f-cb
+================================================================ */
+
+.f-group  { margin-bottom: 16px; }
+.f-label  { font-size: 12px; font-weight: 600; color: var(--txt2); display: block; margin-bottom: 6px; }
+
+.f-input {
+  width: 100%;
+  background: var(--surface2); border: 1.5px solid var(--border);
+  color: var(--txt); border-radius: 10px;
+  padding: 9px 12px; font-size: 13px; font-family: inherit;
+  outline: none; transition: all .2s;
+}
+.f-input:focus {
+  border-color: var(--violet); background: var(--surface);
+  box-shadow: 0 0 0 3px rgba(124,92,252,.1);
+}
+.f-input::placeholder { color: var(--txt3); }
+.f-input:disabled     { opacity: .45; cursor: not-allowed; }
+textarea.f-input  { resize: vertical; min-height: 72px; }
+select.f-input    { appearance: none; cursor: pointer; }
+
+.f-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+.f-cb { display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 4px 0; }
+.f-cb input { width: 16px; height: 16px; accent-color: var(--violet); cursor: pointer; }
+.f-cb .f-label { margin: 0; cursor: pointer; }

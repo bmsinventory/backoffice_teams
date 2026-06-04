@@ -1,0 +1,19 @@
+/* ================================================================
+   WORKLOAD.CSS — Workload Summary Module
+   .wl-container, .wl-col, .wl-hcard, .wl-card
+================================================================ */
+
+.wl-container { display: flex; flex-direction: column; flex: 1; overflow-y: auto; background: var(--bg); }
+.wl-col       { flex: 1; display: flex; flex-direction: column; gap: 12px; overflow: hidden; min-width: 280px; }
+
+.wl-hcard {
+  padding: 20px; border-radius: 16px; border: 1px solid var(--border);
+  position: relative; overflow: hidden; flex-shrink: 0;
+}
+.wl-hcard-title { font-size: 13px; font-weight: 700; margin-bottom: 12px; }
+.wl-hcard-num   { font-size: 24px; font-weight: 800; line-height: 1; margin-bottom: 6px; }
+.wl-hcard-sub   { font-size: 10px; }
+.wl-hcard-icon  { position: absolute; right: 20px; top: 24px; width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+
+.wl-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 4px; padding-bottom: 20px; }
+.wl-card { padding: 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); box-shadow: var(--sh-sm); }

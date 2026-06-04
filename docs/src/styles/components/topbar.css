@@ -1,0 +1,66 @@
+/* ================================================================
+   TOPBAR.CSS — Top Navigation Bar Component
+   #topbar, .tp-*, .pulse, .tp-btn, .tp-badge
+================================================================ */
+
+#topbar {
+  height: 60px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 12px;
+  flex-shrink: 0;
+  box-shadow: 0 1px 0 var(--border);
+}
+
+.tp-title {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -.4px;
+  flex: 1;
+  background: linear-gradient(135deg, var(--txt), var(--txt2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.tp-badge {
+  display: flex; align-items: center; gap: 5px;
+  padding: 5px 11px; border-radius: 20px;
+  font-size: 11px; font-weight: 600; transition: all .2s;
+}
+.tp-badge.ok   { background: rgba(6,214,160,.12); color: var(--teal); }
+.tp-badge.warn { background: rgba(255,107,107,.12); color: var(--coral); }
+.tp-badge:hover { opacity: .8; }
+
+/* ── Pulse Indicator ── */
+.pulse {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+  animation: pulse 2s ease-in-out infinite;
+}
+.pulse.ok   { background: var(--teal); }
+.pulse.warn { background: var(--coral); }
+
+/* ── Topbar Button ── */
+.tp-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 16px; border-radius: 20px;
+  font-size: 12px; font-weight: 600; cursor: pointer;
+  border: none; transition: all .2s; font-family: inherit;
+}
+.tp-btn.pri {
+  background: linear-gradient(135deg, var(--violet), var(--coral));
+  color: #fff; box-shadow: 0 4px 14px rgba(124,92,252,.4);
+}
+.tp-btn.pri:hover { box-shadow: 0 6px 20px rgba(124,92,252,.55); transform: translateY(-1px); }
+.tp-btn.sec { background: var(--surface2); color: var(--txt2); border: 1px solid var(--border); }
+.tp-btn.sec:hover { background: var(--surface3); color: var(--txt); }
+
+/* ── Loader Box ── */
+.loader-box {
+  background: var(--surface); padding: 24px 32px; border-radius: 16px;
+  box-shadow: var(--sh-lg); display: flex; align-items: center; gap: 16px;
+  font-weight: 600; font-size: 15px; color: var(--txt); border: 1px solid var(--border);
+}

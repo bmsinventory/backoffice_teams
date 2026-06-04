@@ -1,0 +1,66 @@
+/* ================================================================
+   LAYOUT.CSS — Main Application Layout Structure
+   #wrap, #sidebar, #main, #topbar, #content, .view
+================================================================ */
+
+/* ── Root Wrapper ── */
+#wrap {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── Main Container ── */
+#main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+/* ── Content Area ── */
+#content {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Views (pages) ── */
+.view {
+  display: none;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+.view.on { display: flex; }
+
+/* View-specific display overrides */
+.view#view-overview.on  { display: block; overflow-y: auto; }
+.view#view-lodging.on   { display: block; overflow-y: auto; }
+.view#view-holidays.on  { display: block; overflow-y: auto; }
+.view#view-advance.on   { display: block; overflow-y: auto; }
+.view#view-leave.on     { display: flex; flex-direction: column; overflow: hidden; }
+
+/* ── Mobile Sidebar Overlay (backdrop) ── */
+#mob-sb-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(26,29,46,.55);
+  z-index: 29;
+  backdrop-filter: blur(2px);
+}
+#mob-sb-overlay.on { display: block; }
+
+/* ── Data Label ── */
+.ldb-lbl {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--txt3);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+}

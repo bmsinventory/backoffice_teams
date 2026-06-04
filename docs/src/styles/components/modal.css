@@ -1,0 +1,73 @@
+/* ================================================================
+   MODAL.CSS — Modal Dialog Component
+   .overlay, .modal, .m-head, .m-body, .m-foot
+================================================================ */
+
+/* ── Backdrop ── */
+.overlay {
+  position: fixed; inset: 0;
+  background: rgba(26,29,46,.5);
+  backdrop-filter: blur(6px);
+  z-index: 9000;
+  display: none; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.overlay.on { display: flex; }
+
+/* ── Modal Container ── */
+.modal {
+  background: var(--surface);
+  border-radius: var(--r3);
+  width: 100%; max-height: 90vh;
+  display: flex; flex-direction: column;
+  box-shadow: var(--sh-xl);
+  border: 1px solid var(--border);
+  animation: mIn .22s cubic-bezier(.4,0,.2,1);
+}
+.modal.md { max-width: 560px; }
+.modal.lg { max-width: 760px; }
+.modal.xl { max-width: 980px; }
+
+@keyframes mIn {
+  from { opacity: 0; transform: translateY(12px) scale(.98); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ── Modal Sections ── */
+.m-head {
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+}
+.m-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+.m-title { font-size: 16px; font-weight: 700; flex: 1; }
+.m-x {
+  width: 30px; height: 30px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 16px; color: var(--txt3);
+  border: none; background: transparent; transition: all .18s;
+}
+.m-x:hover { background: rgba(255,107,107,.1); color: var(--coral); }
+
+.m-body { overflow-y: auto; padding: 24px; flex: 1; }
+.m-foot {
+  padding: 16px 24px;
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: flex-end; gap: 10px;
+  flex-shrink: 0;
+  background: var(--surface2);
+  border-radius: 0 0 var(--r3) var(--r3);
+}
+
+/* ── Section Row inside Modal ── */
+.m-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px;
+  background: var(--surface2); border-radius: 10px;
+  border: 1px solid var(--border); margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+/* ── Section Header ── */
+.sec-head  { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.sec-label { font-size: 12px; font-weight: 700; color: var(--txt3); text-transform: uppercase; letter-spacing: .7px; }

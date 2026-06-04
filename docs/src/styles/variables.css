@@ -1,0 +1,50 @@
+/* ================================================================
+   VARIABLES.CSS — CSS Custom Properties (Design Tokens)
+   ศูนย์กลางของสี ฟอนต์ spacing และตัวแปรทั้งระบบ
+================================================================ */
+
+:root {
+  /* ── Background & Surface ── */
+  --bg:       #f4f5f7;
+  --surface:  #ffffff;
+  --surface2: #f8f9fb;
+  --surface3: #eef0f4;
+
+  /* ── Border ── */
+  --border:  #e4e7ed;
+  --border2: #d0d5e0;
+
+  /* ── Text ── */
+  --txt:  #1a1d2e;
+  --txt2: #5a6075;
+  --txt3: #9ba3b8;
+
+  /* ── Brand Colors ── */
+  --coral:  #ff6b6b;
+  --violet: #7c5cfc;
+  --teal:   #06d6a0;
+  --amber:  #ffa62b;
+  --sky:    #4cc9f0;
+  --pink:   #f72585;
+  --indigo: #4361ee;
+
+  /* ── Shadows ── */
+  --sh-sm: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.05);
+  --sh-md: 0 4px 16px rgba(0,0,0,.08), 0 2px 6px rgba(0,0,0,.04);
+  --sh-lg: 0 12px 40px rgba(0,0,0,.12), 0 4px 12px rgba(0,0,0,.06);
+  --sh-xl: 0 24px 64px rgba(0,0,0,.16);
+
+  /* ── Border Radius ── */
+  --r:  12px;
+  --r2: 16px;
+  --r3: 20px;
+
+  /* ── Typography ── */
+  font-family: 'Plus Jakarta Sans', 'Noto Sans Thai', sans-serif;
+
+  /* ── Bottom Nav Height (mobile) ── */
+  --nav-h: 58px;
+
+  /* ── Color Scheme ── */
+  color-scheme: light dark;
+}

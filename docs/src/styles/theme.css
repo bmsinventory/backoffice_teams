@@ -1,0 +1,128 @@
+/* ================================================================
+   THEME.CSS — Dark Mode & Theme System
+   System dark, manual [data-theme="dark"], manual [data-theme="light"]
+================================================================ */
+
+/* ── System Dark Mode ── */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg:      #0d1117;
+    --surface: #161b27;
+    --surface2:#1c2333;
+    --surface3:#21283a;
+    --border:  #2a3244;
+    --border2: #374256;
+    --txt:     #e6eaf4;
+    --txt2:    #8d96b0;
+    --txt3:    #586278;
+    --sh-sm: 0 1px 3px rgba(0,0,0,.4), 0 1px 2px rgba(0,0,0,.3);
+    --sh-md: 0 4px 16px rgba(0,0,0,.4), 0 2px 6px rgba(0,0,0,.3);
+    --sh-lg: 0 12px 40px rgba(0,0,0,.5), 0 4px 12px rgba(0,0,0,.4);
+  }
+}
+
+/* ── Manual Dark Mode ── */
+[data-theme="dark"] {
+  --bg:      #0d1117;
+  --surface: #161b27;
+  --surface2:#1c2333;
+  --surface3:#21283a;
+  --border:  #2a3244;
+  --border2: #374256;
+  --txt:     #e6eaf4;
+  --txt2:    #8d96b0;
+  --txt3:    #586278;
+  --sh-sm: 0 1px 3px rgba(0,0,0,.4), 0 1px 2px rgba(0,0,0,.3);
+  --sh-md: 0 4px 16px rgba(0,0,0,.4), 0 2px 6px rgba(0,0,0,.3);
+  --sh-lg: 0 12px 40px rgba(0,0,0,.5), 0 4px 12px rgba(0,0,0,.4);
+}
+
+/* ── Manual Light Mode ── */
+[data-theme="light"] {
+  --bg:#f4f5f7; --surface:#fff; --surface2:#f8f9fb; --surface3:#eef0f4;
+  --border:#e4e7ed; --border2:#d0d5e0; --txt:#1a1d2e; --txt2:#5a6075; --txt3:#9ba3b8;
+}
+
+/* ── Dark: Image Dim ── */
+[data-theme="dark"] img:not([data-no-dim]) { filter: brightness(.88); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) img:not([data-no-dim]) { filter: brightness(.88); }
+}
+
+/* ── Dark: Component Overrides ── */
+[data-theme="dark"] .lform          { background: #0d1117; }
+[data-theme="dark"] .lcard          { border-color: var(--border); }
+[data-theme="dark"] .lf-inp         { background: var(--surface2); border-color: var(--border); color: var(--txt); }
+[data-theme="dark"] .lf-inp:focus   { background: var(--surface3); }
+[data-theme="dark"] .lf-inp::placeholder { color: var(--txt3); }
+[data-theme="dark"] .lf-lbl         { color: var(--txt2); }
+[data-theme="dark"] .lf-chk         { color: var(--txt2); }
+[data-theme="dark"] .lf-chk-box     { background: var(--surface2); border-color: var(--border2); }
+[data-theme="dark"] .lcard-t1       { color: var(--txt); }
+[data-theme="dark"] .lcard-t2,
+[data-theme="dark"] .lcard-foot     { color: var(--txt3); }
+[data-theme="dark"] .lbtn-sso       { background: var(--surface2); border-color: var(--border); color: var(--txt); }
+[data-theme="dark"] .lf-div::before,
+[data-theme="dark"] .lf-div::after  { background: var(--border); }
+[data-theme="dark"] .login-err      { background: rgba(220,38,38,.15); border-color: rgba(220,38,38,.3); }
+
+[data-theme="dark"] .stat-c         { background: var(--surface); border-color: var(--border); }
+[data-theme="dark"] .kb-card        { background: var(--surface); border-color: var(--border); }
+[data-theme="dark"] .kb-card:hover  { background: var(--surface2); }
+[data-theme="dark"] .kb-col         { background: var(--surface2); border-color: var(--border); }
+[data-theme="dark"] .dtable-inner   { background: var(--surface); border-color: var(--border); }
+[data-theme="dark"] thead th        { background: var(--surface2); color: var(--txt3); }
+[data-theme="dark"] tbody tr:hover  { background: var(--surface3); }
+[data-theme="dark"] .modal          { background: var(--surface); border-color: var(--border); }
+[data-theme="dark"] .m-head         { border-color: var(--border); }
+[data-theme="dark"] .m-foot         { background: var(--surface2); border-color: var(--border); }
+[data-theme="dark"] .overlay        { background: rgba(0,0,0,.65); }
+[data-theme="dark"] .f-input        { background: var(--surface2); border-color: var(--border); color: var(--txt); }
+[data-theme="dark"] .f-input:focus  { background: var(--surface3); border-color: var(--violet); }
+[data-theme="dark"] .t-sel          { background: var(--surface2); border-color: var(--border); color: var(--txt2); }
+[data-theme="dark"] .t-search input { background: var(--surface2); border-color: var(--border); color: var(--txt); }
+[data-theme="dark"] #sidebar        { background: var(--surface); border-color: var(--border); }
+[data-theme="dark"] #topbar         { background: var(--surface); border-color: var(--border); }
+[data-theme="dark"] .toolbar        { background: var(--surface); border-color: var(--border); }
+[data-theme="dark"] .af-tabs        { background: var(--surface); border-color: var(--border); }
+[data-theme="dark"] .af-tab         { background: var(--surface2); color: var(--txt3); }
+[data-theme="dark"] .af-tab:hover   { background: var(--surface3); }
+[data-theme="dark"] #bottom-nav     { background: var(--surface); border-color: var(--border); }
+[data-theme="dark"] .btn-sec,
+[data-theme="dark"] .btn-ghost      { background: var(--surface2); border-color: var(--border); color: var(--txt2); }
+[data-theme="dark"] .ts-card        { background: var(--surface); border-color: var(--border); }
+[data-theme="dark"] .ts-card-body   { background: var(--surface2); }
+[data-theme="dark"] .ts-row-item:hover { background: var(--surface3); }
+[data-theme="dark"] .ov-card        { background: var(--surface); border-color: var(--border); }
+[data-theme="dark"] .wl-card        { background: var(--surface); border-color: var(--border); }
+
+/* ── System Dark: Mirror Overrides ── */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .lform  { background: #0d1117; }
+  :root:not([data-theme="light"]) .lcard  { border-color: var(--border); }
+  :root:not([data-theme="light"]) .lf-inp { background: var(--surface2); border-color: var(--border); color: var(--txt); }
+  :root:not([data-theme="light"]) #sidebar      { background: var(--surface); border-color: var(--border); }
+  :root:not([data-theme="light"]) #topbar       { background: var(--surface); border-color: var(--border); }
+  :root:not([data-theme="light"]) .toolbar      { background: var(--surface); border-color: var(--border); }
+  :root:not([data-theme="light"]) .modal        { background: var(--surface); border-color: var(--border); }
+  :root:not([data-theme="light"]) .m-foot       { background: var(--surface2); border-color: var(--border); }
+  :root:not([data-theme="light"]) .f-input      { background: var(--surface2); border-color: var(--border); color: var(--txt); }
+  :root:not([data-theme="light"]) .stat-c       { background: var(--surface); }
+  :root:not([data-theme="light"]) .dtable-inner { background: var(--surface); border-color: var(--border); }
+  :root:not([data-theme="light"]) thead th      { background: var(--surface2); }
+  :root:not([data-theme="light"]) tbody tr:hover { background: var(--surface3); }
+  :root:not([data-theme="light"]) .kb-card      { background: var(--surface); border-color: var(--border); }
+  :root:not([data-theme="light"]) .kb-col       { background: var(--surface2); border-color: var(--border); }
+  :root:not([data-theme="light"]) .overlay      { background: rgba(0,0,0,.65); }
+  :root:not([data-theme="light"]) #bottom-nav   { background: var(--surface); border-color: var(--border); }
+  :root:not([data-theme="light"]) .btn-sec,
+  :root:not([data-theme="light"]) .btn-ghost    { background: var(--surface2); border-color: var(--border); color: var(--txt2); }
+  :root:not([data-theme="light"]) .t-sel        { background: var(--surface2); border-color: var(--border); color: var(--txt2); }
+  :root:not([data-theme="light"]) .t-search input { background: var(--surface2); border-color: var(--border); color: var(--txt); }
+  :root:not([data-theme="light"]) .ts-card      { background: var(--surface); border-color: var(--border); }
+  :root:not([data-theme="light"]) .ts-card-body { background: var(--surface2); }
+  :root:not([data-theme="light"]) .ov-card      { background: var(--surface); border-color: var(--border); }
+  :root:not([data-theme="light"]) .wl-card      { background: var(--surface); border-color: var(--border); }
+  :root:not([data-theme="light"]) .af-tabs      { background: var(--surface); }
+  :root:not([data-theme="light"]) .af-tab       { background: var(--surface2); color: var(--txt3); }
+}

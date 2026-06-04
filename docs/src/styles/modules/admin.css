@@ -1,0 +1,41 @@
+/* ================================================================
+   ADMIN.CSS — Admin Panel Module
+   .adm-layout, .adm-sidebar, .adm-nav, .adm-main, .adm-card
+================================================================ */
+
+.adm-layout {
+  display: flex; height: 85vh; width: 100%; overflow: hidden;
+  background: var(--bg); border-radius: var(--r3); box-shadow: var(--sh-xl); flex-direction: row;
+}
+.adm-sidebar { width: 240px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; z-index: 10; }
+.adm-sidebar-head { padding: 24px 20px; font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--border); color: var(--txt); }
+.adm-nav { padding: 16px 12px; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; flex: 1; }
+.adm-nav-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 10px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--txt2); transition: all .2s; border: 1px solid transparent; }
+.adm-nav-item:hover { background: var(--surface2); color: var(--txt); }
+.adm-nav-item.on    { background: #fff; border-color: var(--border); box-shadow: var(--sh-sm); color: var(--violet); }
+.adm-nav-icon { font-size: 16px; min-width: 24px; text-align: center; }
+
+.adm-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); }
+.adm-main-head { padding: 20px 24px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+.adm-main-body { padding: 24px; overflow-y: auto; flex: 1; }
+
+.adm-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; transition: all .2s; box-shadow: var(--sh-sm); display: flex; align-items: center; gap: 14px; cursor: default; }
+.adm-card:hover { transform: translateY(-2px); box-shadow: var(--sh-md); border-color: var(--border2); }
+.adm-card-icon    { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+.adm-card-info    { flex: 1; min-width: 0; }
+.adm-card-title   { font-size: 14px; font-weight: 700; color: var(--txt); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.adm-card-sub     { font-size: 11px; color: var(--txt3); font-family: 'JetBrains Mono', monospace; }
+.adm-card-actions { display: flex; gap: 6px; opacity: 0; transition: opacity .2s; }
+.adm-card:hover .adm-card-actions { opacity: 1; }
+
+.adm-form-wrap {
+  background: var(--surface); border: 1px solid var(--violet);
+  border-radius: 14px; padding: 24px; margin-bottom: 24px;
+  box-shadow: 0 12px 32px rgba(124,92,252,.12);
+  position: relative; animation: fadeUp .3s cubic-bezier(.4,0,.2,1);
+}
+.adm-form-wrap::before {
+  content: ''; position: absolute; top: 0; left: 0; bottom: 0; width: 5px;
+  background: linear-gradient(180deg, var(--violet), var(--coral));
+  border-radius: 14px 0 0 14px;
+}

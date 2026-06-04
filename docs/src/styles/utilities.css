@@ -1,0 +1,35 @@
+/* ================================================================
+   UTILITIES.CSS — Shared Utility Classes
+   .av, .av-stack, .text-*, .w-full, .dm-toggle
+================================================================ */
+
+/* ── Avatar ── */
+.av {
+  width: 28px; height: 28px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0;
+}
+.av-stack { display: flex; }
+.av-stack .av { margin-left: -5px; border: 2px solid var(--surface); }
+.av-stack .av:first-child { margin-left: 0; }
+
+/* ── Dark Mode Toggle ── */
+#dm-toggle {
+  width: 34px; height: 34px; border-radius: 10px;
+  background: var(--surface2); border: 1.5px solid var(--border);
+  color: var(--txt2); display: flex; align-items: center;
+  justify-content: center; cursor: pointer; font-size: 16px;
+  transition: all .2s; flex-shrink: 0;
+}
+#dm-toggle:hover { background: var(--surface3); color: var(--txt); }
+
+/* ── Text Utilities ── */
+.text-wrap   { word-break: break-word; overflow-wrap: anywhere; white-space: normal; line-height: 1.4; }
+.text-nowrap { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.w-full      { width: 100%; max-width: 100%; }
+
+/* ── Bottom Navigation ── */
+#bottom-nav { display: none; }
+
+/* ── Small Screens: hide button labels ── */
+.btn-lbl { /* hidden at ≤480px via responsive.css */ }

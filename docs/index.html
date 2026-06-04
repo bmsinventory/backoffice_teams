@@ -21,8 +21,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-<link rel="stylesheet" href="css/style.css">
-<link rel="stylesheet" href="css/responsive.css">
+<!-- ══ New Modular CSS (replaces css/style.css + css/responsive.css) ══ -->
+<link rel="stylesheet" href="src/styles/main.css">
 <script src="js/mobile.js"></script>
 </head>
 <body>
@@ -2015,18 +2015,41 @@
   </div>
 </div>
 
-<!-- ── ตั้งค่า Supabase credentials ที่นี่ ── -->
+<!-- ══ Supabase Credentials (ตั้งค่าที่นี่ก่อน SDK โหลด) ══ -->
 <script>
   window.SUPABASE_URL      = 'https://zsxllqiygochmldmtpgc.supabase.co';
   window.SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpzeGxscWl5Z29jaG1sZG10cGdjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MDcwODcsImV4cCI6MjA5NTk4MzA4N30.UOJCTHO0jjMRW21unnB3xUqlBjRp-S2s-JMYZuzkWOw';
 </script>
 <!-- Supabase JS SDK (UMD) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<!-- Supabase adapter + config + auth (โหลดก่อน module scripts) -->
-<script src="js/supabase-adapter.js"></script>
-<script src="js/config-sb.js"></script>
-<script src="js/auth-sb.js"></script>
-<!-- App modules -->
+
+<!-- ══ New Modular Architecture (replaces supabase-adapter.js, config-sb.js, auth-sb.js) ══
+     Load Order: config → utils → services → router
+     Feature modules below still use the same window.* globals ══ -->
+
+<!-- 1. Config Layer -->
+<script src="src/config/api.config.js"></script>
+<script src="src/config/app.config.js"></script>
+<script src="src/config/routes.config.js"></script>
+
+<!-- 2. Utils Layer (ไม่มี dependency ต่อกัน) -->
+<script src="src/utils/dom.util.js"></script>
+<script src="src/utils/date.util.js"></script>
+<script src="src/utils/number.util.js"></script>
+<script src="src/utils/string.util.js"></script>
+<script src="src/utils/permission.util.js"></script>
+<script src="src/utils/labor.util.js"></script>
+
+<!-- 3. Services Layer (ต้องโหลดหลัง utils) -->
+<script src="src/services/storage.service.js"></script>
+<script src="src/services/supabase.service.js"></script>
+<script src="src/services/realtime.service.js"></script>
+<script src="src/services/auth.service.js"></script>
+
+<!-- 4. Router -->
+<script src="src/router.js"></script>
+
+<!-- ══ Feature Modules (unchanged — ยังใช้ window.* globals เหมือนเดิม) ══ -->
 <script type="module" src="js/overview.js"></script>
 <script type="module" src="js/kanban.js"></script>
 <script type="module" src="js/projects.js"></script>
@@ -2047,6 +2070,9 @@
 <script type="module" src="js/worklog.js"></script>
 <script src="js/budget.js"></script>
 <script src="js/export.js"></script>
+
+<!-- 5. App Entry Point (โหลดสุดท้าย หลัง feature modules ทั้งหมด) -->
+<script src="src/app.js"></script>
 
 <!-- PWA Install Bar (Android) -->
 <div id="pwa-bar" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:9998;

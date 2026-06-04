@@ -1,0 +1,21 @@
+/* ================================================================
+   OVERVIEW.CSS — Dashboard Overview Module
+   .ov-grid, .ov-card
+================================================================ */
+
+.ov-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 280px;
+  gap: 16px;
+  padding: 0 24px 24px;
+  flex: 1; overflow-y: auto; background: var(--bg);
+}
+.ov-card {
+  background: var(--surface); border-radius: var(--r2);
+  border: 1px solid var(--border); padding: 20px;
+  box-shadow: var(--sh-sm);
+}
+.ov-card-title {
+  font-size: 12px; font-weight: 700; color: var(--txt3);
+  text-transform: uppercase; letter-spacing: .7px; margin-bottom: 14px;
+}
