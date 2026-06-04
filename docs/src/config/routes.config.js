@@ -22,6 +22,7 @@
     { id:'targets',      label:'เป้าหมายทีม',    icon:'🎯' },
     { id:'hospital',     label:'รายชื่อ รพ.',     icon:'🏥' },
     { id:'contract',     label:'ข้อมูลสัญญา',     icon:'📄' },
+    { id:'worklog',      label:'บันทึกงาน',       icon:'📝' },
   ];
 
   // ── Route Map: moduleId → viewId ──

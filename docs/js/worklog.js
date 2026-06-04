@@ -3,7 +3,6 @@
 'use strict';
 
 var _wlEditId = null;
-var _wlFilter = 'mine';
 
 const WL_CATS = [
   {id:'meeting',   emoji:'🗣️', label:'ประชุม'},
@@ -78,17 +77,9 @@ window.renderWorkLog = function(){
   if(!body) return;
 
   var allLogs = window.WORK_LOGS || [];
-  var mySid   = _curStaffId();
   var myUid   = window.cu ? window.cu.id : '';
 
-  var logs = allLogs.filter(function(wl){
-    if(_wlFilter === 'mine'){
-      var isCreator = wl.uid === myUid || wl.staffId === mySid;
-      var isParticipant = (wl.participants||[]).some(function(p){ return p.sid === mySid; });
-      return isCreator || isParticipant;
-    }
-    return true;
-  });
+  var logs = allLogs.slice();
 
   var q = ((document.getElementById('wl-q')||{}).value||'').toLowerCase();
   if(q) logs = logs.filter(function(wl){
@@ -158,17 +149,6 @@ window.renderWorkLog = function(){
   });
 
   body.innerHTML = html;
-};
-
-// ── FILTER TABS ──
-window._wlSetFilter = function(f, el){
-  _wlFilter = f;
-  document.querySelectorAll('.wl-ftab').forEach(function(b){
-    b.style.color = 'var(--txt-muted)';
-    b.style.borderBottom = '2px solid transparent';
-  });
-  if(el){ el.style.color='var(--violet)'; el.style.borderBottom='2px solid var(--violet)'; }
-  window.renderWorkLog();
 };
 
 // ── MODAL OPEN ──

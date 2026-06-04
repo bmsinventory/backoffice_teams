@@ -641,13 +641,8 @@
         <div style="padding:16px 24px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;">
           <div style="font-size:16px;font-weight:800;color:var(--txt);">📝 บันทึกงาน</div>
           <div style="flex:1;"></div>
-          <button class="btn btn-pri btn-sm" onclick="window.openWorkLogModal()">+ เพิ่มบันทึก</button>
-        </div>
-        <div style="padding:10px 24px;display:flex;align-items:center;gap:4px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;">
-          <button class="wl-ftab" onclick="window._wlSetFilter('mine',this)" style="background:transparent;border:none;border-bottom:2px solid var(--violet);padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;color:var(--violet);">ของฉัน</button>
-          <button class="wl-ftab" onclick="window._wlSetFilter('all',this)" style="background:transparent;border:none;border-bottom:2px solid transparent;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;color:var(--txt-muted);">ทั้งทีม</button>
-          <div style="flex:1;"></div>
           <input type="text" id="wl-q" class="t-sel" placeholder="🔍 ค้นหา..." style="width:160px;" oninput="window.renderWorkLog&&window.renderWorkLog()">
+          <button class="btn btn-pri btn-sm" onclick="window.openWorkLogModal()">+ เพิ่มบันทึก</button>
         </div>
         <div id="wl-list" style="padding:12px 24px 28px;"></div>
       </div>
