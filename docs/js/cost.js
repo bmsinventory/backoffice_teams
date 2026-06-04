@@ -403,6 +403,7 @@ function _populateCostFilters() {
 // ── MODAL ─────────────────────────────────────────────────────────────────────
 window.openCostModal = function(id) {
   const c = id ? window.COSTS.find(r => r.id === id) : null;
+  if (c ? !window.canEdit('cost') : !window.canAdd('cost')) return;
   document.getElementById('m-cost-title').textContent = c ? 'แก้ไขค่าใช้จ่าย' : 'บันทึกค่าใช้จ่าย';
   document.getElementById('cost-edit-id').value = c ? c.id : '';
 
@@ -429,6 +430,7 @@ window.openCostModal = function(id) {
 
 window.saveCost = async function() {
   const id      = document.getElementById('cost-edit-id').value;
+  if (id ? !window.canEdit('cost') : !window.canAdd('cost')) return;
   const pid     = document.getElementById('costf-proj').value;
   const cat     = document.getElementById('costf-cat').value;
   const amount  = parseFloat(document.getElementById('costf-amount').value);

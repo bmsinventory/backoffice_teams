@@ -274,7 +274,10 @@ window.openWorkLogModal = function(id){
 
   document.getElementById('m-worklog-body').innerHTML = html;
   var delBtn = document.getElementById('m-worklog-del');
-  if(delBtn) delBtn.style.display = wl ? '' : 'none';
+  var myUid2 = window.cu ? window.cu.id : '';
+  var isCreator = wl && (wl.uid === myUid2);
+  // Delete button: visible only for creator or users with canDel permission
+  if(delBtn) delBtn.style.display = (wl && (isCreator || window.canDel('worklog'))) ? '' : 'none';
   window.openM('m-worklog');
 };
 
@@ -349,6 +352,15 @@ window._wlStaffFilter = function(q){
 
 // ── SAVE ──
 window.saveWorkLog = async function(){
+  // Editing: must be creator OR have canEdit; Adding new: any logged-in user
+  if (_wlEditId) {
+    var existing = (window.WORK_LOGS||[]).find(function(w){ return w.id===_wlEditId; });
+    var myUid3 = window.cu ? window.cu.id : '';
+    if (existing && existing.uid !== myUid3 && !window.canEdit('worklog')) {
+      window.showAlert&&window.showAlert('คุณไม่มีสิทธิ์แก้ไขบันทึกงานของผู้อื่น','warn'); return;
+    }
+  } else if (!window.cu) { return; }
+
   var titleEl = document.getElementById('wlf-title');
   var title   = titleEl ? titleEl.value.trim() : '';
   if(!title){ window.showAlert&&window.showAlert('กรุณาระบุชื่องาน','error'); return; }
@@ -407,6 +419,11 @@ window.saveWorkLog = async function(){
 // ── DELETE ──
 window.deleteWorkLog = async function(){
   if(!_wlEditId) return;
+  var existing2 = (window.WORK_LOGS||[]).find(function(w){ return w.id===_wlEditId; });
+  var myUid4 = window.cu ? window.cu.id : '';
+  if (existing2 && existing2.uid !== myUid4 && !window.canDel('worklog')) {
+    window.showAlert&&window.showAlert('คุณไม่มีสิทธิ์ลบบันทึกงานของผู้อื่น','warn'); return;
+  }
   if(!await window.confirmAsync('ต้องการลบบันทึกงานนี้?',{icon:'🗑️',title:'ลบบันทึกงาน'})) return;
   try {
     await window.deleteDoc(window.getDocRef('WORK_LOGS', _wlEditId));

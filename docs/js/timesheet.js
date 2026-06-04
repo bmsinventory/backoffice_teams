@@ -332,6 +332,7 @@ function _populateTsFilters() {
 
 // ── AUTO-SYNC FROM PROJECT MEMBERS / VISITS ──────────────────────────────────
 window.tsSyncProject = async function(pid, members) {
+  if (!window.canEdit('projects')) return;
   var batch = writeBatch();
 
   // ลบรายการ auto-generate เก่าของโครงการนี้

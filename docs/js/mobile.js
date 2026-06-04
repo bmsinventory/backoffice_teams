@@ -91,21 +91,13 @@ function updateBottomNav(viewId) {
   });
 }
 
-window._origGoView = window.goView;
-// Wrap goView to sync bottom nav
+// Patch goView to also sync bottom-nav indicator (router.js defines goView first)
 function patchGoView() {
   if (!window.goView || window.goView._patched) return;
   var orig = window.goView;
   window.goView = function (viewId, btn) {
     orig(viewId, btn);
     updateBottomNav(viewId);
-    // Close mobile sidebar if open
-    if (window.innerWidth <= 768) {
-      var sb = document.getElementById('sidebar');
-      var ov = document.getElementById('mob-sb-overlay');
-      if (sb) sb.classList.remove('mob-open');
-      if (ov) ov.classList.remove('on');
-    }
   };
   window.goView._patched = true;
 }

@@ -6,6 +6,12 @@ var HOL_TYPE_LABEL={national:'🇹🇭 วันหยุดราชการ',
 var HOL_TYPE_COLOR={national:'var(--coral)',company:'var(--violet)',both:'var(--teal)',custom:'var(--amber)'};
 
 window.renderHolidays=function(){
+  // แสดง/ซ่อนปุ่ม Add/Import ตามสิทธิ์
+  var canAddHol = window.canAdd && window.canAdd('holiday');
+  var holAddBtn = document.getElementById('hol-add-btn');
+  var holImpBtn = document.getElementById('hol-import-btn');
+  if (holAddBtn) holAddBtn.style.display = canAddHol ? '' : 'none';
+  if (holImpBtn) holImpBtn.style.display = canAddHol ? '' : 'none';
   var yf=document.getElementById('hol-yr');
   if(yf){
     var prevVal=yf.value;
@@ -53,9 +59,9 @@ window.renderHolidays=function(){
         +'<div style="font-size:13px;font-weight:600;color:var(--txt);">'+esc(h.name)+'</div>'
         +'<div style="font-size:11px;color:var(--txt3);margin-top:2px;">'+dateDisp+' · <span style="color:'+(HOL_TYPE_COLOR[h.type]||'var(--violet)')+';">'+esc(HOL_TYPE_LABEL[h.type]||h.type)+'</span></div>'
         +'</div>'
-        +(window.canEdit('leave')?'<div style="display:flex;gap:6px;flex-shrink:0;">'
+        +(window.canEdit('holiday')?'<div style="display:flex;gap:6px;flex-shrink:0;">'
           +'<button class="btn btn-ghost btn-sm" onclick="window.openHolForm(\''+h.id+'\')">✏️</button>'
-          +'<button class="btn btn-red btn-sm" onclick="window.deleteHoliday(\''+h.id+'\',\''+esc(h.name)+'\')">🗑</button>'
+          +(window.canDel('holiday')?'<button class="btn btn-red btn-sm" onclick="window.deleteHoliday(\''+h.id+'\',\''+esc(h.name)+'\')">🗑</button>':'')
           +'</div>':'')
         +'</div>';
     });
@@ -344,6 +350,8 @@ window.approveLeave=function(id){
 };
 
 window.saveLeave=async function(){
+  var eidCheck=document.getElementById('leave-edit-id').value;
+  if(eidCheck ? !window.canEdit('leave') : !window.canAdd('leave')){window.showAlert('คุณไม่มีสิทธิ์บันทึกการลางาน','warn');return;}
   var staffId=document.getElementById('leavef-staff').value;
   var start=document.getElementById('leavef-start').value;
   var end=document.getElementById('leavef-end').value;
@@ -373,8 +381,11 @@ window.saveLeave=async function(){
 
 window.deleteLeave=function(id){
   var lv=window.LEAVES.find(function(x){return x.id===id;});
-  if(lv&&lv.status==='approved'&&!window.isAdmin()){window.showAlert('ไม่สามารถลบการลาที่อนุมัติแล้วได้','warn');return;}
-  if(lv&&lv.status==='rejected'&&!window.canEdit('leave')){window.showAlert('คุณไม่มีสิทธิ์ลบรายการที่ไม่อนุมัติ','warn');return;}
+  if(!lv) return;
+  // approved: admin only
+  if(lv.status==='approved'&&!window.isAdmin()){window.showAlert('ไม่สามารถลบการลาที่อนุมัติแล้วได้','warn');return;}
+  // rejected/pending: must have canDel permission
+  if(!window.canDel('leave')&&!window.isAdmin()){window.showAlert('คุณไม่มีสิทธิ์ลบรายการลางาน','warn');return;}
   window.showConfirm('ลบรายการลางานนี้?',function(){
     deleteDoc(getDocRef('LEAVES',id)).catch(function(e){window.showDbError(e);});
   },{icon:'🗑',title:'ยืนยันการลบ',okColor:'var(--coral)',okText:'ลบ'});
@@ -391,6 +402,8 @@ window.openHolForm=function(id){
 };
 
 window.saveHoliday=async function(){
+  var eidHol=document.getElementById('hol-edit-id').value;
+  if(eidHol ? !window.canEdit('holiday') : !window.canAdd('holiday')){window.showAlert('คุณไม่มีสิทธิ์จัดการวันหยุด','warn');return;}
   var name=document.getElementById('holf-name').value.trim();
   var date=document.getElementById('holf-date').value;
   if(!name){window.showAlert('กรุณาระบุชื่อวันหยุด','error');return;}
@@ -403,6 +416,7 @@ window.saveHoliday=async function(){
 };
 
 window.deleteHoliday=function(id,name){
+  if(!window.canDel('holiday')){window.showAlert('คุณไม่มีสิทธิ์ลบวันหยุด','warn');return;}
   window.showConfirm('ลบวันหยุด "'+name+'" ?',function(){
     deleteDoc(getDocRef('HOLIDAYS',id)).catch(function(e){window.showDbError(e);});
   },{icon:'🗑',title:'ยืนยันการลบ',okColor:'var(--coral)',okText:'ลบ'});
@@ -411,6 +425,7 @@ window.deleteHoliday=function(id,name){
 window._holParsedRows=[];
 
 window.openHolImport=function(){
+  if(!window.canAdd('holiday')){window.showAlert('คุณไม่มีสิทธิ์นำเข้าวันหยุด','warn');return;}
   document.getElementById('hol-import-txt').value='';
   document.getElementById('hol-import-preview').innerHTML='';
   var fs=document.getElementById('hol-file-status');if(fs)fs.style.display='none';
@@ -603,6 +618,7 @@ window.downloadHolTemplate=function(){
 };
 
 window.doHolImport=async function(){
+  if(!window.canAdd('holiday')){window.showAlert('คุณไม่มีสิทธิ์นำเข้าวันหยุด','warn');return;}
   var records=[];
   // Priority 1: file upload parsed rows
   if(window._holParsedRows&&window._holParsedRows.length){

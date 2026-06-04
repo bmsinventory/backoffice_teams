@@ -18,28 +18,94 @@
  */
 (function () {
 
-  // ── Setup User Session (sidebar UI, permissions) ──
+  // ── Setup User Session (sidebar UI, permissions, element visibility) ──
   window.setupUser = function () {
     var cu = window.cu;
     if (!cu) return;
 
-    // Update avatar & name in sidebar
-    var uName = document.getElementById('user-name');
-    var uRole = document.getElementById('user-role');
-    var uAv   = document.getElementById('user-av');
+    // Update avatar & name in sidebar (IDs match index.html: u-av, u-name, u-role)
+    var uAv   = document.getElementById('u-av');
+    var uName = document.getElementById('u-name');
+    var uRole = document.getElementById('u-role');
+    var roleColors = {
+      admin:  'linear-gradient(135deg,#ff6b6b,#ffa62b)',
+      pm:     'linear-gradient(135deg,#7c5cfc,#4cc9f0)',
+      viewer: 'linear-gradient(135deg,#06d6a0,#4cc9f0)',
+    };
+    if (uAv) {
+      uAv.textContent = (cu.name || cu.username || '?').charAt(0).toUpperCase();
+      uAv.style.background = roleColors[cu.role] || 'linear-gradient(135deg,#7c5cfc,#ff6b6b)';
+    }
     if (uName) uName.textContent = cu.name || cu.username || '';
     if (uRole) uRole.textContent = window.roleLabel ? window.roleLabel(cu.role) : (cu.role || '');
-    if (uAv)   uAv.textContent   = (cu.name || cu.username || '?').charAt(0).toUpperCase();
 
-    // Update topbar
-    var tpUser = document.getElementById('tp-user');
-    if (tpUser) tpUser.textContent = cu.name || cu.username || '';
-
-    // Show/hide nav buttons by permission
-    document.querySelectorAll('.nav-btn[data-module]').forEach(function (btn) {
-      var moduleId = btn.getAttribute('data-module');
-      btn.style.display = (window.canView && window.canView(moduleId)) ? '' : 'none';
+    // Show/hide role-based CSS class elements
+    var isAdm  = window.isAdmin && window.isAdmin();
+    var canAdm = window.canView && window.canView('admin');
+    document.querySelectorAll('.admin-only').forEach(function (el) {
+      el.style.display = (isAdm || canAdm) ? '' : 'none';
     });
+    document.querySelectorAll('.ce-only').forEach(function (el) {
+      el.style.display = (window.ce && window.ce()) ? '' : 'none';
+    });
+    document.querySelectorAll('.cl-only').forEach(function (el) {
+      el.style.display = (window.cl && window.cl()) ? '' : 'none';
+    });
+    document.querySelectorAll('.targets-only').forEach(function (el) {
+      el.style.display = (isAdm || (window.canView && window.canView('targets'))) ? '' : 'none';
+    });
+
+    // Import button (topbar) — admin only
+    var btnImport = document.getElementById('btn-import-top');
+    if (btnImport) btnImport.style.display = isAdm ? '' : 'none';
+
+    // Admin sub-tab visibility (Users + Roles tabs are admin-only)
+    var atUsers = document.getElementById('at-users');
+    var atRoles = document.getElementById('at-roles');
+    if (atUsers) atUsers.style.display = isAdm ? '' : 'none';
+    if (atRoles) atRoles.style.display = isAdm ? '' : 'none';
+
+    // Nav button visibility per permission
+    var navModules = [
+      'overview','kanban','projects','advance','lodging',
+      'workload','availability','calendar','leave','timesheet',
+      'cost','budget','targets','hospital','contract','worklog','holiday',
+    ];
+    navModules.forEach(function (m) {
+      var btn = document.querySelector('.nav-btn[onclick*="\'' + m + '\'"]');
+      if (!btn) return;
+      var canSee = window.canView ? window.canView(m) : true;
+      btn.style.display = canSee ? '' : 'none';
+      if (!canSee) btn.classList.remove('on');
+    });
+
+
+    // Sync advance overdue badge
+    window.updateBadge && window.updateBadge();
+  };
+
+  // ── Update Advance Overdue Badge ──
+  window.updateBadge = function () {
+    var pd  = window.pd;
+    var now = new Date();
+    var ov  = (window.ADVANCES || []).filter(function (a) {
+      return a.ddate && pd(a.ddate) < now && a.status !== 'cleared';
+    }).length;
+
+    var nb = document.getElementById('adv-nb');
+    if (nb) { nb.textContent = ov; nb.style.display = ov ? '' : 'none'; }
+
+    var bNb = document.getElementById('bnav-adv-badge');
+    if (bNb) { bNb.textContent = ov; bNb.style.display = ov ? '' : 'none'; }
+
+    var td = document.getElementById('tp-overdue');
+    var tt = document.getElementById('tp-overdue-txt');
+    if (ov > 0) {
+      if (td) td.style.display = 'flex';
+      if (tt) tt.textContent = ov + ' Advance เกินกำหนด';
+    } else {
+      if (td) td.style.display = 'none';
+    }
   };
 
   // ── Render All Active Views ──
@@ -49,7 +115,7 @@
     // Overview is default — always render
     if (window.renderOverview) window.renderOverview();
 
-    // Check active views and re-render
+    // Re-render whichever view is currently active
     var renders = {
       'view-kanban':       'renderKanban',
       'view-projects':     'renderProjects',
@@ -76,6 +142,9 @@
         window[renderFn]();
       }
     });
+
+    // Always sync badges after any data update
+    window.updateBadge && window.updateBadge();
   };
 
   // ── PWA Install Prompt ──
@@ -100,14 +169,14 @@
     });
   }
 
-  // ── Restore remembered username on login form ──
+  // ── DOM Ready: restore remembered login + bind login form ──
   document.addEventListener('DOMContentLoaded', function () {
     var remUser = window.StorageService && window.StorageService.getRememberedUser();
-    var uEl = document.getElementById('lu');
+    var uEl  = document.getElementById('lu');
     var remEl = document.getElementById('l-rem');
     if (remUser && uEl) { uEl.value = remUser; if (remEl) remEl.checked = true; }
 
-    // Enter key on login form
+    // Enter key on username/password inputs → login
     ['lu', 'lp'].forEach(function (id) {
       var el = document.getElementById(id);
       if (el) el.addEventListener('keydown', function (e) { if (e.key === 'Enter') window.doLogin && window.doLogin(); });

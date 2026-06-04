@@ -333,7 +333,8 @@ window.renderContract = function(){
       var diff      = endD ? Math.ceil((endD - now)/864e5) : null;
       var expWarn   = c.status==='active' && diff!==null && diff>=0 && diff<=30;
       var expired   = c.status==='active' && diff!==null && diff<0;
-      var canEdit   = window.ce ? window.ce() : false;
+      var canEdit   = window.canEdit ? window.canEdit('contract') : false;
+      var canDel2   = window.canDel  ? window.canDel('contract')  : false;
       var endColor  = (expWarn||expired) ? 'var(--coral)' : 'var(--txt2)';
       var endVal    = c.endDate ? fd(c.endDate)+(expWarn?' ⚠️':expired?' ⛔':'') : '—';
 
@@ -363,10 +364,8 @@ window.renderContract = function(){
           +(expWarn?'<span style="background:var(--coral)12;color:var(--coral);font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;border:1px solid var(--coral)30;white-space:nowrap;">⏰ อีก '+diff+' วัน</span>':'')
           +(expired?'<span style="background:var(--coral)12;color:var(--coral);font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;border:1px solid var(--coral)30;white-space:nowrap;">⛔ หมดอายุแล้ว</span>':'')
           +'<div style="flex:1;"></div>'
-          +(canEdit
-              ?'<button class="btn btn-ghost btn-sm" style="font-size:11px;" onclick="event.stopPropagation();window.openContractModal(\''+safeId+'\')">✏️ แก้ไข</button>'
-               +'<button class="btn btn-ghost btn-sm" style="color:var(--coral);font-size:11px;" onclick="event.stopPropagation();window.askDel(\'contract\',\''+safeId+'\',\''+safeName+'\')">🗑</button>'
-              :'')
+          +(canEdit?'<button class="btn btn-ghost btn-sm" style="font-size:11px;" onclick="event.stopPropagation();window.openContractModal(\''+safeId+'\')">✏️ แก้ไข</button>':'')
+          +(canDel2?'<button class="btn btn-ghost btn-sm" style="color:var(--coral);font-size:11px;" onclick="event.stopPropagation();window.askDel(\'contract\',\''+safeId+'\',\''+safeName+'\')">🗑</button>':'')
         +'</div>'
 
         // ── section: body ──
@@ -455,12 +454,13 @@ window.openContractModal = function(id){
 
   var foot = document.getElementById('m-contract-foot');
   if(foot){
-    var canEdit = window.ce ? window.ce() : false;
-    foot.innerHTML = (canEdit && !isNew
+    var canEditCt = isNew ? (window.canAdd ? window.canAdd('contract') : false) : (window.canEdit ? window.canEdit('contract') : false);
+    var canDelCt  = !isNew && (window.canDel ? window.canDel('contract') : false);
+    foot.innerHTML = (canDelCt
       ? '<button class="btn btn-ghost" style="color:var(--coral);margin-right:auto" onclick="window.askDel(\'contract\',\''+c.id+'\',\''+esc((c.name||c.id)).replace(/'/g,'\\\'')+'\')" >🗑 ลบ</button>'
       : '<span></span>')
       +'<button class="btn btn-ghost" onclick="window.closeM(\'m-contract\')">ยกเลิก</button>'
-      +(canEdit ? '<button class="btn btn-pri" onclick="window.saveContract()">💾 บันทึก</button>' : '');
+      +(canEditCt ? '<button class="btn btn-pri" onclick="window.saveContract()">💾 บันทึก</button>' : '');
   }
 
   // tabs + transactions (edit mode only)
@@ -476,6 +476,8 @@ window.openContractModal = function(id){
 // ── SAVE ─────────────────────────────────────────────────────────────────────
 window.saveContract = async function(){
   if(!window.auth||!window.auth.currentUser){ window.showAlert('กรุณาเข้าสู่ระบบ','warn'); return; }
+  var editIdCt = document.getElementById('ctf-id').value.trim();
+  if (editIdCt ? !window.canEdit('contract') : !window.canAdd('contract')) { window.showAlert('คุณไม่มีสิทธิ์บันทึกสัญญา','warn'); return; }
   var editId   = document.getElementById('ctf-id').value.trim();
   var codeVal  = document.getElementById('ctf-code').value.trim();
   var nameVal  = document.getElementById('ctf-name').value.trim();

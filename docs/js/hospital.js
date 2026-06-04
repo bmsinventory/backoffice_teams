@@ -1190,6 +1190,7 @@ window.openHospitalModal = function(id) {
 
 window.saveHospital = async function() {
   var id   = document.getElementById('m-hsp-id').value;
+  if (id ? !window.canEdit('hospital') : !window.canAdd('hospital')) { window.showAlert('คุณไม่มีสิทธิ์บันทึกข้อมูล รพ.', 'warn'); return; }
   var code = document.getElementById('m-hsp-code').value.trim();
   var name = document.getElementById('m-hsp-name').value.trim();
 

@@ -182,6 +182,25 @@
     if (remUser && uEl) uEl.value = remUser;
   };
 
+  // ── Toggle login password show/hide ──
+  window.toggleLoginPw = function () {
+    var inp      = document.getElementById('lp');
+    var showIcon = document.getElementById('eye-show');
+    var hideIcon = document.getElementById('eye-hide');
+    if (!inp) return;
+    inp.type = inp.type === 'password' ? 'text' : 'password';
+    if (showIcon) showIcon.style.display = inp.type === 'text' ? 'none' : '';
+    if (hideIcon) hideIcon.style.display = inp.type === 'text' ? '' : 'none';
+  };
+
+  // ── Bind login button click on DOM ready ──
+  document.addEventListener('DOMContentLoaded', function () {
+    var loginBtn = document.getElementById('login-btn');
+    if (loginBtn) loginBtn.addEventListener('click', function () {
+      window.doLogin && window.doLogin();
+    });
+  });
+
   // ── Initialize: seed + start realtime ──
   seedDatabaseIfEmpty().then(function () {
     window.RealtimeService && window.RealtimeService.setup();

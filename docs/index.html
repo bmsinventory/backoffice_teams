@@ -212,7 +212,7 @@
       <div class="nav-btn" onclick="window.goView('calendar',this)">
         <span class="ni">📅</span><span class="nl">ปฏิทินทีม</span>
       </div>
-      <div class="nav-btn ce-only" style="display:none" onclick="window.goView('holidays',this)">
+      <div class="nav-btn holiday-only" style="display:none" onclick="window.goView('holiday',this)">
         <span class="ni">🎌</span><span class="nl">วันหยุด</span>
       </div>
       <div class="nav-btn" onclick="window.goView('leave',this)">
@@ -560,8 +560,8 @@
           <div style="font-size:18px;font-weight:800;color:var(--txt);">🎌 วันหยุด</div>
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
             <select class="t-sel" id="hol-yr" onchange="window.renderHolidays()"><option value="">ทุกปี</option></select>
-            <button class="btn btn-ghost btn-sm" onclick="window.openHolImport()">📥 นำเข้าวันหยุด</button>
-            <button class="btn btn-pri btn-sm" onclick="window.openHolForm(null)">+ เพิ่มวันหยุด</button>
+            <button id="hol-import-btn" class="btn btn-ghost btn-sm" onclick="window.openHolImport()">📥 นำเข้าวันหยุด</button>
+            <button id="hol-add-btn" class="btn btn-pri btn-sm" onclick="window.openHolForm(null)">+ เพิ่มวันหยุด</button>
           </div>
         </div>
         <div id="hol-summary" style="display:flex;gap:12px;padding:12px 24px;flex-wrap:wrap;"></div>
