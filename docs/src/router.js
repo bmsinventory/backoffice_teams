@@ -10,7 +10,7 @@
     var viewId = (window.ROUTE_MAP && window.ROUTE_MAP[moduleId]) || ('view-' + moduleId);
 
     // Permission check
-    if (window.canView && !window.canView(moduleId) && moduleId !== 'overview') {
+    if (window.canView && !window.canView(moduleId)) {
       console.warn('[router] No permission to view:', moduleId);
       return;
     }
@@ -48,7 +48,7 @@
   // Wraps goTo + triggers the render function for the target view
   window.goView = function (id, el) {
     // Permission check with user-visible alert
-    if (window.canView && !window.canView(id) && id !== 'overview') {
+    if (window.canView && !window.canView(id)) {
       window.showAlert && window.showAlert('คุณไม่มีสิทธิ์เข้าถึง Module นี้', 'warn');
       return;
     }
@@ -117,13 +117,18 @@
     if (ov) ov.classList.remove('on');
   };
 
-  // ── Force Sync (UI feedback only — data is always realtime) ──
+  // ── Force Sync: re-render active view and update status timestamp ──
   window.forceSync = function () {
     var stat = document.getElementById('tp-status');
-    if (stat) {
-      stat.innerHTML = '<span class="pulse ok"></span> ซิงค์แล้ว';
-      setTimeout(function () { stat.innerHTML = '<span class="pulse ok"></span> Realtime'; }, 1500);
-    }
+    if (stat) stat.innerHTML = '<span class="pulse ok"></span> กำลังโหลด...';
+    window.renderAll && window.renderAll();
+    setTimeout(function () {
+      if (!stat) return;
+      var now = new Date();
+      var t = ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2) + ':' + ('0' + now.getSeconds()).slice(-2);
+      window._lastSyncTime = t;
+      stat.innerHTML = '<span class="pulse ok"></span> ' + t;
+    }, 400);
   };
 
   // ── Handle Deep Links from URL hash ──
@@ -132,6 +137,19 @@
     if (hash && window.ROUTE_MAP && window.ROUTE_MAP[hash]) {
       window.goView(hash);
     }
+  };
+
+  // ── Navigate to first accessible view after login ──
+  window._goDefaultView = function () {
+    var modules = [
+      'overview','kanban','projects','advance','lodging','workload',
+      'availability','calendar','leave','timesheet','cost','budget',
+      'targets','hospital','contract','worklog','holiday',
+    ];
+    var first = modules.find(function (m) {
+      return !window.canView || window.canView(m);
+    });
+    if (first) window.goView(first);
   };
 
   // ── Backward-compat: showView(id) ──

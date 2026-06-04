@@ -513,6 +513,8 @@ window.saveContract = async function(){
 
   try {
     await setDoc(getDocRef('CONTRACTS', docId), payload);
+    window._applyLocalDoc('CONTRACTS', docId, payload);
+    window.renderContract&&window.renderContract();
     window.closeM('m-contract');
     window.showAlert((editId ? 'แก้ไข' : 'เพิ่ม')+'สัญญาเรียบร้อยแล้ว','success');
   } catch(e){

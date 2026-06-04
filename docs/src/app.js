@@ -80,6 +80,14 @@
     });
 
 
+    // Bottom nav (mobile) — hide items user can't access
+    document.querySelectorAll('.bottom-nav-item[data-view]').forEach(function (btn) {
+      var m = btn.getAttribute('data-view');
+      if (!m) return;
+      var canSee = window.canView ? window.canView(m) : true;
+      btn.style.display = canSee ? '' : 'none';
+    });
+
     // Sync advance overdue badge
     window.updateBadge && window.updateBadge();
   };
@@ -112,8 +120,11 @@
   window.renderAll = function () {
     if (!window.cu || !window.isDbLoaded) return;
 
-    // Overview is default — always render
-    if (window.renderOverview) window.renderOverview();
+    // Render overview only if user has permission and it's active
+    var ovEl = document.getElementById('view-overview');
+    if (window.renderOverview && ovEl && ovEl.classList.contains('on') && (!window.canView || window.canView('overview'))) {
+      window.renderOverview();
+    }
 
     // Re-render whichever view is currently active
     var renders = {

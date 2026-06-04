@@ -174,6 +174,10 @@ window.saveAdvance=async function(){
   window.closeM('m-adv');
   try {
     await setDoc(getDocRef('ADVANCES',aid),dbAdv);
+    window._applyLocalDoc('ADVANCES',aid,dbAdv);
+    window.renderAdvance&&window.renderAdvance();
+    window.renderOverview&&window.renderOverview();
+    window.updateBadge&&window.updateBadge();
     if(status==='cleared') await window.advSyncCosts(aid, finalPid, pur.trim(), dbAdv);
     // แจ้งเตือน Advance บันทึก/อัปเดต
     if(window.sendAdvanceSavedNotify){
@@ -238,6 +242,19 @@ window.advSyncCosts = async function(aid, pid, purpose, dbAdv) {
   });
 
   await batch.commit();
+  // Optimistic local sync: remove old advance-sourced costs, push new ones
+  window.COSTS = (window.COSTS||[]).filter(function(c){return c.advanceId!==aid;});
+  var costDate = dbAdv.due_date||dbAdv.request_date||new Date().toISOString().slice(0,10);
+  var advno = dbAdv.advance_no||aid;
+  (dbAdv.expense_items||[]).forEach(function(it,i){
+    if(!it.amount||it.amount<=0)return;
+    window._applyLocalDoc('COSTS','CST-'+aid+'-E'+i,{cost_id:'CST-'+aid+'-E'+i,project_id:pid,staff_id:'',category:it.category,amount:it.amount,cost_date:costDate,description:it.description+' [เบิก: '+purpose+']',receipt_no:advno,source:'advance',advance_id:aid});
+  });
+  (dbAdv.labor_items||[]).filter(function(it){return it.included&&it.staffId;}).forEach(function(it,i){
+    if(it.laborCost>0) window._applyLocalDoc('COSTS','CST-'+aid+'-L'+i+'a',{cost_id:'CST-'+aid+'-L'+i+'a',project_id:pid,staff_id:it.staffId,category:'labor',amount:it.laborCost,cost_date:costDate,description:'ค่าแรง [เบิก: '+purpose+']',receipt_no:advno,source:'advance',advance_id:aid});
+    if(it.allowanceCost>0) window._applyLocalDoc('COSTS','CST-'+aid+'-L'+i+'b',{cost_id:'CST-'+aid+'-L'+i+'b',project_id:pid,staff_id:it.staffId,category:'allowance',amount:it.allowanceCost,cost_date:costDate,description:'เบี้ยเลี้ยง [เบิก: '+purpose+']',receipt_no:advno,source:'advance',advance_id:aid});
+  });
+  window.renderCost&&window.renderCost();
 }
 
 // ── EXPENSE ITEMS (หมวดค่าใช้จ่าย) ────────────────────────────────────────────

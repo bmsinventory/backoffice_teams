@@ -458,8 +458,11 @@ window.saveCost = async function() {
 
   try {
     await setDoc(getDocRef('COSTS', docId), data);
+    window._applyLocalDoc('COSTS', docId, data);
     _costExpanded.add(pid);       // keep project open
     _costActiveCat[pid] = cat;    // show the saved category panel
+    window.renderCost&&window.renderCost();
+    window.renderOverview&&window.renderOverview();
     window.closeM('m-cost');
   } catch(e) { alert('บันทึกไม่สำเร็จ: ' + e.message); }
 };

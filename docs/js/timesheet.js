@@ -395,4 +395,5 @@ window.tsSyncProject = async function(pid, members) {
   }
 
   await batch.commit();
+  // Optimistic local sync handled in caller (saveProject) via renderAll
 };

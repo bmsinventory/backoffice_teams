@@ -407,8 +407,11 @@ window.saveWorkLog = async function(){
   if(!_wlEditId) data.created_at = new Date().toISOString();
 
   try {
-    var ref = window.getDocRef('WORK_LOGS', _wlEditId||window.uid());
+    var docId = _wlEditId||window.uid();
+    var ref = window.getDocRef('WORK_LOGS', docId);
     await window.setDoc(ref, data, {merge:true});
+    window._applyLocalDoc('WORK_LOGS', docId, Object.assign({id:docId}, data));
+    window.renderWorkLog&&window.renderWorkLog();
     window.closeM('m-worklog');
     window.showAlert&&window.showAlert('บันทึกเรียบร้อย','success');
   } catch(err){
@@ -426,6 +429,8 @@ window.deleteWorkLog = async function(){
   }
   if(!await window.confirmAsync('ต้องการลบบันทึกงานนี้?',{icon:'🗑️',title:'ลบบันทึกงาน'})) return;
   try {
+    window._removeLocalDoc('WORK_LOGS', _wlEditId);
+    window.renderWorkLog&&window.renderWorkLog();
     await window.deleteDoc(window.getDocRef('WORK_LOGS', _wlEditId));
     window.closeM('m-worklog');
     window.showAlert&&window.showAlert('ลบเรียบร้อย','success');

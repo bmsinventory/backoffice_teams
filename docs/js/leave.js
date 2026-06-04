@@ -372,6 +372,9 @@ window.saveLeave=async function(){
   var rec={leave_id:id,staff_id:staffId,leave_type:leaveType,start_date:start,end_date:end,substitute_id:subId,note:note,status:statusVal,approved_by:approvedBy};
   try{
     await setDoc(getDocRef('LEAVES',id),rec);
+    window._applyLocalDoc('LEAVES',id,rec);
+    window.renderLeave&&window.renderLeave();
+    window.renderCalendar&&window.renderCalendar();
     window.closeM('m-leave');
     var notifyType=eid?'edit':'new';
     if(statusVal==='rejected') notifyType='rejected';
@@ -387,6 +390,9 @@ window.deleteLeave=function(id){
   // rejected/pending: must have canDel permission
   if(!window.canDel('leave')&&!window.isAdmin()){window.showAlert('คุณไม่มีสิทธิ์ลบรายการลางาน','warn');return;}
   window.showConfirm('ลบรายการลางานนี้?',function(){
+    window._removeLocalDoc('LEAVES',id);
+    window.renderLeave&&window.renderLeave();
+    window.renderCalendar&&window.renderCalendar();
     deleteDoc(getDocRef('LEAVES',id)).catch(function(e){window.showDbError(e);});
   },{icon:'🗑',title:'ยืนยันการลบ',okColor:'var(--coral)',okText:'ลบ'});
 };
@@ -411,13 +417,21 @@ window.saveHoliday=async function(){
   var eid=document.getElementById('hol-edit-id').value;
   var id=eid||('H'+Date.now());
   var rec={holiday_id:id,name:name,date:date,type:document.getElementById('holf-type').value||'national'};
-  try{await setDoc(getDocRef('HOLIDAYS',id),rec);window.closeM('m-holiday');}
-  catch(e){window.showDbError(e);}
+  try{
+    await setDoc(getDocRef('HOLIDAYS',id),rec);
+    window._applyLocalDoc('HOLIDAYS',id,rec);
+    window.renderHolidays&&window.renderHolidays();
+    window.renderCalendar&&window.renderCalendar();
+    window.closeM('m-holiday');
+  }catch(e){window.showDbError(e);}
 };
 
 window.deleteHoliday=function(id,name){
   if(!window.canDel('holiday')){window.showAlert('คุณไม่มีสิทธิ์ลบวันหยุด','warn');return;}
   window.showConfirm('ลบวันหยุด "'+name+'" ?',function(){
+    window._removeLocalDoc('HOLIDAYS',id);
+    window.renderHolidays&&window.renderHolidays();
+    window.renderCalendar&&window.renderCalendar();
     deleteDoc(getDocRef('HOLIDAYS',id)).catch(function(e){window.showDbError(e);});
   },{icon:'🗑',title:'ยืนยันการลบ',okColor:'var(--coral)',okText:'ลบ'});
 };

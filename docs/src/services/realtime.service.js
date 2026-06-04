@@ -76,25 +76,66 @@
   // ── Check if active view needs re-render ──
   function _von(id) { var el = document.getElementById(id); return el && el.classList.contains('on'); }
 
+  // ── Optimistic Local Update Helpers ──
+  // Call these right after setDoc/deleteDoc so the UI updates instantly
+  // without waiting for the Supabase realtime snapshot to come back.
+  window._applyLocalDoc = function (collection, id, rawData) {
+    var arr = window[collection];
+    if (!Array.isArray(arr)) return;
+    var fn = transform[collection];
+    var obj = fn ? fn(rawData) : Object.assign({}, rawData, { id: id });
+    var idx = arr.findIndex(function (x) { return x.id === id; });
+    if (idx >= 0) arr[idx] = obj; else arr.push(obj);
+  };
+
+  window._removeLocalDoc = function (collection, id) {
+    if (!Array.isArray(window[collection])) return;
+    window[collection] = window[collection].filter(function (x) { return x.id !== id; });
+  };
+
   // ── Setup All Realtime Listeners ──
   window.RealtimeService = {
     setup: function () {
       var CORE_COLS = ['STAGES','PTYPES','PGROUPS','STAFF','USERS','PROJECTS','ADVANCES','LODGINGS','POSITIONS','HOLIDAYS','LEAVES','TIMESHEETS','COSTS','DEPARTMENTS'];
       var loadCount = 0;
+      var _initialLoadDone = false;
+      var _updateTimer = null;
+
+      function _flashUpdate() {
+        if (!_initialLoadDone) return;
+        var stat = document.getElementById('tp-status');
+        if (!stat) return;
+        var now = new Date();
+        var t = ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2) + ':' + ('0' + now.getSeconds()).slice(-2);
+        window._lastSyncTime = t;
+        if (_updateTimer) clearTimeout(_updateTimer);
+        stat.className = 'tp-badge ok';
+        stat.innerHTML = '<span class="pulse ok"></span> กำลังอัปเดต...';
+        _updateTimer = setTimeout(function () {
+          stat.innerHTML = '<span class="pulse ok"></span> ' + t;
+        }, 800);
+      }
 
       function checkLoaded() {
         loadCount++;
         if (loadCount < CORE_COLS.length) return;
         window.isDbLoaded = true;
-        window.hideLoader && window.hideLoader();
-        window._mobileInit && window._mobileInit();
-        if (window.cu) {
-          window.setupUser && window.setupUser();
+
+        if (!_initialLoadDone) {
+          _initialLoadDone = true;
+          window.hideLoader && window.hideLoader();
+          window._mobileInit && window._mobileInit();
+          if (window.cu) {
+            window.setupUser && window.setupUser();
+            window.renderAll && window.renderAll();
+            window.startAutoStageLoop && window.startAutoStageLoop();
+            if (window.checkDailyNotifications && window._settingsLoaded) window.checkDailyNotifications();
+            else window._pendingDailyCheck = true;
+            window._handleDeepLink && window._handleDeepLink();
+          }
+        } else if (window.cu) {
+          _flashUpdate();
           window.renderAll && window.renderAll();
-          window.startAutoStageLoop && window.startAutoStageLoop();
-          if (window.checkDailyNotifications && window._settingsLoaded) window.checkDailyNotifications();
-          else window._pendingDailyCheck = true;
-          window._handleDeepLink && window._handleDeepLink();
         }
       }
 
@@ -127,6 +168,8 @@
       window.onSnapshot(window.getColRef('USERS'), function (s) {
         window.USERS = s.docs.map(function (doc) { return transform.USERS(doc.data()); });
         checkLoaded();
+        // Re-apply sidebar/permission UI when user list changes (role or name might have changed)
+        if (window.cu && window.isDbLoaded) window.setupUser && window.setupUser();
       }, window.showDbError);
 
       window.onSnapshot(window.getColRef('PROJECTS'), function (s) {
@@ -145,11 +188,19 @@
       window.onSnapshot(window.getColRef('ADVANCES'), function (s) {
         window.ADVANCES = s.docs.map(function (doc) { return transform.ADVANCES(doc.data()); });
         checkLoaded();
+        if (window.cu && window.isDbLoaded) {
+          if (_von('view-overview'))     window.renderOverview && window.renderOverview();
+          else if (_von('view-advance')) window.renderAdvance && window.renderAdvance();
+          window.updateBadge && window.updateBadge();
+        }
       }, window.showDbError);
 
       window.onSnapshot(window.getColRef('LODGINGS'), function (s) {
         window.LODGINGS = s.docs.map(function (doc) { return transform.LODGINGS(doc.data()); });
         checkLoaded();
+        if (window.cu && window.isDbLoaded && _von('view-lodging')) {
+          window.renderLodging && window.renderLodging();
+        }
       }, window.showDbError);
 
       window.onSnapshot(window.getColRef('HOLIDAYS'), function (s) {

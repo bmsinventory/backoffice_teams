@@ -748,6 +748,8 @@ window.saveProject=async function(){
   window.closeM('m-proj');
   try {
     await setDoc(getDocRef('PROJECTS',pid),dbProj);
+    window._applyLocalDoc('PROJECTS',pid,dbProj);
+    window.renderAll&&window.renderAll();
     if(typeof window.tsSyncProject==='function') await window.tsSyncProject(pid, members);
     if(_saveGrpId==='GRP17733355541904'&&dbProj.parent_project_id&&dbProj.end_date){
       var _rvSibs=(window.PROJECTS||[]).filter(function(rp){return rp.groupId==='GRP17733355541904'&&rp.parentProjectId===dbProj.parent_project_id&&rp.id!==pid;});

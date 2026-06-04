@@ -572,6 +572,7 @@ window.saveLodging=async function(){
     m_electric:(document.getElementById('ld-m-electric')||{}).value||'',
     m_extras:(document.getElementById('ld-m-extras')||{}).value||'',
     m_incl_util:(document.getElementById('ld-m-inclutil')&&document.getElementById('ld-m-inclutil').checked)?'TRUE':'FALSE'};
+  window._applyLocalDoc('LODGINGS',id,dbLd);
   window.openLodgingGroupModal(pid);
   setDoc(getDocRef('LODGINGS',id),dbLd).catch(e=>window.showDbError(e));
 }

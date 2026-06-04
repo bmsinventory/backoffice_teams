@@ -92,21 +92,16 @@
     document.getElementById('login').style.display = 'none';
     document.getElementById('wrap').style.display = 'flex';
 
-    // Reset views & nav
+    // Reset views & nav (clear all — permission-aware default view set after setupUser)
     document.querySelectorAll('.view').forEach(function (v) { v.classList.remove('on'); });
     document.querySelectorAll('.nav-btn').forEach(function (n) { n.classList.remove('on'); });
-
-    var defView = document.getElementById('view-overview');
-    if (defView) { defView.style.display = ''; defView.classList.add('on'); }
-    var defNav = document.querySelector('.nav-btn[onclick*="\'overview\'"]');
-    if (defNav) defNav.classList.add('on');
-    var titleEl = document.getElementById('tp-title');
-    if (titleEl) titleEl.textContent = 'Overview';
+    document.querySelectorAll('.bottom-nav-item').forEach(function (n) { n.classList.remove('active'); });
+    try { history.replaceState(null, '', location.pathname); } catch (e) {}
 
     if (window.isDbLoaded) {
       window.setupUser && window.setupUser();
       window.renderAll && window.renderAll();
-      window._handleDeepLink && window._handleDeepLink();
+      window._goDefaultView && window._goDefaultView();
     } else {
       window.showLoader && window.showLoader('กำลังโหลดข้อมูล...');
       window.setupUser && window.setupUser();
@@ -114,13 +109,13 @@
         if (window.isDbLoaded) {
           clearInterval(waitRender);
           window.renderAll && window.renderAll();
-          window._handleDeepLink && window._handleDeepLink();
+          window._goDefaultView && window._goDefaultView();
         }
       }, 300);
       setTimeout(function () {
         clearInterval(waitRender);
         window.renderAll && window.renderAll();
-        window._handleDeepLink && window._handleDeepLink();
+        window._goDefaultView && window._goDefaultView();
       }, 15000);
     }
   }
@@ -172,12 +167,20 @@
   // ── Logout ──
   window.doLogout = function () {
     window.cu = null;
+    if (window._loginRetryInterval) { clearInterval(window._loginRetryInterval); window._loginRetryInterval = null; }
+    window.closeMobSidebar && window.closeMobSidebar();
+    try { history.replaceState(null, '', location.pathname); } catch (e) {}
     document.getElementById('wrap').style.display = 'none';
     document.getElementById('login').style.display = 'flex';
+    _loginBtnReset();
     var uEl = document.getElementById('lu');
     var pEl = document.getElementById('lp');
+    var errEl = document.getElementById('lerr');
+    var infoEl = document.getElementById('linfo');
     if (uEl) uEl.value = '';
     if (pEl) pEl.value = '';
+    if (errEl) errEl.style.display = 'none';
+    if (infoEl) infoEl.style.display = 'none';
     var remUser = window.StorageService.getRememberedUser();
     if (remUser && uEl) uEl.value = remUser;
   };

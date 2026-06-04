@@ -188,9 +188,11 @@ window.saveAdmGroup=async function(){
   if(!window.canEdit('admin')||!window.auth.currentUser)return;
   var l=(document.getElementById('agf-lbl')||{}).value||'';if(!l.trim())return;
   var gid=window._editGroupId||'GRP'+Date.now();
+  var raw={group_id:gid,label_th:l.trim(),color_hex:document.getElementById('agf-col').value};
+  window._applyLocalDoc('PGROUPS',gid,raw);
   window.closeM('m-group');
   window.admTab('groups');
-  setDoc(getDocRef('PGROUPS',gid),{group_id:gid,label_th:l.trim(),color_hex:document.getElementById('agf-col').value}).catch(e=>window.showDbError(e));
+  setDoc(getDocRef('PGROUPS',gid),raw).catch(e=>window.showDbError(e));
 }
 
 window._editTypeId=null;
@@ -209,9 +211,11 @@ window.saveAdmType=async function(){
   if(!window.canEdit('admin')||!window.auth.currentUser)return;
   var l=(document.getElementById('atf-lbl')||{}).value||'';if(!l.trim())return;
   var tid=window._editTypeId||'T'+Date.now();
+  var raw={type_id:tid,label_th:l.trim(),color_hex:document.getElementById('atf-col').value};
+  window._applyLocalDoc('PTYPES',tid,raw);
   window.closeM('m-type');
   window.admTab('types');
-  setDoc(getDocRef('PTYPES',tid),{type_id:tid,label_th:l.trim(),color_hex:document.getElementById('atf-col').value}).catch(e=>window.showDbError(e));
+  setDoc(getDocRef('PTYPES',tid),raw).catch(e=>window.showDbError(e));
 }
 
 window._editPositionId=null;
@@ -230,9 +234,11 @@ window.saveAdmPosition=async function(){
   var l=(document.getElementById('apf-lbl')||{}).value||'';if(!l.trim())return;
   var pid=window._editPositionId||'POS'+Date.now();
   var rate=parseFloat((document.getElementById('apf-rate')||{}).value)||0;
+  var raw={position_id:pid,label_th:l.trim(),daily_rate:rate};
+  window._applyLocalDoc('POSITIONS',pid,raw);
   window.closeM('m-position');
   window.admTab('positions');
-  setDoc(getDocRef('POSITIONS',pid),{position_id:pid,label_th:l.trim(),daily_rate:rate}).catch(e=>window.showDbError(e));
+  setDoc(getDocRef('POSITIONS',pid),raw).catch(e=>window.showDbError(e));
 }
 
 window._editDeptId=null;
@@ -250,6 +256,10 @@ window.saveAdmDept=async function(){
   if(!window.canEdit('admin')||!window.auth.currentUser)return;
   var l=(document.getElementById('adf-lbl')||{}).value||'';if(!l.trim())return;
   var did=window._editDeptId||'DEPT'+Date.now();
+  var dObj={id:did,label:l.trim()};
+  var dIdx=window.DEPT_LIST.findIndex(function(x){return x.id===did;});
+  if(dIdx>=0)window.DEPT_LIST[dIdx]=dObj;else window.DEPT_LIST.push(dObj);
+  window.DEPARTMENTS=window.DEPT_LIST.map(function(d){return d.label;});
   window.closeM('m-department');
   window.admTab('dept');
   setDoc(getDocRef('DEPARTMENTS',did),{dept_id:did,label_th:l.trim()}).catch(e=>window.showDbError(e));
@@ -287,12 +297,15 @@ window.saveAdmStage=async function(){
   var sid=window._editStageId||'STG'+Date.now();
   var maxOrder=window.STAGES.length>0?Math.max(...window.STAGES.map(s=>s.order||0)):0;
   var order=window._editStageId?(window.STAGES.find(x=>x.id===window._editStageId)||{}).order||maxOrder:maxOrder+1;
-  window.closeM('m-stage');
-  window.admTab('stages');
   var rule=(document.getElementById('asgf-rule')||{}).value||'';
   var offset=parseInt((document.getElementById('asgf-offset')||{}).value)||0;
   var prog=parseInt((document.getElementById('asgf-prog')||{}).value);if(isNaN(prog))prog=-1;
-  setDoc(getDocRef('STAGES',sid),{stage_id:sid,label_th:l.trim(),color_hex:document.getElementById('asgf-col').value,order:order,auto_rule:rule,auto_offset:offset,set_progress:prog},{merge:true}).catch(e=>window.showDbError(e));
+  var raw={stage_id:sid,label_th:l.trim(),color_hex:document.getElementById('asgf-col').value,order:order,auto_rule:rule,auto_offset:offset,set_progress:prog};
+  window._applyLocalDoc('STAGES',sid,raw);
+  window.STAGES.sort(function(a,b){return a.order-b.order;});
+  window.closeM('m-stage');
+  window.admTab('stages');
+  setDoc(getDocRef('STAGES',sid),raw,{merge:true}).catch(e=>window.showDbError(e));
 }
 window.stgDragId=null;window.stgDrag=function(e,id){window.stgDragId=id;}
 window.stgDrop=async function(e,targetId){e.preventDefault();if(!window.stgDragId||window.stgDragId===targetId||!window.canEdit('admin'))return;let arr=[...window.STAGES];let fromIdx=arr.findIndex(x=>x.id===window.stgDragId);let toIdx=arr.findIndex(x=>x.id===targetId);if(fromIdx<0||toIdx<0)return;let[moved]=arr.splice(fromIdx,1);arr.splice(toIdx,0,moved);arr.forEach((s,i)=>s.order=i+1);window.STAGES=arr;window.admTab('stages');try{const batch=writeBatch();arr.forEach(s=>{batch.update(getDocRef('STAGES',s.id),{order:s.order});});await batch.commit();}catch(err){window.showDbError(err);}window.stgDragId=null;}
@@ -348,6 +361,7 @@ window.saveAdmStaff=async function(){
   var sid=id||'S'+Date.now();
   var rateVal=parseFloat((document.getElementById('asf-rate')||{}).value);
   let dbStf={staff_id:sid,full_name:nm.trim(),nickname:document.getElementById('asf-nick').value.trim()||nm.split(' ')[0],department:document.getElementById('asf-dept').value,position:document.getElementById('asf-role').value,email:document.getElementById('asf-email').value,phone:document.getElementById('asf-phone').value,is_active:document.getElementById('asf-active').value==='TRUE',start_date:document.getElementById('asf-start').value,birth_date:'',remark:document.getElementById('asf-remark').value,daily_rate:isNaN(rateVal)?null:rateVal};
+  window._applyLocalDoc('STAFF',sid,dbStf);
   window.closeM('m-staff');
   window.admTab('staff');
   setDoc(getDocRef('STAFF',sid),dbStf).catch(e=>window.showDbError(e));
@@ -384,6 +398,7 @@ window.saveAdmUser=async function(){
   var ex=id?window.USERS.find(function(x){return x.id===id;}):null;
   var uid2=id||'U'+Date.now();
   var dbUsr={user_id:uid2,username:un.trim(),name:nm.trim(),role:document.getElementById('auf-r').value,password:pw?pw:(ex?ex.password:''),is_active:true,staff_id:(document.getElementById('auf-staff')||{value:''}).value||''};
+  window._applyLocalDoc('USERS',uid2,dbUsr);
   window.closeM('m-user');
   window.admTab('users');
   setDoc(getDocRef('USERS',uid2),dbUsr).catch(e=>window.showDbError(e));
