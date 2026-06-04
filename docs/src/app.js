@@ -173,8 +173,14 @@
     _deferredPrompt.userChoice.then(function () { _deferredPrompt = null; });
   };
 
-  // ── Register Service Worker ──
+  // ── Register Service Worker + auto-reload on update ──
   if ('serviceWorker' in navigator) {
+    var _swRefreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      if (_swRefreshing) return;
+      _swRefreshing = true;
+      window.location.reload();
+    });
     navigator.serviceWorker.register('sw.js').catch(function (err) {
       console.warn('[app] SW register failed:', err);
     });
