@@ -205,9 +205,13 @@ CREATE TABLE IF NOT EXISTS lodgings (
   approved         TEXT DEFAULT '',
   approved_at      TEXT DEFAULT '',
   approved_by      TEXT DEFAULT '',
-  approved_daily   TEXT DEFAULT '',
-  approved_monthly TEXT DEFAULT '',
-  created_at       TIMESTAMPTZ DEFAULT NOW()
+  approved_daily      TEXT DEFAULT '',
+  approved_daily_at   TEXT DEFAULT '',
+  approved_daily_by   TEXT DEFAULT '',
+  approved_monthly    TEXT DEFAULT '',
+  approved_monthly_at TEXT DEFAULT '',
+  approved_monthly_by TEXT DEFAULT '',
+  created_at          TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ── HOLIDAYS ────────────────────────────────────────────────
