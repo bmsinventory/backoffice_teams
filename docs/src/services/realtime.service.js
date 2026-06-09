@@ -195,11 +195,13 @@
         }
       }, window.showDbError);
 
+      var _ldRenderTimer = null;
       window.onSnapshot(window.getColRef('LODGINGS'), function (s) {
         window.LODGINGS = s.docs.map(function (doc) { return transform.LODGINGS(doc.data()); });
         checkLoaded();
         if (window.cu && window.isDbLoaded && _von('view-lodging')) {
-          window.renderLodging && window.renderLodging();
+          clearTimeout(_ldRenderTimer);
+          _ldRenderTimer = setTimeout(function () { window.renderLodging && window.renderLodging(); }, 300);
         }
       }, window.showDbError);
 
