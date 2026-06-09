@@ -180,7 +180,6 @@ window.approveLdType=async function(pid,ldId,type){
   var l=window.LODGINGS.find(x=>x.id===ldId);
   if(l){l[localField]='yes';}
   var upd={[field]:'yes'};
-  upd[field+'_at']=new Date().toISOString();upd[field+'_by']=(window.cu&&window.cu.uid)||'';
   await setDoc(getDocRef('LODGINGS',ldId),upd,{merge:true}).catch(e=>window.showDbError(e));
   window.renderLodging();
 }
