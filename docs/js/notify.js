@@ -327,7 +327,7 @@ window.sendLeaveNotify=async function(eventType,lv){
     var lvId=lv.leave_id||lv.id||'';
     var _appBase=(window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1')
       ?(window.location.origin+window.location.pathname)
-      :'https://bms-toey.github.io/backoffice_teams/';
+      :'https://bmsinventory.github.io/backoffice_teams/';
     var lvLink=lvId?(_appBase+'#leave='+lvId):'';
     var baseInfo='👤 ชื่อ: **'+st.name+'**'
       +(st.role?'\n💼 ตำแหน่ง: '+st.role:'')
@@ -336,16 +336,15 @@ window.sendLeaveNotify=async function(eventType,lv){
       +'\n📅 '+dateRange
       +(subName?'\n🔄 ผู้ทำงานแทน: '+subName:'')
       +(noteText?'\n📝 รายละเอียด: '+noteText:'')
-      +'\n📌 สถานะ: '+statusLabel
-      +(lvLink?'\n🔗 '+lvLink:'');
+      +'\n📌 สถานะ: '+statusLabel;
     if(eventType==='new'){
-      content='📋 **แจ้งการลางานใหม่**\n'+baseInfo;
+      content='📋 **แจ้งการลางานใหม่**\n'+baseInfo+(lvLink?'\n🔗 '+lvLink:'');
     } else if(eventType==='edit'){
-      content='✏️ **แก้ไขการลางาน**\n'+baseInfo+(approvedBy?'\n👨‍💼 ผู้อนุมัติ: '+approvedBy:'');
+      content='✏️ **แก้ไขการลางาน**\n'+baseInfo+(lvLink?'\n🔗 '+lvLink:'')+(approvedBy?'\n👨‍💼 ผู้อนุมัติ: '+approvedBy:'');
     } else if(eventType==='approved'){
       content='✅ **อนุมัติการลา**\n'+baseInfo+(approvedBy?'\n👨‍💼 ผู้อนุมัติ: '+approvedBy:'');
     } else if(eventType==='rejected'){
-      content='❌ **ไม่อนุมัติการลา**\n'+baseInfo+(approvedBy?'\n👨‍💼 ผู้อนุมัติ: '+approvedBy:'');
+      content='❌ **ไม่อนุมัติการลา**\n'+baseInfo+(lvLink?'\n🔗 '+lvLink:'')+(approvedBy?'\n👨‍💼 ผู้อนุมัติ: '+approvedBy:'');
     }
   }
   if(!content)return;

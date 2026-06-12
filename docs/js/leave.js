@@ -211,7 +211,7 @@ window.renderLeave=function(){
     var dotHtml=(isActive?'<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--teal);vertical-align:middle;margin-right:3px;" title="กำลังลาอยู่"></span>':'')
       +(isUpcoming&&!isActive?'<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--amber);vertical-align:middle;margin-right:3px;" title="กำลังจะลา"></span>':'');
 
-    return '<div style="border:1px solid var(--border);border-left:4px solid '+sColor+';border-radius:10px;background:var(--surface);box-shadow:var(--sh-sm);display:flex;align-items:stretch;overflow:hidden;min-width:0;">'
+    return '<div data-leave-id="'+lv.id+'" style="border:1px solid var(--border);border-left:4px solid '+sColor+';border-radius:10px;background:var(--surface);box-shadow:var(--sh-sm);display:flex;align-items:stretch;overflow:hidden;min-width:0;transition:outline .3s,box-shadow .3s;">'
       // Avatar strip
       +'<div style="width:52px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;padding:14px 0 12px;gap:6px;">'
         +'<div style="width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,'+ac[0]+','+ac[1]+');display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;">'+initial+'</div>'

@@ -134,7 +134,23 @@
   // ── Handle Deep Links from URL hash ──
   window._handleDeepLink = function () {
     var hash = location.hash.replace('#', '');
-    if (hash && window.ROUTE_MAP && window.ROUTE_MAP[hash]) {
+    if (!hash) return;
+    var eqIdx = hash.indexOf('=');
+    if (eqIdx > -1) {
+      var module = hash.slice(0, eqIdx);
+      var itemId = hash.slice(eqIdx + 1);
+      if (module && window.ROUTE_MAP && window.ROUTE_MAP[module]) {
+        window.goView(module);
+        setTimeout(function () {
+          var card = document.querySelector('[data-leave-id="' + itemId + '"]');
+          if (!card) return;
+          card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          card.style.outline = '2px solid var(--violet)';
+          card.style.boxShadow = '0 0 0 5px rgba(124,92,252,.25)';
+          setTimeout(function () { card.style.outline = ''; card.style.boxShadow = ''; }, 2500);
+        }, 350);
+      }
+    } else if (window.ROUTE_MAP && window.ROUTE_MAP[hash]) {
       window.goView(hash);
     }
   };
