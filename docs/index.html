@@ -2093,8 +2093,18 @@
 // ── PWA: Service Worker ──
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function() {
-    navigator.serviceWorker.register('sw.js').catch(function(e) {
+    navigator.serviceWorker.register('sw.js').then(function(reg) {
+      // Check for SW updates every 5 minutes (covers tabs left open for hours)
+      setInterval(function() { reg.update(); }, 5 * 60 * 1000);
+    }).catch(function(e) {
       console.warn('[SW] register failed:', e);
+    });
+
+    // When a new SW activates it broadcasts SW_UPDATED → reload to get latest code
+    navigator.serviceWorker.addEventListener('message', function(e) {
+      if (e.data && e.data.type === 'SW_UPDATED') {
+        window.location.reload();
+      }
     });
   });
 }

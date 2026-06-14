@@ -17,18 +17,20 @@ self.addEventListener('install', (e) => {
   );
 });
 
-// Activate: delete all old caches, claim all clients immediately
+// Activate: delete old caches, claim clients, then notify them to reload
 self.addEventListener('activate', (e) => {
   e.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((k) => k !== CACHE && k !== IMG_CACHE)
-          .map((k) => caches.delete(k))
+    caches.keys()
+      .then((keys) =>
+        Promise.all(keys.filter((k) => k !== CACHE && k !== IMG_CACHE).map((k) => caches.delete(k)))
       )
-    )
+      .then(() => self.clients.claim())
+      .then(() =>
+        self.clients.matchAll({ type: 'window' }).then((clients) => {
+          clients.forEach((c) => c.postMessage({ type: 'SW_UPDATED' }));
+        })
+      )
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', (e) => {
