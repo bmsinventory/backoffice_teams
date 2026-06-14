@@ -85,6 +85,9 @@
         contract:   'renderContract',
         worklog:    'renderWorkLog',
       };
+      if (id === 'overview' || id === 'kanban' || id === 'projects') {
+        window.runAutoStage && window.runAutoStage(true);
+      }
       var fn = _renderMap[id];
       if (fn && typeof window[fn] === 'function') window[fn]();
     }

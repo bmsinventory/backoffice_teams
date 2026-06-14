@@ -128,19 +128,34 @@
     return function () { _sb.removeChannel(channel); };
   };
 
+  // ── Own-Write Suppression: prevent realtime echo from re-rendering ──
+  window._ownWrite      = window._ownWrite      || {};
+  window._ownWriteTimer = window._ownWriteTimer || {};
+  function _markOwnWrite(fsName) {
+    if (!fsName) return;
+    window._ownWrite[fsName] = true;
+    clearTimeout(window._ownWriteTimer[fsName]);
+    window._ownWriteTimer[fsName] = setTimeout(function () {
+      window._ownWrite[fsName] = false;
+    }, 2000);
+  }
+
   // ── Write Operations ──
   window.setDoc = async function (ref, data, _options) {
+    _markOwnWrite(ref._fs);
     var payload = Object.assign({}, data, { id: ref._id });
     var res = await _sb.from(ref._sb).upsert(payload, { onConflict:'id' });
     if (res.error) throw res.error;
   };
 
   window.updateDoc = async function (ref, data) {
+    _markOwnWrite(ref._fs);
     var res = await _sb.from(ref._sb).update(data).eq('id', ref._id);
     if (res.error) throw res.error;
   };
 
   window.deleteDoc = async function (ref) {
+    _markOwnWrite(ref._fs);
     var res = await _sb.from(ref._sb).delete().eq('id', ref._id);
     if (res.error) throw res.error;
   };

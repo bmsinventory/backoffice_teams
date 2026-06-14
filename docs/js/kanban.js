@@ -159,7 +159,7 @@ window._autoStageTimer=null;
 window.startAutoStageLoop=function(){
   window.runAutoStage(true);
   clearInterval(window._autoStageTimer);
-  window._autoStageTimer=setInterval(function(){window.runAutoStage(true);},60*60*1000);
+  window._autoStageTimer=setInterval(function(){window.runAutoStage(true);},5*60*1000);
 }
 
 window.kbDrag=function(e,pid){window.kbPid=pid;}

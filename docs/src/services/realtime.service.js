@@ -101,6 +101,22 @@
       var _initialLoadDone = false;
       var _updateTimer = null;
 
+      // Debounce timers for per-collection renders
+      var _metaTimer = null;
+      var _projTimer = null, _advTimer = null, _ldRenderTimer = null;
+      var _holTimer = null, _lvTimer = null, _tsTimer = null, _costTimer = null;
+      var _wlTimer = null, _cnTimer = null, _hspPTimer = null, _hspTimer = null;
+
+      // Helper: skip realtime render if the snapshot is an echo of our own write
+      function _ownWrite(col) { return window._ownWrite && window._ownWrite[col]; }
+
+      // Debounced renderAll for metadata-only collections (STAGES, STAFF, etc.)
+      function _deferRenderAll() {
+        if (!window.cu || !window.isDbLoaded) return;
+        clearTimeout(_metaTimer);
+        _metaTimer = setTimeout(function () { window.renderAll && window.renderAll(); }, 300);
+      }
+
       function _flashUpdate() {
         if (!_initialLoadDone) return;
         var stat = document.getElementById('tp-status');
@@ -135,7 +151,7 @@
           }
         } else if (window.cu) {
           _flashUpdate();
-          window.renderAll && window.renderAll();
+          // Per-collection onSnapshot handlers manage their own debounced renders
         }
       }
 
@@ -143,62 +159,75 @@
       window.onSnapshot(window.getColRef('STAGES'), function (s) {
         window.STAGES = s.docs.map(function (doc) { return transform.STAGES(doc.data()); }).sort(function (a,b) { return a.order - b.order; });
         checkLoaded();
+        if (!_ownWrite('STAGES')) _deferRenderAll();
       }, window.showDbError);
 
       window.onSnapshot(window.getColRef('PTYPES'), function (s) {
         window.PTYPES = s.docs.map(function (doc) { return transform.PTYPES(doc.data()); });
         checkLoaded();
+        if (!_ownWrite('PTYPES')) _deferRenderAll();
       }, window.showDbError);
 
       window.onSnapshot(window.getColRef('PGROUPS'), function (s) {
         window.PGROUPS = s.docs.map(function (doc) { return transform.PGROUPS(doc.data()); });
         checkLoaded();
+        if (!_ownWrite('PGROUPS')) _deferRenderAll();
       }, window.showDbError);
 
       window.onSnapshot(window.getColRef('POSITIONS'), function (s) {
         window.POSITIONS = s.docs.map(function (doc) { return transform.POSITIONS(doc.data()); });
         checkLoaded();
+        if (!_ownWrite('POSITIONS')) _deferRenderAll();
       }, window.showDbError);
 
       window.onSnapshot(window.getColRef('STAFF'), function (s) {
         window.STAFF = s.docs.map(function (doc) { return transform.STAFF(doc.data()); });
         checkLoaded();
+        if (!_ownWrite('STAFF')) _deferRenderAll();
       }, window.showDbError);
 
       window.onSnapshot(window.getColRef('USERS'), function (s) {
         window.USERS = s.docs.map(function (doc) { return transform.USERS(doc.data()); });
         checkLoaded();
-        // Re-apply sidebar/permission UI when user list changes (role or name might have changed)
         if (window.cu && window.isDbLoaded) window.setupUser && window.setupUser();
+        if (!_ownWrite('USERS')) _deferRenderAll();
       }, window.showDbError);
 
       window.onSnapshot(window.getColRef('PROJECTS'), function (s) {
         window.PROJECTS = s.docs.map(function (doc) { return transform.PROJECTS(doc.data()); });
         checkLoaded();
+        if (_ownWrite('PROJECTS')) return;
         if (window.cu && window.isDbLoaded) {
-          if (_von('view-overview'))     window.renderOverview && window.renderOverview();
-          else if (_von('view-kanban'))  window.renderKanban && window.renderKanban();
-          else if (_von('view-projects'))window.renderProjects && window.renderProjects();
-          else if (_von('view-workload'))window.renderWorkload && window.renderWorkload();
-          else if (_von('view-calendar'))window.renderCalendar && window.renderCalendar();
-          else if (_von('view-availability')) window.renderAvailability && window.renderAvailability();
+          clearTimeout(_projTimer);
+          _projTimer = setTimeout(function () {
+            if (_von('view-overview'))      window.renderOverview && window.renderOverview();
+            else if (_von('view-kanban'))   window.renderKanban && window.renderKanban();
+            else if (_von('view-projects')) window.renderProjects && window.renderProjects();
+            else if (_von('view-workload')) window.renderWorkload && window.renderWorkload();
+            else if (_von('view-calendar')) window.renderCalendar && window.renderCalendar();
+            else if (_von('view-availability')) window.renderAvailability && window.renderAvailability();
+          }, 300);
         }
       }, window.showDbError);
 
       window.onSnapshot(window.getColRef('ADVANCES'), function (s) {
         window.ADVANCES = s.docs.map(function (doc) { return transform.ADVANCES(doc.data()); });
         checkLoaded();
+        if (_ownWrite('ADVANCES')) return;
         if (window.cu && window.isDbLoaded) {
-          if (_von('view-overview'))     window.renderOverview && window.renderOverview();
-          else if (_von('view-advance')) window.renderAdvance && window.renderAdvance();
-          window.updateBadge && window.updateBadge();
+          clearTimeout(_advTimer);
+          _advTimer = setTimeout(function () {
+            if (_von('view-overview'))     window.renderOverview && window.renderOverview();
+            else if (_von('view-advance')) window.renderAdvance && window.renderAdvance();
+            window.updateBadge && window.updateBadge();
+          }, 300);
         }
       }, window.showDbError);
 
-      var _ldRenderTimer = null;
       window.onSnapshot(window.getColRef('LODGINGS'), function (s) {
         window.LODGINGS = s.docs.map(function (doc) { return transform.LODGINGS(doc.data()); });
         checkLoaded();
+        if (_ownWrite('LODGINGS')) return;
         if (window.cu && window.isDbLoaded && _von('view-lodging')) {
           clearTimeout(_ldRenderTimer);
           _ldRenderTimer = setTimeout(function () { window.renderLodging && window.renderLodging(); }, 300);
@@ -208,35 +237,51 @@
       window.onSnapshot(window.getColRef('HOLIDAYS'), function (s) {
         window.HOLIDAYS = s.docs.map(function (doc) { return transform.HOLIDAYS(doc.data()); }).sort(function (a,b) { return (a.date||'').localeCompare(b.date||''); });
         checkLoaded();
+        if (_ownWrite('HOLIDAYS')) return;
         if (window.cu && window.isDbLoaded) {
-          if (_von('view-holidays')) window.renderHolidays && window.renderHolidays();
-          if (window.calTime === 'month') window.renderCalendar && window.renderCalendar();
+          clearTimeout(_holTimer);
+          _holTimer = setTimeout(function () {
+            if (_von('view-holidays')) window.renderHolidays && window.renderHolidays();
+            if (window.calTime === 'month') window.renderCalendar && window.renderCalendar();
+          }, 300);
         }
       }, window.showDbError);
 
       window.onSnapshot(window.getColRef('LEAVES'), function (s) {
         window.LEAVES = s.docs.map(function (doc) { return transform.LEAVES(doc.data()); });
         checkLoaded();
+        if (_ownWrite('LEAVES')) return;
         if (window.cu && window.isDbLoaded) {
-          if (_von('view-leave'))    window.renderLeave && window.renderLeave();
-          if (_von('view-calendar')) window.renderCalendar && window.renderCalendar();
+          clearTimeout(_lvTimer);
+          _lvTimer = setTimeout(function () {
+            if (_von('view-leave'))    window.renderLeave && window.renderLeave();
+            if (_von('view-calendar')) window.renderCalendar && window.renderCalendar();
+          }, 300);
         }
       }, window.showDbError);
 
       window.onSnapshot(window.getColRef('TIMESHEETS'), function (s) {
         window.TIMESHEETS = s.docs.map(function (doc) { return transform.TIMESHEETS(doc.data()); });
         checkLoaded();
+        if (_ownWrite('TIMESHEETS')) return;
         if (window.cu && window.isDbLoaded) {
-          if (_von('view-timesheet')) window.renderTimesheet && window.renderTimesheet();
-          if (_von('view-cost'))      window.renderCost && window.renderCost();
+          clearTimeout(_tsTimer);
+          _tsTimer = setTimeout(function () {
+            if (_von('view-timesheet')) window.renderTimesheet && window.renderTimesheet();
+            if (_von('view-cost'))      window.renderCost && window.renderCost();
+          }, 300);
         }
       }, window.showDbError);
 
       window.onSnapshot(window.getColRef('COSTS'), function (s) {
         window.COSTS = s.docs.map(function (doc) { return transform.COSTS(doc.data()); });
         checkLoaded();
+        if (_ownWrite('COSTS')) return;
         if (window.cu && window.isDbLoaded) {
-          if (_von('view-cost')) window.renderCost && window.renderCost();
+          clearTimeout(_costTimer);
+          _costTimer = setTimeout(function () {
+            if (_von('view-cost')) window.renderCost && window.renderCost();
+          }, 300);
         }
       }, window.showDbError);
 
@@ -244,39 +289,56 @@
         window.DEPT_LIST = s.docs.map(function (doc) { return transform.DEPARTMENTS(doc.data()); }).sort(function (a,b) { return a.label.localeCompare(b.label, 'th'); });
         if (window.DEPT_LIST.length > 0) window.DEPARTMENTS = window.DEPT_LIST.map(function (d) { return d.label; });
         checkLoaded();
+        if (!_ownWrite('DEPARTMENTS')) _deferRenderAll();
       }, window.showDbError);
 
       // ── Background Collections (non-blocking) ──
       window.onSnapshot(window.getColRef('WORK_LOGS'), function (s) {
         window.WORK_LOGS = s.docs.map(function (doc) { return transform.WORK_LOGS(doc.data()); }).sort(function (a,b) { var da=a.type==='daily'?a.date:a.startDate; var db=b.type==='daily'?b.date:b.startDate; return (db||'').localeCompare(da||''); });
+        if (_ownWrite('WORK_LOGS')) return;
         if (window.cu) {
-          if (_von('view-worklog'))     window.renderWorkLog && window.renderWorkLog();
-          if (_von('view-calendar'))    window.renderCalendar && window.renderCalendar();
-          if (_von('view-availability'))window.renderAvailability && window.renderAvailability();
+          clearTimeout(_wlTimer);
+          _wlTimer = setTimeout(function () {
+            if (_von('view-worklog'))      window.renderWorkLog && window.renderWorkLog();
+            if (_von('view-calendar'))     window.renderCalendar && window.renderCalendar();
+            if (_von('view-availability')) window.renderAvailability && window.renderAvailability();
+          }, 300);
         }
       }, window.showDbError);
 
       window.onSnapshot(window.getColRef('CONTRACTS'), function (s) {
         window.CONTRACTS = s.docs.map(function (doc) { return transform.CONTRACTS(doc.data()); });
-        if (window.cu && _von('view-contract')) window.renderContract && window.renderContract();
+        if (_ownWrite('CONTRACTS')) return;
+        if (window.cu && _von('view-contract')) {
+          clearTimeout(_cnTimer);
+          _cnTimer = setTimeout(function () { window.renderContract && window.renderContract(); }, 300);
+        }
       }, window.showDbError);
 
       window.onSnapshot(window.getColRef('HSP_PRODUCTS'), function (s) {
         window.HSP_PRODUCTS = s.docs.map(function (doc) { return transform.HSP_PRODUCTS(doc.data()); }).sort(function (a,b) { return a.name.localeCompare(b.name, 'th'); });
-        if (window.cu && _von('view-hospital')) {
-          window.renderHspProductMgmt && window.renderHspProductMgmt();
-          if (window._hspViewMode === 'analysis') window.renderHspAnalysis && window.renderHspAnalysis();
-        }
         if (window.cu && window.admCur === 'hsp_products') window.admTab && window.admTab('hsp_products');
+        if (_ownWrite('HSP_PRODUCTS')) return;
+        if (window.cu && _von('view-hospital')) {
+          clearTimeout(_hspPTimer);
+          _hspPTimer = setTimeout(function () {
+            window.renderHspProductMgmt && window.renderHspProductMgmt();
+            if (window._hspViewMode === 'analysis') window.renderHspAnalysis && window.renderHspAnalysis();
+          }, 300);
+        }
       }, window.showDbError);
 
       window.onSnapshot(window.getColRef('HOSPITALS'), function (s) {
         window.HOSPITALS = s.docs.map(function (doc) { return transform.HOSPITALS(doc.data()); });
+        if (_ownWrite('HOSPITALS')) return;
         if (window.cu && _von('view-hospital')) {
-          var vm = window._hspViewMode || 'dashboard';
-          if (vm === 'dashboard')  window.renderHspDashboard && window.renderHspDashboard();
-          else if (vm === 'analysis') { window._hspPopulateFilters && window._hspPopulateFilters(); window.renderHspAnalysis && window.renderHspAnalysis(); }
-          else { window._hspPopulateFilters && window._hspPopulateFilters(); window.renderHospital && window.renderHospital(); }
+          clearTimeout(_hspTimer);
+          _hspTimer = setTimeout(function () {
+            var vm = window._hspViewMode || 'dashboard';
+            if (vm === 'dashboard')       window.renderHspDashboard && window.renderHspDashboard();
+            else if (vm === 'analysis')   { window._hspPopulateFilters && window._hspPopulateFilters(); window.renderHspAnalysis && window.renderHspAnalysis(); }
+            else                          { window._hspPopulateFilters && window._hspPopulateFilters(); window.renderHospital && window.renderHospital(); }
+          }, 300);
         }
       }, window.showDbError);
 
