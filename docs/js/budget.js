@@ -1,8 +1,43 @@
 // ── BUDGET SUMMARY ──
 (function(){
 var _chart=null;
+var _budCurTab='budget';
+
+// ── Tab switching ──
+window._budSwitchTab=function(tab){
+  _budCurTab=tab;
+  var pb=document.getElementById('bud-pane-budget');
+  var po=document.getElementById('bud-pane-owner');
+  if(pb)pb.style.display=tab==='budget'?'':'none';
+  if(po)po.style.display=tab==='owner'?'':'none';
+  document.querySelectorAll('.bud-tab-btn').forEach(function(b){
+    var active=b.dataset.tab===tab;
+    b.style.borderBottomColor=active?'#4361ee':'transparent';
+    b.style.color=active?'#4361ee':'var(--txt3)';
+  });
+  window.renderBudget();
+};
 
 window.renderBudget=function(){
+  if(_budCurTab==='owner'){_renderOwner();return;}
+  _renderBudgetTab();
+};
+
+window.renderSiteOwner=function(){_renderOwner();};
+
+// ── Expand / collapse owner row ──
+window._soToggle=function(headerEl){
+  var card=headerEl.parentElement;
+  var sub=card.querySelector('.so-sub');
+  var chev=headerEl.querySelector('.so-chev');
+  if(!sub)return;
+  var open=sub.style.display!=='none';
+  sub.style.display=open?'none':'';
+  if(chev)chev.style.transform=open?'':'rotate(90deg)';
+};
+
+// ── Budget Tab ──────────────────────────────────────────────
+function _renderBudgetTab(){
   var yf=document.getElementById('bud-yr');
   if(yf&&yf.options.length<=1){
     var yrs=[...new Set((window.PROJECTS||[]).map(function(p){return window.getYearBE(p.start);}).filter(Boolean))].sort(function(a,b){return b-a;});
@@ -86,7 +121,6 @@ window.renderBudget=function(){
     if(!wrap)return;
     wrap.style.height='auto';
     wrap.style.position='static';
-    // Legend
     var legend='<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px;font-size:11px;color:var(--txt-muted);">'
       +'<span style="display:flex;align-items:center;gap:5px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#06d6a0;"></span>ใช้งบ &lt;50%</span>'
       +'<span style="display:flex;align-items:center;gap:5px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#4361ee;"></span>50–79%</span>'
@@ -100,7 +134,6 @@ window.renderBudget=function(){
       var remainColor=r.remain<0?'#ff6b6b':'var(--txt-muted)';
       var pg=window.gG?window.gG(r.p.groupId):null;
       return '<div onclick="window.openProjModal(\''+r.p.id+'\')" style="padding:10px 14px;cursor:pointer;transition:background .12s;'+(i<cr.length-1?'border-bottom:1px solid var(--border);':'')+'" onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">'
-        // Row 1: name + %
         +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:5px;">'
           +'<div>'
             +'<div style="font-size:12px;font-weight:600;color:var(--txt);line-height:1.45;">'+window.esc(r.p.name)+'</div>'
@@ -108,11 +141,9 @@ window.renderBudget=function(){
           +'</div>'
           +'<span style="font-size:13px;font-weight:800;color:'+barColor+';flex-shrink:0;min-width:40px;text-align:right;">'+pct+'%</span>'
         +'</div>'
-        // Row 2: progress bar
         +'<div style="height:8px;background:'+barColor+'1a;border-radius:4px;overflow:hidden;margin-bottom:5px;">'
           +'<div style="width:'+barW+'%;height:100%;background:'+barColor+';border-radius:4px;"></div>'
         +'</div>'
-        // Row 3: amounts
         +'<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--txt-muted);">'
           +'<span>งบ <b style="color:var(--txt);">'+window.fc(r.budget)+'</b></span>'
           +'<span>ใช้ <b style="color:'+barColor+';">'+window.fc(r.used)+'</b> · คงเหลือ <b style="color:'+remainColor+';">'+window.fc(r.remain)+'</b></span>'
@@ -154,5 +185,127 @@ window.renderBudget=function(){
       +'<td style="font-size:11px;color:var(--txt2);">'+(r.p.start?window.fd(r.p.start):'')+'</td>'
       +'</tr>';
   }).join('');
-};
+}
+
+// ── Site Owner Tab ──────────────────────────────────────────
+function _renderOwner(){
+  // Populate type dropdown once
+  var soTypeEl=document.getElementById('so-type');
+  if(soTypeEl&&soTypeEl.options.length<=1){
+    (window.PTYPES||[]).forEach(function(t){
+      var o=document.createElement('option');o.value=t.id;o.textContent=t.label;soTypeEl.appendChild(o);
+    });
+  }
+  // Populate stage dropdown once
+  var soStageEl=document.getElementById('so-stage');
+  if(soStageEl&&soStageEl.options.length<=1){
+    (window.STAGES||[]).slice().sort(function(a,b){return (a.order||99)-(b.order||99);}).forEach(function(s){
+      var o=document.createElement('option');o.value=s.id;o.textContent=s.label;soStageEl.appendChild(o);
+    });
+  }
+
+  var yr=(document.getElementById('bud-yr')||{}).value||'';
+  var q=((document.getElementById('so-q')||{}).value||'').toLowerCase();
+  var typeF=(document.getElementById('so-type')||{}).value||'';
+  var stageF=(document.getElementById('so-stage')||{}).value||'';
+  var sort=(document.getElementById('so-sort')||{}).value||'value_desc';
+
+  // Build owner map from PROJECTS
+  var ownerMap={};
+  (window.PROJECTS||[]).forEach(function(p){
+    if(yr&&window.getYearBE(p.start)!=yr)return;
+    if(typeF&&p.typeId!==typeF)return;
+    if(stageF&&p.stage!==stageF)return;
+    var owner=p.siteOwner||'(ไม่ระบุ)';
+    if(!ownerMap[owner])ownerMap[owner]={name:owner,projects:[],budget:0,byType:{}};
+    ownerMap[owner].projects.push(p);
+    ownerMap[owner].budget+=(p.cost||0);
+    var tid=p.typeId||'';
+    if(!ownerMap[owner].byType[tid])ownerMap[owner].byType[tid]={count:0,budget:0};
+    ownerMap[owner].byType[tid].count++;
+    ownerMap[owner].byType[tid].budget+=(p.cost||0);
+  });
+
+  var owners=Object.values(ownerMap).filter(function(o){
+    return !q||o.name.toLowerCase().includes(q);
+  });
+
+  owners.sort(function(a,b){
+    if(sort==='value_desc')return b.budget-a.budget;
+    if(sort==='value_asc')return a.budget-b.budget;
+    if(sort==='count_desc')return b.projects.length-a.projects.length;
+    if(sort==='name_asc')return a.name.localeCompare(b.name,'th');
+    return b.budget-a.budget;
+  });
+
+  // KPI summary cards
+  var totalBudget=owners.reduce(function(s,o){return s+o.budget;},0);
+  var totalProjects=owners.reduce(function(s,o){return s+o.projects.length;},0);
+  var kpi=document.getElementById('so-kpi');
+  if(kpi){
+    kpi.innerHTML=[
+      {k:'เจ้าของไซต์',v:owners.length+' ราย',icon:'🏢',g1:'#4361ee',g2:'#4cc9f0'},
+      {k:'มูลค่ารวมทั้งหมด',v:window.fc(totalBudget),icon:'💵',g1:'#06d6a0',g2:'#4cc9f0'},
+      {k:'โครงการทั้งหมด',v:totalProjects+' โครงการ',icon:'📁',g1:'#7c5cfc',g2:'#f72585'},
+    ].map(function(s){
+      return'<div class="stat-c" style="display:flex;flex-direction:column;gap:2px;">'
+        +'<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px;">'
+        +'<div class="stat-k">'+s.k+'</div>'
+        +'<div class="stat-icon" style="background:linear-gradient(135deg,'+s.g1+'18,'+s.g2+'18);width:36px;height:36px;flex-shrink:0;">'+s.icon+'</div>'
+        +'</div>'
+        +'<div class="stat-v" style="background:linear-gradient(135deg,'+s.g1+','+s.g2+');-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-size:22px;">'+s.v+'</div>'
+        +'</div>';
+    }).join('');
+  }
+
+  var body=document.getElementById('so-body');
+  if(!body)return;
+  if(!owners.length){
+    body.innerHTML='<div style="text-align:center;padding:60px;color:var(--txt3);">ไม่พบข้อมูล</div>';
+    return;
+  }
+
+  body.innerHTML=owners.map(function(o){
+    // Type breakdown badges
+    var badges=Object.entries(o.byType).map(function(entry){
+      var tid=entry[0],d=entry[1];
+      var t=window.gT(tid);
+      return'<span style="display:inline-flex;align-items:center;gap:3px;background:'+t.color+'18;color:'+t.color+';border-radius:4px;padding:2px 8px;font-size:10px;font-weight:600;">'
+        +window.esc(t.label)+'<span style="opacity:.65;">×'+d.count+'</span></span>';
+    }).join('');
+
+    // Sub-rows for each project
+    var subRows=o.projects.map(function(p){
+      var t=window.gT(p.typeId);
+      var s=window.gS(p.stage);
+      return'<tr onclick="window.openProjModal(\''+p.id+'\')" style="cursor:pointer;" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">'
+        +'<td style="padding-left:36px;font-size:12px;">'+window.esc(p.name)+'</td>'
+        +'<td><span style="background:'+t.color+'18;color:'+t.color+';border-radius:4px;padding:1px 7px;font-size:10px;font-weight:600;">'+window.esc(t.label)+'</span></td>'
+        +'<td><span style="background:'+s.color+'18;color:'+s.color+';border-radius:4px;padding:1px 7px;font-size:10px;font-weight:600;">'+s.label+'</span></td>'
+        +'<td style="text-align:right;font-weight:700;font-size:12px;">'+window.fc(p.cost||0)+'</td>'
+        +'</tr>';
+    }).join('');
+
+    return'<div class="ov-card" style="padding:0;overflow:hidden;margin-bottom:10px;">'
+      +'<div onclick="window._soToggle(this)" style="display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;transition:background .12s;" onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">'
+        +'<span class="so-chev" style="font-size:11px;color:var(--txt3);transition:transform .2s;flex-shrink:0;">▶</span>'
+        +'<div style="flex:1;min-width:0;">'
+          +'<div style="font-weight:700;font-size:14px;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+window.esc(o.name)+'</div>'
+          +'<div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:4px;">'+badges+'</div>'
+        +'</div>'
+        +'<div style="text-align:right;flex-shrink:0;padding-left:12px;">'
+          +'<div style="font-size:11px;color:var(--txt3);">'+o.projects.length+' โครงการ</div>'
+          +'<div style="font-size:16px;font-weight:800;color:#4361ee;">'+window.fc(o.budget)+'</div>'
+        +'</div>'
+      +'</div>'
+      +'<div class="so-sub" style="display:none;border-top:1px solid var(--border);">'
+        +'<table class="t-table" style="width:100%;">'
+          +'<thead><tr><th>ชื่อโครงการ</th><th>ประเภท</th><th>Stage</th><th style="text-align:right">มูลค่า (฿)</th></tr></thead>'
+          +'<tbody>'+subRows+'</tbody>'
+        +'</table>'
+      +'</div>'
+    +'</div>';
+  }).join('');
+}
+
 })();
