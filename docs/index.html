@@ -1108,6 +1108,24 @@
   </div>
 </div>
 
+<!-- TARGETS MODAL -->
+<div class="overlay" id="m-targets">
+  <div class="modal lg">
+    <div class="m-head">
+      <div class="m-icon" style="background:rgba(124,92,252,.12)">🎯</div>
+      <div class="m-title">ตั้งค่าเป้าหมายทีม</div>
+      <button class="m-x" onclick="window.closeM('m-targets')">✕</button>
+    </div>
+    <div class="m-body" id="m-targets-body" style="max-height:70vh;overflow-y:auto;padding:0;"></div>
+    <div class="m-foot">
+      <button id="m-targets-del" class="btn btn-ghost" style="display:none;color:var(--coral);" onclick="window.deleteTarget()">🗑 ลบ</button>
+      <div style="flex:1;"></div>
+      <button class="btn btn-ghost" onclick="window.closeM('m-targets')">ยกเลิก</button>
+      <button class="btn btn-pri" onclick="window.saveTarget()">💾 บันทึก</button>
+    </div>
+  </div>
+</div>
+
 <!-- WORK LOG MODAL -->
 <div class="overlay" id="m-worklog">
   <div class="modal lg">
@@ -2063,6 +2081,7 @@
 <script type="module" src="js/hospital.js"></script>
 <script type="module" src="js/contract.js"></script>
 <script type="module" src="js/worklog.js"></script>
+<script type="module" src="js/targets.js"></script>
 <script src="js/budget.js"></script>
 <script src="js/export.js"></script>
 
