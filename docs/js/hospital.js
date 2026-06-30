@@ -813,7 +813,9 @@ window.renderHospital = function() {
     if (cs.length) {
       sec2Body = cs.map(function(c) {
         return '<div style="margin-bottom:8px;padding:8px 10px;background:var(--bg);border-radius:8px;border:1px solid var(--border);">' +
-          '<div style="font-size:12px;font-weight:700;color:var(--txt);">' + esc(c.name||'—') + '</div>' +
+          '<div style="font-size:12px;font-weight:700;color:var(--txt);">' + esc(c.name||'—') +
+          (c.nickname ? ' <span style="font-size:11px;font-weight:500;color:var(--txt-muted);">(' + esc(c.nickname) + ')</span>' : '') +
+          '</div>' +
           (c.position ? '<div style="font-size:10px;color:var(--violet);font-weight:600;margin-top:1px;">' + esc(c.position) + '</div>' : '') +
           '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:5px;">' +
           (c.phone ? '<span style="font-size:11px;color:var(--txt-muted);">📞 ' + esc(c.phone) + '</span>' : '') +
@@ -953,7 +955,7 @@ window.openHospitalDetail = function(id) {
       `<div style="display:flex;flex-direction:column;gap:10px;">` +
       cs.map(function(c) {
         return `<div style="background:var(--bg);border-radius:10px;padding:14px 16px;border:1px solid var(--border);">
-          <div style="font-size:14px;font-weight:700;color:var(--txt);">${esc(c.name||'—')}</div>
+          <div style="font-size:14px;font-weight:700;color:var(--txt);">${esc(c.name||'—')}${c.nickname ? ` <span style="font-size:12px;font-weight:500;color:var(--txt-muted);">(${esc(c.nickname)})</span>` : ''}</div>
           ${c.position ? `<div style="font-size:11px;color:var(--violet);margin-top:2px;font-weight:600;">${esc(c.position)}</div>` : ''}
           <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;font-size:12px;color:var(--txt-muted);">
             ${c.phone ? `<span>📞 ${esc(c.phone)}</span>` : ''}
@@ -1060,11 +1062,12 @@ window._hspAddContact = function(c) {
   row.style.cssText = 'background:var(--bg);border-radius:8px;padding:10px 12px;margin-bottom:8px;border:1px solid var(--border);';
   row.innerHTML =
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">' +
-      '<input class="f-input" placeholder="ชื่อ-นามสกุล" data-cf="name" value="' + esc(c?.name||'') + '" style="margin:0;">' +
+      '<input class="f-input" placeholder="ชื่อ-นามสกุล *" data-cf="name" value="' + esc(c?.name||'') + '" style="margin:0;">' +
+      '<input class="f-input" placeholder="ชื่อเล่น" data-cf="nickname" value="' + esc(c?.nickname||'') + '" style="margin:0;">' +
       '<input class="f-input" placeholder="เบอร์โทร" data-cf="phone" value="' + esc(c?.phone||'') + '" style="margin:0;">' +
       '<input class="f-input" placeholder="ตำแหน่ง" data-cf="position" value="' + esc(c?.position||'') + '" style="margin:0;">' +
       '<input class="f-input" placeholder="Email" data-cf="email" type="email" value="' + esc(c?.email||'') + '" style="margin:0;">' +
-      '<input class="f-input" placeholder="หมายเหตุ" data-cf="note" value="' + esc(c?.note||'') + '" style="margin:0;grid-column:1/-1;">' +
+      '<input class="f-input" placeholder="หมายเหตุ" data-cf="note" value="' + esc(c?.note||'') + '" style="margin:0;">' +
     '</div>' +
     '<div style="text-align:right;">' +
       '<button type="button" class="btn btn-ghost btn-sm" onclick="window._hspRemoveContact(this)" style="color:var(--coral);font-size:11px;">🗑 ลบผู้ติดต่อ</button>' +
@@ -1086,11 +1089,12 @@ function _hspGetContacts() {
   var contacts = [];
   document.querySelectorAll('#hsp-contacts-list .hsp-contact-row').forEach(function(row) {
     var name     = (row.querySelector('[data-cf="name"]').value     || '').trim();
+    var nickname = (row.querySelector('[data-cf="nickname"]').value || '').trim();
     var phone    = (row.querySelector('[data-cf="phone"]').value    || '').trim();
     var position = (row.querySelector('[data-cf="position"]').value || '').trim();
     var email    = (row.querySelector('[data-cf="email"]').value    || '').trim();
     var note     = (row.querySelector('[data-cf="note"]').value     || '').trim();
-    if (name || phone || email) contacts.push({ name, phone, position, email, note });
+    if (name || phone || email) contacts.push({ name, nickname, phone, position, email, note });
   });
   return contacts;
 }
@@ -1341,19 +1345,7 @@ window.downloadHospitalTemplate = function() {
     'tel','website','affiliation','note',
   ];
 
-  var examples = [
-    // แบบ code only (ถ้าเชื่อมต่อ MOPH API จะดึงข้อมูลให้อัตโนมัติ)
-    ['10669','','','','','','','','','','',''],
-    ['10710','','','','','','','','','','',''],
-    ['10736','','','','','','','','','','',''],
-    // แบบกรอกข้อมูลครบ
-    ['11001','โรงพยาบาลนนทบุรี','S',388,'นนทบุรี','เมืองนนทบุรี','สวรรค์ใต้','68 ถ.รัตนาธิเบศร์ ต.สวรรค์ใต้ อ.เมือง จ.นนทบุรี','02-589-5000','','กระทรวงสาธารณสุข',''],
-    ['10773','โรงพยาบาลรามาธิบดี','A',1200,'กรุงเทพมหานคร','ราษฎร์บูรณะ','','270 ถ.พระรามหก แขวงทุ่งพญาไท เขตราษฎร์บูรณะ','02-201-1000','www.rama.mahidol.ac.th','มหาวิทยาลัยมหิดล',''],
-    ['13770','โรงพยาบาลชัยบาดาล','F1',90,'ลพบุรี','ชัยบาดาล','ลำนารายณ์','ถ.พหลโยธิน ต.ลำนารายณ์ อ.ชัยบาดาล จ.ลพบุรี 15130','036-459-009','','กระทรวงสาธารณสุข',''],
-    ['11101','คลินิกเวชกรรมตัวอย่าง','P',0,'กรุงเทพมหานคร','บางรัก','','12/34 ถ.สีลม แขวงบางรัก','02-000-0000','','เอกชน','ตัวอย่างประเภท P'],
-  ];
-
-  var ws1 = XLSX.utils.aoa_to_sheet([headers, ...examples]);
+  var ws1 = XLSX.utils.aoa_to_sheet([headers]);
   ws1['!cols'] = [
     {wch:14},{wch:38},{wch:13},{wch:7},
     {wch:20},{wch:18},{wch:16},{wch:46},
@@ -1412,21 +1404,16 @@ window.downloadHospitalTemplate = function() {
 window.downloadHospitalContactsTemplate = function() {
   var wb = XLSX.utils.book_new();
 
-  var headers = ['hospital_code','contact_name','phone','position','email','note'];
-  var examples = [
-    ['10669','นพ.สมชาย ใจดี','043-246-100 ต่อ 101','ผู้อำนวยการ','director@kkhospital.go.th','ติดต่อได้วันจันทร์-ศุกร์'],
-    ['10669','นางสาวสมหญิง รักงาน','081-234-5678','พยาบาลวิชาชีพ','nurse@kkhospital.go.th',''],
-    ['10710','นายพิชัย มั่นคง','042-512-000','เลขานุการ','secretary@udonhosp.go.th',''],
-  ];
-  var wsData = [headers, ...examples];
-  var ws = XLSX.utils.aoa_to_sheet(wsData);
-  ws['!cols'] = [{wch:14},{wch:22},{wch:18},{wch:20},{wch:28},{wch:28}];
+  var headers = ['hospital_code','contact_name','nickname','phone','position','email','note'];
+  var ws = XLSX.utils.aoa_to_sheet([headers]);
+  ws['!cols'] = [{wch:14},{wch:22},{wch:14},{wch:18},{wch:20},{wch:28},{wch:28}];
   XLSX.utils.book_append_sheet(wb, ws, 'ผู้ติดต่อ รพ.');
 
   var guide = [
     ['คอลัมน์','คำอธิบาย','ตัวอย่าง','จำเป็น'],
     ['hospital_code','รหัสสถานพยาบาล 5 หลัก','10669','✅'],
     ['contact_name','ชื่อ-นามสกุลผู้ติดต่อ','นพ.สมชาย ใจดี','✅'],
+    ['nickname','ชื่อเล่น','หมอชาย',''],
     ['phone','เบอร์โทรศัพท์','043-246-100 ต่อ 101',''],
     ['position','ตำแหน่งงาน','ผู้อำนวยการ',''],
     ['email','อีเมล','director@hospital.go.th',''],
@@ -1465,6 +1452,7 @@ window.importHospitalContactsFromFile = async function(file) {
     }
     var colCode     = findCol(['hospital_code','รหัสสถานพยาบาล','รหัส','code','hcode']);
     var colName     = findCol(['contact_name','ชื่อผู้ติดต่อ','ชื่อ-นามสกุล','ชื่อ','name']);
+    var colNickname = findCol(['nickname','ชื่อเล่น']);
     var colPhone    = findCol(['phone','เบอร์โทร','โทรศัพท์','tel','telephone']);
     var colPosition = findCol(['position','ตำแหน่ง','ตำแหน่งงาน']);
     var colEmail    = findCol(['email','อีเมล','e-mail']);
@@ -1478,18 +1466,19 @@ window.importHospitalContactsFromFile = async function(file) {
     var errorRows = [];
 
     rows.forEach(function(row, i) {
-      var code    = String(colCode ? row[colCode] : '').trim();
-      var cName   = String(colName     ? row[colName]     : '').trim();
-      var cPhone  = String(colPhone    ? row[colPhone]    : '').trim();
-      var cPos    = String(colPosition ? row[colPosition] : '').trim();
-      var cEmail  = String(colEmail    ? row[colEmail]    : '').trim();
-      var cNote   = String(colNote     ? row[colNote]     : '').trim();
+      var code      = String(colCode ? row[colCode] : '').trim();
+      var cName     = String(colName     ? row[colName]     : '').trim();
+      var cNickname = String(colNickname ? row[colNickname] : '').trim();
+      var cPhone    = String(colPhone    ? row[colPhone]    : '').trim();
+      var cPos      = String(colPosition ? row[colPosition] : '').trim();
+      var cEmail    = String(colEmail    ? row[colEmail]    : '').trim();
+      var cNote     = String(colNote     ? row[colNote]     : '').trim();
 
       if (!code) { errorRows.push({ rowNum: i + 2, reason: 'ไม่มีรหัสสถานพยาบาล' }); return; }
       if (!cName) { errorRows.push({ rowNum: i + 2, code, reason: 'ไม่มีชื่อผู้ติดต่อ' }); return; }
 
       if (!groups[code]) groups[code] = [];
-      groups[code].push({ name: cName, phone: cPhone, position: cPos, email: cEmail, note: cNote });
+      groups[code].push({ name: cName, nickname: cNickname, phone: cPhone, position: cPos, email: cEmail, note: cNote });
     });
 
     // จับคู่กับ window.HOSPITALS

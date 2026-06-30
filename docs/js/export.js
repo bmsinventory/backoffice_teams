@@ -217,7 +217,7 @@
       return true;
     }).map(function(h){
       var prods=(h.products||[]).map(function(pid){var pr=(window.HSP_PRODUCTS||[]).find(function(x){return x.id===pid;});return pr?pr.name:'';}).filter(Boolean).join(', ');
-      var contacts=(h.contacts||[]).map(function(c){return(c.name||'')+(c.phone?' '+c.phone:'');}).join(' | ');
+      var contacts=(h.contacts||[]).map(function(c){return(c.name||'')+(c.nickname?' ('+c.nickname+')':'')+(c.phone?' '+c.phone:'');}).join(' | ');
       return[h.code,h.name,h.type,h.beds,h.province,h.district,h.tambon,h.tel,contacts,prods,h.note];
     });
     doExport(['รหัส','ชื่อโรงพยาบาล','ระดับ','จำนวนเตียง','จังหวัด','อำเภอ','ตำบล','โทรศัพท์','ผู้ติดต่อ','ผลิตภัณฑ์ที่ใช้','หมายเหตุ'],rows,'โรงพยาบาล');
