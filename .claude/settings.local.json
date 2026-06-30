@@ -18,7 +18,22 @@
       "Bash(node)",
       "Read(//d/ส่วนตัว/พัฒนาโปรแกรม/backoffice_teams/**)",
       "Read(//d/ส่วนตัว/พัฒนาโปรแกรม/backoffice_teams/docs/**)",
-      "Read(//d/ส่วนตัว/พัฒนาโปรแกรม/backoffice_teams/docs/js/**)"
+      "Read(//d/ส่วนตัว/พัฒนาโปรแกรม/backoffice_teams/docs/js/**)",
+      "Bash(Remove-Item \"d:\\\\ส่วนตัว\\\\พัฒนาโปรแกรม\\\\backoffice_teams - supabase\\\\docs\\\\js\\\\config.js\" -Force)",
+      "Bash(Remove-Item \"d:\\\\ส่วนตัว\\\\พัฒนาโปรแกรม\\\\backoffice_teams - supabase\\\\docs\\\\js\\\\auth.js\" -Force)",
+      "Bash(Remove-Item \"d:\\\\ส่วนตัว\\\\พัฒนาโปรแกรม\\\\backoffice_teams - supabase\\\\firebase.json\" -Force)",
+      "Bash(Remove-Item \"d:\\\\ส่วนตัว\\\\พัฒนาโปรแกรม\\\\backoffice_teams - supabase\\\\.firebaserc\" -Force)",
+      "Bash(git restore *)",
+      "Bash(Get-ChildItem -Path \"d:\\\\ส่วนตัว\\\\พัฒนาโปรแกรม\\\\backoffice_teams - supabase\" -Recurse -Directory)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Sort-Object)",
+      "Bash(Select-String -Path \"d:\\\\ส่วนตัว\\\\พัฒนาโปรแกรม\\\\backoffice_teams - supabase\\\\docs\\\\js\\\\projects.js\" -Pattern \"saveProject|contract_id|pf-contract\")",
+      "Bash(Select-Object -First 30)",
+      "Bash(Format-Table LineNumber,Line -AutoSize)",
+      "Bash(cmdkey /list)",
+      "Bash(findstr github *)",
+      "PowerShell(git config --global credential.helper)",
+      "PowerShell(git -C \"d:\\\\��ǹ���\\\\�Ѳ�������\\\\backoffice_teams - supabase\" config credential.helper)"
     ],
     "additionalDirectories": [
       "C:\\Users\\BMS\\Desktop\\backoffice-teams\\public"

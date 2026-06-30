@@ -21,6 +21,13 @@ window.renderLodging=function(){
     if(stFil==='pending'&&lds.some(l=>l.approvedDaily==='yes'||l.approvedMonthly==='yes'))return false;
     return true;
   });
+  // ── Sort ──
+  var sortV=(document.getElementById('ld-sort')||{}).value||'start_desc';
+  fProjs.sort(function(a,b){
+    if(sortV==='start_asc')return (a.start||'').localeCompare(b.start||'');
+    if(sortV==='name_asc')return (a.name||'').localeCompare(b.name||'','th');
+    return (b.start||'').localeCompare(a.start||'');
+  });
   // ── Summary bar ──
   var allLds=window.LODGINGS.filter(l=>fProjs.some(p=>p.id===l.pid));
   var approvedDCount=fProjs.filter(p=>(grouped[p.id]||[]).some(l=>l.approvedDaily==='yes')).length;

@@ -437,6 +437,11 @@
           <select class="t-sel" id="adv-grp" onchange="window.renderAdvance()"><option value="">ทุกกลุ่มโครงการ</option></select>
           <select class="t-sel" id="adv-type" onchange="window.renderAdvance()"><option value="">ทุกประเภท</option></select>
           <select class="t-sel" id="adv-yr" onchange="window.renderAdvance()"><option value="">ทุกปี พ.ศ.</option></select>
+          <select class="t-sel" id="adv-sort" onchange="window.renderAdvance()">
+            <option value="start_desc">📅 วันเริ่ม (ใหม่→เก่า)</option>
+            <option value="start_asc">📅 วันเริ่ม (เก่า→ใหม่)</option>
+            <option value="name_asc">🔤 ชื่อโครงการ (ก→ฮ)</option>
+          </select>
           <div style="flex:1"></div>
           <button class="btn btn-xls btn-sm" onclick="window.exportAdvances()" title="Export Excel">📥 Excel</button>
           <button class="btn btn-teal btn-sm" id="btn-add-adv" onclick="window.openAdvModal(null)">+ New Advance</button>
@@ -459,6 +464,11 @@
             <option value="approved_daily">📅 อนุมัติรายวัน</option>
             <option value="approved_monthly">📆 อนุมัติรายเดือน</option>
             <option value="pending">⏳ รออนุมัติ</option>
+          </select>
+          <select class="t-sel" id="ld-sort" onchange="window.renderLodging()">
+            <option value="start_desc">📅 วันเริ่ม (ใหม่→เก่า)</option>
+            <option value="start_asc">📅 วันเริ่ม (เก่า→ใหม่)</option>
+            <option value="name_asc">🔤 ชื่อโครงการ (ก→ฮ)</option>
           </select>
           <div style="flex:1"></div>
           <button class="btn btn-xls btn-sm" onclick="window.exportLodging()" title="Export Excel">📥 Excel</button>

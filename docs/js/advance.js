@@ -27,6 +27,15 @@ window.renderAdvance=function(){
     if(yr&&(!p||getYearBE(p.start)!=yr))return false;
     return!q||a.purpose.includes(q)||(p&&p.name.includes(q));
   });
+  // ── Sort ──
+  var sortV=(document.getElementById('adv-sort')||{}).value||'start_desc';
+  rows.sort(function(a,b){
+    var pa=window.PROJECTS.find(function(x){return x.id===a.pid;})||{};
+    var pb=window.PROJECTS.find(function(x){return x.id===b.pid;})||{};
+    if(sortV==='start_asc')return (pa.start||'').localeCompare(pb.start||'');
+    if(sortV==='name_asc')return (pa.name||'').localeCompare(pb.name||'','th');
+    return (pb.start||'').localeCompare(pa.start||'');
+  });
   // ── Summary bar ──
   var totalAmt=rows.reduce((s,a)=>s+(a.amount||0),0);
   var totalClr=rows.reduce((s,a)=>s+(a.cleared||0),0);
