@@ -1294,11 +1294,17 @@ window.saveHospital = async function() {
     };
 
     await window.setDoc(getDocRef('HOSPITALS', data.hospital_id), data);
+    window._applyLocalDoc('HOSPITALS', data.hospital_id, data);
     window.closeM('m-hsp');
 
     var msg = id ? 'อัปเดตข้อมูลแล้ว' : 'เพิ่มโรงพยาบาลแล้ว';
     if (enriched) msg += ' · เติมข้อมูลจาก MOPH API';
     window.showAlert(msg, 'success');
+
+    var vm = window._hspViewMode || 'dashboard';
+    if (vm === 'dashboard') window.renderHspDashboard && window.renderHspDashboard();
+    else if (vm === 'analysis') { window._hspPopulateFilters && window._hspPopulateFilters(); window.renderHspAnalysis && window.renderHspAnalysis(); }
+    else { window._hspPopulateFilters && window._hspPopulateFilters(); window.renderHospital && window.renderHospital(); }
 
   } catch(e) {
     window.showAlert('บันทึกไม่สำเร็จ: ' + e.message, 'warn');
@@ -1313,7 +1319,12 @@ window.deleteHospital = async function(id) {
   if (!await window.confirmAsync('ลบ "'+h.name+'" ออกจากระบบ?',{icon:'🗑️',title:'ลบโรงพยาบาล'})) return;
   try {
     await window.deleteDoc(getDocRef('HOSPITALS', id));
+    window._removeLocalDoc('HOSPITALS', id);
     window.showAlert('ลบข้อมูลแล้ว', 'success');
+    var vm = window._hspViewMode || 'dashboard';
+    if (vm === 'dashboard') window.renderHspDashboard && window.renderHspDashboard();
+    else if (vm === 'analysis') { window._hspPopulateFilters && window._hspPopulateFilters(); window.renderHspAnalysis && window.renderHspAnalysis(); }
+    else { window._hspPopulateFilters && window._hspPopulateFilters(); window.renderHospital && window.renderHospital(); }
   } catch(e) {
     window.showAlert('ลบไม่สำเร็จ: ' + e.message, 'warn');
   }
