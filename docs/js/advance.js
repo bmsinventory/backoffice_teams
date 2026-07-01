@@ -121,6 +121,77 @@ window.renderAdvance=function(){
 
 
 
+// ── Searchable Grouped Combobox — Advance Project Picker (inline dropdown) ──
+window._initAdvCombobox=(function(){
+  var IH=36,HH=30,BUF=6;
+  function hi(txt,q){
+    if(!q)return esc(txt);
+    var lt=txt.toLowerCase(),lq=q.toLowerCase(),out='',i=0;
+    while(i<txt.length){var x=lt.indexOf(lq,i);if(x<0){out+=esc(txt.slice(i));break;}
+      out+=esc(txt.slice(i,x))+'<mark style="background:#ffd60a66;border-radius:2px;padding:0 1px;">'+esc(txt.slice(x,x+lq.length))+'</mark>';i=x+lq.length;}
+    return out;
+  }
+  return function(projects,curPid){
+    var inp=document.getElementById('adv-cmb-input'),drop=document.getElementById('adv-cmb-drop'),lst=document.getElementById('adv-cmb-list'),hid=document.getElementById('af-pid');
+    if(!inp||!drop||!lst||!hid)return;
+    var tmap={},tord=[];
+    window.PTYPES.forEach(function(t){tmap[t.id]={id:t.id,label:t.label,color:t.color||'var(--txt3)',items:[]};tord.push(t.id);});
+    projects.forEach(function(p){
+      if(tmap[p.typeId])tmap[p.typeId].items.push(p);
+      else{if(!tmap['__x__']){tmap['__x__']={id:'__x__',label:'Project อื่น ๆ',color:'var(--txt3)',items:[]};tord.push('__x__');}tmap['__x__'].items.push(p);}
+    });
+    tord=tord.filter(function(tid){return tmap[tid]&&tmap[tid].items.length>0;});
+    var selId=curPid||'',selName='',col=new Set(),q='',fi=-1,flat=[],dt=null,isOpen=false;
+    var _cp=window.PROJECTS.find(function(p){return p.id===selId;});selName=_cp?_cp.name:'';
+    function bFlat(sq){
+      var f=[],lq=sq.toLowerCase();
+      if(sq){projects.forEach(function(p){if(p.name.toLowerCase().includes(lq))f.push({k:'i',id:p.id,name:p.name});});}
+      else{tord.forEach(function(tid){var g=tmap[tid];if(!g||!g.items.length)return;f.push({k:'h',tid:tid,label:g.label,color:g.color,count:g.items.length});if(!col.has(tid))g.items.forEach(function(p){f.push({k:'i',id:p.id,name:p.name});});});}
+      return f;
+    }
+    function render(){
+      if(!flat.length){lst.innerHTML='<div style="padding:24px 12px;text-align:center;color:var(--txt3);font-size:12px;">ไม่พบโครงการ'+(q?'<br><small style="opacity:.7;">'+esc(q)+'</small>':'')+'</div>';return;}
+      var offs=[],tot=0;flat.forEach(function(it){offs.push(tot);tot+=(it.k==='h'?HH:IH);});
+      var st=lst.scrollTop,vh=lst.clientHeight||260,si=0,ei=flat.length;
+      for(var i=0;i<flat.length;i++){if(offs[i]+(flat[i].k==='h'?HH:IH)>st-BUF*IH){si=i;break;}}
+      for(var j=si;j<flat.length;j++){if(offs[j]>st+vh+BUF*IH){ei=j;break;}}
+      var topH=offs[si]||0,botH=tot-(ei<flat.length?offs[ei]:tot);
+      var html='<div style="height:'+topH+'px"></div>';
+      flat.slice(si,ei).forEach(function(it,r){
+        var idx=si+r;
+        if(it.k==='h'){var cc=col.has(it.tid);html+='<div class="adc-h" data-tid="'+esc(it.tid)+'" style="height:'+HH+'px;display:flex;align-items:center;gap:7px;padding:0 10px;cursor:pointer;font-size:10px;font-weight:700;background:var(--surface2);border-bottom:1px solid var(--border);color:'+esc(it.color)+';user-select:none;position:sticky;top:0;z-index:2;"><span style="width:7px;height:7px;border-radius:50%;background:'+esc(it.color)+';flex-shrink:0;display:inline-block;"></span><span>'+esc(it.label)+'</span><span style="font-size:9px;color:var(--txt3);margin-left:2px;">('+it.count+')</span><span style="margin-left:auto;font-size:9px;opacity:.5;">'+(cc?'▶':'▼')+'</span></div>';}
+        else{var foc=idx===fi,isSel=it.id===selId;html+='<div class="adc-i" data-id="'+esc(it.id)+'" data-name="'+esc(it.name)+'" data-idx="'+idx+'" style="height:'+IH+'px;display:flex;align-items:center;padding:0 12px;cursor:pointer;font-size:12px;border-bottom:1px solid rgba(0,0,0,.04);background:'+(foc?'var(--indigo)12':isSel?'var(--teal)0d':'transparent')+';color:var(--txt1);">'+(isSel?'<span style="color:var(--teal);margin-right:6px;font-size:10px;flex-shrink:0;">✓</span>':'')+hi(it.name,q)+'</div>';}
+      });
+      html+='<div style="height:'+botH+'px"></div>';
+      lst.innerHTML=html;
+    }
+    function openDrop(){if(isOpen)return;isOpen=true;q='';fi=-1;flat=bFlat('');lst.scrollTop=0;render();drop.style.display='block';}
+    function closeDrop(){if(!isOpen)return;isOpen=false;drop.style.display='none';inp.value=selName;}
+    function selProj(id,name){selId=id;selName=name;hid.value=id;closeDrop();window.advOnProjectChange&&window.advOnProjectChange();}
+    lst.addEventListener('click',function(e){
+      var h=e.target.closest('.adc-h'),it=e.target.closest('.adc-i');
+      if(h){var tid=h.dataset.tid;if(col.has(tid))col.delete(tid);else col.add(tid);flat=bFlat(q);fi=-1;render();}
+      else if(it)selProj(it.dataset.id,it.dataset.name);
+    });
+    lst.addEventListener('mousemove',function(e){var it=e.target.closest('.adc-i');if(it){var ni=+it.dataset.idx;if(ni!==fi){fi=ni;render();}}});
+    lst.addEventListener('scroll',render);
+    inp.addEventListener('click',function(){if(isOpen)closeDrop();else openDrop();});
+    inp.addEventListener('input',function(){if(!isOpen)openDrop();clearTimeout(dt);dt=setTimeout(function(){q=inp.value.trim();fi=-1;flat=bFlat(q);lst.scrollTop=0;render();},200);});
+    inp.addEventListener('keydown',function(e){
+      var iis=flat.map(function(it,i){return it.k==='i'?i:-1;}).filter(function(i){return i>=0;});
+      if(e.key==='Escape'){closeDrop();return;}
+      if(e.key==='Tab'){closeDrop();return;}
+      if(!isOpen&&(e.key==='ArrowDown'||e.key==='Enter')){openDrop();return;}
+      if(e.key==='ArrowDown'){e.preventDefault();var ci=iis.indexOf(fi);fi=ci<0?iis[0]:iis[ci+1]!==undefined?iis[ci+1]:iis[ci];render();scFi();}
+      else if(e.key==='ArrowUp'){e.preventDefault();var ci2=iis.indexOf(fi);fi=ci2<=0?iis[0]:iis[ci2-1];render();scFi();}
+      else if(e.key==='Enter'){e.preventDefault();var it=flat[fi];if(it&&it.k==='i')selProj(it.id,it.name);}
+    });
+    document.addEventListener('mousedown',function onOut(e){var wrap=document.getElementById('adv-cmb-wrap');if(wrap&&!wrap.contains(e.target)){closeDrop();document.removeEventListener('mousedown',onOut);}});
+    function scFi(){if(fi<0)return;var top=0;for(var i=0;i<fi;i++)top+=flat[i]?(flat[i].k==='h'?HH:IH):0;if(top<lst.scrollTop)lst.scrollTop=top;else if(top+IH>lst.scrollTop+lst.clientHeight)lst.scrollTop=top+IH-lst.clientHeight;}
+    inp.value=selName;flat=bFlat('');render();
+  };
+})();
+
 window.openAdvModal=function(id){
   window.editAid=id;var a=id?window.ADVANCES.find(function(x){return x.id===id;}):null;
   document.getElementById('m-adv-title').textContent=a?'แก้ไข Advance':'New Advance';
@@ -137,14 +208,14 @@ window.openAdvModal=function(id){
   var curPid=a?a.pid:'';
   var curP2=curPid?window.PROJECTS.find(x=>x.id===curPid):null;
   if(curPid&&curP2&&!availProjects.find(x=>x.id===curPid))availProjects.unshift(curP2);
-  var pOpts=availProjects.map(p=>`<option value="${esc(p.id)}"${curPid===p.id?' selected':''}>${esc(p.name)}</option>`).join('');
+  var advPidHtml=window.canEdit('advance')?`<div id="adv-cmb-wrap" style="position:relative;"><input id="adv-cmb-input" type="text" class="f-input" placeholder="ค้นหาหรือเลือกโครงการ..." autocomplete="off" spellcheck="false" style="padding-right:28px;cursor:pointer;"><span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:11px;color:var(--txt3);">▼</span><input type="hidden" id="af-pid" value="${esc(curPid)}"><div id="adv-cmb-drop" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:200;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.15);overflow:hidden;"><div id="adv-cmb-list" style="max-height:260px;overflow-y:auto;"></div></div></div>`:`<input class="f-input" value="${esc(curP2?curP2.name:'')}" disabled><input type="hidden" id="af-pid" value="${esc(curPid)}">` ;
   var stepHtml=`<div class="adv-stepper">`+window.AFLW.map(function(s,i){var done=i<ai,active=i===ai;return`<div class="adv-s${done?' done':''}${active?' active':''}"><div class="adv-dot">${done?'✓':i+1}</div><div class="adv-lbl" style="color:${active?s.color:done?s.color:'var(--txt3)'}">${s.label}</div></div>`;}).join('')+`</div>`;
   if(a&&window.canEdit('advance')){var diff2=a.amount-(a.cleared||0);if(isClr&&diff2!==0){stepHtml+=`<div style="display:flex;justify-content:space-between;padding:10px 14px;background:${diff2>0?'rgba(255,107,107,.08)':'rgba(255,166,43,.08)'};border:1px solid ${diff2>0?'rgba(255,107,107,.2)':'rgba(255,166,43,.2)'};border-radius:10px;margin-bottom:14px;font-size:13px"><span style="font-weight:600">ส่วนต่าง</span><span style="font-weight:700;color:${diff2>0?'var(--coral)':'var(--amber)'}">${fca(Math.abs(diff2))}</span></div>`;}
   var btnPrev=window.APRV[status]?`<button class="btn btn-ghost btn-sm" onclick="window.advStep('prev')">‹ ย้อนกลับ</button>`:'';var btnNext=window.ANXT[status]?`<button class="btn btn-pri btn-sm" onclick="window.advStep('next')">ขั้นถัดไป ›</button>`:'';stepHtml+=`<div style="display:flex;gap:8px;margin-bottom:18px">${btnPrev}${btnNext}</div>`;}
   var isFullCleared = isClr;
   var clearedSect = isFullCleared && window.canEdit('advance') ? window.advBuildClearedSection(a, curPid) : '';
-  document.getElementById('m-adv-body').innerHTML=stepHtml+`<input type="hidden" id="af-status" value="${status}"><div class="f-group"><label class="f-label">โครงการ</label><select class="f-input" id="af-pid" onchange="window.advOnProjectChange()" ${window.canEdit('advance')?'':'disabled'}><option value="">-- เลือกโครงการ --</option>${pOpts}</select></div><div class="f-grid"><div class="f-group"><label class="f-label">เลขที่ Advance</label><input class="f-input" id="af-advno" value="${esc(a?a.advno:'')}" placeholder="เช่น ADV-001" ${window.canEdit('advance')?'':'disabled'}></div><div class="f-group"><label class="f-label">วัตถุประสงค์ *</label><select class="f-input" id="af-purpose" ${window.canEdit('advance')?'':'disabled'}><option value="">-- เลือกวัตถุประสงค์ --</option><option value="เพื่อใช้ในการติดตั้งระบบ"${a&&a.purpose==='เพื่อใช้ในการติดตั้งระบบ'?' selected':''}>เพื่อใช้ในการติดตั้งระบบ</option><option value="เพื่อใช้ในการเข้า Revisit"${a&&a.purpose==='เพื่อใช้ในการเข้า Revisit'?' selected':''}>เพื่อใช้ในการเข้า Revisit</option><option value="เพื่อใช้ในการดูแลหลังการขาย (MA)"${a&&a.purpose==='เพื่อใช้ในการดูแลหลังการขาย (MA)'?' selected':''}>เพื่อใช้ในการดูแลหลังการขาย (MA)</option></select></div></div><div class="f-grid"><div class="f-group"><label class="f-label">จำนวนเบิก (฿)</label><input type="text" inputmode="decimal" class="f-input" id="af-amount" value="${a?Number(a.amount).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):''}" onblur="window.advFmtAmt(this)" onfocus="window.advUnfmtAmt(this)" style="text-align:right;" ${window.canEdit('advance')?'':'disabled'}></div>${isClr?`<div class="f-group"><label class="f-label">จ่ายจริง (฿) <span style="font-size:10px;color:var(--txt3)">(auto จากรายการค่าใช้จ่าย ไม่รวมค่าแรง)</span></label><input type="text" class="f-input" id="af-cleared" value="${a?Number(a.cleared).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):''}" readonly style="background:var(--surface2);cursor:not-allowed;text-align:right;"></div>`:''}<div class="f-group"><label class="f-label">วันที่ขอ</label><input type="date" class="f-input" id="af-rdate" value="${a?a.rdate:''}" ${window.canEdit('advance')?'':'disabled'}></div><div class="f-group"><label class="f-label">กำหนดเคลียร์</label><input type="date" class="f-input" id="af-ddate" value="${a?a.ddate:''}" ${window.canEdit('advance')?'':'disabled'}></div></div><div class="f-group"><label class="f-label">หมายเหตุ</label><textarea class="f-input" id="af-note" ${window.canEdit('advance')?'':'disabled'}>${esc(a?a.note:'')}</textarea></div>${clearedSect}`;
-  document.getElementById('m-adv-foot').style.display=window.canEdit('advance')?'':'none';window.openM('m-adv');
+  document.getElementById('m-adv-body').innerHTML=stepHtml+`<input type="hidden" id="af-status" value="${status}"><div class="f-group"><label class="f-label">โครงการ</label>${advPidHtml}</div><div class="f-grid"><div class="f-group"><label class="f-label">เลขที่ Advance</label><input class="f-input" id="af-advno" value="${esc(a?a.advno:'')}" placeholder="เช่น ADV-001" ${window.canEdit('advance')?'':'disabled'}></div><div class="f-group"><label class="f-label">วัตถุประสงค์ *</label><select class="f-input" id="af-purpose" ${window.canEdit('advance')?'':'disabled'}><option value="">-- เลือกวัตถุประสงค์ --</option><option value="เพื่อใช้ในการติดตั้งระบบ"${a&&a.purpose==='เพื่อใช้ในการติดตั้งระบบ'?' selected':''}>เพื่อใช้ในการติดตั้งระบบ</option><option value="เพื่อใช้ในการเข้า Revisit"${a&&a.purpose==='เพื่อใช้ในการเข้า Revisit'?' selected':''}>เพื่อใช้ในการเข้า Revisit</option><option value="เพื่อใช้ในการดูแลหลังการขาย (MA)"${a&&a.purpose==='เพื่อใช้ในการดูแลหลังการขาย (MA)'?' selected':''}>เพื่อใช้ในการดูแลหลังการขาย (MA)</option></select></div></div><div class="f-grid"><div class="f-group"><label class="f-label">จำนวนเบิก (฿)</label><input type="text" inputmode="decimal" class="f-input" id="af-amount" value="${a?Number(a.amount).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):''}" onblur="window.advFmtAmt(this)" onfocus="window.advUnfmtAmt(this)" style="text-align:right;" ${window.canEdit('advance')?'':'disabled'}></div>${isClr?`<div class="f-group"><label class="f-label">จ่ายจริง (฿) <span style="font-size:10px;color:var(--txt3)">(auto จากรายการค่าใช้จ่าย ไม่รวมค่าแรง)</span></label><input type="text" class="f-input" id="af-cleared" value="${a?Number(a.cleared).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):''}" readonly style="background:var(--surface2);cursor:not-allowed;text-align:right;"></div>`:''}<div class="f-group"><label class="f-label">วันที่ขอ</label><input type="date" class="f-input" id="af-rdate" value="${a?a.rdate:''}" ${window.canEdit('advance')?'':'disabled'}></div><div class="f-group"><label class="f-label">กำหนดเคลียร์</label><input type="date" class="f-input" id="af-ddate" value="${a?a.ddate:''}" ${window.canEdit('advance')?'':'disabled'}></div></div><div class="f-group"><label class="f-label">หมายเหตุ</label><textarea class="f-input" id="af-note" ${window.canEdit('advance')?'':'disabled'}>${esc(a?a.note:'')}</textarea></div>${clearedSect}`;
+  document.getElementById('m-adv-foot').style.display=window.canEdit('advance')?'':'none';window.openM('m-adv');if(window.canEdit('advance'))window._initAdvCombobox&&window._initAdvCombobox(availProjects,curPid);
   // init expense + labor rows after DOM ready
   if(isFullCleared && window.canEdit('advance')) {
     _expRows = []; _laborRows = [];

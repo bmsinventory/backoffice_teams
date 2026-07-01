@@ -200,14 +200,87 @@ window.unapproveLdType=async function(pid,ldId,type){
   window.renderLodging();
 }
 
+// ── Searchable Grouped Combobox — Lodging Project Picker ──
+window._initLdCombobox=(function(){
+  var IH=38,HH=32,BUF=8;
+  function hi(txt,q){
+    if(!q)return esc(txt);
+    var lt=txt.toLowerCase(),lq=q.toLowerCase(),out='',i=0;
+    while(i<txt.length){var x=lt.indexOf(lq,i);if(x<0){out+=esc(txt.slice(i));break;}
+      out+=esc(txt.slice(i,x))+'<mark style="background:#ffd60a66;border-radius:2px;padding:0 1px;">'+esc(txt.slice(x,x+lq.length))+'</mark>';i=x+lq.length;}
+    return out;
+  }
+  return function(projects){
+    var tmap={},tord=[];
+    window.PTYPES.forEach(function(t){tmap[t.id]={id:t.id,label:t.label,color:t.color||'var(--txt3)',items:[]};tord.push(t.id);});
+    projects.forEach(function(p){
+      if(tmap[p.typeId])tmap[p.typeId].items.push(p);
+      else{if(!tmap['__x__']){tmap['__x__']={id:'__x__',label:'Project อื่น ๆ',color:'var(--txt3)',items:[]};tord.push('__x__');}tmap['__x__'].items.push(p);}
+    });
+    tord=tord.filter(function(tid){return tmap[tid]&&tmap[tid].items.length>0;});
+    var col=new Set(),q='',fi=-1,flat=[],dt=null;
+    var inp=document.getElementById('ld-cmb-input'),lst=document.getElementById('ld-cmb-list');
+    if(!inp||!lst)return;
+    function bFlat(sq){
+      var f=[],lq=sq.toLowerCase();
+      if(sq){projects.forEach(function(p){if(p.name.toLowerCase().includes(lq))f.push({k:'i',id:p.id,name:p.name});});}
+      else{tord.forEach(function(tid){var g=tmap[tid];if(!g||!g.items.length)return;f.push({k:'h',tid:tid,label:g.label,color:g.color,count:g.items.length});if(!col.has(tid))g.items.forEach(function(p){f.push({k:'i',id:p.id,name:p.name});});});}
+      return f;
+    }
+    function render(){
+      if(!flat.length){lst.innerHTML='<div style="padding:40px 20px;text-align:center;color:var(--txt3);font-size:13px;">ไม่พบโครงการ'+(q?'<br><span style="font-size:11px;opacity:.6;">'+esc(q)+'</span>':'')+'</div>';return;}
+      var offs=[],tot=0;flat.forEach(function(it){offs.push(tot);tot+=(it.k==='h'?HH:IH);});
+      var st=lst.scrollTop,vh=lst.clientHeight||380,si=0,ei=flat.length;
+      for(var i=0;i<flat.length;i++){if(offs[i]+(flat[i].k==='h'?HH:IH)>st-BUF*IH){si=i;break;}}
+      for(var j=si;j<flat.length;j++){if(offs[j]>st+vh+BUF*IH){ei=j;break;}}
+      var topH=offs[si]||0,botH=tot-(ei<flat.length?offs[ei]:tot);
+      var html='<div style="height:'+topH+'px"></div>';
+      flat.slice(si,ei).forEach(function(it,r){
+        var idx=si+r;
+        if(it.k==='h'){
+          var cc=col.has(it.tid);
+          html+='<div class="ldc-h" data-tid="'+esc(it.tid)+'" style="height:'+HH+'px;display:flex;align-items:center;gap:8px;padding:0 12px;cursor:pointer;font-size:11px;font-weight:700;background:var(--surface2);border-bottom:1px solid var(--border);color:'+esc(it.color)+';user-select:none;position:sticky;top:0;z-index:2;">'
+            +'<span style="width:8px;height:8px;border-radius:50%;background:'+esc(it.color)+';flex-shrink:0;display:inline-block;"></span>'
+            +'<span>'+esc(it.label)+'</span>'
+            +'<span style="font-size:10px;color:var(--txt3);margin-left:3px;">('+it.count+')</span>'
+            +'<span style="margin-left:auto;font-size:10px;opacity:.5;">'+(cc?'▶':'▼')+'</span>'
+            +'</div>';
+        }else{
+          var foc=idx===fi;
+          html+='<div class="ldc-i" data-id="'+esc(it.id)+'" data-idx="'+idx+'" style="height:'+IH+'px;display:flex;align-items:center;padding:0 16px;cursor:pointer;font-size:13px;border-bottom:1px solid rgba(0,0,0,.05);background:'+(foc?'var(--indigo)15':'transparent')+';transition:background .1s;color:var(--txt1);">'+hi(it.name,q)+'</div>';
+        }
+      });
+      html+='<div style="height:'+botH+'px"></div>';
+      lst.innerHTML=html;
+    }
+    lst.addEventListener('click',function(e){
+      var h=e.target.closest('.ldc-h'),it=e.target.closest('.ldc-i');
+      if(h){var tid=h.dataset.tid;if(col.has(tid))col.delete(tid);else col.add(tid);flat=bFlat(q);fi=-1;render();}
+      else if(it)window.openLodgingGroupModal(it.dataset.id);
+    });
+    lst.addEventListener('mousemove',function(e){var it=e.target.closest('.ldc-i');if(it){var ni=+it.dataset.idx;if(ni!==fi){fi=ni;render();}}});
+    lst.addEventListener('scroll',render);
+    inp.addEventListener('input',function(){clearTimeout(dt);dt=setTimeout(function(){q=inp.value.trim();fi=-1;flat=bFlat(q);lst.scrollTop=0;render();},200);});
+    inp.addEventListener('keydown',function(e){
+      var iis=flat.map(function(it,i){return it.k==='i'?i:-1;}).filter(function(i){return i>=0;});
+      if(e.key==='Escape'){window.closeM('m-lodging');return;}
+      if(e.key==='Tab'){e.preventDefault();window.closeM('m-lodging');return;}
+      if(e.key==='ArrowDown'){e.preventDefault();var ci=iis.indexOf(fi);fi=ci<0?iis[0]:iis[ci+1]!==undefined?iis[ci+1]:iis[ci];render();scFi();}
+      else if(e.key==='ArrowUp'){e.preventDefault();var ci2=iis.indexOf(fi);fi=ci2<=0?iis[0]:iis[ci2-1];render();scFi();}
+      else if(e.key==='Enter'){e.preventDefault();var it=flat[fi];if(it&&it.k==='i')window.openLodgingGroupModal(it.id);}
+    });
+    function scFi(){if(fi<0)return;var top=0;for(var i=0;i<fi;i++)top+=flat[i]?(flat[i].k==='h'?HH:IH):0;if(top<lst.scrollTop)lst.scrollTop=top;else if(top+IH>lst.scrollTop+lst.clientHeight)lst.scrollTop=top+IH-lst.clientHeight;}
+    flat=bFlat('');render();setTimeout(function(){inp.focus();},80);
+  };
+})();
+
 window.openLodgingGroupModal=function(pid){
   window.currentLdPid=pid;
   if(!pid){
     document.getElementById('m-ld-title').textContent='เลือกโครงการ';
-    var EXCL_LD_GRPS=['GRP17733355541905','GRP17733355541906'];var lodgedPids=new Set(window.LODGINGS.map(function(l){return l.pid;}));var availLdProjs=window.PROJECTS.filter(function(proj){return!EXCL_LD_GRPS.includes(proj.groupId)&&!lodgedPids.has(proj.id);});
-var pOpts='<option value="">-- เลือกโครงการ --</option>'+availLdProjs.map(proj=>`<option value="${proj.id}">${esc(proj.name)}</option>`).join('');
-    document.getElementById('m-ld-body').innerHTML=`<div class="f-group"><label class="f-label">เลือกโครงการ</label><select class="f-input" id="ld-sel-pid" onchange="window.openLodgingGroupModal(this.value)">${pOpts}</select></div>`;
-    document.getElementById('m-ld-foot').style.display='none';window.openM('m-lodging');return;
+    var EXCL_LD_GRPS=['GRP17733355541905','GRP17733355541906'];var lodgedPids=new Set(window.LODGINGS.map(function(l){return l.pid;}));var _td=new Date();_td.setHours(0,0,0,0);var availLdProjs=window.PROJECTS.filter(function(proj){if(EXCL_LD_GRPS.includes(proj.groupId))return false;if(lodgedPids.has(proj.id))return false;if(!proj.start)return false;return new Date(proj.start)>=_td;});
+    document.getElementById('m-ld-body').innerHTML=`<div id="ld-cmb-wrap"><div style="padding-bottom:10px;"><div style="position:relative;"><span style="position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:14px;pointer-events:none;color:var(--txt3);">🔍</span><input id="ld-cmb-input" type="text" placeholder="ค้นหาโครงการ..." autocomplete="off" spellcheck="false" style="width:100%;padding:9px 12px 9px 34px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;background:var(--surface);color:var(--txt1);outline:none;box-sizing:border-box;transition:border-color .2s;" onfocus="this.style.borderColor='var(--indigo)'" onblur="this.style.borderColor='var(--border)'"></div></div><div id="ld-cmb-list" style="height:380px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;"></div></div>`;
+    document.getElementById('m-ld-foot').style.display='none';window.openM('m-lodging');window._initLdCombobox(availLdProjs);return;
   }
   var lds=window.LODGINGS.filter(l=>l.pid===pid);var p=window.PROJECTS.find(x=>x.id===pid);
   var pt=gT(p?p.typeId:'');
