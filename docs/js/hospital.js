@@ -887,6 +887,95 @@ window._hspGo = function(p) {
   window.renderHospital();
 };
 
+// ── SUMMARY VIEW: ผู้ติดต่อ + ระบบ/Anydesk แบบดูรวดเดียว (การ์ดต่อ รพ.) ──────
+window._hspSummaryPage = 1;
+var HSP_SUMMARY_PAGE_SIZE = 40;
+
+window.renderHspSummary = function() {
+  var body = document.getElementById('hsp-summary-body');
+  if (!body) return;
+
+  var all   = _hspFiltered();
+  var total = all.length;
+  var totalPages = Math.max(1, Math.ceil(total / HSP_SUMMARY_PAGE_SIZE));
+  if (window._hspSummaryPage > totalPages) window._hspSummaryPage = 1;
+  var curPage = Math.min(Math.max(1, window._hspSummaryPage), totalPages);
+  window._hspSummaryPage = curPage;
+  var rows = all.slice((curPage - 1) * HSP_SUMMARY_PAGE_SIZE, curPage * HSP_SUMMARY_PAGE_SIZE);
+
+  var cnt = document.getElementById('hsp-count');
+  if (cnt) cnt.textContent = total.toLocaleString() + ' แห่ง';
+
+  var canEdit = window.isAdmin ? window.isAdmin() : false;
+  if (!canEdit && window.canEdit) canEdit = window.canEdit('hospital');
+
+  if (!rows.length) {
+    body.innerHTML = '<div style="text-align:center;color:var(--txt-muted);padding:48px 24px;">ไม่พบข้อมูลโรงพยาบาล</div>';
+    var pg0 = document.getElementById('hsp-summary-pager');
+    if (pg0) pg0.innerHTML = '';
+    return;
+  }
+
+  body.innerHTML = rows.map(function(h) {
+    var t       = _hspType(h.type);
+    var cs      = h.contacts || [];
+    var editBtn = canEdit
+      ? '<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();window.openHospitalModal(\'' + esc(h.id) + '\')" title="แก้ไข" style="margin-left:auto;flex-shrink:0;">✏️ แก้ไข</button>'
+      : '';
+    var website = h.website
+      ? '<a href="' + esc(h.website) + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--primary);font-size:11px;word-break:break-all;">🌐 ' + esc(h.website) + '</a>'
+      : '';
+
+    var header = '<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--bg);flex-wrap:wrap;">' +
+      '<span style="background:' + t.color + '22;color:' + t.color + ';padding:1px 8px;border-radius:6px;font-size:10px;font-weight:700;white-space:nowrap;">' + esc(h.type||'?') + '</span>' +
+      '<span style="font-family:monospace;color:var(--primary);font-size:11px;font-weight:700;">' + esc(h.code||'—') + '</span>' +
+      '<span style="font-weight:700;color:var(--txt);font-size:13px;">' + esc(h.name) + '</span>' +
+      (website ? '<span>' + website + '</span>' : '') +
+      editBtn +
+      '</div>';
+
+    var body2 = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:0;">' +
+      '<div style="padding:8px 14px;border-right:1px solid var(--border);">' +
+      '<div style="font-size:10px;font-weight:700;color:var(--txt-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;">👤 ผู้ติดต่อ' +
+      (cs.length ? ' <span style="background:var(--violet)22;color:var(--violet);padding:0 6px;border-radius:10px;font-size:10px;font-weight:700;">' + cs.length + '</span>' : '') +
+      '</div>' + _hspContactsHtmlCompact(cs) + '</div>' +
+      '<div style="padding:8px 14px;">' +
+      '<div style="font-size:10px;font-weight:700;color:var(--txt-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;">🖥️ ระบบ / Anydesk</div>' +
+      _hspSystemsHtmlCompact(h.systems) + '</div>' +
+      '</div>';
+
+    var clickable = canEdit ? ' onclick="window.openHospitalModal(\'' + esc(h.id) + '\')" style="cursor:pointer;"' : '';
+    return '<div style="border:1px solid var(--border);border-left:3px solid ' + t.color + ';border-radius:10px;overflow:hidden;margin-bottom:8px;background:var(--surface);"' + clickable + '>' +
+      header + body2 + '</div>';
+  }).join('');
+
+  _renderHspSummaryPager(totalPages);
+};
+
+function _renderHspSummaryPager(totalPages) {
+  var pg = document.getElementById('hsp-summary-pager');
+  if (!pg) return;
+  if (totalPages <= 1) { pg.innerHTML = ''; return; }
+  var btns = '';
+  btns += '<button class="btn btn-ghost btn-sm" onclick="window._hspSummaryGo(' + (window._hspSummaryPage-1) + ')" ' + (window._hspSummaryPage<=1?'disabled':'') + '>‹</button>';
+  for (var p = 1; p <= totalPages; p++) {
+    if (p === 1 || p === totalPages || Math.abs(p - window._hspSummaryPage) <= 2) {
+      btns += '<button class="btn btn-sm ' + (p===window._hspSummaryPage?'btn-pri':'btn-ghost') + '" onclick="window._hspSummaryGo(' + p + ')">' + p + '</button>';
+    } else if (Math.abs(p - window._hspSummaryPage) === 3) {
+      btns += '<span style="color:var(--txt-muted);padding:0 4px;">…</span>';
+    }
+  }
+  btns += '<button class="btn btn-ghost btn-sm" onclick="window._hspSummaryGo(' + (window._hspSummaryPage+1) + ')" ' + (window._hspSummaryPage>=totalPages?'disabled':'') + '>›</button>';
+  pg.innerHTML = '<div style="display:flex;gap:4px;align-items:center;justify-content:center;flex-wrap:wrap;">' + btns + '</div>';
+}
+
+window._hspSummaryGo = function(p) {
+  var total = _hspFiltered().length;
+  var max = Math.max(1, Math.ceil(total / HSP_SUMMARY_PAGE_SIZE));
+  window._hspSummaryPage = Math.max(1, Math.min(p, max));
+  window.renderHspSummary();
+};
+
 // ── DETAIL POPUP ────────────────────────────────────────────────────────────
 window._hspDetailId = null;
 
@@ -894,11 +983,13 @@ window._hspDetailTab = function(name) {
   var panels = {
     info:     document.getElementById('m-hsp-detail-panel-info'),
     contacts: document.getElementById('m-hsp-detail-panel-contacts'),
+    systems:  document.getElementById('m-hsp-detail-panel-systems'),
     products: document.getElementById('m-hsp-detail-panel-products'),
   };
   var tabs = {
     info:     document.getElementById('m-hsp-dtab-info'),
     contacts: document.getElementById('m-hsp-dtab-contacts'),
+    systems:  document.getElementById('m-hsp-dtab-systems'),
     products: document.getElementById('m-hsp-dtab-products'),
   };
   Object.keys(panels).forEach(function(k) {
@@ -950,25 +1041,15 @@ window.openHospitalDetail = function(id) {
     ${h.note ? `<div style="margin-top:10px;padding:10px 12px;background:var(--warn)11;border-radius:8px;font-size:12px;color:var(--txt-muted);"><b>หมายเหตุ:</b> ${esc(h.note)}</div>` : ''}`;
 
   // ── Panel: ผู้ติดต่อ ──
-  if (cs.length) {
-    document.getElementById('m-hsp-detail-panel-contacts').innerHTML =
-      `<div style="display:flex;flex-direction:column;gap:10px;">` +
-      cs.map(function(c) {
-        return `<div style="background:var(--bg);border-radius:10px;padding:14px 16px;border:1px solid var(--border);">
-          <div style="font-size:14px;font-weight:700;color:var(--txt);">${esc(c.name||'—')}${c.nickname ? ` <span style="font-size:12px;font-weight:500;color:var(--txt-muted);">(${esc(c.nickname)})</span>` : ''}</div>
-          ${c.position ? `<div style="font-size:11px;color:var(--violet);margin-top:2px;font-weight:600;">${esc(c.position)}</div>` : ''}
-          <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;font-size:12px;color:var(--txt-muted);">
-            ${c.phone ? `<span>📞 ${esc(c.phone)}</span>` : ''}
-            ${c.email ? `<span>✉️ ${esc(c.email)}</span>` : ''}
-            ${c.note  ? `<span>💬 ${esc(c.note)}</span>` : ''}
-          </div>
-        </div>`;
-      }).join('') +
-      `</div>`;
-  } else {
-    document.getElementById('m-hsp-detail-panel-contacts').innerHTML =
-      `<div style="text-align:center;color:var(--txt-muted);padding:48px 24px;font-size:13px;">ยังไม่มีข้อมูลผู้ติดต่อ</div>`;
-  }
+  document.getElementById('m-hsp-detail-panel-contacts').innerHTML = _hspContactsHtml(cs);
+
+  // ── Panel: ระบบ/Anydesk (Anydesk / Database / Config แยกกันอิสระ) ──
+  var sysObj  = h.systems || {};
+  var adRows  = sysObj.anydesk  || [];
+  var dbRows  = sysObj.database || [];
+  var cfgRows = sysObj.config   || [];
+
+  document.getElementById('m-hsp-detail-panel-systems').innerHTML = _hspSystemsHtml(sysObj);
 
   // ── Panel: Product ──
   var prodPanel = document.getElementById('m-hsp-detail-panel-products');
@@ -1013,6 +1094,11 @@ window.openHospitalDetail = function(id) {
     var pCount = (h.products || []).length;
     prodBadge.textContent = pCount; prodBadge.style.display = pCount ? '' : 'none';
   }
+  var sysBadge = document.getElementById('m-hsp-dtab-systems-badge');
+  if (sysBadge) {
+    var sCount = adRows.length + dbRows.length + cfgRows.length;
+    sysBadge.textContent = sCount; sysBadge.style.display = sCount ? '' : 'none';
+  }
   var editBtn = document.getElementById('m-hsp-detail-edit-btn');
   if (editBtn) editBtn.style.display = canEdit ? '' : 'none';
 
@@ -1028,10 +1114,158 @@ function _detailRow(icon, label, val) {
   </div>`;
 }
 
+function _detailPwRow(icon, label, val) {
+  if (!val) return '';
+  var id = 'hsp-pw-' + Math.random().toString(36).slice(2, 9);
+  return `<div style="background:var(--bg);border-radius:8px;padding:10px 12px;">
+    <div style="font-size:10px;color:var(--txt-muted);margin-bottom:2px;">${icon} ${label}</div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span id="${id}" data-val="${esc(String(val))}" style="font-size:13px;color:var(--txt);font-weight:500;font-family:monospace;">••••••••</span>
+      <button type="button" onclick="event.stopPropagation();window._hspToggleReveal('${id}')" style="background:none;border:none;cursor:pointer;font-size:13px;padding:0;">👁</button>
+    </div>
+  </div>`;
+}
+
+window._hspToggleReveal = function(id) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = el.textContent.indexOf('•') > -1 ? el.dataset.val : '••••••••';
+};
+
+// ── ผู้ติดต่อ + ระบบ/Anydesk แบบ read-only (ใช้ร่วมกันทั้ง Detail popup และแถบสรุปข้อมูล) ──
+function _hspContactsHtml(cs) {
+  cs = cs || [];
+  if (!cs.length) {
+    return `<div style="text-align:center;color:var(--txt-muted);padding:48px 24px;font-size:13px;">ยังไม่มีข้อมูลผู้ติดต่อ</div>`;
+  }
+  return `<div style="display:flex;flex-direction:column;gap:10px;">` +
+    cs.map(function(c) {
+      return `<div style="background:var(--bg);border-radius:10px;padding:14px 16px;border:1px solid var(--border);">
+        <div style="font-size:14px;font-weight:700;color:var(--txt);">${esc(c.name||'—')}${c.nickname ? ` <span style="font-size:12px;font-weight:500;color:var(--txt-muted);">(${esc(c.nickname)})</span>` : ''}</div>
+        ${c.position ? `<div style="font-size:11px;color:var(--violet);margin-top:2px;font-weight:600;">${esc(c.position)}</div>` : ''}
+        <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;font-size:12px;color:var(--txt-muted);">
+          ${c.phone ? `<span>📞 ${esc(c.phone)}</span>` : ''}
+          ${c.email ? `<span>✉️ ${esc(c.email)}</span>` : ''}
+          ${c.note  ? `<span>💬 ${esc(c.note)}</span>` : ''}
+        </div>
+      </div>`;
+    }).join('') +
+    `</div>`;
+}
+
+function _hspSystemsHtml(sysObj) {
+  sysObj = sysObj || {};
+  var adRows  = sysObj.anydesk  || [];
+  var dbRows  = sysObj.database || [];
+  var cfgRows = sysObj.config   || [];
+
+  var sysHtml = '';
+  sysHtml += '<div style="font-size:12px;font-weight:700;color:var(--txt-muted);margin-bottom:8px;">🖥️ Anydesk</div>';
+  sysHtml += adRows.length
+    ? '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px;">' + adRows.map(function(a) {
+        return `<div style="background:var(--surface);border-radius:10px;padding:12px 14px;border:1px solid var(--border);">
+          ${a.label ? `<div style="font-size:13px;font-weight:700;color:var(--txt);margin-bottom:6px;">${esc(a.label)}</div>` : ''}
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            ${_detailRow('🖥️', 'IP', a.ip)}
+            ${_detailPwRow('🔑', 'Password', a.password)}
+          </div>
+        </div>`;
+      }).join('') + '</div>'
+    : '<div style="text-align:center;color:var(--txt-muted);padding:16px;font-size:12px;margin-bottom:18px;">ยังไม่มี Anydesk</div>';
+
+  sysHtml += '<div style="font-size:12px;font-weight:700;color:var(--txt-muted);margin-bottom:8px;">🗄️ Database</div>';
+  sysHtml += dbRows.length
+    ? '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px;">' + dbRows.map(function(d) {
+        return `<div style="background:var(--surface);border-radius:10px;padding:12px 14px;border:1px solid var(--border);">
+          ${d.label ? `<div style="font-size:13px;font-weight:700;color:var(--txt);margin-bottom:6px;">${esc(d.label)}</div>` : ''}
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            ${_detailRow('🗄️', 'IP Server', d.ip)}
+            ${_detailRow('💾', 'Database', d.database)}
+            ${_detailRow('👤', 'User', d.user)}
+            ${_detailPwRow('🔑', 'Password', d.password)}
+          </div>
+        </div>`;
+      }).join('') + '</div>'
+    : '<div style="text-align:center;color:var(--txt-muted);padding:16px;font-size:12px;margin-bottom:18px;">ยังไม่มี Database</div>';
+
+  sysHtml += '<div style="font-size:12px;font-weight:700;color:var(--txt-muted);margin-bottom:8px;">⚙️ Config</div>';
+  sysHtml += cfgRows.length
+    ? '<div style="display:flex;flex-direction:column;gap:8px;">' + cfgRows.map(function(c) {
+        return `<div style="background:var(--surface);border-radius:10px;padding:12px 14px;border:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+          ${c.label ? `<div style="font-size:13px;font-weight:700;color:var(--txt);">${esc(c.label)}</div>` : '<div></div>'}
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            ${c.hosxp ? '<span style="background:var(--teal)22;color:var(--teal);padding:2px 10px;border-radius:8px;font-size:11px;font-weight:700;">✓ Auto Config HOSxP</span>' : ''}
+            ${c.inv   ? '<span style="background:var(--violet)22;color:var(--violet);padding:2px 10px;border-radius:8px;font-size:11px;font-weight:700;">✓ Auto Config INV</span>' : ''}
+          </div>
+        </div>`;
+      }).join('') + '</div>'
+    : '<div style="text-align:center;color:var(--txt-muted);padding:16px;font-size:12px;">ยังไม่มี Config</div>';
+
+  return sysHtml;
+}
+
+// ── เวอร์ชันย่อ (การ์ดในแถบสรุปข้อมูล — เน้นประหยัดพื้นที่ ดูได้หลาย รพ. ในหน้าจอเดียว) ──
+function _hspCompactPw(val) {
+  if (!val) return '—';
+  var id = 'hsp-cpw-' + Math.random().toString(36).slice(2, 9);
+  return '<span id="' + id + '" data-val="' + esc(String(val)) + '" style="font-family:monospace;">••••••</span>' +
+    ' <button type="button" onclick="event.stopPropagation();window._hspToggleReveal(\'' + id + '\')" style="background:none;border:none;cursor:pointer;font-size:11px;padding:0;vertical-align:middle;">👁</button>';
+}
+
+function _hspContactsHtmlCompact(cs) {
+  cs = cs || [];
+  if (!cs.length) return '<div style="color:var(--txt-muted);font-size:12px;font-style:italic;">ยังไม่มีผู้ติดต่อ</div>';
+  return cs.map(function(c) {
+    var lines = [c.phone ? '📞 ' + esc(c.phone) : '', c.email ? '✉️ ' + esc(c.email) : '', c.note ? '💬 ' + esc(c.note) : ''].filter(Boolean).join('  ');
+    return '<div style="padding:5px 0;border-bottom:1px dashed var(--border);font-size:12px;line-height:1.5;">' +
+      '<b style="color:var(--txt);">' + esc(c.name || '—') + '</b>' +
+      (c.nickname ? ' <span style="color:var(--txt-muted);">(' + esc(c.nickname) + ')</span>' : '') +
+      (c.position ? ' <span style="color:var(--violet);">· ' + esc(c.position) + '</span>' : '') +
+      (lines ? '<div style="color:var(--txt-muted);">' + lines + '</div>' : '') +
+      '</div>';
+  }).join('');
+}
+
+function _hspSystemsHtmlCompact(sysObj) {
+  sysObj = sysObj || {};
+  var adRows  = sysObj.anydesk  || [];
+  var dbRows  = sysObj.database || [];
+  var cfgRows = sysObj.config   || [];
+  var lineStyle = 'padding:5px 0;border-bottom:1px dashed var(--border);font-size:12px;line-height:1.5;';
+
+  var parts = [];
+  adRows.forEach(function(a) {
+    if (!a.label && !a.ip && !a.password) return;
+    var fields = [a.ip ? '🌐 ' + esc(a.ip) : '', '🔑 ' + _hspCompactPw(a.password)].filter(Boolean).join('&nbsp;&nbsp;&nbsp;');
+    parts.push('<div style="' + lineStyle + '"><b>🖥️ ' + esc(a.label || 'Anydesk') + '</b>' +
+      '<div style="color:var(--txt-muted);margin-top:1px;">' + fields + '</div></div>');
+  });
+  dbRows.forEach(function(d) {
+    if (!d.label && !d.ip && !d.database && !d.user && !d.password) return;
+    var fields = [
+      d.ip       ? '🖥️ ' + esc(d.ip)       : '',
+      d.database ? '💾 ' + esc(d.database) : '',
+      d.user     ? '👤 ' + esc(d.user)     : '',
+      '🔑 ' + _hspCompactPw(d.password),
+    ].filter(Boolean).join('&nbsp;&nbsp;&nbsp;');
+    parts.push('<div style="' + lineStyle + '"><b>🗄️ ' + esc(d.label || 'Database') + '</b>' +
+      '<div style="color:var(--txt-muted);margin-top:1px;">' + fields + '</div></div>');
+  });
+  cfgRows.forEach(function(c) {
+    var flags = [c.hosxp ? '✓ HOSxP' : '', c.inv ? '✓ INV' : ''].filter(Boolean).join('&nbsp;&nbsp;&nbsp;');
+    if (!c.label && !flags) return;
+    parts.push('<div style="' + lineStyle + '"><b>⚙️ ' + esc(c.label || 'Config') + '</b>' +
+      (flags ? '<div style="color:var(--txt-muted);margin-top:1px;">' + flags + '</div>' : '') + '</div>');
+  });
+
+  if (!parts.length) return '<div style="color:var(--txt-muted);font-size:12px;font-style:italic;">ยังไม่มีข้อมูลระบบ/Anydesk</div>';
+  return parts.join('');
+}
+
 // ── MODAL TABS ──────────────────────────────────────────────────────────────
 window._hspTab = function(name) {
-  var panels = { info: document.getElementById('m-hsp-panel-info'), contacts: document.getElementById('m-hsp-panel-contacts'), products: document.getElementById('m-hsp-panel-products') };
-  var tabs   = { info: document.getElementById('m-hsp-tab-info'),   contacts: document.getElementById('m-hsp-tab-contacts'),   products: document.getElementById('m-hsp-tab-products') };
+  var panels = { info: document.getElementById('m-hsp-panel-info'), contacts: document.getElementById('m-hsp-panel-contacts'), systems: document.getElementById('m-hsp-panel-systems'), products: document.getElementById('m-hsp-panel-products') };
+  var tabs   = { info: document.getElementById('m-hsp-tab-info'),   contacts: document.getElementById('m-hsp-tab-contacts'),   systems: document.getElementById('m-hsp-tab-systems'),   products: document.getElementById('m-hsp-tab-products') };
   Object.keys(panels).forEach(function(k) {
     if (!panels[k] || !tabs[k]) return;
     var active = k === name;
@@ -1099,6 +1333,183 @@ function _hspGetContacts() {
   return contacts;
 }
 
+// ── ระบบ/Anydesk HELPERS ────────────────────────────────────────────────────
+// Anydesk, Database และ Config เป็น 3 รายการอิสระต่อกัน เพิ่ม/ลบแยกกันได้
+function _hspUpdateSystemBadge() {
+  var badge = document.getElementById('m-hsp-tab-systems-badge');
+  if (!badge) return;
+  var n1 = document.querySelectorAll('#hsp-anydesk-list .hsp-anydesk-row').length;
+  var n2 = document.querySelectorAll('#hsp-db-list .hsp-db-row').length;
+  var n3 = document.querySelectorAll('#hsp-config-list .hsp-config-row').length;
+  var count = n1 + n2 + n3;
+  badge.textContent = count;
+  badge.style.display = count ? '' : 'none';
+}
+
+window._hspTogglePw = function(btn) {
+  var inp = btn.previousElementSibling;
+  if (!inp) return;
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+  btn.textContent = inp.type === 'password' ? '👁' : '🙈';
+};
+
+function _hspPwField(placeholder, cf, val) {
+  return '<div style="position:relative;">' +
+    '<input class="f-input" placeholder="' + placeholder + '" type="password" data-cf="' + cf + '" value="' + esc(val||'') + '" style="margin:0;padding-right:32px;">' +
+    '<button type="button" onclick="window._hspTogglePw(this)" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:14px;">👁</button>' +
+  '</div>';
+}
+
+// -- Anydesk --
+window._hspAddAnydesk = function(a) {
+  var list = document.getElementById('hsp-anydesk-list');
+  var empty = document.getElementById('hsp-anydesk-empty');
+  if (!list) return;
+  if (empty) empty.style.display = 'none';
+
+  var row = document.createElement('div');
+  row.className = 'hsp-anydesk-row';
+  row.style.cssText = 'background:var(--bg);border-radius:8px;padding:10px 12px;margin-bottom:8px;border:1px solid var(--border);';
+  row.innerHTML =
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;align-items:start;">' +
+      '<input class="f-input" placeholder="ชื่อเครื่อง/หมายเหตุ" data-cf="label" value="' + esc(a?.label||'') + '" style="margin:0;">' +
+      '<input class="f-input" placeholder="Anydesk IP" data-cf="ip" value="' + esc(a?.ip||'') + '" style="margin:0;">' +
+      _hspPwField('Anydesk Password', 'password', a?.password) +
+    '</div>' +
+    '<div style="text-align:right;margin-top:8px;">' +
+      '<button type="button" class="btn btn-ghost btn-sm" onclick="window._hspRemoveAnydesk(this)" style="color:var(--coral);font-size:11px;">🗑 ลบ</button>' +
+    '</div>';
+  list.appendChild(row);
+  _hspUpdateSystemBadge();
+};
+
+window._hspRemoveAnydesk = function(btn) {
+  var row = btn.closest('.hsp-anydesk-row');
+  if (row) row.remove();
+  var list = document.getElementById('hsp-anydesk-list');
+  var empty = document.getElementById('hsp-anydesk-empty');
+  if (empty && list && !list.querySelector('.hsp-anydesk-row')) empty.style.display = '';
+  _hspUpdateSystemBadge();
+};
+
+function _hspGetAnydesk() {
+  var out = [];
+  document.querySelectorAll('#hsp-anydesk-list .hsp-anydesk-row').forEach(function(row) {
+    var label    = (row.querySelector('[data-cf="label"]').value    || '').trim();
+    var ip       = (row.querySelector('[data-cf="ip"]').value       || '').trim();
+    var password = (row.querySelector('[data-cf="password"]').value || '').trim();
+    if (label || ip || password) out.push({ label, ip, password });
+  });
+  return out;
+}
+
+// -- Database --
+window._hspAddDb = function(d) {
+  var list = document.getElementById('hsp-db-list');
+  var empty = document.getElementById('hsp-db-empty');
+  if (!list) return;
+  if (empty) empty.style.display = 'none';
+
+  var row = document.createElement('div');
+  row.className = 'hsp-db-row';
+  row.style.cssText = 'background:var(--bg);border-radius:8px;padding:10px 12px;margin-bottom:8px;border:1px solid var(--border);';
+  row.innerHTML =
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">' +
+      '<input class="f-input" placeholder="ชื่อเครื่อง/หมายเหตุ" data-cf="label" value="' + esc(d?.label||'') + '" style="margin:0;grid-column:1/-1;">' +
+      '<input class="f-input" placeholder="IP Server" data-cf="ip" value="' + esc(d?.ip||'') + '" style="margin:0;">' +
+      '<input class="f-input" placeholder="Database" data-cf="database" value="' + esc(d?.database||'') + '" style="margin:0;">' +
+      '<input class="f-input" placeholder="User" data-cf="user" value="' + esc(d?.user||'') + '" style="margin:0;">' +
+      _hspPwField('Password', 'password', d?.password) +
+    '</div>' +
+    '<div style="text-align:right;">' +
+      '<button type="button" class="btn btn-ghost btn-sm" onclick="window._hspRemoveDb(this)" style="color:var(--coral);font-size:11px;">🗑 ลบ</button>' +
+    '</div>';
+  list.appendChild(row);
+  _hspUpdateSystemBadge();
+};
+
+window._hspRemoveDb = function(btn) {
+  var row = btn.closest('.hsp-db-row');
+  if (row) row.remove();
+  var list = document.getElementById('hsp-db-list');
+  var empty = document.getElementById('hsp-db-empty');
+  if (empty && list && !list.querySelector('.hsp-db-row')) empty.style.display = '';
+  _hspUpdateSystemBadge();
+};
+
+function _hspGetDb() {
+  var out = [];
+  document.querySelectorAll('#hsp-db-list .hsp-db-row').forEach(function(row) {
+    var label    = (row.querySelector('[data-cf="label"]').value    || '').trim();
+    var ip       = (row.querySelector('[data-cf="ip"]').value       || '').trim();
+    var database = (row.querySelector('[data-cf="database"]').value || '').trim();
+    var user     = (row.querySelector('[data-cf="user"]').value     || '').trim();
+    var password = (row.querySelector('[data-cf="password"]').value || '').trim();
+    if (label || ip || database) out.push({ label, ip, database, user, password });
+  });
+  return out;
+}
+
+// -- Config --
+window._hspAddConfig = function(c) {
+  var list = document.getElementById('hsp-config-list');
+  var empty = document.getElementById('hsp-config-empty');
+  if (!list) return;
+  if (empty) empty.style.display = 'none';
+
+  var row = document.createElement('div');
+  row.className = 'hsp-config-row';
+  row.style.cssText = 'background:var(--bg);border-radius:8px;padding:10px 12px;margin-bottom:8px;border:1px solid var(--border);';
+  row.innerHTML =
+    '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">' +
+      '<input class="f-input" placeholder="ชื่อเครื่อง/หมายเหตุ" data-cf="label" value="' + esc(c?.label||'') + '" style="margin:0;flex:1;min-width:160px;">' +
+      _hspCfgPill('hosxp', 'Auto Config HOSxP', 'var(--teal)', c?.hosxp) +
+      _hspCfgPill('inv', 'Auto Config INV', 'var(--violet)', c?.inv) +
+      '<button type="button" class="btn btn-ghost btn-sm" onclick="window._hspRemoveConfig(this)" style="color:var(--coral);font-size:11px;white-space:nowrap;">🗑 ลบ</button>' +
+    '</div>';
+  list.appendChild(row);
+  _hspUpdateSystemBadge();
+};
+
+function _hspCfgPill(cf, text, color, checked) {
+  return '<label style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:20px;cursor:pointer;' +
+    'font-size:12px;font-weight:700;white-space:nowrap;transition:all .15s;' +
+    'border:2px solid ' + (checked ? color : 'var(--border)') + ';' +
+    'background:' + (checked ? color + '22' : 'var(--bg)') + ';' +
+    'color:' + (checked ? color : 'var(--txt-muted)') + ';" ' +
+    'onchange="window._hspTogglePill(this.querySelector(\'input\'),\'' + color + '\')">' +
+    '<input type="checkbox" data-cf="' + cf + '" ' + (checked ? 'checked' : '') + ' style="display:none;">' +
+    text + '</label>';
+}
+
+window._hspTogglePill = function(cb, color) {
+  var label = cb.closest('label');
+  if (!label) return;
+  label.style.borderColor = cb.checked ? color : 'var(--border)';
+  label.style.background  = cb.checked ? color + '22' : 'var(--bg)';
+  label.style.color       = cb.checked ? color : 'var(--txt-muted)';
+};
+
+window._hspRemoveConfig = function(btn) {
+  var row = btn.closest('.hsp-config-row');
+  if (row) row.remove();
+  var list = document.getElementById('hsp-config-list');
+  var empty = document.getElementById('hsp-config-empty');
+  if (empty && list && !list.querySelector('.hsp-config-row')) empty.style.display = '';
+  _hspUpdateSystemBadge();
+};
+
+function _hspGetConfig() {
+  var out = [];
+  document.querySelectorAll('#hsp-config-list .hsp-config-row').forEach(function(row) {
+    var label = (row.querySelector('[data-cf="label"]').value || '').trim();
+    var hosxp = row.querySelector('[data-cf="hosxp"]').checked;
+    var inv   = row.querySelector('[data-cf="inv"]').checked;
+    if (label || hosxp || inv) out.push({ label, hosxp, inv });
+  });
+  return out;
+}
+
 // ── ADD / EDIT MODAL ────────────────────────────────────────────────────────
 window.openHospitalModal = function(id) {
   var h = id ? (window.HOSPITALS || []).find(x => x.id === id) : null;
@@ -1128,6 +1539,28 @@ window.openHospitalModal = function(id) {
   if (ce) ce.style.display = contacts.length ? 'none' : '';
   contacts.forEach(function(c) { window._hspAddContact(c); });
   _hspUpdateContactBadge();
+
+  // ── ระบบ/Anydesk (Anydesk / Database / Config แยกกันอิสระ) ─────────────────
+  var sys = h?.systems || {};
+  var adList = document.getElementById('hsp-anydesk-list'), adEmpty = document.getElementById('hsp-anydesk-empty');
+  if (adList) adList.innerHTML = '';
+  var adRows = sys.anydesk || [];
+  if (adEmpty) adEmpty.style.display = adRows.length ? 'none' : '';
+  adRows.forEach(function(a) { window._hspAddAnydesk(a); });
+
+  var dbList = document.getElementById('hsp-db-list'), dbEmpty = document.getElementById('hsp-db-empty');
+  if (dbList) dbList.innerHTML = '';
+  var dbRows = sys.database || [];
+  if (dbEmpty) dbEmpty.style.display = dbRows.length ? 'none' : '';
+  dbRows.forEach(function(d) { window._hspAddDb(d); });
+
+  var cfgList = document.getElementById('hsp-config-list'), cfgEmpty = document.getElementById('hsp-config-empty');
+  if (cfgList) cfgList.innerHTML = '';
+  var cfgRows = sys.config || [];
+  if (cfgEmpty) cfgEmpty.style.display = cfgRows.length ? 'none' : '';
+  cfgRows.forEach(function(c) { window._hspAddConfig(c); });
+
+  _hspUpdateSystemBadge();
 
   // ดึงตัวเลือก district/tambon ตามจังหวัดที่เลือก
   window._hspFormProvinceChanged(false);
@@ -1221,6 +1654,7 @@ window.saveHospital = async function() {
     var fAffiliation = document.getElementById('m-hsp-affiliation').value.trim();
     var fNote        = document.getElementById('m-hsp-note').value.trim();
     var fContacts    = _hspGetContacts();
+    var fSystems     = { anydesk: _hspGetAnydesk(), database: _hspGetDb(), config: _hspGetConfig() };
     var fProducts    = Array.from(document.querySelectorAll('#hsp-products-cb-list .hsp-prod-cb:checked')).map(cb => cb.getAttribute('data-pid'));
 
     // ── ดึง MOPH API เมื่อมี field ที่ว่าง ───────────────────────────────
@@ -1295,6 +1729,7 @@ window.saveHospital = async function() {
       note:        fNote,
       contacts:    fContacts,
       products:    fProducts,
+      systems:     fSystems,
     };
 
     await window.setDoc(getDocRef('HOSPITALS', data.hospital_id), data);
@@ -1308,6 +1743,7 @@ window.saveHospital = async function() {
     var vm = window._hspViewMode || 'dashboard';
     if (vm === 'dashboard') window.renderHspDashboard && window.renderHspDashboard();
     else if (vm === 'analysis') { window._hspPopulateFilters && window._hspPopulateFilters(); window.renderHspAnalysis && window.renderHspAnalysis(); }
+    else if (vm === 'summary') { window._hspPopulateFilters && window._hspPopulateFilters(); window.renderHspSummary && window.renderHspSummary(); }
     else { window._hspPopulateFilters && window._hspPopulateFilters(); window.renderHospital && window.renderHospital(); }
 
   } catch(e) {
@@ -1328,6 +1764,7 @@ window.deleteHospital = async function(id) {
     var vm = window._hspViewMode || 'dashboard';
     if (vm === 'dashboard') window.renderHspDashboard && window.renderHspDashboard();
     else if (vm === 'analysis') { window._hspPopulateFilters && window._hspPopulateFilters(); window.renderHspAnalysis && window.renderHspAnalysis(); }
+    else if (vm === 'summary') { window._hspPopulateFilters && window._hspPopulateFilters(); window.renderHspSummary && window.renderHspSummary(); }
     else { window._hspPopulateFilters && window._hspPopulateFilters(); window.renderHospital && window.renderHospital(); }
   } catch(e) {
     window.showAlert('ลบไม่สำเร็จ: ' + e.message, 'warn');
@@ -2312,6 +2749,7 @@ window._hspProvChanged = function() {
   window.renderHospital();
   if (window._hspViewMode === 'analysis')  window.renderHspAnalysis  && window.renderHspAnalysis();
   if (window._hspViewMode === 'dashboard') window.renderHspDashboard && window.renderHspDashboard();
+  if (window._hspViewMode === 'summary')   window.renderHspSummary   && window.renderHspSummary();
 };
 
 window._hspDistChanged = function() {
@@ -2319,6 +2757,7 @@ window._hspDistChanged = function() {
   window.renderHospital();
   if (window._hspViewMode === 'analysis')  window.renderHspAnalysis  && window.renderHspAnalysis();
   if (window._hspViewMode === 'dashboard') window.renderHspDashboard && window.renderHspDashboard();
+  if (window._hspViewMode === 'summary')   window.renderHspSummary   && window.renderHspSummary();
 };
 
 // ── CASCADE ในฟอร์ม Add/Edit ─────────────────────────────────────────────────
@@ -2866,7 +3305,7 @@ window._hspProdCbChange = function(cb, color) {
 // ─────────────────────────────────────────────────────────────────────────────
 // VIEW TOGGLE: รายชื่อ ↔ วิเคราะห์ Product
 // ─────────────────────────────────────────────────────────────────────────────
-window._hspViewMode = 'dashboard';
+window._hspViewMode = 'list';
 window._hspAnalysisTier = '';
 window._hspAnalysisPage = 1;
 window._hspAnalysisLastFilter = '';
@@ -2877,13 +3316,16 @@ window.goHspView = function(mode) {
   var listArea  = document.getElementById('hsp-list-area');
   var dashArea  = document.getElementById('hsp-dashboard-area');
   var analyArea = document.getElementById('hsp-analysis-area');
+  var summArea  = document.getElementById('hsp-summary-area');
   var tabList   = document.getElementById('hsp-vtab-list');
   var tabDash   = document.getElementById('hsp-vtab-dashboard');
   var tabAnaly  = document.getElementById('hsp-vtab-analysis');
+  var tabSumm   = document.getElementById('hsp-vtab-summary');
   if (listArea)  listArea.style.display  = mode === 'list'      ? '' : 'none';
   if (dashArea)  dashArea.style.display  = mode === 'dashboard' ? '' : 'none';
   if (analyArea) analyArea.style.display = mode === 'analysis'  ? '' : 'none';
-  [['list', tabList], ['dashboard', tabDash], ['analysis', tabAnaly]].forEach(function(p) {
+  if (summArea)  summArea.style.display  = mode === 'summary'   ? '' : 'none';
+  [['list', tabList], ['dashboard', tabDash], ['analysis', tabAnaly], ['summary', tabSumm]].forEach(function(p) {
     if (!p[1]) return;
     var active = mode === p[0];
     p[1].style.color            = active ? 'var(--violet)' : 'var(--txt-muted)';
@@ -2911,6 +3353,12 @@ window.goHspView = function(mode) {
     if (multiWrap) multiWrap.style.display = 'none';
     if (singleSel) singleSel.style.display = 'none';
     window.renderHspDashboard();
+  }
+  if (mode === 'summary') {
+    if (multiWrap) multiWrap.style.display = 'none';
+    if (singleSel) singleSel.style.display = 'none';
+    if (usageSel)  usageSel.style.display = 'none';
+    window.renderHspSummary();
   }
 };
 

@@ -318,8 +318,12 @@ CREATE TABLE IF NOT EXISTS hospitals (
   note        TEXT DEFAULT '',
   contacts    JSONB DEFAULT '[]',
   products    JSONB DEFAULT '[]',
+  systems     JSONB DEFAULT '{}',
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
+-- systems = { anydesk:[{label,ip,password}], database:[{label,ip,database,user,password}], config:[{label,hosxp,inv}] }
+-- migration for existing DB:
+-- ALTER TABLE hospitals ADD COLUMN IF NOT EXISTS systems JSONB DEFAULT '{}';
 
 -- ── WORK_LOGS ───────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS work_logs (

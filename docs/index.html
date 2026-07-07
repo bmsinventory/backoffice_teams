@@ -728,10 +728,10 @@
       <!-- HOSPITAL LIST -->
       <div class="view" id="view-hospital" style="overflow-y:auto;">
         <div class="toolbar" style="position:sticky;top:0;z-index:10;background:var(--surface);">
-          <div class="t-search"><input id="hsp-q" placeholder="ค้นหาจากรหัส / ชื่อ รพ. / อำเภอ..." oninput="window._hspPage=1;window.renderHospital();if(window._hspViewMode==='analysis')window.renderHspAnalysis&&window.renderHspAnalysis();"></div>
+          <div class="t-search"><input id="hsp-q" placeholder="ค้นหาจากรหัส / ชื่อ รพ. / อำเภอ..." oninput="window._hspPage=1;window.renderHospital();if(window._hspViewMode==='analysis')window.renderHspAnalysis&&window.renderHspAnalysis();if(window._hspViewMode==='summary')window.renderHspSummary&&window.renderHspSummary();"></div>
           <select class="t-sel" id="hsp-prov" onchange="window._hspProvChanged()"><option value="">ทุกจังหวัด</option></select>
           <select class="t-sel" id="hsp-dist" onchange="window._hspDistChanged()"><option value="">ทุกอำเภอ</option></select>
-          <select class="t-sel" id="hsp-type" onchange="window._hspPage=1;window.renderHospital();if(window._hspViewMode==='analysis')window.renderHspAnalysis&&window.renderHspAnalysis();">
+          <select class="t-sel" id="hsp-type" onchange="window._hspPage=1;window.renderHospital();if(window._hspViewMode==='analysis')window.renderHspAnalysis&&window.renderHspAnalysis();if(window._hspViewMode==='summary')window.renderHspSummary&&window.renderHspSummary();">
             <option value="">ทุกระดับ</option>
             <option value="A">A – ระดับสูงสุด (500+ เตียง)</option>
             <option value="S">S – ศูนย์/ทั่วไปใหญ่ (300–499 เตียง)</option>
@@ -764,28 +764,37 @@
         </div>
         <!-- View toggle tabs -->
         <div style="display:flex;gap:0;border-bottom:2px solid var(--border);padding:0 24px;background:var(--surface);">
-          <button id="hsp-vtab-dashboard" onclick="window.goHspView('dashboard')"
-            style="padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;cursor:pointer;color:var(--violet);border-bottom:2px solid var(--violet);margin-bottom:-2px;transition:all .15s;">
-            🗺️ Dashboard
-          </button>
           <button id="hsp-vtab-list" onclick="window.goHspView('list')"
-            style="padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;cursor:pointer;color:var(--txt-muted);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s;">
+            style="padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;cursor:pointer;color:var(--violet);border-bottom:2px solid var(--violet);margin-bottom:-2px;transition:all .15s;">
             📋 รายชื่อ รพ.
+          </button>
+          <button id="hsp-vtab-summary" onclick="window.goHspView('summary')"
+            style="padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;cursor:pointer;color:var(--txt-muted);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s;">
+            📇 สรุปข้อมูลการติดต่อ
           </button>
           <button id="hsp-vtab-analysis" onclick="window.goHspView('analysis')"
             style="padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;cursor:pointer;color:var(--txt-muted);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s;">
             📊 วิเคราะห์ Product
           </button>
+          <button id="hsp-vtab-dashboard" onclick="window.goHspView('dashboard')"
+            style="padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;cursor:pointer;color:var(--txt-muted);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s;">
+            🗺️ Dashboard
+          </button>
         </div>
         <div id="hsp-import-progress" style="text-align:center;padding:6px 24px;font-size:12px;color:var(--primary);display:block;min-height:0;"></div>
         <!-- Dashboard view -->
-        <div id="hsp-dashboard-area" style="padding:20px 24px;">
+        <div id="hsp-dashboard-area" style="display:none;padding:20px 24px;">
           <div id="hsp-dashboard-body"></div>
         </div>
         <!-- List view -->
-        <div id="hsp-list-area" style="display:none;">
+        <div id="hsp-list-area">
           <div id="hsp-body" style="padding:0 24px 16px;"></div>
           <div id="hsp-pager" style="padding:12px 24px 28px;"></div>
+        </div>
+        <!-- Summary view (ผู้ติดต่อ + ระบบ/Anydesk แบบดูรวดเดียว) -->
+        <div id="hsp-summary-area" style="display:none;">
+          <div id="hsp-summary-body" style="padding:0 24px 16px;"></div>
+          <div id="hsp-summary-pager" style="padding:12px 24px 28px;"></div>
         </div>
         <!-- Analysis view -->
         <div id="hsp-analysis-area" style="display:none;padding:20px 24px;">
@@ -1762,7 +1771,7 @@
 
 <!-- HOSPITAL DETAIL MODAL -->
 <div class="overlay" id="m-hsp-detail">
-  <div class="modal md" style="max-height:90vh;display:flex;flex-direction:column;">
+  <div class="modal lg" style="height:min(700px,90vh);display:flex;flex-direction:column;width:min(760px,96vw);">
     <div class="m-head" style="flex-shrink:0;">
       <div class="m-icon" style="background:rgba(67,97,238,.12)">🏥</div>
       <div class="m-title" id="m-hsp-detail-title">ข้อมูลโรงพยาบาล</div>
@@ -1779,6 +1788,11 @@
         📋 ผู้ติดต่อ
         <span id="m-hsp-dtab-contacts-badge" style="display:none;background:var(--violet);color:#fff;border-radius:10px;font-size:11px;padding:1px 7px;margin-left:4px;"></span>
       </button>
+      <button id="m-hsp-dtab-systems" onclick="window._hspDetailTab('systems')"
+        style="background:none;border:none;padding:10px 16px;cursor:pointer;font-size:13px;font-weight:600;color:var(--txt-muted);border-bottom:2px solid transparent;margin-bottom:-2px;transition:color .15s;">
+        🖥️ ระบบ/Anydesk
+        <span id="m-hsp-dtab-systems-badge" style="display:none;background:var(--coral);color:#fff;border-radius:10px;font-size:11px;padding:1px 7px;margin-left:4px;"></span>
+      </button>
       <button id="m-hsp-dtab-products" onclick="window._hspDetailTab('products')"
         style="background:none;border:none;padding:10px 16px;cursor:pointer;font-size:13px;font-weight:600;color:var(--txt-muted);border-bottom:2px solid transparent;margin-bottom:-2px;transition:color .15s;">
         📦 Product
@@ -1789,6 +1803,8 @@
     <div id="m-hsp-detail-panel-info" style="flex:1;overflow-y:auto;padding:20px 24px;"></div>
     <!-- Panel: ผู้ติดต่อ -->
     <div id="m-hsp-detail-panel-contacts" style="display:none;flex:1;overflow-y:auto;padding:20px 24px;"></div>
+    <!-- Panel: ระบบ/Anydesk -->
+    <div id="m-hsp-detail-panel-systems" style="display:none;flex:1;overflow-y:auto;padding:20px 24px;"></div>
     <!-- Panel: Product -->
     <div id="m-hsp-detail-panel-products" style="display:none;flex:1;overflow-y:auto;padding:20px 24px;"></div>
     <!-- Footer -->
@@ -1852,7 +1868,7 @@
 
 <!-- HOSPITAL ADD/EDIT MODAL -->
 <div class="overlay" id="m-hsp">
-  <div class="modal md" style="max-height:90vh;display:flex;flex-direction:column;">
+  <div class="modal lg" style="height:min(700px,90vh);display:flex;flex-direction:column;width:min(760px,96vw);">
     <div class="m-head" style="flex-shrink:0;">
       <div class="m-icon" style="background:rgba(67,97,238,.12)">🏥</div>
       <div class="m-title" id="m-hsp-title">➕ เพิ่มโรงพยาบาล</div>
@@ -1870,6 +1886,11 @@
         style="padding:10px 20px;font-size:13px;font-weight:600;background:none;border:none;cursor:pointer;
                color:var(--txt-muted);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s;">
         📋 ข้อมูลการติดต่อ <span id="m-hsp-tab-contacts-badge" style="display:none;background:var(--violet);color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;margin-left:4px;"></span>
+      </button>
+      <button id="m-hsp-tab-systems" onclick="window._hspTab('systems')"
+        style="padding:10px 20px;font-size:13px;font-weight:600;background:none;border:none;cursor:pointer;
+               color:var(--txt-muted);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s;">
+        🖥️ ระบบ/Anydesk <span id="m-hsp-tab-systems-badge" style="display:none;background:var(--coral);color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;margin-left:4px;"></span>
       </button>
       <button id="m-hsp-tab-products" onclick="window._hspTab('products')"
         style="padding:10px 20px;font-size:13px;font-weight:600;background:none;border:none;cursor:pointer;
@@ -1973,7 +1994,41 @@
       </div>
     </div>
 
-    <!-- Panel 3: Product -->
+    <!-- Panel 3: ระบบ/Anydesk -->
+    <div id="m-hsp-panel-systems" style="display:none;flex:1;overflow-y:auto;padding:20px 24px;">
+
+      <!-- Anydesk -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <span style="font-size:13px;font-weight:700;color:var(--txt);">🖥️ Anydesk</span>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="window._hspAddAnydesk()">+ เพิ่ม Anydesk</button>
+      </div>
+      <div id="hsp-anydesk-list"></div>
+      <div id="hsp-anydesk-empty" style="text-align:center;padding:20px 0;font-size:12px;color:var(--txt-muted);border:1px dashed var(--border);border-radius:8px;margin-bottom:20px;">
+        ยังไม่มี Anydesk · กด + เพิ่ม Anydesk
+      </div>
+
+      <!-- Database -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <span style="font-size:13px;font-weight:700;color:var(--txt);">🗄️ Database</span>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="window._hspAddDb()">+ เพิ่ม Database</button>
+      </div>
+      <div id="hsp-db-list"></div>
+      <div id="hsp-db-empty" style="text-align:center;padding:20px 0;font-size:12px;color:var(--txt-muted);border:1px dashed var(--border);border-radius:8px;margin-bottom:20px;">
+        ยังไม่มี Database · กด + เพิ่ม Database
+      </div>
+
+      <!-- Config -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <span style="font-size:13px;font-weight:700;color:var(--txt);">⚙️ Config</span>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="window._hspAddConfig()">+ เพิ่ม Config</button>
+      </div>
+      <div id="hsp-config-list"></div>
+      <div id="hsp-config-empty" style="text-align:center;padding:20px 0;font-size:12px;color:var(--txt-muted);border:1px dashed var(--border);border-radius:8px;">
+        ยังไม่มี Config · กด + เพิ่ม Config
+      </div>
+    </div>
+
+    <!-- Panel 4: Product -->
     <div id="m-hsp-panel-products" style="display:none;flex:1;overflow-y:auto;padding:20px 24px;">
       <div style="font-size:12px;color:var(--txt-muted);margin-bottom:14px;">เลือก Product ที่ รพ. นี้ใช้งานอยู่</div>
       <div id="hsp-products-cb-list" style="display:flex;flex-wrap:wrap;gap:8px;"></div>

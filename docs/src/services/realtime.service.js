@@ -69,7 +69,7 @@
       return { id:d.product_id||d.id, name:d.name||'', color:d.color||'#7c3aed', note:d.note||'', group:d.group||'' };
     },
     HOSPITALS: function (d) {
-      return { id:d.hospital_id||d.id, code:d.code||'', name:d.name||'', type:d.type||'other', beds:Number(d.beds)||0, province:d.province||'', district:d.district||'', tambon:d.tambon||'', address:d.address||'', tel:d.tel||'', website:d.website||'', affiliation:d.affiliation||'', note:d.note||'', contacts:Array.isArray(d.contacts)?d.contacts:[], products:Array.isArray(d.products)?d.products:[] };
+      return { id:d.hospital_id||d.id, code:d.code||'', name:d.name||'', type:d.type||'other', beds:Number(d.beds)||0, province:d.province||'', district:d.district||'', tambon:d.tambon||'', address:d.address||'', tel:d.tel||'', website:d.website||'', affiliation:d.affiliation||'', note:d.note||'', contacts:Array.isArray(d.contacts)?d.contacts:[], products:Array.isArray(d.products)?d.products:[], systems:d.systems&&typeof d.systems==='object'?d.systems:{} };
     },
   };
 
@@ -334,9 +334,10 @@
         if (window.cu && _von('view-hospital')) {
           clearTimeout(_hspTimer);
           _hspTimer = setTimeout(function () {
-            var vm = window._hspViewMode || 'dashboard';
+            var vm = window._hspViewMode || 'list';
             if (vm === 'dashboard')       window.renderHspDashboard && window.renderHspDashboard();
             else if (vm === 'analysis')   { window._hspPopulateFilters && window._hspPopulateFilters(); window.renderHspAnalysis && window.renderHspAnalysis(); }
+            else if (vm === 'summary')    { window._hspPopulateFilters && window._hspPopulateFilters(); window.renderHspSummary && window.renderHspSummary(); }
             else                          { window._hspPopulateFilters && window._hspPopulateFilters(); window.renderHospital && window.renderHospital(); }
           }, 300);
         }

@@ -59,6 +59,7 @@
       window._hspPopulateFilters && window._hspPopulateFilters();
       if (window._hspViewMode === 'dashboard') { window.renderHspDashboard && window.renderHspDashboard(); }
       else if (window._hspViewMode === 'analysis') { window.renderHspAnalysis && window.renderHspAnalysis(); }
+      else if (window._hspViewMode === 'summary') { window.renderHspSummary && window.renderHspSummary(); }
       else { window.renderHospital && window.renderHospital(); }
     } else if (id === 'availability') {
       window.avlPopulateDept && window.avlPopulateDept();
