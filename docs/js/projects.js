@@ -649,6 +649,9 @@ window.ssDeptAll = function(check) {
   document.querySelectorAll('#ss-overlay .ss-dept-chk').forEach(function(el){el.checked=check;});
 };
 
+function ssLocalISO(d) {
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
 window.runSmartSchedule = function() {
   var weeks=parseInt((document.getElementById('ss-weeks')||{}).value)||2;
   var lookahead=parseInt((document.getElementById('ss-lookahead')||{}).value)||16;
@@ -663,12 +666,12 @@ window.runSmartSchedule = function() {
   var startSearch=new Date(today);startSearch.setDate(startSearch.getDate()+1);
   // Snap to next Monday
   var dow=startSearch.getDay();if(dow!==1){var toMon=dow===0?1:(8-dow);startSearch.setDate(startSearch.getDate()+toMon);}
-  var durationDays=weeks*7;
+  var durationDays=(weeks-1)*7+5;
   var slots=[];
   for(var off=0;off<lookahead*7;off+=7){
     var sl=new Date(startSearch);sl.setDate(sl.getDate()+off);
     var se=new Date(sl);se.setDate(se.getDate()+durationDays-1);
-    var sStr=sl.toISOString().slice(0,10);var eStr=se.toISOString().slice(0,10);
+    var sStr=ssLocalISO(sl);var eStr=ssLocalISO(se);
     var holCnt=(window.HOLIDAYS||[]).filter(function(h){if(!h.date)return false;var hd=pd(h.date);return hd>=sl&&hd<=se;}).length;
     var free=[],busy=[];
     targetStaff.forEach(function(s){

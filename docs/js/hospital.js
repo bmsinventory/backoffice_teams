@@ -891,11 +891,20 @@ window._hspGo = function(p) {
 window._hspSummaryPage = 1;
 var HSP_SUMMARY_PAGE_SIZE = 40;
 
+function _hspHasContactInfo(h) {
+  if ((h.contacts || []).length) return true;
+  var sys = h.systems || {};
+  var hasAnydesk = (sys.anydesk  || []).some(function(a) { return a.label || a.ip || a.password; });
+  var hasDb      = (sys.database || []).some(function(d) { return d.label || d.ip || d.database || d.user || d.password; });
+  var hasCfg     = (sys.config   || []).some(function(c) { return c.label || c.hosxp || c.inv; });
+  return hasAnydesk || hasDb || hasCfg;
+}
+
 window.renderHspSummary = function() {
   var body = document.getElementById('hsp-summary-body');
   if (!body) return;
 
-  var all   = _hspFiltered();
+  var all   = _hspFiltered().filter(_hspHasContactInfo);
   var total = all.length;
   var totalPages = Math.max(1, Math.ceil(total / HSP_SUMMARY_PAGE_SIZE));
   if (window._hspSummaryPage > totalPages) window._hspSummaryPage = 1;
