@@ -7,11 +7,23 @@ window.askDel=function(type,id,label){window.delTarget={type:type,id:id};documen
 window.execDelete=async function(){
   if(!window.delTarget)return;if(!window.auth.currentUser)return;
   var t=window.delTarget.type,id=window.delTarget.id;
-  var _delModMap={project:'projects',advance:'advance',lodging:'lodging',timesheet:'timesheet',cost:'cost',leave:'leave',contract:'contract'};
+  var _delModMap={project:'projects',advance:'advance',lodging:'lodging',timesheet:'timesheet',cost:'cost',leave:'leave',contract:'contract',imt_project:'impl_tracker',imt_phase:'impl_tracker',imt_task:'impl_tracker',imt_template:'impl_tracker'};
   if(['staff','type','position','group','user','stage','department'].includes(t)){if(!window.canDel('admin'))return;}
   else if(_delModMap[t]){if(!window.canDel(_delModMap[t]))return;}
   else{if(!window.isAdmin())return;}
-  var sheetMap={project:'PROJECTS',advance:'ADVANCES',staff:'STAFF',type:'PTYPES',user:'USERS',position:'POSITIONS',group:'PGROUPS',lodging:'LODGINGS',stage:'STAGES',timesheet:'TIMESHEETS',cost:'COSTS',department:'DEPARTMENTS',contract:'CONTRACTS'};
+  var sheetMap={project:'PROJECTS',advance:'ADVANCES',staff:'STAFF',type:'PTYPES',user:'USERS',position:'POSITIONS',group:'PGROUPS',lodging:'LODGINGS',stage:'STAGES',timesheet:'TIMESHEETS',cost:'COSTS',department:'DEPARTMENTS',contract:'CONTRACTS',imt_project:'IMPL_PROJECTS',imt_phase:'IMPL_PHASES',imt_task:'IMPL_TASKS',imt_template:'IMPL_TEMPLATES'};
+  function _imtCascadeTask(taskId){
+    window.IMPL_CHECKLIST_ITEMS.filter(x=>x.taskId===taskId).forEach(c=>deleteDoc(getDocRef('IMPL_CHECKLIST_ITEMS',c.id)));
+    window.IMPL_COMMENTS.filter(x=>x.taskId===taskId).forEach(c=>deleteDoc(getDocRef('IMPL_COMMENTS',c.id)));
+    window.IMPL_ATTACHMENTS.filter(x=>x.taskId===taskId).forEach(a=>deleteDoc(getDocRef('IMPL_ATTACHMENTS',a.id)));
+    window.IMPL_CHECKLIST_ITEMS=window.IMPL_CHECKLIST_ITEMS.filter(x=>x.taskId!==taskId);
+    window.IMPL_COMMENTS=window.IMPL_COMMENTS.filter(x=>x.taskId!==taskId);
+    window.IMPL_ATTACHMENTS=window.IMPL_ATTACHMENTS.filter(x=>x.taskId!==taskId);
+  }
+  function _imtCascadePhase(phaseId){
+    window.IMPL_TASKS.filter(x=>x.phaseId===phaseId).forEach(t=>{_imtCascadeTask(t.id);deleteDoc(getDocRef('IMPL_TASKS',t.id));});
+    window.IMPL_TASKS=window.IMPL_TASKS.filter(x=>x.phaseId!==phaseId);
+  }
   if(t==='project'){window.PROJECTS=window.PROJECTS.filter(x=>x.id!==id);window.ADVANCES.filter(x=>x.pid===id).forEach(a=>deleteDoc(getDocRef('ADVANCES',a.id)));window.LODGINGS.filter(x=>x.pid===id).forEach(l=>deleteDoc(getDocRef('LODGINGS',l.id)));}
   else if(t==='advance')window.ADVANCES=window.ADVANCES.filter(x=>x.id!==id);
   else if(t==='lodging')window.LODGINGS=window.LODGINGS.filter(x=>x.id!==id);
@@ -25,11 +37,32 @@ window.execDelete=async function(){
   else if(t==='timesheet')window.TIMESHEETS=window.TIMESHEETS.filter(x=>x.id!==id);
   else if(t==='cost')window.COSTS=window.COSTS.filter(x=>x.id!==id);
   else if(t==='contract')window.CONTRACTS=window.CONTRACTS.filter(x=>x.id!==id);
+  else if(t==='imt_project'){
+    window.IMPL_PHASES.filter(x=>x.projectId===id).forEach(p=>{_imtCascadePhase(p.id);deleteDoc(getDocRef('IMPL_PHASES',p.id));});
+    window.IMPL_ISSUES.filter(x=>x.projectId===id).forEach(i=>deleteDoc(getDocRef('IMPL_ISSUES',i.id)));
+    window.IMPL_RISKS.filter(x=>x.projectId===id).forEach(r=>deleteDoc(getDocRef('IMPL_RISKS',r.id)));
+    window.IMPL_ACTIVITY_LOG.filter(x=>x.projectId===id).forEach(a=>deleteDoc(getDocRef('IMPL_ACTIVITY_LOG',a.id)));
+    window.IMPL_PHASES=window.IMPL_PHASES.filter(x=>x.projectId!==id);
+    window.IMPL_ISSUES=window.IMPL_ISSUES.filter(x=>x.projectId!==id);
+    window.IMPL_RISKS=window.IMPL_RISKS.filter(x=>x.projectId!==id);
+    window.IMPL_ACTIVITY_LOG=window.IMPL_ACTIVITY_LOG.filter(x=>x.projectId!==id);
+    window.IMPL_PROJECTS=window.IMPL_PROJECTS.filter(x=>x.id!==id);
+    if(window.imtCurrentProjectId===id){window.imtCurrentProjectId='';window.imtTab='dashboard';}
+  }
+  else if(t==='imt_phase'){_imtCascadePhase(id);window.IMPL_PHASES=window.IMPL_PHASES.filter(x=>x.id!==id);}
+  else if(t==='imt_task'){_imtCascadeTask(id);window.IMPL_TASKS=window.IMPL_TASKS.filter(x=>x.id!==id);}
+  else if(t==='imt_template')window.IMPL_TEMPLATES=window.IMPL_TEMPLATES.filter(x=>x.id!==id);
   window.closeM('m-del');window.delTarget=null;window.renderAll();
   if(t==='staff')window.admTab('staff');else if(['type','user','position','group','stage'].includes(t))window.admTab(t+'s');
   if(t==='department')window.admTab('dept');
   if(t==='lodging'&&window.currentLdPid)window.openLodgingGroupModal(window.currentLdPid);
   deleteDoc(getDocRef(sheetMap[t],id)).catch(e=>window.showDbError(e));
+  if(t==='imt_project'){
+    // ── ลบโครงการเดียวยิง deleteDoc หลายสิบครั้งพร้อมกันข้ามหลายตาราง (Phase/Task/Checklist/ฯลฯ)
+    // realtime sync ของแต่ละตารางอาจตามไม่ทันทันที ทำให้เปิดโครงการอื่นดูตอนนั้นพอดีเห็นข้อมูลว่างชั่วคราว
+    // (ข้อมูลจริงไม่ได้หายไปไหนในฐานข้อมูล) — เรียก re-render ซ้ำอีกครั้งหลังรอ sync นิ่งแล้ว กันผู้ใช้ต้องกด F5 เอง ──
+    setTimeout(function(){window.renderAll();},1500);
+  }
 }
 
 // ── IMPORT ──

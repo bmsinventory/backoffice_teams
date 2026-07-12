@@ -70,6 +70,7 @@
       'overview','kanban','projects','advance','lodging',
       'workload','availability','calendar','leave','timesheet',
       'cost','budget','targets','hospital','contract','worklog','holiday',
+      'impl_tracker',
     ];
     navModules.forEach(function (m) {
       var btn = document.querySelector('.nav-btn[onclick*="\'' + m + '\'"]');
@@ -144,6 +145,7 @@
       'view-contract':     'renderContract',
       'view-targets':      'renderTargets',
       'view-worklog':      'renderWorkLog',
+      'view-impl-tracker': 'renderImplTracker',
     };
 
     Object.keys(renders).forEach(function (viewId) {

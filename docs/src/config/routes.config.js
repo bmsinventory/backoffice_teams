@@ -23,6 +23,7 @@
     { id:'hospital',     label:'รายชื่อ รพ.',     icon:'🏥' },
     { id:'contract',     label:'ข้อมูลสัญญา',     icon:'📄' },
     { id:'worklog',      label:'บันทึกงาน',       icon:'📝' },
+    { id:'impl_tracker', label:'ติดตามโครงการติดตั้ง', icon:'🛠️' },
   ];
 
   // ── Route Map: moduleId → viewId ──
@@ -44,6 +45,7 @@
     targets:      'view-targets',
     worklog:      'view-worklog',
     budget:       'view-budget',
+    impl_tracker: 'view-impl-tracker',
   };
 
   // ── Default Route ──

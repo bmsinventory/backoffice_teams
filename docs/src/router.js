@@ -85,6 +85,7 @@
         targets:    'renderTargets',
         contract:   'renderContract',
         worklog:    'renderWorkLog',
+        impl_tracker: 'renderImplTracker',
       };
       if (id === 'overview' || id === 'kanban' || id === 'projects') {
         window.runAutoStage && window.runAutoStage(true);

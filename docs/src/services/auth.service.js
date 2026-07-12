@@ -207,6 +207,7 @@
   // ── Initialize: seed + start realtime ──
   seedDatabaseIfEmpty().then(function () {
     window.RealtimeService && window.RealtimeService.setup();
+    window.ImplTrackerService && window.ImplTrackerService.setup();
   }).catch(function (e) {
     console.warn('[auth.service] init error:', e.message);
   });

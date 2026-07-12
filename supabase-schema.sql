@@ -453,3 +453,159 @@ ALTER PUBLICATION supabase_realtime ADD TABLE hsp_products;
 ALTER PUBLICATION supabase_realtime ADD TABLE hospitals;
 ALTER PUBLICATION supabase_realtime ADD TABLE work_logs;
 ALTER PUBLICATION supabase_realtime ADD TABLE settings;
+
+-- =============================================================
+-- IMPLEMENTATION TRACKER (impl_tracker) — Module ติดตามงานโครงการติดตั้งระบบ
+-- Project → Phase → Task → Checklist, แยกอิสระจากตาราง projects เดิม (คนละความหมาย)
+-- รายละเอียดเต็ม + seed template: ดู supabase-migration-impl-tracker.sql
+-- =============================================================
+CREATE TABLE IF NOT EXISTS impl_templates (
+  id            TEXT PRIMARY KEY,
+  template_name TEXT DEFAULT '',
+  description   TEXT DEFAULT '',
+  structure     JSONB DEFAULT '{}'::jsonb,
+  created_at    TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS impl_projects (
+  id               TEXT PRIMARY KEY,
+  project_name     TEXT DEFAULT '',
+  hospital_name    TEXT DEFAULT '',
+  start_date       DATE,
+  end_date         DATE,
+  project_manager  TEXT DEFAULT '',
+  status           TEXT DEFAULT 'not_started',
+  progress_percent NUMERIC DEFAULT 0,
+  template_id      TEXT DEFAULT '',
+  source_project_id TEXT DEFAULT '',
+  created_at       TIMESTAMPTZ DEFAULT NOW(),
+  updated_at       TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS impl_phases (
+  id               TEXT PRIMARY KEY,
+  project_id       TEXT NOT NULL,
+  phase_name       TEXT DEFAULT '',
+  description      TEXT DEFAULT '',
+  sort_order       INTEGER DEFAULT 99,
+  status           TEXT DEFAULT 'not_started',
+  progress_percent NUMERIC DEFAULT 0,
+  created_at       TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS impl_tasks (
+  id               TEXT PRIMARY KEY,
+  phase_id         TEXT NOT NULL,
+  project_id       TEXT NOT NULL,
+  task_name        TEXT DEFAULT '',
+  description      TEXT DEFAULT '',
+  owner            TEXT DEFAULT '',
+  start_date       DATE,
+  due_date         DATE,
+  priority         TEXT DEFAULT 'medium',
+  status           TEXT DEFAULT 'not_started',
+  progress_percent NUMERIC DEFAULT 0,
+  sort_order       INTEGER DEFAULT 99,
+  created_at       TIMESTAMPTZ DEFAULT NOW(),
+  updated_at       TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS impl_checklist_items (
+  id             TEXT PRIMARY KEY,
+  task_id        TEXT NOT NULL,
+  checklist_name TEXT DEFAULT '',
+  is_done        BOOLEAN DEFAULT false,
+  done_date      DATE,
+  done_by        TEXT DEFAULT '',
+  remark         TEXT DEFAULT '',
+  sort_order     INTEGER DEFAULT 99,
+  created_at     TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS impl_comments (
+  id           TEXT PRIMARY KEY,
+  task_id      TEXT NOT NULL,
+  author       TEXT DEFAULT '',
+  comment_text TEXT DEFAULT '',
+  created_at   TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS impl_attachments (
+  id          TEXT PRIMARY KEY,
+  task_id     TEXT NOT NULL,
+  file_name   TEXT DEFAULT '',
+  file_url    TEXT DEFAULT '',
+  file_size   NUMERIC DEFAULT 0,
+  uploaded_by TEXT DEFAULT '',
+  uploaded_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS impl_activity_log (
+  id          TEXT PRIMARY KEY,
+  project_id  TEXT NOT NULL,
+  entity_type TEXT DEFAULT '',
+  entity_id   TEXT DEFAULT '',
+  action      TEXT DEFAULT '',
+  detail      TEXT DEFAULT '',
+  actor       TEXT DEFAULT '',
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_impl_phases_project_id ON impl_phases (project_id);
+CREATE INDEX IF NOT EXISTS idx_impl_tasks_phase_id     ON impl_tasks (phase_id);
+CREATE INDEX IF NOT EXISTS idx_impl_tasks_project_id   ON impl_tasks (project_id);
+CREATE INDEX IF NOT EXISTS idx_impl_tasks_due_date     ON impl_tasks (due_date);
+CREATE INDEX IF NOT EXISTS idx_impl_checklist_task_id  ON impl_checklist_items (task_id);
+CREATE INDEX IF NOT EXISTS idx_impl_comments_task_id   ON impl_comments (task_id);
+CREATE INDEX IF NOT EXISTS idx_impl_attachments_task_id ON impl_attachments (task_id);
+CREATE INDEX IF NOT EXISTS idx_impl_activity_project_id ON impl_activity_log (project_id);
+
+ALTER TABLE impl_templates       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE impl_projects        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE impl_phases          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE impl_tasks           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE impl_checklist_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE impl_comments        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE impl_attachments     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE impl_activity_log    ENABLE ROW LEVEL SECURITY;
+
+DO $$
+DECLARE
+  tbl TEXT;
+  tbls TEXT[] := ARRAY[
+    'impl_templates','impl_projects','impl_phases','impl_tasks','impl_checklist_items',
+    'impl_comments','impl_attachments','impl_activity_log'
+  ];
+BEGIN
+  FOREACH tbl IN ARRAY tbls LOOP
+    EXECUTE format('DROP POLICY IF EXISTS "anon_all_%s" ON %I', tbl, tbl);
+    EXECUTE format(
+      'CREATE POLICY "anon_all_%s" ON %I FOR ALL TO anon USING (true) WITH CHECK (true)',
+      tbl, tbl
+    );
+  END LOOP;
+END $$;
+
+DO $$
+DECLARE
+  tbl TEXT;
+  tbls TEXT[] := ARRAY[
+    'impl_templates','impl_projects','impl_phases','impl_tasks','impl_checklist_items',
+    'impl_comments','impl_attachments','impl_activity_log'
+  ];
+BEGIN
+  FOREACH tbl IN ARRAY tbls LOOP
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_publication_tables
+      WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = tbl
+    ) THEN
+      EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE %I', tbl);
+    END IF;
+  END LOOP;
+END $$;
+
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('impl-attachments', 'impl-attachments', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Seed template ("TPL_INV_STD") + storage policies: ดู supabase-migration-impl-tracker.sql

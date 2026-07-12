@@ -20,7 +20,13 @@
 .f-input::placeholder { color: var(--txt3); }
 .f-input:disabled     { opacity: .45; cursor: not-allowed; }
 textarea.f-input  { resize: vertical; min-height: 72px; }
-select.f-input    { appearance: none; cursor: pointer; }
+select.f-input {
+  appearance: none; cursor: pointer;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' fill='none' stroke='%238b93a7' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+}
 
 .f-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 
