@@ -112,7 +112,7 @@
   .btn, .tp-btn, button:not(.lf-eye):not(.m-x):not(#dm-toggle) { min-height: 44px; padding-top: 10px !important; padding-bottom: 10px !important; }
   .btn-sm { min-height: 36px; }
   .nav-btn { padding: 12px 10px !important; min-height: 44px; }
-  .f-input, .t-sel, .t-search input, select { min-height: 44px; }
+  .f-input, .t-sel, .t-search input, select, .ms-filter .ms-btn { min-height: 44px; }
   .lf-inp { min-height: 48px; font-size: 16px !important; } /* 16px prevents iOS zoom */
   td { min-height: 44px; }
 
@@ -121,6 +121,7 @@
   .t-search { flex: 1 1 140px; min-width: 120px; }
   .t-search input { width: 100% !important; min-width: 0; font-size: 14px; }
   .t-sel { font-size: 13px; max-width: 100%; min-width: 0; flex-shrink: 1; flex: 1 1 120px; }
+  .ms-filter { max-width: 100%; min-width: 0; flex-shrink: 1; flex: 1 1 120px; }
   .toolbar > .btn { flex-shrink: 0; }
   .toolbar .btn { padding: 8px 12px; font-size: 12px; }
 
@@ -216,6 +217,9 @@
   .t-search { flex: 1 1 auto; min-width: 0; }
   .t-search input { width: 100% !important; min-width: 0; }
   .toolbar .t-sel { min-width: 0; flex: 1; font-size: 12px; }
+  .toolbar .ms-filter { min-width: 0; flex: 1; }
+  .toolbar .ms-filter .ms-btn { font-size: 12px; }
+  .ms-panel { max-width: calc(100vw - 24px); }
   .stat-c { padding: 12px 10px; }
   .stat-v { font-size: 17px; }
   .stat-k { font-size: 9px; }

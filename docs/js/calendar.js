@@ -51,14 +51,20 @@ window.updateCalFilterOpts=function(){
   // Show/hide "only active" checkbox
   if(onlyWrap){onlyWrap.style.display=isStaff?'flex':'none';}
   // Refresh individual filter list
+  var isPtype=window.calView==='ptype';
+  var cfMs=document.getElementById('cal-filter-ptype');
+  if(cf)cf.style.display=isPtype?'none':'';
+  if(cfMs)cfMs.style.display=isPtype?'':'none';
+  if(isPtype){
+    if(cfMs)window.msFilter('cal-filter-ptype',window.PTYPES,{placeholder:'ทั้งหมด',onChange:window.renderCalendar});
+    return;
+  }
   if(!cf)return;
   var currentVal=cf.value;
   var fDept=(deptSel&&deptSel.value)||'';
   cf.innerHTML='<option value="">ทั้งหมด</option>';
   if(isStaff){
     window.STAFF.filter(s=>s.active&&(!fDept||(s.dept||'')===fDept)).forEach(s=>{cf.insertAdjacentHTML('beforeend','<option value="'+s.id+'">'+esc(s.name)+'</option>');});
-  } else if(window.calView==='ptype'){
-    window.PTYPES.forEach(t=>{cf.insertAdjacentHTML('beforeend','<option value="'+t.id+'">'+esc(t.label)+'</option>');});
   } else if(isProject){
     window.PROJECTS.forEach(p=>{cf.insertAdjacentHTML('beforeend','<option value="'+p.id+'">'+esc(p.name)+'</option>');});
   }
@@ -68,7 +74,10 @@ window.updateCalFilterOpts=function(){
 function getColIndices(startDt,endDt,tCols){let viewStart=tCols[0].s;let viewEnd=tCols[tCols.length-1].e;if(endDt<viewStart||startDt>viewEnd)return null;let sIdx=-1,eIdx=-1;for(let i=0;i<tCols.length;i++){if(sIdx===-1&&startDt<=tCols[i].e)sIdx=i;if(endDt>=tCols[i].s)eIdx=i;}if(sIdx===-1)sIdx=0;if(eIdx===-1)eIdx=tCols.length-1;return{sIdx,eIdx};}
 
 window.renderCalendar=function(){
-  var cf=document.getElementById('cal-filter');if(cf&&cf.options.length<=1)window.updateCalFilterOpts();var filt=(cf&&cf.value)||'';
+  var cf=document.getElementById('cal-filter');
+  var isPtypeView=window.calView==='ptype';
+  if(isPtypeView||(cf&&cf.options.length<=1))window.updateCalFilterOpts();
+  var filt=isPtypeView?window.msValues('cal-filter-ptype'):((cf&&cf.value)||'');
   var tCols=[];var y=window.calY;
   if(window.calTime==='month'){var dim=new Date(y,window.calM+1,0).getDate();for(var d=1;d<=dim;d++){var dt=new Date(y,window.calM,d);var _ds=y+'-'+String(window.calM+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');var _hol=window.HOLIDAYS.find(function(h){return h.date===_ds;});tCols.push({label:d,sub:window.DNAMES[dt.getDay()],s:dt,e:new Date(y,window.calM,d,23,59,59),isWk:dt.getDay()===0||dt.getDay()===6,isHol:!!_hol,holName:_hol?_hol.name:''});}document.getElementById('cal-lbl').textContent=window.THMON[window.calM]+' '+(y+543);}
   else if(window.calTime==='year'){for(var m=0;m<12;m++){var dt=new Date(y,m,1);tCols.push({label:window.THMON[m].slice(0,3),sub:'',s:dt,e:new Date(y,m+1,0,23,59,59),isWk:false});}document.getElementById('cal-lbl').textContent='ปี '+(y+543);}
@@ -108,7 +117,7 @@ window.renderCalendar=function(){
       baseRows=baseRows.filter(function(r){return _hasEvt.has(r.id);});
     }
   }
-  else if(window.calView==='ptype')baseRows=window.PTYPES.filter(t=>(!filt||t.id===filt)).map(t=>({id:t.id,name:t.label,sub:'ประเภท',type:'ptype',obj:t}));
+  else if(window.calView==='ptype')baseRows=window.PTYPES.filter(t=>(!filt.length||filt.includes(t.id))).map(t=>({id:t.id,name:t.label,sub:'ประเภท',type:'ptype',obj:t}));
   else if(window.calView==='project'){
     baseRows=window.PROJECTS.filter(function(p){
       if(filt&&p.id!==filt)return false;

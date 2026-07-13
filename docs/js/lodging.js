@@ -2,18 +2,18 @@ const { esc, fd, fc, fca, pd, gS, gT, gG, gSt, gC, avC, uid, getFY, getYearBE, g
 const setDoc = (...a) => window.setDoc(...a);
 // ── LODGING ──
 window.renderLodging=function(){
-  var qf=document.getElementById('ld-q'),gf=document.getElementById('ld-grp'),tf=document.getElementById('ld-type'),yf=document.getElementById('ld-yr'),sf=document.getElementById('ld-status');
-  if(gf&&gf.options.length<=1)window.PGROUPS.forEach(g=>{var o=document.createElement('option');o.value=g.id;o.textContent=g.label;gf.appendChild(o);});
-  if(tf&&tf.options.length<=1)window.PTYPES.forEach(t=>{var o=document.createElement('option');o.value=t.id;o.textContent=t.label;tf.appendChild(o);});
+  var qf=document.getElementById('ld-q'),yf=document.getElementById('ld-yr'),sf=document.getElementById('ld-status');
+  window.msFilter('ld-grp',window.PGROUPS,{placeholder:'ทุกกลุ่มโครงการ',onChange:window.renderLodging});
+  window.msFilter('ld-type',window.PTYPES,{placeholder:'ทุกประเภท',onChange:window.renderLodging});
   if(yf&&yf.options.length<=1){[...new Set(window.PROJECTS.map(p=>getYearBE(p.start)).filter(Boolean))].sort((a,b)=>b-a).forEach(y=>{var o=document.createElement('option');o.value=y;o.textContent='ปี พ.ศ. '+y;yf.appendChild(o);});var _cbe=(new Date().getFullYear()+543).toString();if(!yf.value||yf.value==='')yf.value=_cbe;}
-  var q=((qf||{}).value||'').toLowerCase(),grp=(gf||{}).value||'',typ=(tf||{}).value||'',yr=(yf||{}).value||'',stFil=(sf||{}).value||'';
+  var q=((qf||{}).value||'').toLowerCase(),grp=window.msValues('ld-grp'),typ=window.msValues('ld-type'),yr=(yf||{}).value||'',stFil=(sf||{}).value||'';
   var grouped={};window.LODGINGS.forEach(l=>{if(!grouped[l.pid])grouped[l.pid]=[];grouped[l.pid].push(l);});
   // ── เฉพาะโครงการที่มีที่พักเพิ่มแล้ว ──
   var fProjs=window.PROJECTS.filter(p=>{
     var lds=grouped[p.id]||[];
     if(lds.length===0)return false; // ← ไม่แสดงโครงการที่ยังไม่มีที่พัก
-    if(grp&&p.groupId!==grp)return false;
-    if(typ&&p.typeId!==typ)return false;
+    if(grp.length&&!grp.includes(p.groupId))return false;
+    if(typ.length&&!typ.includes(p.typeId))return false;
     if(yr&&getYearBE(p.start)!=yr)return false;
     if(q&&!p.name.toLowerCase().includes(q))return false;
     if(stFil==='approved_daily'&&!lds.some(l=>l.approvedDaily==='yes'))return false;

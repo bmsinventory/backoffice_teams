@@ -1,6 +1,7 @@
 // ── EXCEL EXPORT ──
 (function(){
   var _v=function(id){var el=document.getElementById(id);return el?el.value||'':'';}
+  var _vm=function(id){return window.msValues?window.msValues(id):[];}
   var _pname=function(pid){var p=(window.PROJECTS||[]).find(function(x){return x.id===pid;});return p?p.name:pid||'';}
   var _sname=function(sid){var s=(window.STAFF||[]).find(function(x){return x.id===sid;});return s?s.name:sid||'';}
   var _today=function(){return new Date().toISOString().slice(0,10);}
@@ -29,12 +30,12 @@
 
   // ── โครงการ ──────────────────────────────────────────────────────────────
   window.exportProjects=function(){
-    var q=_v('proj-q').toLowerCase(),fy=_v('proj-fy'),typ=_v('proj-type'),stg=_v('proj-stg');
+    var q=_v('proj-q').toLowerCase(),fy=_v('proj-fy'),typ=_vm('proj-type'),stg=_v('proj-stg');
     var stMap={active:'กำลังดำเนินการ',completed:'เสร็จสิ้น',cancelled:'ยกเลิก',on_hold:'พักชั่วคราว'};
     var rows=(window.PROJECTS||[]).filter(function(p){
       if(q&&!p.name.toLowerCase().includes(q))return false;
       if(fy&&window.getYearBE(p.start)!=fy)return false;
-      if(typ&&p.typeId!==typ)return false;
+      if(typ.length&&!typ.includes(p.typeId))return false;
       if(stg&&p.stage!==stg)return false;
       return true;
     }).map(function(p){
@@ -49,14 +50,14 @@
 
   // ── เบิกล่วงหน้า ──────────────────────────────────────────────────────────
   window.exportAdvances=function(){
-    var q=_v('adv-q').toLowerCase(),grp=_v('adv-grp'),typ=_v('adv-type'),yr=_v('adv-yr');
+    var q=_v('adv-q').toLowerCase(),grp=_vm('adv-grp'),typ=_vm('adv-type'),yr=_v('adv-yr');
     var stTab=window.advFilter||'';
     var stMap={draft:'ร่าง',submitted:'ยื่นขออนุมัติ',approved:'อนุมัติแล้ว',clearing:'กำลัง Clear',cleared:'Clear แล้ว',rejected:'ปฏิเสธ'};
     var rows=(window.ADVANCES||[]).filter(function(a){
       var p=(window.PROJECTS||[]).find(function(x){return x.id===a.pid;});
       if(q&&!(a.purpose||'').toLowerCase().includes(q)&&!(p&&p.name.toLowerCase().includes(q)))return false;
-      if(grp&&(!p||p.groupId!==grp))return false;
-      if(typ&&(!p||p.typeId!==typ))return false;
+      if(grp.length&&(!p||!grp.includes(p.groupId)))return false;
+      if(typ.length&&(!p||!typ.includes(p.typeId)))return false;
       if(yr&&window.getYearBE(a.rdate)!=yr)return false;
       if(stTab&&a.status!==stTab)return false;
       return true;
@@ -69,7 +70,7 @@
 
   // ── Timesheet ──────────────────────────────────────────────────────────────
   window.exportTimesheet=function(){
-    var q=_v('ts-q').toLowerCase(),yr=_v('ts-yr'),mon=_v('ts-mon'),typ=_v('ts-type'),proj=_v('ts-proj'),staff=_v('ts-staff');
+    var q=_v('ts-q').toLowerCase(),yr=_v('ts-yr'),mon=_v('ts-mon'),typ=_vm('ts-type'),proj=_v('ts-proj'),staff=_v('ts-staff');
     var catMap={fieldwork:'งานภาคสนาม',office:'งานสำนักงาน',training:'อบรม',meeting:'ประชุม',other:'อื่นๆ'};
     var rows=(window.TIMESHEETS||[]).filter(function(t){
       var p=(window.PROJECTS||[]).find(function(x){return x.id===t.pid;});
@@ -77,7 +78,7 @@
       if(q&&!(p&&p.name.toLowerCase().includes(q))&&!(s&&s.name.toLowerCase().includes(q)))return false;
       if(yr&&t.workDate&&window.getYearBE(t.workDate)!=yr)return false;
       if(mon&&t.workDate){var m=new Date(t.workDate).getMonth()+1;if(m!=Number(mon))return false;}
-      if(typ&&t.category!==typ)return false;
+      if(typ.length&&(!p||!typ.includes(p.typeId)))return false;
       if(proj&&t.pid!==proj)return false;
       if(staff&&t.staffId!==staff)return false;
       return true;
@@ -113,15 +114,15 @@
 
   // ── ที่พัก ──────────────────────────────────────────────────────────────────
   window.exportLodging=function(){
-    var q=_v('ld-q').toLowerCase(),grp=_v('ld-grp'),typ=_v('ld-type'),yr=_v('ld-yr'),stFil=_v('ld-status');
+    var q=_v('ld-q').toLowerCase(),grp=_vm('ld-grp'),typ=_vm('ld-type'),yr=_v('ld-yr'),stFil=_v('ld-status');
     var grouped={};
     (window.LODGINGS||[]).forEach(function(l){if(!grouped[l.pid])grouped[l.pid]=[];grouped[l.pid].push(l);});
     var rows=[];
     (window.PROJECTS||[]).forEach(function(p){
       var lds=grouped[p.id]||[];
       if(!lds.length)return;
-      if(grp&&p.groupId!==grp)return;
-      if(typ&&p.typeId!==typ)return;
+      if(grp.length&&!grp.includes(p.groupId))return;
+      if(typ.length&&!typ.includes(p.typeId))return;
       if(yr&&window.getYearBE(p.start)!=yr)return;
       if(q&&!p.name.toLowerCase().includes(q))return;
       if(stFil==='approved_daily'&&!lds.some(function(l){return l.approvedDaily==='yes';}))return;

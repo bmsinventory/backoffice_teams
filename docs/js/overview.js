@@ -3,12 +3,10 @@ const { esc, fd, fc, fca, pd, gS, gT, gG, gSt, gC, avC, uid, getFY, getYearBE, g
 window.renderOverview = function(){
   var yf=document.getElementById('ov-yr');
   if(yf&&yf.options.length<=1){var yrs=[...new Set(window.PROJECTS.map(p=>getYearBE(p.start)).filter(Boolean))].sort((a,b)=>b-a);yrs.forEach(function(y){var o=document.createElement('option');o.value=y;o.textContent='ปี พ.ศ. '+y;yf.appendChild(o);});var _cbe=(new Date().getFullYear()+543).toString();if(!yf.value||yf.value==='')yf.value=_cbe;}
-  var gf=document.getElementById('ov-grp');
-  if(gf&&gf.options.length<=1){window.PGROUPS.forEach(function(g){var o=document.createElement('option');o.value=g.id;o.textContent=g.label;gf.appendChild(o);});}
-  var tf_ov=document.getElementById('ov-type');
-  if(tf_ov&&tf_ov.options.length<=1){window.PTYPES.forEach(function(t){var o=document.createElement('option');o.value=t.id;o.textContent=t.label;tf_ov.appendChild(o);});}
-  var yr=(yf||{}).value||'';var grp=(gf||{}).value||'';var ovTyp=(tf_ov||{}).value||'';
-  var fProjs=window.PROJECTS.filter(function(p){return(!yr||getYearBE(p.start)==yr)&&(!grp||p.groupId===grp)&&(!ovTyp||p.typeId===ovTyp);});
+  window.msFilter('ov-grp',window.PGROUPS,{placeholder:'ทุกกลุ่มโครงการ',onChange:window.renderOverview});
+  window.msFilter('ov-type',window.PTYPES,{placeholder:'ทุกประเภทโครงการ',onChange:window.renderOverview});
+  var yr=(yf||{}).value||'';var grp=window.msValues('ov-grp');var ovTyp=window.msValues('ov-type');
+  var fProjs=window.PROJECTS.filter(function(p){return(!yr||getYearBE(p.start)==yr)&&(!grp.length||grp.includes(p.groupId))&&(!ovTyp.length||ovTyp.includes(p.typeId));});
   var fPids=fProjs.map(p=>p.id);
   var fAdvs=window.ADVANCES.filter(function(a){return fPids.includes(a.pid);});
   var totalBudget=fProjs.reduce(function(s,p){return s+p.cost;},0);
@@ -139,16 +137,15 @@ window.renderOvTable = function() {
   var yf=document.getElementById('ov-tbl-yr');
   if(yf&&yf.options.length<=1){var yrs=[...new Set(window.PROJECTS.map(function(p){return getYearBE(p.start);}).filter(Boolean))].sort(function(a,b){return b-a;});yrs.forEach(function(y){var o=document.createElement('option');o.value=y;o.textContent='ปี พ.ศ. '+y;yf.appendChild(o);});var curBE=(new Date().getFullYear()+543).toString();if(yrs.map(String).includes(curBE))yf.value=curBE;}
   // Populate type filter
-  var tf2=document.getElementById('ov-tbl-type');
-  if(tf2&&tf2.options.length<=1){window.PTYPES.forEach(function(t){var o=document.createElement('option');o.value=t.id;o.textContent=t.label;tf2.appendChild(o);});}
+  window.msFilter('ov-tbl-type',window.PTYPES,{placeholder:'ทุกประเภท',onChange:window.renderOvTable});
   var yr=(document.getElementById('ov-tbl-yr')||{}).value||(document.getElementById('ov-yr')||{}).value||'';
-  var grp=(document.getElementById('ov-grp')||{}).value||'';
-  var typeF=(document.getElementById('ov-tbl-type')||{}).value||'';
+  var grp=window.msValues('ov-grp');
+  var typeF=window.msValues('ov-tbl-type');
   var q=((document.getElementById('ov-tbl-q')||{}).value||'').toLowerCase();
   var stg=(document.getElementById('ov-tbl-stg')||{}).value||'';
   var sort=(document.getElementById('ov-tbl-sort')||{}).value||'end_asc';
   var rows=window.PROJECTS.filter(function(p){
-    return (!yr||getYearBE(p.start)==yr)&&(!grp||p.groupId===grp)&&(!typeF||p.typeId===typeF)&&(!stg||p.stage===stg)&&(!q||p.name.toLowerCase().includes(q));
+    return (!yr||getYearBE(p.start)==yr)&&(!grp.length||grp.includes(p.groupId))&&(!typeF.length||typeF.includes(p.typeId))&&(!stg||p.stage===stg)&&(!q||p.name.toLowerCase().includes(q));
   });
   rows.sort(function(a,b){
     if(sort==='end_asc'){var ad=a.end?pd(a.end):new Date(9e12);var bd=b.end?pd(b.end):new Date(9e12);return ad-bd;}

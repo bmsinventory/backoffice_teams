@@ -30,8 +30,7 @@ window.renderProjects=function(){
   }
   var fyf=document.getElementById('proj-fy');
   if(fyf&&fyf.options.length<=1){var fys=[...new Set(window.PROJECTS.map(p=>getYearBE(p.start)).filter(Boolean))].sort((a,b)=>b-a);fys.forEach(function(fy){var o=document.createElement('option');o.value=fy;o.textContent='ปี พ.ศ. '+fy;fyf.appendChild(o);});var _cbe=(new Date().getFullYear()+543).toString();if(!fyf.value||fyf.value==='')fyf.value=_cbe;}
-  var tf=document.getElementById('proj-type');
-  if(tf&&tf.options.length<=1){window.PTYPES.forEach(function(t){var o=document.createElement('option');o.value=t.id;o.textContent=t.label;tf.appendChild(o);});}
+  window.msFilter('proj-type',window.PTYPES,{placeholder:'ทุกประเภท',onChange:window.renderProjects});
   var sf=document.getElementById('proj-stg');
   if(sf&&sf.options.length<=1){window.STAGES.forEach(function(s){var o=document.createElement('option');o.value=s.id;o.textContent=s.label;sf.appendChild(o);});}
   var grp=window.projGrpTab||'';
@@ -40,12 +39,12 @@ window.renderProjects=function(){
   if(typeEl)typeEl.style.display='';
   if(sortEl)sortEl.style.display=isAll?'':'none';
   var q=(document.getElementById('proj-q')||{}).value||'';
-  var ty=(document.getElementById('proj-type')||{}).value||'';
+  var ty=window.msValues('proj-type');
   var st=(document.getElementById('proj-stg')||{}).value||'';
   var fy=(document.getElementById('proj-fy')||{}).value||'';
   var rows=window.PROJECTS.filter(function(p){
     var grpMatch=!grp||(grp==='__onsite__'?window.isOnsiteGroup(p.groupId):p.groupId===grp);
-    return grpMatch&&(!q||p.name.includes(q))&&(!ty||p.typeId===ty)&&(!st||p.stage===st)&&(!fy||getYearBE(p.start)==fy);
+    return grpMatch&&(!q||p.name.includes(q))&&(!ty.length||ty.includes(p.typeId))&&(!st||p.stage===st)&&(!fy||getYearBE(p.start)==fy);
   });
   var sortVal=(document.getElementById('proj-sort')||{}).value||'start_asc';
   rows.sort(function(a,b){

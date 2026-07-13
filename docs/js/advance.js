@@ -5,8 +5,8 @@ const getDocs   = (...a) => window.getDocs(...a);
 const writeBatch = ()   => window.writeBatch();
 // ── ADVANCE ──
 window.renderAdvance=function(){
-  var gf=document.getElementById('adv-grp');if(gf&&gf.options.length<=1){window.PGROUPS.forEach(function(g){var o=document.createElement('option');o.value=g.id;o.textContent=g.label;gf.appendChild(o);});}
-  var tf=document.getElementById('adv-type');if(tf&&tf.options.length<=1){window.PTYPES.forEach(function(t){var o=document.createElement('option');o.value=t.id;o.textContent=t.label;tf.appendChild(o);});}
+  window.msFilter('adv-grp',window.PGROUPS,{placeholder:'ทุกกลุ่มโครงการ',onChange:window.renderAdvance});
+  window.msFilter('adv-type',window.PTYPES,{placeholder:'ทุกประเภท',onChange:window.renderAdvance});
   var yf=document.getElementById('adv-yr');if(yf&&yf.options.length<=1){var yrs=[...new Set(window.PROJECTS.map(p=>getYearBE(p.start)).filter(Boolean))].sort((a,b)=>b-a);yrs.forEach(function(y){var o=document.createElement('option');o.value=y;o.textContent='ปี พ.ศ. '+y;yf.appendChild(o);});var _cbe=(new Date().getFullYear()+543).toString();if(!yf.value||yf.value==='')yf.value=_cbe;}
   // Status tabs
   var tabs=document.getElementById('af-tabs');
@@ -15,15 +15,15 @@ window.renderAdvance=function(){
       return`<div class="af-tab${on?' on':''}" style="${on?'background:'+s.color+';color:#fff':''}" onclick="window.advFilter='${s.id}';window.renderAdvance()">${s.label}<span class="af-cnt">${cnt}</span></div>`;
     }).join('');}
   var q=(document.getElementById('adv-q')||{}).value||'';
-  var grp=(document.getElementById('adv-grp')||{}).value||'';
-  var ty=(document.getElementById('adv-type')||{}).value||'';
+  var grp=window.msValues('adv-grp');
+  var ty=window.msValues('adv-type');
   var yr=(document.getElementById('adv-yr')||{}).value||'';
   var now=new Date();
   var rows=window.ADVANCES.filter(function(a){
     if(window.advFilter&&a.status!==window.advFilter)return false;
     var p=window.PROJECTS.find(function(x){return x.id===a.pid;});
-    if(grp&&(!p||p.groupId!==grp))return false;
-    if(ty&&(!p||p.typeId!==ty))return false;
+    if(grp.length&&(!p||!grp.includes(p.groupId)))return false;
+    if(ty.length&&(!p||!ty.includes(p.typeId)))return false;
     if(yr&&(!p||getYearBE(p.start)!=yr))return false;
     return!q||a.purpose.includes(q)||(p&&p.name.includes(q));
   });

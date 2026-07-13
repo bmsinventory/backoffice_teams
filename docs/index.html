@@ -306,8 +306,8 @@
           <div style="font-size:18px;font-weight:800;color:var(--txt);">Dashboard Overview</div>
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
             <select class="t-sel" id="ov-yr" onchange="window.renderOverview()"><option value="">ทุกปี พ.ศ.</option></select>
-            <select class="t-sel" id="ov-grp" onchange="window.renderOverview()"><option value="">ทุกกลุ่มโครงการ</option></select>
-            <select class="t-sel" id="ov-type" onchange="window.renderOverview()"><option value="">ทุกประเภทโครงการ</option></select>
+            <div class="ms-filter" id="ov-grp"></div>
+            <div class="ms-filter" id="ov-type"></div>
           </div>
         </div>
         <!-- KPI cards -->
@@ -362,7 +362,7 @@
               <span style="font-size:12px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.7px;">📋 รายการโครงการทั้งหมด</span>
               <div class="t-search" style="margin-left:auto"><input id="ov-tbl-q" placeholder="ค้นหาโครงการ..." oninput="window.renderOvTable()"></div>
               <select class="t-sel" id="ov-tbl-yr" onchange="window.renderOvTable()"><option value="">ทุกปี</option></select>
-              <select class="t-sel" id="ov-tbl-type" onchange="window.renderOvTable()"><option value="">ทุกประเภท</option></select>
+              <div class="ms-filter" id="ov-tbl-type"></div>
               <select class="t-sel" id="ov-tbl-stg" onchange="window.renderOvTable()"><option value="">ทุก Stage</option></select>
               <select class="t-sel" id="ov-tbl-sort" onchange="window.renderOvTable()">
                 <option value="end_asc">⏰ วันสิ้นสุด ใกล้ก่อน</option>
@@ -395,8 +395,8 @@
       <div class="view" id="view-kanban">
         <div class="toolbar">
           <select class="t-sel" id="kb-yr" onchange="window.runAutoStage(false).then(()=>window.renderKanban())"><option value="">ทุกปี พ.ศ.</option></select>
-          <select class="t-sel" id="kb-type" onchange="window.renderKanban()"><option value="">ทุกประเภท</option></select>
-          <select class="t-sel" id="kb-grp" onchange="window.renderKanban()"><option value="">ทุกกลุ่มโครงการ</option></select>
+          <div class="ms-filter" id="kb-type"></div>
+          <div class="ms-filter" id="kb-grp"></div>
           <div style="flex:1"></div>
           <button class="btn btn-sm ce-only" style="background:var(--violet)15;color:var(--violet);border:1px solid var(--violet)30;font-weight:700;" onclick="window.runAutoStage(false)">⚡ อัปเดต Stage อัตโนมัติ</button>
           <div id="kb-last-auto" style="font-size:10px;color:var(--txt3);padding:0 8px;"></div>
@@ -410,7 +410,7 @@
         <div class="toolbar" style="position:sticky;top:44px;z-index:10;background:var(--surface);">
           <div class="t-search"><input id="proj-q" placeholder="ค้นหาโครงการ..." oninput="window.renderProjects()"></div>
           <select class="t-sel" id="proj-fy" onchange="window.renderProjects()"><option value="">ทุกปี พ.ศ.</option></select>
-          <select class="t-sel" id="proj-type" onchange="window.renderProjects()"><option value="">ทุกประเภท</option></select>
+          <div class="ms-filter" id="proj-type"></div>
           <select class="t-sel" id="proj-stg" onchange="window.renderProjects()"><option value="">ทุก Stage</option></select>
           <select class="t-sel" id="proj-sort" onchange="window.renderProjects()" style="min-width:160px">
             <option value="start_asc">📅 วันเริ่ม (เก่า→ใหม่)</option>
@@ -444,8 +444,8 @@
         <div class="af-tabs" id="af-tabs" style="position:sticky;top:0;z-index:11;background:var(--surface);border-bottom:1px solid var(--border);padding:0 20px;"></div>
         <div class="toolbar" style="position:sticky;top:44px;z-index:10;background:var(--surface);">
           <div class="t-search"><input id="adv-q" placeholder="ค้นหา..." oninput="window.renderAdvance()"></div>
-          <select class="t-sel" id="adv-grp" onchange="window.renderAdvance()"><option value="">ทุกกลุ่มโครงการ</option></select>
-          <select class="t-sel" id="adv-type" onchange="window.renderAdvance()"><option value="">ทุกประเภท</option></select>
+          <div class="ms-filter" id="adv-grp"></div>
+          <div class="ms-filter" id="adv-type"></div>
           <select class="t-sel" id="adv-yr" onchange="window.renderAdvance()"><option value="">ทุกปี พ.ศ.</option></select>
           <select class="t-sel" id="adv-sort" onchange="window.renderAdvance()">
             <option value="start_desc">📅 วันเริ่ม (ใหม่→เก่า)</option>
@@ -466,8 +466,8 @@
       <div class="view" id="view-lodging">
         <div class="toolbar" style="position:sticky;top:0;z-index:10;background:var(--surface);">
           <div class="t-search"><input id="ld-q" placeholder="ค้นหาโครงการ..." oninput="window.renderLodging()"></div>
-          <select class="t-sel" id="ld-grp" onchange="window.renderLodging()"><option value="">ทุกกลุ่มโครงการ</option></select>
-          <select class="t-sel" id="ld-type" onchange="window.renderLodging()"><option value="">ทุกประเภท</option></select>
+          <div class="ms-filter" id="ld-grp"></div>
+          <div class="ms-filter" id="ld-type"></div>
           <select class="t-sel" id="ld-yr" onchange="window.renderLodging()"><option value="">ทุกปี พ.ศ.</option></select>
           <select class="t-sel" id="ld-status" onchange="window.renderLodging()">
             <option value="">ทุกสถานะ</option>
@@ -566,6 +566,7 @@
           <select class="t-sel" id="cal-filter" onchange="window.renderCalendar()">
             <option value="">ทั้งหมด</option>
           </select>
+          <div class="ms-filter" id="cal-filter-ptype" style="display:none"></div>
           <label id="cal-only-active-wrap" style="display:none;align-items:center;gap:5px;font-size:12px;color:var(--txt2);cursor:pointer;white-space:nowrap;">
             <input type="checkbox" id="cal-only-active" checked onchange="window.renderCalendar()"> แสดงเฉพาะคนที่มีงาน
           </label>
@@ -687,7 +688,7 @@
             <option value="7">ก.ค.</option><option value="8">ส.ค.</option><option value="9">ก.ย.</option>
             <option value="10">ต.ค.</option><option value="11">พ.ย.</option><option value="12">ธ.ค.</option>
           </select>
-          <select class="t-sel" id="ts-type" onchange="window.renderTimesheet()"><option value="">ทุกประเภท</option></select>
+          <div class="ms-filter" id="ts-type"></div>
           <select class="t-sel" id="ts-proj" onchange="window.renderTimesheet()"><option value="">ทุกโครงการ</option></select>
           <select class="t-sel" id="ts-staff" onchange="window.renderTimesheet()"><option value="">ทุกคน</option></select>
           <div style="flex:1"></div>
@@ -711,7 +712,7 @@
             <option value="7">ก.ค.</option><option value="8">ส.ค.</option><option value="9">ก.ย.</option>
             <option value="10">ต.ค.</option><option value="11">พ.ย.</option><option value="12">ธ.ค.</option>
           </select>
-          <select class="t-sel" id="cost-type" onchange="window.renderCost()"><option value="">ทุกประเภท</option></select>
+          <div class="ms-filter" id="cost-type"></div>
           <select class="t-sel" id="cost-proj" onchange="window.renderCost()"><option value="">ทุกโครงการ</option></select>
           <select class="t-sel" id="cost-cat" onchange="window.renderCost()">
             <option value="">ทุกหมวด</option>
@@ -872,7 +873,7 @@
         <div id="bud-pane-owner" style="display:none;">
           <div style="display:flex;gap:10px;align-items:center;padding:12px 24px;flex-wrap:wrap;border-bottom:1px solid var(--border);">
             <div class="t-search" style="min-width:180px;flex:1;"><input id="so-q" placeholder="ค้นหาเจ้าของไซต์..." oninput="window.renderSiteOwner()"></div>
-            <select class="t-sel" id="so-type" onchange="window.renderSiteOwner()"><option value="">ทุกประเภท</option></select>
+            <div class="ms-filter" id="so-type"></div>
             <select class="t-sel" id="so-stage" onchange="window.renderSiteOwner()"><option value="">ทุก Stage</option></select>
             <select class="t-sel" id="so-sort" onchange="window.renderSiteOwner()">
               <option value="value_desc">มูลค่า (มาก→น้อย)</option>
@@ -2230,6 +2231,7 @@
 <script src="src/utils/string.util.js"></script>
 <script src="src/utils/permission.util.js"></script>
 <script src="src/utils/labor.util.js"></script>
+<script src="js/ms-select.js"></script>
 
 <!-- 3. Services Layer (ต้องโหลดหลัง utils) -->
 <script src="src/services/storage.service.js"></script>

@@ -120,15 +120,15 @@ window.renderTimesheet = function() {
   const q          = (document.getElementById('ts-q')?.value || '').toLowerCase();
   const yr         = document.getElementById('ts-yr')?.value || '';
   const mon        = document.getElementById('ts-mon')?.value || '';
-  const typeFilter = document.getElementById('ts-type')?.value || '';
+  const typeFilter = window.msValues('ts-type');
   const projFilter = document.getElementById('ts-proj')?.value || '';
   const stf        = document.getElementById('ts-staff')?.value || '';
 
   let rows = window.TIMESHEETS.slice();
 
-  if (typeFilter) rows = rows.filter(r => {
+  if (typeFilter.length) rows = rows.filter(r => {
     const p = window.PROJECTS.find(p => p.id === r.pid);
-    return p?.typeId === typeFilter;
+    return p && typeFilter.includes(p.typeId);
   });
   if (projFilter) rows = rows.filter(r => r.pid === projFilter);
   if (stf)        rows = rows.filter(r => r.staffId === stf);
@@ -297,7 +297,6 @@ window.tsToggleCard = function(pid) {
 // ── FILTERS ───────────────────────────────────────────────────────────────────
 function _populateTsFilters() {
   const yrSel   = document.getElementById('ts-yr');
-  const typeSel = document.getElementById('ts-type');
   const projSel = document.getElementById('ts-proj');
   const stfSel  = document.getElementById('ts-staff');
   if (!yrSel) return;
@@ -309,12 +308,10 @@ function _populateTsFilters() {
   yrSel.innerHTML = '<option value="">ทุกปี พ.ศ.</option>' + years.map(y => `<option value="${y}"${y==curYr?' selected':''}>ปี พ.ศ. ${y}</option>`).join('');
 
   // Project types that appear in timesheets
-  if (typeSel && (window.PTYPES || []).length) {
+  if ((window.PTYPES || []).length) {
     const pids     = [...new Set(window.TIMESHEETS.map(r => r.pid).filter(Boolean))];
     const typeIds  = new Set(window.PROJECTS.filter(p => pids.includes(p.id)).map(p => p.typeId).filter(Boolean));
-    const curType  = typeSel.value;
-    typeSel.innerHTML = '<option value="">ทุกประเภท</option>' +
-      window.PTYPES.filter(t => typeIds.has(t.id)).map(t => `<option value="${t.id}"${t.id===curType?' selected':''}>${esc(t.label)}</option>`).join('');
+    window.msFilter('ts-type', window.PTYPES.filter(t => typeIds.has(t.id)).map(t => ({value:t.id,label:t.label,color:t.color})), {placeholder:'ทุกประเภท',onChange:window.renderTimesheet});
   }
 
   // Projects that have timesheets

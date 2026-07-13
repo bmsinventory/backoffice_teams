@@ -190,12 +190,7 @@ function _renderBudgetTab(){
 // ── Site Owner Tab ──────────────────────────────────────────
 function _renderOwner(){
   // Populate type dropdown once
-  var soTypeEl=document.getElementById('so-type');
-  if(soTypeEl&&soTypeEl.options.length<=1){
-    (window.PTYPES||[]).forEach(function(t){
-      var o=document.createElement('option');o.value=t.id;o.textContent=t.label;soTypeEl.appendChild(o);
-    });
-  }
+  window.msFilter('so-type',window.PTYPES,{placeholder:'ทุกประเภท',onChange:window.renderSiteOwner});
   // Populate stage dropdown once
   var soStageEl=document.getElementById('so-stage');
   if(soStageEl&&soStageEl.options.length<=1){
@@ -206,7 +201,7 @@ function _renderOwner(){
 
   var yr=(document.getElementById('bud-yr')||{}).value||'';
   var q=((document.getElementById('so-q')||{}).value||'').toLowerCase();
-  var typeF=(document.getElementById('so-type')||{}).value||'';
+  var typeF=window.msValues('so-type');
   var stageF=(document.getElementById('so-stage')||{}).value||'';
   var sort=(document.getElementById('so-sort')||{}).value||'value_desc';
 
@@ -214,7 +209,7 @@ function _renderOwner(){
   var ownerMap={};
   (window.PROJECTS||[]).forEach(function(p){
     if(yr&&window.getYearBE(p.start)!=yr)return;
-    if(typeF&&p.typeId!==typeF)return;
+    if(typeF.length&&!typeF.includes(p.typeId))return;
     if(stageF&&p.stage!==stageF)return;
     var owner=p.siteOwner||'(ไม่ระบุ)';
     if(!ownerMap[owner])ownerMap[owner]={name:owner,projects:[],budget:0,byType:{}};
