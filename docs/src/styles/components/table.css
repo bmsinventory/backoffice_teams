@@ -50,6 +50,7 @@
   box-shadow: var(--sh-md); padding: 6px;
 }
 .ms-panel.open { display: block; }
+.ms-panel.ms-panel-right { left: auto; right: 0; }
 .ms-panel-actions {
   display: flex; justify-content: flex-end; padding: 2px 6px 6px;
   border-bottom: 1px solid var(--border); margin-bottom: 4px;

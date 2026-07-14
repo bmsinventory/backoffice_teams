@@ -46,7 +46,7 @@ window.renderOverview = function(){
       <div style="margin-top:4px;">${s.sub}</div>
     </div>`;
   }).join('');
-  var annualProjs=window.PROJECTS.filter(function(p){return(!yr||getYearBE(p.start)==yr)&&(!grp||p.groupId===grp);});
+  var annualProjs=window.PROJECTS.filter(function(p){return(!yr||getYearBE(p.start)==yr)&&(!grp.length||grp.includes(p.groupId));});
   window.renderAnnualTarget(annualProjs, yr);
   Chart.defaults.font.family='Plus Jakarta Sans';Chart.defaults.color='#9ba3b8';
   // ── Monthly Workload Trend ──
@@ -290,8 +290,8 @@ function _buildAnnualTargetRows(fProjs, byType, useGroups) {
     rows.push({id:g.id,isGroup:true,label:dots+'<b style="vertical-align:middle;">'+esc(g.label)+'</b>',
       tgt,total,closed,pctT,pctC,needFind:Math.max(0,tgt-total),needClose:Math.max(0,tgt-closed)});
   });
-  // Ungrouped type rows — แสดงทุกประเภทที่ไม่อยู่ในกลุ่ม ถ้ามีกลุ่มอยู่ หรือมีข้อมูล
-  var showAllTypes = groups.length > 0;
+  // Ungrouped type rows — แสดงทุกประเภทที่ไม่อยู่ในกลุ่ม ถ้ามีการตั้งกลุ่มไว้ในระบบ (ไม่ว่ามุมมองปัจจุบันจะรวมกลุ่มหรือแยกประเภท) หรือมีข้อมูล
+  var showAllTypes = (window.TARGET_TYPE_GROUPS || []).length > 0;
   (window.PTYPES||[]).filter(function(t){return !groupedIds.has(t.id)&&(showAllTypes||allTypeIds.has(t.id));}).forEach(function(t){
     var tgt = Number(byType[t.id]||0);
     var projs = fProjs.filter(function(p){return p.typeId===t.id;});

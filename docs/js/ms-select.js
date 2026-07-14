@@ -73,7 +73,12 @@
         ev.stopPropagation();
         var willOpen=!panel.classList.contains('open');
         closeAllPanels();
-        if(willOpen) panel.classList.add('open');
+        if(willOpen){
+          panel.classList.remove('ms-panel-right');
+          panel.classList.add('open');
+          var rect=panel.getBoundingClientRect();
+          if(rect.right>window.innerWidth) panel.classList.add('ms-panel-right');
+        }
       });
       list.addEventListener('change',function(ev){
         var cb=ev.target;
