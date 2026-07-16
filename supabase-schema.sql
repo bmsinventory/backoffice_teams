@@ -360,6 +360,7 @@ CREATE TABLE IF NOT EXISTS settings (
   allowance_holiday_normal   NUMERIC DEFAULT 650,
   allowance_weekday_border   NUMERIC DEFAULT 650,
   allowance_holiday_border   NUMERIC DEFAULT 1250,
+  imt_ai_key                 TEXT DEFAULT '',
   -- role permissions (each role stored as JSONB)
   admin                      JSONB,
   pm                         JSONB,

@@ -425,9 +425,10 @@
   .imt-picker-tasklist { max-height: 220px; }
   .imt-picker-task-row { font-size: 11px; }
 
-  /* Project Health strip (Dashboard) — ชิปเลื่อนแนวนอนแทนการตัดบรรทัด */
-  .imt-health-strip { padding: 14px 14px 4px; flex-wrap: nowrap; overflow-x: auto; }
-  .imt-health-chip { flex-shrink: 0; padding: 7px 12px; font-size: 11.5px; }
+  /* Project Health strip (Dashboard) — เดิมเลื่อนแนวนอน (nowrap+overflow-x) ทำให้เห็นแค่ชิปแรกเสี้ยวเดียว
+     โดยไม่มี indicator ว่าเลื่อนดูต่อได้ ผู้ใช้จึงมองว่า "ไม่เห็นตัวกรอง" เปลี่ยนเป็น wrap ให้เห็นครบ 4 ชิปทันที ── */
+  .imt-health-strip { padding: 14px 14px 4px; flex-wrap: wrap; }
+  .imt-health-chip { padding: 7px 12px; font-size: 11.5px; }
 
   /* Dashboard list rows — ยุบชื่อ/รายละเอียดให้พอดีจอแคบ */
   .imt-dash-row-name { font-size: 12px; }
@@ -454,4 +455,11 @@
 
   /* Template Builder modal */
   .imt-tplphase { padding: 10px; }
+}
+
+/* ── ปุ่ม action ระดับโครงการในหัวหน้าจอ "งาน" (+ Phase, 📐 บันทึกเป็น Template, ✏️ แก้ไข, 🗑️ ลบ) ไม่แสดง
+   บนมือถือ/iPad (≤1024px) ตามคำขอ — งานเหล่านี้ทำผ่านเดสก์ท็อปแทน scope เฉพาะ class นี้ ไม่กระทบปุ่มอื่น
+   (เช่น + Task ต่อ Phase หรือ 🗑️ ลบ Phase ซึ่งอยู่คนละ class) ── */
+@media (max-width: 1024px) {
+  .imt-ws-actions { display: none !important; }
 }

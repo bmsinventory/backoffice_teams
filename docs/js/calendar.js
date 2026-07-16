@@ -73,13 +73,33 @@ window.updateCalFilterOpts=function(){
 
 function getColIndices(startDt,endDt,tCols){let viewStart=tCols[0].s;let viewEnd=tCols[tCols.length-1].e;if(endDt<viewStart||startDt>viewEnd)return null;let sIdx=-1,eIdx=-1;for(let i=0;i<tCols.length;i++){if(sIdx===-1&&startDt<=tCols[i].e)sIdx=i;if(endDt>=tCols[i].s)eIdx=i;}if(sIdx===-1)sIdx=0;if(eIdx===-1)eIdx=tCols.length-1;return{sIdx,eIdx};}
 
+// ── Agenda view (มือถือ/iPad): การ์ดแนวตั้งต่อคน/โครงการ/ประเภท แทน Gantt แนวนอน — ใช้ข้อมูลชุดเดียวกับ
+// .tl-container (activeRowsData) ไม่ต้องคำนวณซ้ำ สลับแสดง/ซ่อนด้วย CSS media query (ดู timeline.css) ──
+function buildCalAgendaHtml(activeRowsData,tCols){
+  return '<div class="cal-agenda-list">'+activeRowsData.map(function(rowData){
+    let r=rowData.rInfo;
+    let avatar='';if(r.type==='staff')avatar=`<div class="av" style="background:${avC(window.STAFF.findIndex(s=>s.id===r.id))}">${r.name.charAt(0)}</div>`;else if(r.type==='ptype')avatar=`<div class="av" style="background:${r.obj.color}">🏷</div>`;else avatar=`<div class="av" style="background:${gS(r.obj.stage).color}">📁</div>`;
+    let projEvts=rowData.events.filter(ev=>!ev.isLeave&&!ev.isWorkLog).length;let leaveEvts=rowData.events.filter(ev=>ev.isLeave).length;let wlEvts=rowData.events.filter(ev=>ev.isWorkLog).length;
+    let workloadText=r.type==='staff'?((projEvts>0?projEvts+' โครงการ':'')+(projEvts>0&&(leaveEvts>0||wlEvts>0)?' · ':'')+( leaveEvts>0?leaveEvts+' วันลา':'')+((leaveEvts>0&&wlEvts>0)?' · ':'')+( wlEvts>0?wlEvts+' บันทึกงาน':'')):(r.type==='project'?rowData.eventCount+' ทีมงาน':rowData.eventCount+' โครงการ');
+    let eventsHtml=rowData.events.length
+      ?rowData.events.slice().sort((a,b)=>a.sIdx-b.sIdx).map(function(ev){
+        let dateLabel=fd(tCols[ev.sIdx].s)+(ev.sIdx!==ev.eIdx?' – '+fd(tCols[ev.eIdx].e):'');
+        let clickAttr=ev.isLeave?`window.openLeaveDetail('${ev.lv?ev.lv.id:''}')`:ev.isWorkLog?`window.openWorkLogModal('${ev.wl.id}')`:`window.openProjModal('${ev.p.id}')`;
+        let barColor=ev.isLeave?'#ff6b6b':ev.isWorkLog?'#ffa62b':ev.color;
+        return `<div class="cal-agenda-event" onclick="${clickAttr}" style="border-left-color:${barColor}"><div class="cal-agenda-event-txt">${esc(ev.text)}</div><div class="cal-agenda-event-date">${dateLabel}</div></div>`;
+      }).join('')
+      :'<div class="cal-agenda-empty">ไม่มีงานในช่วงนี้</div>';
+    return `<div class="cal-agenda-row"><div class="cal-agenda-head">${avatar}<div class="cal-agenda-head-txt"><div class="cal-agenda-name">${esc(r.name)}</div><div class="cal-agenda-sub">${esc(r.sub)}</div>${workloadText?'<div class="cal-agenda-workload">'+workloadText+'</div>':''}</div></div><div class="cal-agenda-events">${eventsHtml}</div></div>`;
+  }).join('')+'</div>';
+}
+
 window.renderCalendar=function(){
   var cf=document.getElementById('cal-filter');
   var isPtypeView=window.calView==='ptype';
   if(isPtypeView||(cf&&cf.options.length<=1))window.updateCalFilterOpts();
   var filt=isPtypeView?window.msValues('cal-filter-ptype'):((cf&&cf.value)||'');
   var tCols=[];var y=window.calY;
-  if(window.calTime==='month'){var dim=new Date(y,window.calM+1,0).getDate();for(var d=1;d<=dim;d++){var dt=new Date(y,window.calM,d);var _ds=y+'-'+String(window.calM+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');var _hol=window.HOLIDAYS.find(function(h){return h.date===_ds;});tCols.push({label:d,sub:window.DNAMES[dt.getDay()],s:dt,e:new Date(y,window.calM,d,23,59,59),isWk:dt.getDay()===0||dt.getDay()===6,isHol:!!_hol,holName:_hol?_hol.name:''});}document.getElementById('cal-lbl').textContent=window.THMON[window.calM]+' '+(y+543);}
+  if(window.calTime==='month'){var dim=new Date(y,window.calM+1,0).getDate();for(var d=1;d<=dim;d++){var dt=new Date(y,window.calM,d);var _ds=y+'-'+String(window.calM+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');var _hol=window.HOLIDAYS.find(function(h){return h.date===_ds;});tCols.push({label:d,sub:window.DNAMES[dt.getDay()],s:dt,e:new Date(y,window.calM,d,23,59,59),isWk:dt.getDay()===0||dt.getDay()===6,isHol:!!_hol,holName:_hol?_hol.name:''});}var _monLbl=(window.matchMedia&&window.matchMedia('(max-width:768px)').matches)?window.THMON_SHORT[window.calM]:window.THMON[window.calM];document.getElementById('cal-lbl').textContent=_monLbl+' '+(y+543);}
   else if(window.calTime==='year'){for(var m=0;m<12;m++){var dt=new Date(y,m,1);tCols.push({label:window.THMON[m].slice(0,3),sub:'',s:dt,e:new Date(y,m+1,0,23,59,59),isWk:false});}document.getElementById('cal-lbl').textContent='ปี '+(y+543);}
   else if(window.calTime==='fiscal'){for(var i=0;i<12;i++){var m=(i+9)%12;var cy=i<3?y-1:y;var dt=new Date(cy,m,1);tCols.push({label:window.THMON[m].slice(0,3),sub:String(cy+543).slice(-2),s:dt,e:new Date(cy,m+1,0,23,59,59),isWk:false});}document.getElementById('cal-lbl').textContent='ปีงบฯ '+(y+543);}
   var deptFilt=(document.getElementById('cal-dept-filter')||{value:''}).value||'';
@@ -225,7 +245,14 @@ window.renderCalendar=function(){
     if(rawEvents.length>0){rawEvents.sort((a,b)=>a.sIdx-b.sIdx);let lanes=[];rawEvents.forEach(ev=>{let assignedLane=0;while(assignedLane<lanes.length&&lanes[assignedLane]>=ev.sIdx){assignedLane++;}ev.lane=assignedLane;lanes[assignedLane]=ev.eIdx;});let totalLanes=Math.max(1,lanes.length);let rowHeight=Math.max(76,(totalLanes*(BAR_HEIGHT+BAR_GAP))-BAR_GAP+(ROW_PAD*2));activeRowsData.push({rInfo:r,events:rawEvents,height:rowHeight,eventCount:rawEvents.length});}
     else if(window.calView==='staff'){var _onlyCbE=document.getElementById('cal-only-active');if(!_onlyCbE||!_onlyCbE.checked)activeRowsData.push({rInfo:r,events:[],height:52,eventCount:0});}
   });
-  if(activeRowsData.length===0){document.getElementById('cal-grid').innerHTML='<div style="padding:48px;text-align:center;color:var(--txt3);font-size:14px;background:var(--surface);border-radius:var(--r2)">ไม่พบข้อมูลในช่วงเวลานี้</div>';return;}
+  if(activeRowsData.length===0){
+    var _emptyHtml='<div style="padding:48px;text-align:center;color:var(--txt3);font-size:14px;background:var(--surface);border-radius:var(--r2)">ไม่พบข้อมูลในช่วงเวลานี้</div>';
+    document.getElementById('cal-grid').innerHTML=_emptyHtml;
+    var _agEmptyEl=document.getElementById('cal-agenda');if(_agEmptyEl)_agEmptyEl.innerHTML=_emptyHtml;
+    return;
+  }
+  var agendaEl=document.getElementById('cal-agenda');
+  if(agendaEl)agendaEl.innerHTML=buildCalAgendaHtml(activeRowsData,tCols);
   const totalGridWidth=tCols.length*DAY_WIDTH;
   let html=`<div class="tl-container"><div class="tl-row tl-head-row"><div class="tl-left" style="width:${LEFT_WIDTH}px">รายชื่อ / รายการ</div><div class="tl-right" style="width:${totalGridWidth}px">`;
   tCols.forEach(tc=>{html+=`<div class="tl-th ${tc.isWk?'wk':''} ${tc.isHol?'hol':''}" style="min-width:${DAY_WIDTH}px;width:${DAY_WIDTH}px" title="${tc.holName||''}"><div class="tl-th-num">${tc.label}</div><div class="tl-th-day">${tc.isHol?'🎌':tc.sub}</div></div>`;});

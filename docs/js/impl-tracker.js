@@ -822,11 +822,18 @@
     })).join('');
     var phaseOpts = ['<option value="">ทุก Phase</option>'].concat(phases.map(function (p) { return '<option value="'+p.id+'"'+(f.phaseId===p.id?' selected':'')+'>'+esc(p.name)+'</option>'; })).join('');
     var statusOpts = ['<option value="">ทุกสถานะ</option>'].concat(window.IMPL_STATUS.map(function (s) { return '<option value="'+s.id+'"'+(f.status===s.id?' selected':'')+'>'+s.icon+' '+s.label+'</option>'; })).join('');
+    // ── ซ่อน Phase ที่เสร็จ 100% แล้ว ค่าเริ่มต้นติ๊กไว้ (undefined !== false → true) กันไม่ให้ผู้ใช้ต้องไล่
+    // เลื่อนผ่าน Phase ที่จบไปแล้วทุกครั้งที่เข้าหน้านี้ ──
+    var hideDone = window.imtHideDonePhases !== false;
+    var hideDoneChk = '<label class="imt-hidedone-chk" style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--txt2);white-space:nowrap;cursor:pointer;">'
+      + '<input type="checkbox" '+(hideDone?'checked':'')+' onchange="window.imtToggleHideDonePhases(this.checked)"> แสดงเฉพาะ Phase ที่ยังไม่เสร็จ'
+      + '</label>';
     var filterBar = '<div class="imt-ws-filterbar">'
       + '<div class="t-search"><input placeholder="ค้นหางาน..." value="'+esc(f.q||'')+'" oninput="window.imtSetTaskFilter(\'q\',this.value)"></div>'
       + '<select class="t-sel" onchange="window.imtSetTaskFilter(\'status\',this.value)">'+statusOpts+'</select>'
       + '<select class="t-sel" onchange="window.imtSetTaskFilter(\'owner\',this.value)">'+ownerOpts+'</select>'
       + '<select class="t-sel" onchange="window.imtSetTaskFilter(\'phaseId\',this.value)">'+phaseOpts+'</select>'
+      + hideDoneChk
       + '<div style="flex:1"></div>'
       + (window.canAdd(window.IMPL_MODULE) && view !== 'card' && phases.length ? '<button class="btn btn-pri btn-sm" onclick="window.openImtTaskModal(null,\'\')">+ Task</button>' : '')
       + '</div>';
@@ -835,17 +842,32 @@
     if (view === 'list') body = renderTaskListView(pid);
     else if (view === 'kanban') body = renderTaskKanbanView(pid);
     else {
-      // ── กรองด้วย Phase (dropdown "รายการ") ให้แสดงเฉพาะ Phase ที่ตรงเงื่อนไข ไม่ใช่ทุก Phase
-      // แต่เลขลำดับ "Phase N" ยังอ้างอิงตำแหน่งจริงใน phases ทั้งหมด (ไม่ใช่ตำแหน่งหลังกรอง) ──
+      // ── กรองด้วย Phase (dropdown "รายการ") และ/หรือ checkbox "ซ่อน Phase ที่เสร็จแล้ว" ให้แสดงเฉพาะ Phase
+      // ที่ตรงเงื่อนไข ไม่ใช่ทุก Phase แต่เลขลำดับ "Phase N" ยังอ้างอิงตำแหน่งจริงใน phases ทั้งหมด
+      // (ไม่ใช่ตำแหน่งหลังกรอง) ──
       var phasesToShow = f.phaseId ? phases.filter(function (p) { return p.id === f.phaseId; }) : phases;
+      if (hideDone) phasesToShow = phasesToShow.filter(function (p) { return window.calcPhaseProgress(p) < 100; });
       body = phasesToShow.map(function (ph) {
         var idx = phases.findIndex(function (p) { return p.id === ph.id; });
         return renderPhaseAccordion(ph, idx, phases.length);
-      }).join('') || '<div class="imt-empty-hero" style="padding:40px 20px;"><div class="imt-empty-icon">📋</div><div class="imt-empty-title">ยังไม่มี Phase ในโครงการนี้</div><div class="imt-empty-sub">กด "+ Phase" ด้านบนเพื่อเริ่มสร้างหมวดงาน</div></div>';
+      }).join('') || (phases.length
+        ? '<div class="imt-empty-hero" style="padding:40px 20px;"><div class="imt-empty-icon">🎉</div><div class="imt-empty-title">ทุก Phase เสร็จสมบูรณ์แล้ว</div><div class="imt-empty-sub">ยกเลิกติ๊ก "แสดงเฉพาะ Phase ที่ยังไม่เสร็จ" ด้านบนเพื่อดู Phase ทั้งหมด</div></div>'
+        : '<div class="imt-empty-hero" style="padding:40px 20px;"><div class="imt-empty-icon">📋</div><div class="imt-empty-title">ยังไม่มี Phase ในโครงการนี้</div><div class="imt-empty-sub">กด "+ Phase" ด้านบนเพื่อเริ่มสร้างหมวดงาน</div></div>');
     }
 
-    mount.innerHTML = header + filterBar + '<div style="padding:'+(view==='kanban'?'0':'16px 24px')+';overflow-y:auto;flex:1;">'+body+'</div>';
+    // ── เก็บ/คืนตำแหน่ง scroll ของพื้นที่เนื้อหา (ไม่ใช่ header/filterbar) กัน re-render แล้วจอกระโดดกลับขึ้นบนสุด
+    // เช่นตอนกดบันทึกใน Task modal ซึ่งจบด้วย window.renderImplTracker() เสมอ ──
+    var prevScrollEl = mount.querySelector('.imt-ws-scroll');
+    var prevScrollTop = prevScrollEl ? prevScrollEl.scrollTop : 0;
+    mount.innerHTML = header + filterBar + '<div class="imt-ws-scroll" style="padding:'+(view==='kanban'?'0':'16px 24px')+';overflow-y:auto;flex:1;">'+body+'</div>';
+    var scrollEl = mount.querySelector('.imt-ws-scroll');
+    if (scrollEl) scrollEl.scrollTop = prevScrollTop;
   }
+
+  window.imtToggleHideDonePhases = function (checked) {
+    window.imtHideDonePhases = checked;
+    window.renderImplTracker();
+  };
 
   function projectPicker() {
     var rows = window.IMPL_PROJECTS.slice().sort(function (a,b) { return IMT_HEALTH_ORDER[imtProjectHealth(a).level] - IMT_HEALTH_ORDER[imtProjectHealth(b).level]; });
@@ -1007,7 +1029,9 @@
   function renderTaskListView(pid) {
     var filtered = imtFilteredTasks(imtTasksOfProject(pid));
     var phases = imtPhasesOf(pid);
+    var hideDone = window.imtHideDonePhases !== false;
     var rowsHtml = phases.map(function (ph, idx) {
+      if (hideDone && window.calcPhaseProgress(ph) >= 100) return '';
       var phaseTasks = filtered.filter(function (t) { return t.phaseId === ph.id; });
       if (!phaseTasks.length) return '';
       var pct = window.calcPhaseProgress(ph);
@@ -1033,9 +1057,11 @@
   function renderTaskKanbanView(pid) {
     var tasks = imtFilteredTasks(imtTasksOfProject(pid));
     var phases = imtPhasesOf(pid);
+    var hideDone = window.imtHideDonePhases !== false;
     var cols = window.IMPL_STATUS.map(function (st) {
       var items = tasks.filter(function (t) { return t.status === st.id; });
       var body = phases.map(function (ph, idx) {
+        if (hideDone && window.calcPhaseProgress(ph) >= 100) return '';
         var phItems = items.filter(function (t) { return t.phaseId === ph.id; });
         if (!phItems.length) return '';
         var cards = phItems.map(function (t) {
@@ -1439,7 +1465,9 @@
     var toolbar = '<div class="toolbar">'
       + '<input type="date" class="f-input" id="imt-ai-date" style="max-width:150px;" value="'+esc(aiDate)+'" oninput="window.imtAiSelectedDate=this.value">'
       + '<button class="btn btn-pri btn-sm" onclick="window.imtGenerateAiWeekSummary()">✨ สรุปด้วย AI</button>'
-      + '<button class="btn btn-ghost btn-sm" onclick="window.imtOpenAiKeyModal()" title="ตั้งค่า API Key">🔑 API Key</button>'
+      // ── ตั้งค่า API Key ให้เฉพาะ Admin เห็น/แก้ได้ — Key ใช้ร่วมกันทั้งระบบผ่าน Supabase (SETTINGS.app.imt_ai_key)
+      // คนอื่นไม่ต้องกรอก Key เองแล้ว จึงไม่มีเหตุผลให้เห็นปุ่มนี้ ──
+      + (window.isAdmin() ? '<button class="btn btn-ghost btn-sm" onclick="window.imtOpenAiKeyModal()" title="ตั้งค่า API Key (Admin เท่านั้น)">🔑 API Key</button>' : '')
       + '<div style="flex:1"></div>'
       + '<button class="btn btn-xls btn-sm" onclick="window.exportImtReport()">📥 Excel</button>'
       + '<button class="btn btn-pri btn-sm" onclick="window.exportImtReportImage()">📷 บันทึกเป็นรูปภาพ</button></div>';
@@ -1651,13 +1679,16 @@
 
   // ================================================================
   // AI WEEKLY SUMMARY — เลือกวัน → สรุป "ทำไปแล้ว" (วันนั้น) + "ยังไม่ได้ทำ" (สัปดาห์ปัจจุบัน) ด้วย Gemini (ฟรี)
-  // Key เก็บใน localStorage ของเบราว์เซอร์ผู้ใช้เท่านั้น — ไม่ commit ลงโค้ด ไม่ผ่าน server ของเรา
-  // (repo นี้เป็น public repo จึงห้ามฝัง API key ไว้ในซอร์สโค้ดเด็ดขาด)
-  // ================================================================
-  var IMT_AI_KEY_STORAGE = 'imt_gemini_key';
+  // Key เก็บส่วนกลางใน Supabase (SETTINGS.app.imt_ai_key → window.IMT_AI_KEY ผ่าน realtime.service.js)
+  // เฉพาะ Admin เท่านั้นที่ตั้ง/แก้ Key ได้ (ปุ่ม "🔑 API Key" ซ่อนจาก role อื่นในหน้า Report) ผู้ใช้อื่นทุกคน
+  // ใช้ "สรุปด้วย AI" ได้ทันทีโดยไม่ต้องกรอก Key เอง — ไม่ commit ลง source code (repo นี้เป็น public repo
+  // จึงห้ามฝัง API key ไว้ในซอร์สโค้ดเด็ดขาด แต่ Supabase เป็น runtime data ไม่ใช่ source code) ──
+  var IMT_AI_KEY_STORAGE = 'imt_gemini_key'; // เดิม (ก่อนย้ายมา Supabase) — เก็บไว้แค่ migrate ค่าเก่าครั้งเดียว
   // ลองหลายโมเดลตามลำดับ เผื่อบางโมเดลโควตาเต็ม/ไม่เปิดให้ใช้กับ Key นี้ (ข้อผิดพลาด 404/429)
   // — ถ้า Key ผิดหรือไม่มีสิทธิ์เลย (401/403) จะหยุดลองทันทีเพราะโมเดลอื่นก็จะพังเหมือนกัน
-  var IMT_AI_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-latest', 'gemini-1.5-flash'];
+  // "gemini-flash-latest" เป็น alias ที่ Google เปลี่ยนให้ชี้รุ่นล่าสุดเองเรื่อย ๆ ไว้ลองก่อนเป็นด่านแรก
+  // (gemini-1.5-flash ถูกตัดออกแล้ว — Google เลิกรองรับ ทำให้ error "not found for API version v1beta") ──
+  var IMT_AI_MODELS = ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.0-flash'];
 
   async function imtCallGemini(apiKey, prompt, model) {
     var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + encodeURIComponent(apiKey);
@@ -1678,6 +1709,20 @@
     return text;
   }
 
+  // ── รายชื่อ IMT_AI_MODELS ข้างบนเป็นชื่อ hardcode — Google ปลดระวางโมเดลเก่าเป็นระยะ (เช่นที่เพิ่งเกิดกับ
+  // gemini-1.5-flash) ทำให้ลิสต์นี้ล้าสมัยได้โดยไม่รู้ตัว ฟังก์ชันนี้ถาม ListModels ตรง ๆ ว่า Key นี้ใช้โมเดล
+  // ไหนกับ generateContent ได้จริงตอนนี้ ใช้เป็นทางสำรองตอนลองทุกชื่อใน IMT_AI_MODELS แล้วไม่ผ่านสักตัว ──
+  async function imtListGeminiModels(apiKey) {
+    var url = 'https://generativelanguage.googleapis.com/v1beta/models?key=' + encodeURIComponent(apiKey);
+    var res = await fetch(url);
+    var data = await res.json();
+    if (!res.ok) throw new Error((data.error && data.error.message) || ('เรียกรายชื่อโมเดลไม่สำเร็จ (HTTP ' + res.status + ')'));
+    return (data.models || [])
+      .filter(function (m) { return (m.supportedGenerationMethods || []).indexOf('generateContent') !== -1; })
+      .map(function (m) { return (m.name || '').replace(/^models\//, ''); })
+      .filter(Boolean);
+  }
+
   function imtWeekRange(dateStr) {
     var d = pd(dateStr);
     var dow = d.getDay(); // 0=Sun..6=Sat
@@ -1695,18 +1740,28 @@
   }
 
   window.imtOpenAiKeyModal = function () {
+    // ปุ่มเปิด modal นี้ซ่อนจาก non-admin อยู่แล้ว แต่กันเหนียวไว้เผื่อถูกเรียกทางอื่น (defense in depth)
+    if (!window.isAdmin()) { window.showAlert && window.showAlert('เฉพาะ Admin เท่านั้นที่ตั้งค่า API Key ได้', 'error'); return; }
     var input = document.getElementById('imt-ai-key-input');
-    if (input) input.value = localStorage.getItem(IMT_AI_KEY_STORAGE) || '';
+    // เผื่อเครื่องนี้เคยตั้งค่าแบบเดิม (localStorage) ไว้ก่อนย้ายมา Supabase — โชว์ให้กรอกต่อได้เลยไม่ต้องหาใหม่
+    if (input) input.value = window.IMT_AI_KEY || localStorage.getItem(IMT_AI_KEY_STORAGE) || '';
     window.openM('m-imt-ai-key');
   };
 
-  window.imtSaveAiKey = function () {
+  window.imtSaveAiKey = async function () {
+    if (!window.isAdmin()) { window.showAlert && window.showAlert('เฉพาะ Admin เท่านั้นที่ตั้งค่า API Key ได้', 'error'); return; }
     var val = (document.getElementById('imt-ai-key-input').value || '').trim();
     if (!val) { window.showAlert && window.showAlert('กรุณากรอก API Key', 'error'); return; }
-    localStorage.setItem(IMT_AI_KEY_STORAGE, val);
     window.closeM('m-imt-ai-key');
-    window.showAlert && window.showAlert('บันทึก API Key แล้ว', 'success');
-    if (window.imtAiPendingGenerate) { window.imtAiPendingGenerate = false; window.imtGenerateAiWeekSummary(); }
+    window.IMT_AI_KEY = val; // อัปเดตทันทีในเครื่องนี้ ไม่ต้องรอ realtime echo กลับมาก่อนถึงจะใช้ได้
+    try {
+      await window.setDoc(window.getDocRef('SETTINGS', 'app'), { imt_ai_key: val }, { merge:true });
+      localStorage.removeItem(IMT_AI_KEY_STORAGE); // เลิกใช้ค่าเก่าเฉพาะเครื่อง ยึด Supabase เป็นแหล่งเดียวจากนี้ไป
+      window.showAlert && window.showAlert('บันทึก API Key แล้ว — ใช้งานได้ทุกคนในระบบทันที', 'success');
+      if (window.imtAiPendingGenerate) { window.imtAiPendingGenerate = false; window.imtGenerateAiWeekSummary(); }
+    } catch (e) {
+      window.showDbError && window.showDbError(e);
+    }
   };
 
   window.imtGenerateAiWeekSummary = async function () {
@@ -1718,8 +1773,14 @@
     var selDate = (dateInput && dateInput.value) || new Date().toISOString().slice(0,10);
     window.imtAiSelectedDate = selDate;
 
-    var apiKey = localStorage.getItem(IMT_AI_KEY_STORAGE);
-    if (!apiKey) { window.imtAiPendingGenerate = true; window.imtOpenAiKeyModal(); return; }
+    // ── Key ส่วนกลางจาก Supabase (window.IMT_AI_KEY) — ใช้ได้ทันทีทุก role ไม่ต้องกรอกเอง
+    // ถ้ายังไม่มีค่า: Admin เปิด modal ตั้งค่าได้เลย ส่วน role อื่นแค่แจ้งให้ไปขอ Admin (ไม่มีสิทธิ์ตั้งเอง) ──
+    var apiKey = window.IMT_AI_KEY || '';
+    if (!apiKey) {
+      if (window.isAdmin()) { window.imtAiPendingGenerate = true; window.imtOpenAiKeyModal(); }
+      else { window.showAlert && window.showAlert('ยังไม่ได้ตั้งค่า API Key — กรุณาแจ้ง Admin ให้ตั้งค่าก่อนใช้งานฟีเจอร์นี้', 'warn'); }
+      return;
+    }
 
     var wk = imtWeekRange(selDate);
     var tasks = imtTasksOfProject(pid);
@@ -1766,17 +1827,32 @@
     out.innerHTML = '<div style="color:var(--txt3);">⏳ กำลังให้ AI สรุปให้...</div>';
     window.openM('m-imt-ai-summary');
 
-    var text = null, lastErr = null;
+    var text = null, lastErr = null, lastModel = null, triedModels = [], rateLimited = false;
     for (var mi = 0; mi < IMT_AI_MODELS.length; mi++) {
       try {
         text = await imtCallGemini(apiKey, prompt, IMT_AI_MODELS[mi]);
         break;
       } catch (e) {
-        lastErr = e;
+        lastErr = e; lastModel = IMT_AI_MODELS[mi]; triedModels.push(IMT_AI_MODELS[mi]);
         // 401/403 = Key ผิดหรือไม่มีสิทธิ์ใช้ API นี้เลย — ลองโมเดลอื่นก็จะพังเหมือนกัน หยุดลองทันที
         if (e.status === 401 || e.status === 403) break;
-        // 404 (ไม่มีโมเดลนี้) / 429 (โควตาเต็มเฉพาะโมเดลนี้) → ลองโมเดลถัดไปในลิสต์
+        // 429 = rate limit/โควตาผูกกับ "Key นี้ทั้งโปรเจกต์" ไม่ใช่ปัญหาเฉพาะโมเดล — ยิงโมเดลอื่นต่อทันที
+        // จะโดน rate limit ซ้ำเท่านั้น (ยิ่งยิงถี่ยิ่งโดนบล็อกนานขึ้น) จึงหยุดทันทีเหมือน 401/403 ไม่ลองต่อ
+        if (e.status === 429) { rateLimited = true; break; }
+        // 404 (ไม่มีโมเดลนี้จริง ๆ) → ไม่เกี่ยวกับโควตา ลองโมเดลถัดไปในลิสต์ต่อได้
       }
+    }
+    // ── ถามรายชื่อโมเดลสดจาก Google เฉพาะตอนพังเพราะ "หาโมเดลไม่เจอ" (404, ลิสต์ hardcode ล้าสมัย) เท่านั้น
+    // ถ้าเป็น rate limit (429) การยิง ListModels ซ้ำจะยิ่งโดน rate limit หนักขึ้นเปล่า ๆ ไม่ช่วยอะไรเลย ──
+    if (!text && lastErr && !rateLimited && lastErr.status !== 401 && lastErr.status !== 403) {
+      try {
+        var liveModels = await imtListGeminiModels(apiKey);
+        var candidate = liveModels.find(function (m) { return triedModels.indexOf(m) === -1 && /flash/i.test(m) && !/embedding|vision|tts|image/i.test(m); });
+        if (candidate) {
+          try { text = await imtCallGemini(apiKey, prompt, candidate); lastModel = candidate; }
+          catch (e2) { lastErr = e2; lastModel = candidate; if (e2.status === 429) rateLimited = true; }
+        }
+      } catch (e3) { /* ListModels เองก็พัง (เช่น Key ผิดรูปแบบ) — ปล่อยผ่าน ใช้ lastErr เดิมแสดงผล */ }
     }
     if (text) {
       // กันเหนียว เผื่อโมเดลยังใส่ markdown มาแม้สั่งห้ามแล้ว (LINE แสดงเป็นดอกจัน/สัญลักษณ์ดิบ ไม่ใช่ตัวหนา)
@@ -1785,9 +1861,19 @@
       out.dataset.raw = text;
       foot.innerHTML = '<button class="btn btn-ghost" onclick="window.closeM(\'m-imt-ai-summary\')">ปิด</button>'
         + '<button class="btn btn-teal" onclick="window.imtCopyAiSummary()">📋 คัดลอกส่ง LINE</button>';
+    } else if (rateLimited) {
+      // ── Rate limit ชั่วคราว (429) — Key เดิมใช้ได้ปกติ แค่มีคนเพิ่งกดสรุปด้วย AI ถี่ ๆ ในไม่กี่วินาทีที่ผ่านมา
+      // (โควตาผูกกับ Key เดียวใช้ร่วมกันทั้งระบบแล้ว จึงชนกันง่ายขึ้นกว่าตอนที่ต่างคนต่างมี Key ของตัวเอง)
+      // ไม่ใช่ปัญหา Key ผิด/หมดสิทธิ์ถาวร แค่รอสักครู่แล้วลองใหม่ก็ใช้ได้ ──
+      out.innerHTML = '<div style="color:var(--amber);">⏳ Google จำกัดจำนวนคำขอชั่วคราว (rate limit)</div>'
+        + '<div style="color:var(--txt3);font-size:11.5px;margin-top:6px;">อาจเป็นเพราะมีคนเพิ่งใช้ "สรุปด้วย AI" ถี่ ๆ เมื่อครู่ (Key นี้ใช้ร่วมกันทั้งระบบ) ไม่ใช่ปัญหา Key เสียหรือหมดสิทธิ์ — รอประมาณ 30-60 วินาทีแล้วกด "สรุปด้วย AI" ใหม่อีกครั้ง</div>';
+      foot.innerHTML = '<button class="btn btn-ghost" onclick="window.closeM(\'m-imt-ai-summary\')">ปิด</button>'
+        + '<button class="btn btn-pri" onclick="window.imtGenerateAiWeekSummary()">🔁 ลองใหม่</button>';
     } else {
-      out.innerHTML = '<div style="color:var(--coral);">เกิดข้อผิดพลาด: ' + esc((lastErr && lastErr.message) || 'ไม่ทราบสาเหตุ') + '</div>'
-        + '<div style="color:var(--txt3);font-size:11.5px;margin-top:6px;">ลองครบทุกโมเดลที่รองรับแล้วไม่สำเร็จ — ถ้าเจอ "quota exceeded, limit: 0" แปลว่า API Key นี้ผูกกับโปรเจกต์ Google Cloud ที่ไม่มีสิทธิ์ใช้งานฟรี ลองสร้าง Key ใหม่ที่ '
+      // ── บอกชื่อโมเดลที่พังจริง (lastModel) แทนที่จะบอกแค่ "ลองครบทุกโมเดลแล้ว" เฉย ๆ — ช่วยแยกได้ทันทีว่า
+      // เป็นปัญหา Key/โควตา (จะพังทุกโมเดลเหมือนกันหมด) หรือแค่ชื่อโมเดลตัวสุดท้ายที่ไม่มีอยู่จริงแล้ว ──
+      out.innerHTML = '<div style="color:var(--coral);">เกิดข้อผิดพลาด' + (lastModel ? ' (' + esc(lastModel) + ')' : '') + ': ' + esc((lastErr && lastErr.message) || 'ไม่ทราบสาเหตุ') + '</div>'
+        + '<div style="color:var(--txt3);font-size:11.5px;margin-top:6px;">ลองครบทุกโมเดลที่รองรับแล้วไม่สำเร็จ (รวมถามรายชื่อโมเดลล่าสุดจาก Google โดยตรงแล้วด้วย) — ถ้าเจอ "quota exceeded, limit: 0" แปลว่า API Key นี้ผูกกับโปรเจกต์ Google Cloud ที่ไม่มีสิทธิ์ใช้งานฟรี ลองสร้าง Key ใหม่ที่ '
         +   '<a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> โดยเลือก "Create API key in new project" (โปรเจกต์ที่ยังไม่เคยผูก Billing มาก่อน)</div>';
       foot.innerHTML = '<button class="btn btn-ghost" onclick="window.closeM(\'m-imt-ai-summary\')">ปิด</button>';
     }
