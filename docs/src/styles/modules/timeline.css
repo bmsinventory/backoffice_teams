@@ -8,12 +8,13 @@
   overflow: hidden; padding: 20px 24px; background: var(--bg);
 }
 .tl-container {
-  flex: 1; overflow: auto; background: var(--surface);
+  flex: 1; overflow-y: auto; overflow-x: hidden; background: var(--surface);
   border: 1px solid var(--border); border-radius: var(--r2);
   box-shadow: var(--sh-sm); position: relative;
+  width: 100%; max-width: 100%;
 }
 
-.tl-row         { display: flex; width: max-content; min-width: 100%; border-bottom: 1px solid var(--border); position: relative; background: var(--surface); }
+.tl-row         { display: flex; width: 100%; min-width: 0; border-bottom: 1px solid var(--border); position: relative; background: var(--surface); }
 .tl-head-row    { background: var(--surface2); position: sticky; top: 0; z-index: 30; }
 
 .tl-left {
@@ -28,28 +29,38 @@
   z-index: 40; background: var(--surface2);
 }
 
-.tl-right   { display: flex; position: relative; flex: 1; }
-.tl-th      { min-width: 45px; width: 45px; padding: 8px 0; text-align: center; border-right: 1px solid var(--border); }
-.tl-th-num  { font-size: 12px; font-weight: 700; color: var(--txt2); }
-.tl-th-day  { font-size: 9px; color: var(--txt3); }
+/* จำนวนคอลัมน์ (1 คอลัมน์ = 1 วัน หรือ 1 เดือน) กำหนดผ่าน inline style
+   grid-template-columns ที่ JS ส่งมาต่อแถว (docs/js/calendar.js renderCalendar) —
+   ทุกคอลัมน์กว้างเท่ากันแบบ minmax(0,1fr) กระจายเต็มพื้นที่ที่เหลือ ไม่ใช้ fixed px
+   จึงไม่มี horizontal scroll ไม่ว่าเดือนจะมี 28–31 วัน ── */
+.tl-right   { display: grid; position: relative; flex: 1; min-width: 0; }
+.tl-th      { min-width: 0; padding: 4px 1px; text-align: center; border-right: 1px solid var(--border); overflow: hidden; }
+.tl-th-num  { font-size: clamp(9px, 0.9vw, 13px); font-weight: 700; color: var(--txt2); }
+.tl-th-day  { font-size: clamp(7px, 0.6vw, 9px); color: var(--txt3); }
 .tl-th.wk   { background: rgba(0,0,0,.03); }
 .tl-th.hol  { background: rgba(255,107,107,.08); }
 .tl-th.hol .tl-th-num { color: var(--coral); }
 
-.tl-bg-cell { min-width: 45px; width: 45px; border-right: 1px dashed var(--border); height: 100%; z-index: 1; }
+.tl-bg-cell { min-width: 0; border-right: 1px dashed var(--border); height: 100%; z-index: 1; }
 .tl-bg-cell.wk  { background: rgba(0,0,0,.015); }
 .tl-bg-cell.hol { background: rgba(255,107,107,.04); }
 
 .tl-bar {
   position: absolute; height: 26px; border-radius: 6px;
-  display: flex; align-items: center; padding: 0 10px;
-  font-size: 11px; font-weight: 600; color: #fff;
+  display: flex; align-items: center; padding: 0 8px;
+  font-size: clamp(8px, 0.75vw, 11px); font-weight: 600; color: #fff;
   overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
   box-shadow: 0 2px 6px rgba(0,0,0,.15);
   transition: transform .15s, box-shadow .15s;
   cursor: pointer; user-select: none; z-index: 10;
 }
 .tl-bar:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(0,0,0,.25); filter: brightness(1.05); z-index: 15; }
+
+@media (max-width: 1440px) {
+  .tl-left { width: 225px; min-width: 225px; padding: 10px 12px; }
+  .tl-th { padding-inline: 0; }
+  .tl-bar { padding-inline: 5px; }
+}
 
 /* ── Fullscreen Mode ── */
 #view-calendar.cal-fullscreen {

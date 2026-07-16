@@ -145,7 +145,7 @@ window.renderCalendar=function(){
       return true;
     }).map(p=>({id:p.id,name:p.name,sub:gS(p.stage).label,type:'project',obj:p}));
   }
-  const DAY_WIDTH=window.calTime==='month'?45:120;const BAR_HEIGHT=26;const BAR_GAP=6;const ROW_PAD=12;const LEFT_WIDTH=260;
+  const BAR_HEIGHT=26;const BAR_GAP=6;const ROW_PAD=12;
   var activeRowsData=[];
   baseRows.forEach((r,ri)=>{
     let rawEvents=[];
@@ -253,18 +253,19 @@ window.renderCalendar=function(){
   }
   var agendaEl=document.getElementById('cal-agenda');
   if(agendaEl)agendaEl.innerHTML=buildCalAgendaHtml(activeRowsData,tCols);
-  const totalGridWidth=tCols.length*DAY_WIDTH;
-  let html=`<div class="tl-container"><div class="tl-row tl-head-row"><div class="tl-left" style="width:${LEFT_WIDTH}px">รายชื่อ / รายการ</div><div class="tl-right" style="width:${totalGridWidth}px">`;
-  tCols.forEach(tc=>{html+=`<div class="tl-th ${tc.isWk?'wk':''} ${tc.isHol?'hol':''}" style="min-width:${DAY_WIDTH}px;width:${DAY_WIDTH}px" title="${tc.holName||''}"><div class="tl-th-num">${tc.label}</div><div class="tl-th-day">${tc.isHol?'🎌':tc.sub}</div></div>`;});
+  const dayCount=tCols.length;
+  const gridCols=`repeat(${dayCount},minmax(0,1fr))`;
+  let html=`<div class="tl-container"><div class="tl-row tl-head-row"><div class="tl-left">รายชื่อ / รายการ</div><div class="tl-right" style="grid-template-columns:${gridCols}">`;
+  tCols.forEach(tc=>{html+=`<div class="tl-th ${tc.isWk?'wk':''} ${tc.isHol?'hol':''}" title="${tc.holName||''}"><div class="tl-th-num">${tc.label}</div><div class="tl-th-day">${tc.isHol?'🎌':tc.sub}</div></div>`;});
   html+=`</div></div>`;
   activeRowsData.forEach(rowData=>{
     let r=rowData.rInfo;let rh=rowData.height;
     let avatar='';if(r.type==='staff')avatar=`<div class="av" style="background:${avC(window.STAFF.findIndex(s=>s.id===r.id))}">${r.name.charAt(0)}</div>`;else if(r.type==='ptype')avatar=`<div class="av" style="background:${r.obj.color}">🏷</div>`;else avatar=`<div class="av" style="background:${gS(r.obj.stage).color}">📁</div>`;
     let projEvts=rowData.events.filter(ev=>!ev.isLeave&&!ev.isWorkLog).length;let leaveEvts=rowData.events.filter(ev=>ev.isLeave).length;let wlEvts=rowData.events.filter(ev=>ev.isWorkLog).length;
     let workloadText=r.type==='staff'?((projEvts>0?projEvts+' โครงการ':'')+(projEvts>0&&(leaveEvts>0||wlEvts>0)?' · ':'')+( leaveEvts>0?leaveEvts+' วันลา':'')+((leaveEvts>0&&wlEvts>0)?' · ':'')+( wlEvts>0?wlEvts+' บันทึกงาน':'')):(r.type==='project'?rowData.eventCount+' ทีมงาน':rowData.eventCount+' โครงการ');
-    html+=`<div class="tl-row" style="height:${rh}px"><div class="tl-left" style="width:${LEFT_WIDTH}px;height:${rh}px">${avatar}<div style="min-width:0;flex:1;display:flex;flex-direction:column;justify-content:center;padding-top:2px;"><div style="font-size:12px;font-weight:600;word-break:break-word;line-height:1.4;">${esc(r.name)}</div><div style="font-size:10px;color:var(--txt3);margin-top:4px;"><div>${esc(r.sub)}</div><div style="color:var(--violet);font-weight:700;">${workloadText}</div></div></div></div><div class="tl-right" style="width:${totalGridWidth}px;height:${rh}px">`;
-    tCols.forEach(tc=>{html+=`<div class="tl-bg-cell ${tc.isWk?'wk':''} ${tc.isHol?'hol':''}" style="min-width:${DAY_WIDTH}px;width:${DAY_WIDTH}px"></div>`;});
-    rowData.events.forEach(ev=>{let leftPx=ev.sIdx*DAY_WIDTH+2;let widthPx=((ev.eIdx-ev.sIdx)+1)*DAY_WIDTH-4;let topPx=ROW_PAD+(ev.lane*(BAR_HEIGHT+BAR_GAP));if(ev.isLeave){let _lid=ev.lv?ev.lv.id:'';html+=`<div class="tl-bar" onclick="window.openLeaveDetail('${_lid}')" style="left:${leftPx}px;width:${widthPx}px;top:${topPx}px;background:rgba(255,107,107,0.15);height:${BAR_HEIGHT}px;border:2px dashed #ff6b6b;color:#c0392b;cursor:pointer;font-weight:600;" title="${esc(ev.text)}">${esc(ev.text)}</div>`;}else if(ev.isWorkLog){html+=`<div class="tl-bar" onclick="window.openWorkLogModal('${ev.wl.id}')" style="left:${leftPx}px;width:${widthPx}px;top:${topPx}px;background:rgba(255,166,43,0.15);height:${BAR_HEIGHT}px;border:2px dashed #ffa62b;color:#b87800;cursor:pointer;font-weight:600;" title="${esc(ev.text)}">${esc(ev.text)}</div>`;}else{html+=`<div class="tl-bar" onclick="window.openProjModal('${ev.p.id}')" style="left:${leftPx}px;width:${widthPx}px;top:${topPx}px;background:${ev.color};height:${BAR_HEIGHT}px" title="${esc(ev.text)}">${esc(ev.text)}</div>`;}});
+    html+=`<div class="tl-row" style="height:${rh}px"><div class="tl-left" style="height:${rh}px">${avatar}<div style="min-width:0;flex:1;display:flex;flex-direction:column;justify-content:center;padding-top:2px;"><div style="font-size:12px;font-weight:600;word-break:break-word;line-height:1.4;">${esc(r.name)}</div><div style="font-size:10px;color:var(--txt3);margin-top:4px;"><div>${esc(r.sub)}</div><div style="color:var(--violet);font-weight:700;">${workloadText}</div></div></div></div><div class="tl-right" style="grid-template-columns:${gridCols};height:${rh}px">`;
+    tCols.forEach(tc=>{html+=`<div class="tl-bg-cell ${tc.isWk?'wk':''} ${tc.isHol?'hol':''}"></div>`;});
+    rowData.events.forEach(ev=>{let leftPct=(ev.sIdx/dayCount)*100;let widthPct=((ev.eIdx-ev.sIdx)+1)/dayCount*100;let topPx=ROW_PAD+(ev.lane*(BAR_HEIGHT+BAR_GAP));let barStyle=`left:calc(${leftPct}% + 2px);width:calc(${widthPct}% - 4px);top:${topPx}px;height:${BAR_HEIGHT}px`;let dateLabel=fd(tCols[ev.sIdx].s)+(ev.sIdx!==ev.eIdx?' – '+fd(tCols[ev.eIdx].e):'');let fullTitle=ev.text+' | '+dateLabel;if(ev.isLeave){let _lid=ev.lv?ev.lv.id:'';html+=`<div class="tl-bar" onclick="window.openLeaveDetail('${_lid}')" style="${barStyle};background:rgba(255,107,107,0.15);border:2px dashed #ff6b6b;color:#c0392b;cursor:pointer;font-weight:600;" title="${esc(fullTitle)}">${esc(ev.text)}</div>`;}else if(ev.isWorkLog){html+=`<div class="tl-bar" onclick="window.openWorkLogModal('${ev.wl.id}')" style="${barStyle};background:rgba(255,166,43,0.15);border:2px dashed #ffa62b;color:#b87800;cursor:pointer;font-weight:600;" title="${esc(fullTitle)}">${esc(ev.text)}</div>`;}else{html+=`<div class="tl-bar" onclick="window.openProjModal('${ev.p.id}')" style="${barStyle};background:${ev.color}" title="${esc(fullTitle)}">${esc(ev.text)}</div>`;}});
     html+=`</div></div>`;
   });
   html+=`</div>`;document.getElementById('cal-grid').innerHTML=html;
