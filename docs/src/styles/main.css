@@ -23,6 +23,9 @@
 @import './modules/timeline.css';
 @import './modules/overview.css';
 @import './modules/advance.css';
+@import './modules/expense-form.css';
+@import './modules/site-deploy-form.css';
+@import './modules/site-notice-form.css';
 @import './modules/timesheet.css';
 @import './modules/workload.css';
 @import './modules/admin.css';

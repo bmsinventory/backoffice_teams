@@ -14,19 +14,19 @@
     var vadd = { view:true,  add:true,  edit:false, del:false };
 
     if (role === 'pm') return {
-      overview:ro, kanban:full, projects:full, advance:full, lodging:full,
+      overview:ro, kanban:full, projects:full, advance:full, expense_form:full, lodging:full,
       workload:ro, calendar:full, leave:full, timesheet:ro, cost:ro,
       availability:ro, holiday:ro, admin:none, targets:none, hospital:ro, contract:full,
       impl_tracker:full,
     };
     if (role === 'viewer') return {
-      overview:ro, kanban:ro, projects:none, advance:full, lodging:full,
+      overview:ro, kanban:ro, projects:none, advance:full, expense_form:full, lodging:full,
       workload:ro, calendar:ro, leave:vadd, timesheet:ro, cost:ro,
       availability:ro, holiday:none, admin:none, targets:none, hospital:ro, contract:ro,
       impl_tracker:ro,
     };
     return {
-      overview:ro, kanban:ro, projects:ro, advance:ro, lodging:ro,
+      overview:ro, kanban:ro, projects:ro, advance:ro, expense_form:ro, lodging:ro,
       workload:ro, calendar:ro, leave:ro, timesheet:ro, cost:ro,
       availability:ro, holiday:none, admin:none, targets:none, hospital:ro, contract:ro,
       impl_tracker:ro,

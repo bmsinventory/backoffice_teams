@@ -1,0 +1,130 @@
+/* ════════════════════════════════════════════════════════════
+   EXPENSE FORM (FM-AC-01) — ใบเบิกเงินทดรองจ่าย
+   ซ้าย = แผงกรอกข้อมูล, ขวา = พรีวิว/พิมพ์จำลองฟอร์มกระดาษ
+   สีดำ = label ตายตัว, สีแดง (.ecf-fill) = ค่าที่กรอก (เทียบเท่าลายมือเดิม)
+════════════════════════════════════════════════════════════ */
+
+#view-expense-form.on { display: flex; flex-direction: column; overflow: hidden; }
+
+/* #ecf-root is the plain wrapper the render function injects the toolbar + .ecf-layout into —
+   it must itself be the flex column (and bounded) so .ecf-layout's flex:1 has a height to size against */
+#ecf-root { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+
+/* #ecf-ac01-wrap / #ecf-ac02-wrap / #ecf-ac03-wrap (FM-AC-01 / FM-AC-02 / site notice letter
+   sub-form switcher, expense-form.js) sit between #ecf-root and .ecf-layout — must relay the
+   same bounded flex column, otherwise .ecf-layout's flex:1 has nothing to size against and
+   overflowing content just clips instead of scrolling inside .ecf-panel / .ecf-preview-wrap */
+#ecf-ac01-wrap, #ecf-ac02-wrap, #ecf-ac03-wrap { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+
+.ecf-layout {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(420px, 620px);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 16px;
+  padding: 16px 24px 28px;
+  min-height: 0;
+  overflow: hidden;
+}
+@media (max-width: 960px) {
+  .ecf-layout { grid-template-columns: 1fr; grid-template-rows: none; overflow-y: auto; }
+  .ecf-panel, .ecf-preview-wrap { overflow-y: visible; }
+}
+
+/* Each column fits the visible screen and scrolls internally once its own content overflows */
+.ecf-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.ecf-preview-wrap { min-height: 0; overflow-y: auto; }
+
+/* ── The printable sheet (screen preview) ── */
+.ecf-sheet {
+  background: #fff;
+  color: #111;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 22px 26px;
+  font-size: 12px;
+  line-height: 1.6;
+  box-shadow: var(--sh-sm);
+  width: 100%;
+  max-width: 620px;
+  margin: 0 auto;
+  font-family: inherit;
+}
+
+.ecf-fill { color: #c0392b; font-weight: 700; }
+.ecf-grow { flex: 1; }
+
+.ecf-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; border-bottom: 2px solid #111; padding-bottom: 8px; margin-bottom: 6px; }
+.ecf-co-name { font-weight: 800; font-size: 13px; }
+.ecf-co-addr { font-size: 10px; color: #555; }
+.ecf-head-title { font-weight: 800; font-size: 13px; white-space: nowrap; }
+.ecf-formno { text-align: right; font-size: 11px; margin-bottom: 8px; }
+
+.ecf-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; margin-bottom: 6px; }
+.ecf-lbl { color: #111; white-space: nowrap; }
+
+.ecf-cat-block { border: 1px solid #999; border-radius: 4px; padding: 8px 10px; margin: 10px 0; }
+.ecf-cat-lbl { font-weight: 700; margin-bottom: 6px; }
+.ecf-cat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px 10px; margin-bottom: 6px; }
+.ecf-cbx { display: flex; align-items: center; gap: 6px; font-size: 11px; white-space: nowrap; }
+.ecf-box { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border: 1px solid #111; font-size: 11px; font-weight: 800; color: #c0392b; flex-shrink: 0; }
+
+.ecf-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 11px; }
+.ecf-table th, .ecf-table td { border: 1px solid #999; padding: 6px 8px; vertical-align: top; text-align: left; }
+.ecf-table thead th { background: #f0f0f0; font-weight: 700; }
+.ecf-table .ecf-amt { text-align: right; white-space: nowrap; width: 110px; }
+.ecf-table tfoot td { font-weight: 800; }
+.ecf-table .ecf-total { font-size: 12px; }
+
+.ecf-workers-lbl { font-weight: 600; margin-bottom: 4px; }
+.ecf-workers-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px 10px; }
+.ecf-w-cell { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ecf-w-idx { color: #555; margin-right: 3px; }
+
+.ecf-notes { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; font-size: 11px; }
+.ecf-notes label { display: flex; align-items: center; gap: 6px; }
+
+.ecf-sign-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px 8px; margin-top: 26px; text-align: center; font-size: 10px; }
+.ecf-sign-line { border-bottom: 1px solid #111; height: 30px; margin-bottom: 4px; }
+.ecf-sign-date { color: #555; margin-top: 3px; }
+
+/* ════ PRINT: show only the sheet, at A4 size, no app chrome ════
+   Scoped to body[data-view="expense_form"] (set by router.js goTo) so this
+   "hide everything except my own print area" rule never fires while printing
+   from any other view — it would otherwise blank out their print output. */
+@media print {
+  /* Closed modals sit in normal document flow (position:static) at the end of <body>.
+     visibility:hidden alone doesn't collapse their box — their leftover height spills
+     onto a second, mostly-blank printed page. Force them out of flow entirely. */
+  body[data-view="expense_form"] .modal { display: none !important; }
+
+  body[data-view="expense_form"] * { visibility: hidden; }
+  body[data-view="expense_form"] #ecf-print-area,
+  body[data-view="expense_form"] #ecf-print-area * { visibility: visible; }
+  body[data-view="expense_form"] #ecf-print-area {
+    position: absolute; top: 0; left: 0; width: 100%; max-width: none;
+    border: none; box-shadow: none; padding: 12mm;
+  }
+  body[data-view="expense_form"] .no-print { display: none !important; }
+  @page { size: A4; margin: 0; }
+
+  /* Tighten vertical rhythm so the sheet reliably fits a single A4 page
+     (screen preview spacing above is untouched — these apply only when printing) */
+  body[data-view="expense_form"] #ecf-print-area { line-height: 1.4; }
+  body[data-view="expense_form"] .ecf-row { margin-bottom: 4px; }
+  body[data-view="expense_form"] .ecf-cat-block { margin: 6px 0; padding: 6px 8px; }
+  body[data-view="expense_form"] .ecf-table { margin-top: 6px; }
+  body[data-view="expense_form"] .ecf-table th,
+  body[data-view="expense_form"] .ecf-table td { padding: 4px 6px; }
+  body[data-view="expense_form"] .ecf-notes { margin-top: 6px; gap: 2px; }
+  body[data-view="expense_form"] .ecf-sign-grid { margin-top: 14px; }
+  body[data-view="expense_form"] .ecf-sign-line { height: 22px; margin-bottom: 2px; }
+}

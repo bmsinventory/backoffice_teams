@@ -1,0 +1,65 @@
+/* ════════════════════════════════════════════════════════════
+   SITE NOTICE LETTER (หนังสือแจ้งออกไซต์) — หนังสือแจ้งหน่วยงานภายนอกก่อนออกไซต์
+   ฟอร์มที่ 3 ในหน้า "เอกสารประกอบ Adv." (view-expense-form) — สลับกับ FM-AC-01 (.ecf-*) / FM-AC-02 (.sdf-*)
+   ใช้ layout กล่อง .ecf-layout / .ecf-panel / .ecf-preview-wrap ร่วมกับฟอร์มอื่น
+   สีดำ = label ตายตัว, สีแดง (.snl-fill) = ค่าที่กรอก (เทียบเท่าลายมือเดิม)
+════════════════════════════════════════════════════════════ */
+
+.snl-sheet {
+  background: #fff;
+  color: #111;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 22px 26px;
+  font-size: 12px;
+  line-height: 1.6;
+  box-shadow: var(--sh-sm);
+  width: 100%;
+  max-width: 620px;
+  margin: 0 auto;
+  font-family: inherit;
+}
+
+.snl-fill { color: #c0392b; font-weight: 700; }
+.snl-grow { flex: 1; }
+
+.snl-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; border-bottom: 2px solid #111; padding-bottom: 8px; margin-bottom: 6px; }
+.snl-co-name { font-weight: 800; font-size: 13px; }
+.snl-co-addr { font-size: 10px; color: #555; }
+.snl-formno { font-size: 11px; white-space: nowrap; }
+
+.snl-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; margin-bottom: 6px; }
+.snl-lbl { color: #111; white-space: nowrap; }
+
+.snl-committee-detail { padding-left: 20px; margin-top: 2px; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; }
+.snl-committee-detail .snl-row { margin-bottom: 0; }
+
+.snl-box-section { border: 1px solid #999; border-radius: 4px; padding: 8px 10px; margin-bottom: 8px; }
+.snl-cat-lbl { font-weight: 700; margin-bottom: 6px; }
+.snl-cat-grid { display: grid; gap: 4px 10px; margin-bottom: 2px; }
+.snl-cbx { display: flex; align-items: center; gap: 6px; font-size: 11px; margin-bottom: 4px; }
+.snl-cbx:last-child { margin-bottom: 0; }
+.snl-cbx-wrap { align-items: flex-start; white-space: normal; }
+.snl-box { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border: 1px solid #111; font-size: 11px; font-weight: 800; color: #c0392b; flex-shrink: 0; }
+
+.snl-work-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; }
+.snl-span2 { grid-column: 1 / -1; }
+
+.snl-att-row { font-size: 11px; margin-bottom: 4px; }
+.snl-att-row:last-child { margin-bottom: 0; }
+.snl-att-idx { color: #555; margin-right: 3px; }
+
+/* ════ PRINT: only the active sub-form's sheet shows — scoped alongside FM-AC-01/02's rule
+   in expense-form.css. #snl-print-area sits inside #ecf-ac03-wrap, which JS sets to
+   display:none whenever another form type is active, so this rule only ever takes visual
+   effect while the site notice letter is the selected form. ════ */
+@media print {
+  body[data-view="expense_form"] #snl-print-area,
+  body[data-view="expense_form"] #snl-print-area * { visibility: visible; }
+  body[data-view="expense_form"] #snl-print-area {
+    position: absolute; top: 0; left: 0; width: 100%; max-width: none;
+    border: none; box-shadow: none; padding: 12mm;
+  }
+  body[data-view="expense_form"] #snl-print-area { line-height: 1.4; }
+  body[data-view="expense_form"] .snl-box-section { margin-bottom: 5px; padding: 5px 8px; }
+}

@@ -190,6 +190,9 @@
         <span class="ni">💳</span><span class="nl">Advance</span>
         <span class="nb" id="adv-nb" style="display:none">0</span>
       </div>
+      <div class="nav-btn" onclick="window.goView('expense_form',this)">
+        <span class="ni">🧾</span><span class="nl">เอกสารประกอบ Adv.</span>
+      </div>
       <div class="nav-btn" onclick="window.goView('lodging',this)">
         <span class="ni">🏨</span><span class="nl">จัดหาที่พัก</span>
       </div>
@@ -460,6 +463,11 @@
         <div id="adv-summary-bar" style="display:flex;gap:12px;padding:12px 24px;background:var(--bg);flex-wrap:wrap;"></div>
         <!-- Cards grid -->
         <div id="adv-cards" style="padding:0 24px 28px;display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;"></div>
+      </div>
+
+      <!-- EXPENSE CLEARING FORM (expense_form) -->
+      <div class="view" id="view-expense-form">
+        <div id="ecf-root"></div>
       </div>
 
       <!-- LODGING -->
@@ -2224,6 +2232,9 @@
 <script src="src/config/app.config.js"></script>
 <script src="src/config/routes.config.js"></script>
 <script src="src/config/impl-tracker.config.js"></script>
+<script src="src/config/expense-form.config.js"></script>
+<script src="src/config/site-deploy-form.config.js"></script>
+<script src="src/config/site-notice-form.config.js"></script>
 
 <!-- 2. Utils Layer (ไม่มี dependency ต่อกัน) -->
 <script src="src/utils/dom.util.js"></script>
@@ -2240,6 +2251,9 @@
 <script src="src/services/realtime.service.js"></script>
 <script src="src/services/auth.service.js"></script>
 <script src="src/services/impl-tracker.service.js"></script>
+<script src="src/services/expense-form.service.js"></script>
+<script src="src/services/site-deploy-form.service.js"></script>
+<script src="src/services/site-notice-form.service.js"></script>
 
 <!-- 4. Router -->
 <script src="src/router.js"></script>
@@ -2249,6 +2263,9 @@
 <script type="module" src="js/kanban.js"></script>
 <script type="module" src="js/projects.js"></script>
 <script type="module" src="js/advance.js"></script>
+<script type="module" src="js/expense-form.js"></script>
+<script type="module" src="js/site-deploy-form.js"></script>
+<script type="module" src="js/site-notice-form.js"></script>
 <script type="module" src="js/lodging.js"></script>
 <script type="module" src="js/workload.js"></script>
 <script type="module" src="js/availability.js"></script>

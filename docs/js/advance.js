@@ -122,75 +122,15 @@ window.renderAdvance=function(){
 
 
 // ── Searchable Grouped Combobox — Advance Project Picker (inline dropdown) ──
-window._initAdvCombobox=(function(){
-  var IH=36,HH=30,BUF=6;
-  function hi(txt,q){
-    if(!q)return esc(txt);
-    var lt=txt.toLowerCase(),lq=q.toLowerCase(),out='',i=0;
-    while(i<txt.length){var x=lt.indexOf(lq,i);if(x<0){out+=esc(txt.slice(i));break;}
-      out+=esc(txt.slice(i,x))+'<mark style="background:#ffd60a66;border-radius:2px;padding:0 1px;">'+esc(txt.slice(x,x+lq.length))+'</mark>';i=x+lq.length;}
-    return out;
-  }
-  return function(projects,curPid){
-    var inp=document.getElementById('adv-cmb-input'),drop=document.getElementById('adv-cmb-drop'),lst=document.getElementById('adv-cmb-list'),hid=document.getElementById('af-pid');
-    if(!inp||!drop||!lst||!hid)return;
-    var tmap={},tord=[];
-    window.PTYPES.forEach(function(t){tmap[t.id]={id:t.id,label:t.label,color:t.color||'var(--txt3)',items:[]};tord.push(t.id);});
-    projects.forEach(function(p){
-      if(tmap[p.typeId])tmap[p.typeId].items.push(p);
-      else{if(!tmap['__x__']){tmap['__x__']={id:'__x__',label:'Project อื่น ๆ',color:'var(--txt3)',items:[]};tord.push('__x__');}tmap['__x__'].items.push(p);}
-    });
-    tord=tord.filter(function(tid){return tmap[tid]&&tmap[tid].items.length>0;});
-    var selId=curPid||'',selName='',col=new Set(),q='',fi=-1,flat=[],dt=null,isOpen=false;
-    var _cp=window.PROJECTS.find(function(p){return p.id===selId;});selName=_cp?_cp.name:'';
-    function bFlat(sq){
-      var f=[],lq=sq.toLowerCase();
-      if(sq){projects.forEach(function(p){if(p.name.toLowerCase().includes(lq))f.push({k:'i',id:p.id,name:p.name});});}
-      else{tord.forEach(function(tid){var g=tmap[tid];if(!g||!g.items.length)return;f.push({k:'h',tid:tid,label:g.label,color:g.color,count:g.items.length});if(!col.has(tid))g.items.forEach(function(p){f.push({k:'i',id:p.id,name:p.name});});});}
-      return f;
-    }
-    function render(){
-      if(!flat.length){lst.innerHTML='<div style="padding:24px 12px;text-align:center;color:var(--txt3);font-size:12px;">ไม่พบโครงการ'+(q?'<br><small style="opacity:.7;">'+esc(q)+'</small>':'')+'</div>';return;}
-      var offs=[],tot=0;flat.forEach(function(it){offs.push(tot);tot+=(it.k==='h'?HH:IH);});
-      var st=lst.scrollTop,vh=lst.clientHeight||260,si=0,ei=flat.length;
-      for(var i=0;i<flat.length;i++){if(offs[i]+(flat[i].k==='h'?HH:IH)>st-BUF*IH){si=i;break;}}
-      for(var j=si;j<flat.length;j++){if(offs[j]>st+vh+BUF*IH){ei=j;break;}}
-      var topH=offs[si]||0,botH=tot-(ei<flat.length?offs[ei]:tot);
-      var html='<div style="height:'+topH+'px"></div>';
-      flat.slice(si,ei).forEach(function(it,r){
-        var idx=si+r;
-        if(it.k==='h'){var cc=col.has(it.tid);html+='<div class="adc-h" data-tid="'+esc(it.tid)+'" style="height:'+HH+'px;display:flex;align-items:center;gap:7px;padding:0 10px;cursor:pointer;font-size:10px;font-weight:700;background:var(--surface2);border-bottom:1px solid var(--border);color:'+esc(it.color)+';user-select:none;position:sticky;top:0;z-index:2;"><span style="width:7px;height:7px;border-radius:50%;background:'+esc(it.color)+';flex-shrink:0;display:inline-block;"></span><span>'+esc(it.label)+'</span><span style="font-size:9px;color:var(--txt3);margin-left:2px;">('+it.count+')</span><span style="margin-left:auto;font-size:9px;opacity:.5;">'+(cc?'▶':'▼')+'</span></div>';}
-        else{var foc=idx===fi,isSel=it.id===selId;html+='<div class="adc-i" data-id="'+esc(it.id)+'" data-name="'+esc(it.name)+'" data-idx="'+idx+'" style="height:'+IH+'px;display:flex;align-items:center;padding:0 12px;cursor:pointer;font-size:12px;border-bottom:1px solid rgba(0,0,0,.04);background:'+(foc?'var(--indigo)12':isSel?'var(--teal)0d':'transparent')+';color:var(--txt1);">'+(isSel?'<span style="color:var(--teal);margin-right:6px;font-size:10px;flex-shrink:0;">✓</span>':'')+hi(it.name,q)+'</div>';}
-      });
-      html+='<div style="height:'+botH+'px"></div>';
-      lst.innerHTML=html;
-    }
-    function openDrop(){if(isOpen)return;isOpen=true;q='';fi=-1;flat=bFlat('');lst.scrollTop=0;render();drop.style.display='block';}
-    function closeDrop(){if(!isOpen)return;isOpen=false;drop.style.display='none';inp.value=selName;}
-    function selProj(id,name){selId=id;selName=name;hid.value=id;closeDrop();window.advOnProjectChange&&window.advOnProjectChange();}
-    lst.addEventListener('click',function(e){
-      var h=e.target.closest('.adc-h'),it=e.target.closest('.adc-i');
-      if(h){var tid=h.dataset.tid;if(col.has(tid))col.delete(tid);else col.add(tid);flat=bFlat(q);fi=-1;render();}
-      else if(it)selProj(it.dataset.id,it.dataset.name);
-    });
-    lst.addEventListener('mousemove',function(e){var it=e.target.closest('.adc-i');if(it){var ni=+it.dataset.idx;if(ni!==fi){fi=ni;render();}}});
-    lst.addEventListener('scroll',render);
-    inp.addEventListener('click',function(){if(isOpen)closeDrop();else openDrop();});
-    inp.addEventListener('input',function(){if(!isOpen)openDrop();clearTimeout(dt);dt=setTimeout(function(){q=inp.value.trim();fi=-1;flat=bFlat(q);lst.scrollTop=0;render();},200);});
-    inp.addEventListener('keydown',function(e){
-      var iis=flat.map(function(it,i){return it.k==='i'?i:-1;}).filter(function(i){return i>=0;});
-      if(e.key==='Escape'){closeDrop();return;}
-      if(e.key==='Tab'){closeDrop();return;}
-      if(!isOpen&&(e.key==='ArrowDown'||e.key==='Enter')){openDrop();return;}
-      if(e.key==='ArrowDown'){e.preventDefault();var ci=iis.indexOf(fi);fi=ci<0?iis[0]:iis[ci+1]!==undefined?iis[ci+1]:iis[ci];render();scFi();}
-      else if(e.key==='ArrowUp'){e.preventDefault();var ci2=iis.indexOf(fi);fi=ci2<=0?iis[0]:iis[ci2-1];render();scFi();}
-      else if(e.key==='Enter'){e.preventDefault();var it=flat[fi];if(it&&it.k==='i')selProj(it.id,it.name);}
-    });
-    document.addEventListener('mousedown',function onOut(e){var wrap=document.getElementById('adv-cmb-wrap');if(wrap&&!wrap.contains(e.target)){closeDrop();document.removeEventListener('mousedown',onOut);}});
-    function scFi(){if(fi<0)return;var top=0;for(var i=0;i<fi;i++)top+=flat[i]?(flat[i].k==='h'?HH:IH):0;if(top<lst.scrollTop)lst.scrollTop=top;else if(top+IH>lst.scrollTop+lst.clientHeight)lst.scrollTop=top+IH-lst.clientHeight;}
-    inp.value=selName;flat=bFlat('');render();
-  };
-})();
+// Thin wrapper around the shared window.initProjectCombobox (dom.util.js), which
+// also powers the same project-picker UX in the Site Notice Form.
+window._initAdvCombobox=function(projects,curPid){
+  window.initProjectCombobox(
+    {wrapId:'adv-cmb-wrap',inputId:'adv-cmb-input',dropId:'adv-cmb-drop',listId:'adv-cmb-list',hiddenId:'af-pid'},
+    projects,curPid,
+    function(){window.advOnProjectChange&&window.advOnProjectChange();}
+  );
+};
 
 window.openAdvModal=function(id){
   window.editAid=id;var a=id?window.ADVANCES.find(function(x){return x.id===id;}):null;

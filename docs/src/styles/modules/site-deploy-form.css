@@ -1,0 +1,70 @@
+/* ════════════════════════════════════════════════════════════
+   SITE DEPLOY FORM (FM-AC-02) — แบบฟอร์มการออกปฏิบัติงาน
+   ฟอร์มที่ 2 ในหน้า "เอกสารประกอบ Adv." (view-expense-form) — สลับกับ FM-AC-01 (.ecf-*)
+   ใช้ layout กล่อง .ecf-layout / .ecf-panel / .ecf-preview-wrap ร่วมกับ FM-AC-01
+   สีดำ = label ตายตัว, สีแดง (.sdf-fill) = ค่าที่กรอก (เทียบเท่าลายมือเดิม)
+════════════════════════════════════════════════════════════ */
+
+.sdf-sheet {
+  background: #fff;
+  color: #111;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 22px 26px;
+  font-size: 12px;
+  line-height: 1.6;
+  box-shadow: var(--sh-sm);
+  width: 100%;
+  max-width: 620px;
+  margin: 0 auto;
+  font-family: inherit;
+}
+
+.sdf-fill { color: #c0392b; font-weight: 700; }
+.sdf-grow { flex: 1; }
+
+.sdf-head { border-bottom: 2px solid #111; padding-bottom: 8px; margin-bottom: 4px; }
+.sdf-co-name { font-weight: 800; font-size: 13px; }
+.sdf-co-addr { font-size: 10px; color: #555; }
+.sdf-title { text-align: center; font-weight: 800; font-size: 13px; border: 1px solid #111; border-radius: 4px; padding: 6px; margin: 8px 0 10px; }
+
+.sdf-box-section { border: 1px solid #999; border-radius: 4px; padding: 8px 10px; margin-bottom: 8px; }
+.sdf-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; margin-bottom: 4px; }
+.sdf-row:last-child { margin-bottom: 0; }
+.sdf-lbl { color: #111; white-space: nowrap; }
+
+.sdf-cat-lbl { font-weight: 700; margin-bottom: 6px; }
+.sdf-contact-grid { display: grid; grid-template-columns: auto 1fr auto 1fr; gap: 4px 10px; align-items: baseline; }
+.sdf-cat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px 10px; flex: 1; }
+.sdf-cbx { display: flex; align-items: center; gap: 6px; font-size: 11px; }
+.sdf-box { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border: 1px solid #111; font-size: 11px; font-weight: 800; color: #c0392b; flex-shrink: 0; }
+
+.sdf-work-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; }
+.sdf-span2 { grid-column: 1 / -1; }
+
+.sdf-prep { white-space: pre-line; margin-top: 2px; }
+
+.sdf-acc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 14px; font-size: 11px; }
+
+.sdf-sign-block { margin-top: 20px; font-size: 11px; text-align: center; }
+.sdf-sign-line { display: inline-block; border-bottom: 1px solid #111; width: 160px; margin-left: 6px; }
+.sdf-sign-name { display: inline-block; min-width: 180px; border-bottom: 1px solid #111; text-align: center; }
+.sdf-sign-date { color: #555; margin-top: 4px; }
+
+.sdf-formno { margin-top: 18px; font-size: 10px; color: #555; }
+
+/* ════ PRINT: only the active sub-form's sheet shows — scoped alongside FM-AC-01's rule
+   in expense-form.css. #sdf-print-area sits inside #ecf-ac02-wrap, which JS sets to
+   display:none whenever FM-AC-01 is active, so this rule only ever takes visual effect
+   while FM-AC-02 is the selected form. ════ */
+@media print {
+  body[data-view="expense_form"] #sdf-print-area,
+  body[data-view="expense_form"] #sdf-print-area * { visibility: visible; }
+  body[data-view="expense_form"] #sdf-print-area {
+    position: absolute; top: 0; left: 0; width: 100%; max-width: none;
+    border: none; box-shadow: none; padding: 12mm;
+  }
+  body[data-view="expense_form"] #sdf-print-area { line-height: 1.4; }
+  body[data-view="expense_form"] .sdf-box-section { margin-bottom: 5px; padding: 5px 8px; }
+  body[data-view="expense_form"] .sdf-sign-block { margin-top: 12px; }
+}

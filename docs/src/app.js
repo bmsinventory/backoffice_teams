@@ -132,6 +132,7 @@
       'view-kanban':       'renderKanban',
       'view-projects':     'renderProjects',
       'view-advance':      'renderAdvance',
+      'view-expense-form': 'renderExpenseForm',
       'view-lodging':      'renderLodging',
       'view-workload':     'renderWorkload',
       'view-calendar':     'renderCalendar',

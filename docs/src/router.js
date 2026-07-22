@@ -24,6 +24,10 @@
     var view = document.getElementById(viewId);
     if (view) { view.style.display = ''; view.classList.add('on'); }
 
+    // Track active module on <body> (used to scope view-specific @media print rules
+    // so one view's print CSS never hides/blanks another view's print output)
+    document.body.setAttribute('data-view', moduleId);
+
     // Activate nav button
     var navBtn = document.querySelector('.nav-btn[onclick*="\'' + moduleId + '\'"]');
     if (navBtn) navBtn.classList.add('on');
@@ -74,6 +78,7 @@
         kanban:     'renderKanban',
         projects:   'renderProjects',
         advance:    'renderAdvance',
+        expense_form: 'renderExpenseForm',
         lodging:    'renderLodging',
         workload:   'renderWorkload',
         calendar:   'renderCalendar',
