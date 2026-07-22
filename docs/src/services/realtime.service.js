@@ -304,7 +304,7 @@
             if (_von('view-availability')) window.renderAvailability && window.renderAvailability();
           }, 300);
         }
-      }, window.showDbError);
+      }, function (e) { window.showDbErrorSoft(e, 'บันทึกงาน'); });
 
       window.onSnapshot(window.getColRef('CONTRACTS'), function (s) {
         window.CONTRACTS = s.docs.map(function (doc) { return transform.CONTRACTS(doc.data()); });
@@ -313,7 +313,7 @@
           clearTimeout(_cnTimer);
           _cnTimer = setTimeout(function () { window.renderContract && window.renderContract(); }, 300);
         }
-      }, window.showDbError);
+      }, function (e) { window.showDbErrorSoft(e, 'ข้อมูลสัญญา'); });
 
       window.onSnapshot(window.getColRef('HSP_PRODUCTS'), function (s) {
         window.HSP_PRODUCTS = s.docs.map(function (doc) { return transform.HSP_PRODUCTS(doc.data()); }).sort(function (a,b) { return a.name.localeCompare(b.name, 'th'); });
@@ -326,7 +326,7 @@
             if (window._hspViewMode === 'analysis') window.renderHspAnalysis && window.renderHspAnalysis();
           }, 300);
         }
-      }, window.showDbError);
+      }, function (e) { window.showDbErrorSoft(e, 'Product รพ.'); });
 
       window.onSnapshot(window.getColRef('HOSPITALS'), function (s) {
         window.HOSPITALS = s.docs.map(function (doc) { return transform.HOSPITALS(doc.data()); });
@@ -341,7 +341,7 @@
             else                          { window._hspPopulateFilters && window._hspPopulateFilters(); window.renderHospital && window.renderHospital(); }
           }, 300);
         }
-      }, window.showDbError);
+      }, function (e) { window.showDbErrorSoft(e, 'รายชื่อ รพ.'); });
 
       // ── Settings Document ──
       window.onSnapshot(window.getDocRef('SETTINGS', 'app'), function (snap) {

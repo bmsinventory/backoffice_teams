@@ -68,6 +68,6 @@
         if (el && el.classList.contains('on')) window.ecfRefreshSavedList && window.ecfRefreshSavedList();
       }, 300);
     }
-  }, window.showDbError);
+  }, function (e) { window.showDbErrorSoft(e, 'เอกสารเคลียร์ค่าใช้จ่าย'); });
 
 })();

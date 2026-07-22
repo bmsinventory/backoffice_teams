@@ -89,6 +89,6 @@
         }
       }, 300);
     }
-  }, window.showDbError);
+  }, function (e) { window.showDbErrorSoft(e, 'แจ้งเข้าดำเนินงานหน้างาน'); });
 
 })();

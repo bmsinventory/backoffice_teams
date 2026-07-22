@@ -176,13 +176,34 @@
     _deferredPrompt.userChoice.then(function () { _deferredPrompt = null; });
   };
 
-  // ── Register Service Worker + auto-reload on update ──
+  // ── New Version Available Banner ──
+  // Shown instead of a silent forced reload, so an in-progress form isn't wiped out.
+  window.showUpdateBanner = function () {
+    if (document.getElementById('sw-update-banner')) return;
+    var b = document.createElement('div');
+    b.id = 'sw-update-banner';
+    b.style.cssText = 'position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:99999;'
+      + 'background:linear-gradient(135deg,#4361ee,#7c5cfc);color:#fff;padding:12px 14px 12px 18px;border-radius:14px;'
+      + 'box-shadow:0 10px 30px rgba(0,0,0,.3);display:flex;align-items:center;gap:14px;font-size:13px;'
+      + 'font-family:inherit;max-width:calc(100vw - 32px);';
+    b.innerHTML = '<span>🚀 มีอัปเดตเวอร์ชันใหม่ของระบบ</span>'
+      + '<button id="sw-update-btn" style="background:#fff;color:#4361ee;border:none;padding:7px 16px;border-radius:9px;font-weight:700;cursor:pointer;font-size:12.5px;white-space:nowrap;">โหลดใหม่ตอนนี้</button>'
+      + '<button id="sw-update-dismiss" title="ปิด" style="background:transparent;color:#fff;border:none;cursor:pointer;font-size:16px;line-height:1;padding:0 2px;opacity:.8;">✕</button>';
+    document.body.appendChild(b);
+    document.getElementById('sw-update-btn').onclick = function () { window.location.reload(); };
+    document.getElementById('sw-update-dismiss').onclick = function () { b.remove(); };
+  };
+
+  // ── Register Service Worker + notify (don't force-reload) on update ──
   if ('serviceWorker' in navigator) {
-    var _swRefreshing = false;
+    var _hadController = !!navigator.serviceWorker.controller;
+    var _swNotified = false;
     navigator.serviceWorker.addEventListener('controllerchange', function () {
-      if (_swRefreshing) return;
-      _swRefreshing = true;
-      window.location.reload();
+      if (_swNotified) return;
+      _swNotified = true;
+      // Only a real update (a SW was already controlling this page) warrants a
+      // notice — the very first-ever activation just means the page is already fresh.
+      if (_hadController) window.showUpdateBanner();
     });
     navigator.serviceWorker.register('sw.js').catch(function (err) {
       console.warn('[app] SW register failed:', err);

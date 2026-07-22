@@ -75,6 +75,6 @@
         }
       }, 300);
     }
-  }, window.showDbError);
+  }, function (e) { window.showDbErrorSoft(e, 'แบบฟอร์มเตรียมความพร้อม Deploy'); });
 
 })();

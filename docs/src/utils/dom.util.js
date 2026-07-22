@@ -50,6 +50,47 @@
     if (el)    el.classList.add('on');
   };
 
+  // ── Toast Notifications (non-blocking, bottom-right, auto-dismiss) ──
+  var _toastWrap = null;
+  function _toastContainer() {
+    if (_toastWrap && document.body.contains(_toastWrap)) return _toastWrap;
+    _toastWrap = document.createElement('div');
+    _toastWrap.id = 'toast-wrap';
+    _toastWrap.style.cssText = 'position:fixed;right:18px;bottom:18px;z-index:99998;display:flex;flex-direction:column;gap:8px;max-width:340px;';
+    document.body.appendChild(_toastWrap);
+    return _toastWrap;
+  }
+  var TOAST_STYLE = {
+    info:    { bg: 'var(--violet, #7c5cfc)', ic: 'ℹ️' },
+    success: { bg: '#22c55e', ic: '✅' },
+    warn:    { bg: '#f59e0b', ic: '⚠️' },
+    error:   { bg: 'var(--coral, #ef4444)', ic: '❌' },
+  };
+  window.showToast = function (msg, type) {
+    var c = TOAST_STYLE[type] || TOAST_STYLE.info;
+    var wrap = _toastContainer();
+    var el = document.createElement('div');
+    el.style.cssText = 'background:' + c.bg + ';color:#fff;padding:10px 14px;border-radius:10px;font-size:12.5px;font-weight:600;box-shadow:0 6px 18px rgba(0,0,0,.25);display:flex;align-items:flex-start;gap:8px;';
+    el.innerHTML = '<span>' + c.ic + '</span><span style="flex:1;line-height:1.4;">' + msg + '</span>';
+    wrap.appendChild(el);
+    setTimeout(function () {
+      el.style.transition = 'opacity .25s,transform .25s';
+      el.style.opacity = '0';
+      el.style.transform = 'translateX(8px)';
+      setTimeout(function () { el.remove(); }, 250);
+    }, 4500);
+  };
+
+  // ── Database Error Display (soft variant — background/non-critical collections) ──
+  // Unlike showDbError, this never covers the whole app: it just logs + shows a
+  // dismissible toast, so a missing/unmigrated table on a background feature
+  // (e.g. site_deploy_forms) doesn't lock users out of the rest of the app.
+  window.showDbErrorSoft = function (err, label) {
+    console.error('[Supabase Background Sync Error]' + (label ? ' (' + label + ')' : '') + ':', err);
+    var msg = (label ? window.esc(label) + ': ' : '') + 'ซิงค์ข้อมูลบางส่วนไม่สำเร็จ (ดูรายละเอียดใน Console)';
+    window.showToast(msg, 'warn');
+  };
+
   // ── View Active Check ──
   window._von = function (id) {
     var el = document.getElementById(id);
