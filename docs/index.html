@@ -514,6 +514,7 @@
               <span class="month-lbl" id="wl-lbl"></span>
               <button class="mnav-btn" onclick="window.wlNav(1)">›</button>
             </div>
+            <button class="btn btn-pri btn-sm ce-only" onclick="window.openWlNotifyReport()" title="สรุปตารางงานที่ยังไม่เริ่ม แยกรายคน สำหรับคัดลอก/บันทึกภาพส่ง LINE">📤 สรุปแจ้งงาน</button>
           </div>
         </div>
         <div id="wl-stats" style="flex-shrink:0;background:var(--surface);border-bottom:2px solid var(--border);"></div>
@@ -579,6 +580,7 @@
             <input type="checkbox" id="cal-only-active" checked onchange="window.renderCalendar()"> แสดงเฉพาะคนที่มีงาน
           </label>
           <button class="btn btn-ghost btn-sm" id="cal-fs-btn" onclick="window.toggleCalFullscreen()" style="margin-left:4px;padding:5px 10px;font-size:12px;" title="ขยายเต็มจอ">⛶ เต็มจอ</button>
+          <button class="btn btn-pri btn-sm ce-only" id="cal-add-proj-btn" style="margin-left:auto;" onclick="window.openProjModal(null)">+ เพิ่มโครงการ</button>
         </div>
         <div class="tl-wrap" id="cal-grid"></div>
         <div class="cal-agenda-wrap" id="cal-agenda"></div>
@@ -1726,6 +1728,24 @@
       <button class="btn btn-ghost" onclick="window.closeM('m-imt-ai-key')">ยกเลิก</button>
       <button class="btn btn-pri" onclick="window.imtSaveAiKey()">💾 บันทึก</button>
     </div>
+  </div>
+</div>
+
+<div class="overlay" id="m-wl-notify">
+  <div class="modal lg">
+    <div class="m-head">
+      <div class="m-icon" style="background:rgba(124,92,252,.12)">📤</div>
+      <div class="m-title">สรุปแจ้งงานที่จะมาถึง</div>
+      <button class="m-x" onclick="window.closeM('m-wl-notify')">✕</button>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 24px;border-bottom:1px solid var(--border);background:var(--surface2);">
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-sm" id="wl-notify-tab-staff" onclick="window.wlNotifySetView('staff')">👤 รายคน</button>
+        <button class="btn btn-sm" id="wl-notify-tab-team" onclick="window.wlNotifySetView('team')">🏗 รายทีม/โครงการ</button>
+      </div>
+      <button class="btn btn-pri btn-sm" onclick="window.wlNotifyExportExcel()">📊 Export Excel</button>
+    </div>
+    <div class="m-body" id="m-wl-notify-body" style="font-size:13px;line-height:1.6;"></div>
   </div>
 </div>
 

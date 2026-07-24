@@ -358,3 +358,264 @@ window.renderWorkload = function() {
     if (headWrap) headWrap.scrollLeft = grid.scrollLeft;
   };
 };
+
+// ══════════════════════════════════════════════════════════════════════════
+// สรุปแจ้งงาน — รายงานวันที่ต้อง "เข้าไซต์" ที่ยังไม่ถึง มี 2 มุมมอง: รายคน / รายทีม-โครงการ
+// สำหรับคัดลอกข้อความ/บันทึกภาพ ส่งเข้า LINE เอง หรือ Export เป็น Excel (ไม่ยิง API อัตโนมัติ)
+// ใช้วันที่เข้าไซต์จริงของแต่ละคน (ต่อ visit/ต่อ member) ไม่ใช่วันเริ่ม-สิ้นสุดของโครงการโดยรวม
+// เพราะโครงการเดียวอาจมีหลายรอบเข้าไซต์ (visits) คนละช่วงวันที่กัน ต้องแยกแสดงให้ครบทุกช่วง ──
+window._WL_NOTIFY_DATA = {};      // sid -> { staff, projs:[{p,periods}] }
+window._WL_NOTIFY_ROWS = [];      // มุมมองรายคน เรียงตามวันที่เข้าไซต์เร็วสุดก่อน
+window._WL_NOTIFY_TEAM_ROWS = []; // มุมมองรายทีม/โครงการ: [{p, entries:[{label,s,e,staff:[...]}]}]
+window._wlNotifyView = 'staff';
+var WL_NOTIFY_COLLAPSE_AT = 4; // คนที่มีงานเกินจำนวนนี้ จะพับซ่อนส่วนเกินไว้ ให้การ์ดไม่ยาวเกินไป
+
+window.openWlNotifyReport = function() {
+  var todayD = new Date(); todayD.setHours(0, 0, 0, 0);
+  var byStaff = {};
+  (window.STAFF || []).filter(function(s) { return s.active !== false; }).forEach(function(s) {
+    byStaff[s.id] = { staff: s, projs: [] };
+  });
+  var teamMap = {}; // pid -> { p, entries: { key -> {label,s,e,staff:[]} } }
+
+  (window.PROJECTS || []).forEach(function(p) {
+    if (p.status === 'cancelled' || p.status === 'completed') return;
+
+    Object.keys(byStaff).forEach(function(sid) {
+      var periods = [];
+      if (p.visits && p.visits.length > 0) {
+        p.visits.forEach(function(v, vi) {
+          var vm = window._vtMember(v.team, sid, v.start, v.end);
+          if (vm && vm.s && vm.e && pd(vm.s) > todayD) {
+            periods.push({ s: vm.s, e: vm.e, label: 'รอบ ' + (v.no || (vi + 1)) });
+          }
+        });
+      } else {
+        var mems = (p.members && p.members.length > 0) ? p.members : (p.team || []).map(function(id) { return { sid: id, s: p.start, e: p.end }; });
+        mems.filter(function(m) { return m.sid === sid && m.s && m.e && pd(m.s) > todayD; }).forEach(function(m) {
+          periods.push({ s: m.s, e: m.e, label: '' });
+        });
+      }
+      if (!periods.length) return;
+      periods.sort(function(a, b) { return pd(a.s) - pd(b.s); });
+      byStaff[sid].projs.push({ p: p, periods: periods });
+
+      // ── รวมเข้ากลุ่ม "รายทีม/โครงการ" — จัดกลุ่มตาม (โครงการ + ช่วงวันที่ + ป้ายรอบ) เพื่อดูว่าไปด้วยกันกับใครบ้าง ──
+      if (!teamMap[p.id]) teamMap[p.id] = { p: p, entries: {} };
+      periods.forEach(function(per) {
+        var key = per.label + '|' + per.s + '|' + per.e;
+        if (!teamMap[p.id].entries[key]) teamMap[p.id].entries[key] = { label: per.label, s: per.s, e: per.e, staff: [] };
+        teamMap[p.id].entries[key].staff.push(byStaff[sid].staff);
+      });
+    });
+  });
+
+  var rows = Object.keys(byStaff).map(function(sid) { return byStaff[sid]; }).filter(function(r) { return r.projs.length > 0; });
+  rows.forEach(function(r) { r.projs.sort(function(a, b) { return pd(a.periods[0].s) - pd(b.periods[0].s); }); });
+  rows.sort(function(a, b) { return pd(a.projs[0].periods[0].s) - pd(b.projs[0].periods[0].s); });
+
+  var teamRows = Object.keys(teamMap).map(function(pid) {
+    var t = teamMap[pid];
+    var entries = Object.keys(t.entries).map(function(k) { return t.entries[k]; });
+    entries.forEach(function(en) { en.staff.sort(function(a, b) { return a.name.localeCompare(b.name, 'th'); }); });
+    entries.sort(function(a, b) { return pd(a.s) - pd(b.s); });
+    return { p: t.p, entries: entries };
+  }).filter(function(t) { return t.entries.length > 0; });
+  teamRows.sort(function(a, b) { return pd(a.entries[0].s) - pd(b.entries[0].s); });
+
+  window._WL_NOTIFY_DATA = {};
+  rows.forEach(function(r) { window._WL_NOTIFY_DATA[r.staff.id] = r; });
+  window._WL_NOTIFY_ROWS = rows;
+  window._WL_NOTIFY_TEAM_ROWS = teamRows;
+
+  window.wlNotifySetView(window._wlNotifyView || 'staff');
+  window.openM('m-wl-notify');
+};
+
+// ── สลับมุมมอง รายคน ↔ รายทีม/โครงการ (ใช้ข้อมูลชุดเดียวกันที่คำนวณไว้แล้วตอนเปิด ไม่ต้องคำนวณซ้ำ) ──
+window.wlNotifySetView = function(mode) {
+  window._wlNotifyView = mode;
+  [['wl-notify-tab-staff', 'staff'], ['wl-notify-tab-team', 'team']].forEach(function(pair) {
+    var el = document.getElementById(pair[0]);
+    if (!el) return;
+    var on = mode === pair[1];
+    el.style.background = on ? 'var(--violet)' : 'var(--surface2)';
+    el.style.color = on ? '#fff' : 'var(--txt2)';
+    el.style.border = '1px solid ' + (on ? 'var(--violet)' : 'var(--border)');
+  });
+  var body = document.getElementById('m-wl-notify-body');
+  if (!body) return;
+  if (mode === 'team') {
+    body.innerHTML = window._WL_NOTIFY_TEAM_ROWS.length
+      ? '<div style="display:flex;flex-direction:column;gap:14px;">' + window._WL_NOTIFY_TEAM_ROWS.map(_wlNotifyTeamCardHtml).join('') + '</div>'
+      : '<div style="padding:40px;text-align:center;color:var(--txt3);">✅ ไม่มีโครงการที่ยังไม่ถึงวันเข้าไซต์</div>';
+  } else {
+    body.innerHTML = window._WL_NOTIFY_ROWS.length
+      ? '<div style="display:flex;flex-direction:column;gap:14px;">' + window._WL_NOTIFY_ROWS.map(_wlNotifyCardHtml).join('') + '</div>'
+      : '<div style="padding:40px;text-align:center;color:var(--txt3);">✅ ไม่มีวันเข้าไซต์ที่ยังไม่ถึง ที่มีทีมงานมอบหมายแล้ว</div>';
+  }
+};
+
+// ── การ์ดรายคน — ถ้ามีหลายโครงการจนรก จะพับซ่อนส่วนเกินไว้หลัง WL_NOTIFY_COLLAPSE_AT รายการแรก พร้อมป้ายสรุปจำนวน ──
+function _wlNotifyProjBlock(sp) {
+  var periodsHtml = sp.periods.map(function(per) {
+    return '<div style="font-size:12px;color:var(--txt3);margin-top:2px;">📅 ' + (per.label ? esc(per.label) + ' — ' : '') + 'เข้าไซต์ ' + fd(per.s) + ' – ' + fd(per.e) + '</div>';
+  }).join('');
+  return '<div style="padding:8px 0;border-bottom:1px solid var(--border);">' +
+    '<div style="font-size:13px;font-weight:700;color:var(--txt);">📌 ' + esc(sp.p.name) + '</div>' +
+    periodsHtml +
+  '</div>';
+}
+
+function _wlNotifyCardHtml(r) {
+  var s = r.staff;
+  var initials = s.name.split(' ').map(function(w) { return w.charAt(0); }).join('').substring(0, 2).toUpperCase();
+  var many = r.projs.length > WL_NOTIFY_COLLAPSE_AT;
+  var visibleProjs = many ? r.projs.slice(0, WL_NOTIFY_COLLAPSE_AT) : r.projs;
+  var hiddenProjs = many ? r.projs.slice(WL_NOTIFY_COLLAPSE_AT) : [];
+  var visibleHtml = visibleProjs.map(_wlNotifyProjBlock).join('');
+  var toggleHtml = many
+    ? '<div id="wl-extra-' + esc(s.id) + '" style="display:none;">' + hiddenProjs.map(_wlNotifyProjBlock).join('') + '</div>' +
+      '<button class="btn btn-ghost btn-sm wl-notify-toggle-btn" style="width:100%;margin-top:6px;" data-count="' + hiddenProjs.length + '" onclick="window.wlNotifyToggleExtra(\'' + esc(s.id) + '\',this)">▾ แสดงเพิ่มอีก ' + hiddenProjs.length + ' โครงการ</button>'
+    : '';
+  var totalPeriods = r.projs.reduce(function(n, sp) { return n + sp.periods.length; }, 0);
+  var badge = '<span style="font-size:10px;font-weight:700;color:var(--violet);background:rgba(124,92,252,.12);padding:2px 8px;border-radius:10px;white-space:nowrap;">🗂 ' + r.projs.length + ' โครงการ' + (totalPeriods > r.projs.length ? ' · ' + totalPeriods + ' ช่วง' : '') + '</span>';
+  return '<div class="wl-notify-card" id="wl-notify-card-' + esc(s.id) + '" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:6px;">' +
+      '<div style="display:flex;align-items:center;gap:10px;">' +
+        '<div style="width:36px;height:36px;border-radius:10px;background:var(--violet);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;">' + esc(initials) + '</div>' +
+        '<div><div style="font-size:14px;font-weight:800;color:var(--txt);display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' + esc(s.name) + (s.nickname ? ' <span style="color:var(--txt3);font-weight:500;font-size:12px;">(' + esc(s.nickname) + ')</span>' : '') + badge + '</div>' +
+        '<div style="font-size:11px;color:var(--txt3);margin-top:2px;">' + esc(s.role || '') + (s.role && s.dept ? ' · ' : '') + esc(s.dept || '') + '</div></div>' +
+      '</div>' +
+      '<div class="wl-notify-card-actions" style="display:flex;gap:6px;">' +
+        '<button class="btn btn-ghost btn-sm" onclick="window.wlNotifyCopy(\'' + esc(s.id) + '\')">📋 คัดลอกข้อความ</button>' +
+        '<button class="btn btn-ghost btn-sm" onclick="window.wlNotifySaveImg(\'' + esc(s.id) + '\')">🖼 บันทึกภาพ</button>' +
+      '</div>' +
+    '</div>' +
+    visibleHtml + toggleHtml +
+  '</div>';
+}
+
+window.wlNotifyToggleExtra = function(sid, btn) {
+  var el = document.getElementById('wl-extra-' + sid);
+  if (!el) return;
+  var show = el.style.display === 'none';
+  el.style.display = show ? 'block' : 'none';
+  if (btn) btn.textContent = show ? '▴ ซ่อน' : ('▾ แสดงเพิ่มอีก ' + btn.getAttribute('data-count') + ' โครงการ');
+};
+
+// ── การ์ดรายทีม/โครงการ — 1 การ์ดต่อโครงการ แสดงว่าแต่ละช่วงวันที่เข้าไซต์มีใครไปด้วยกันบ้าง ──
+function _wlNotifyTeamCardHtml(t) {
+  var p = t.p;
+  var totalPeople = {};
+  t.entries.forEach(function(en) { en.staff.forEach(function(s) { totalPeople[s.id] = 1; }); });
+  var entriesHtml = t.entries.map(function(en) {
+    var names = en.staff.map(function(s) { return esc(s.nickname || s.name); }).join(', ');
+    return '<div style="padding:8px 0;border-bottom:1px solid var(--border);">' +
+      '<div style="font-size:12px;font-weight:700;color:var(--txt);">📅 ' + (en.label ? esc(en.label) + ' — ' : '') + 'เข้าไซต์ ' + fd(en.s) + ' – ' + fd(en.e) + '</div>' +
+      '<div style="font-size:12px;color:var(--txt2);margin-top:3px;">👥 ' + names + '</div>' +
+    '</div>';
+  }).join('');
+  return '<div class="wl-notify-card" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:6px;">' +
+      '<div style="font-size:14px;font-weight:800;color:var(--txt);">📁 ' + esc(p.name) + '</div>' +
+      '<span style="font-size:10px;font-weight:700;color:var(--violet);background:rgba(124,92,252,.12);padding:2px 8px;border-radius:10px;white-space:nowrap;">👥 ' + Object.keys(totalPeople).length + ' คน · ' + t.entries.length + ' ช่วง</span>' +
+    '</div>' +
+    entriesHtml +
+  '</div>';
+}
+
+window.wlNotifyCopy = function(sid) {
+  var r = window._WL_NOTIFY_DATA[sid];
+  if (!r) return;
+  var lines = ['📋 ตารางเข้าไซต์ที่กำลังจะมาถึง — ' + r.staff.name, ''];
+  r.projs.forEach(function(sp) {
+    lines.push('📌 ' + sp.p.name);
+    sp.periods.forEach(function(per) {
+      lines.push('📅 ' + (per.label ? per.label + ' — ' : '') + 'เข้าไซต์ ' + fd(per.s) + ' – ' + fd(per.e));
+    });
+    lines.push('');
+  });
+  navigator.clipboard.writeText(lines.join('\n').trim()).then(function() {
+    window.showAlert && window.showAlert('คัดลอกแล้ว พร้อมวางส่ง LINE', 'success');
+  });
+};
+
+window.wlNotifySaveImg = async function(sid) {
+  if (!window.html2canvas) { window.showAlert && window.showAlert('ยังโหลดไลบรารีสร้างรูปภาพไม่เสร็จ ลองใหม่อีกครั้ง', 'error'); return; }
+  var src = document.getElementById('wl-notify-card-' + sid);
+  var r = window._WL_NOTIFY_DATA[sid];
+  if (!src || !r) return;
+  var clone = src.cloneNode(true);
+  var actionsEl = clone.querySelector('.wl-notify-card-actions');
+  if (actionsEl) actionsEl.remove();
+  // บันทึกภาพต้องได้ครบทุกโครงการ ไม่ใช่แค่ส่วนที่พับแสดงอยู่บนจอ — เปิดส่วนที่ซ่อนไว้ก่อนแคป แล้วเอาปุ่ม toggle ออก
+  var extraEl = clone.querySelector('[id^="wl-extra-"]');
+  if (extraEl) extraEl.style.display = 'block';
+  var toggleBtn = clone.querySelector('.wl-notify-toggle-btn');
+  if (toggleBtn) toggleBtn.remove();
+  clone.style.cssText = 'display:block;position:fixed;top:-100000px;left:0;width:480px;height:auto;background:#fff;padding:20px;';
+  document.body.appendChild(clone);
+  await new Promise(function(res) { requestAnimationFrame(function() { requestAnimationFrame(res); }); });
+  try {
+    var capW = clone.scrollWidth, capH = clone.scrollHeight;
+    var canvas = await window.html2canvas(clone, { scale: 2, backgroundColor: '#ffffff', width: capW, height: capH, windowWidth: capW, windowHeight: capH });
+    var safeName = (r.staff.name || 'staff').replace(/[^a-zA-Z0-9ก-๙]+/g, '_');
+    var link = document.createElement('a');
+    link.download = 'ตารางงาน_' + safeName + '_' + new Date().toISOString().slice(0, 10) + '.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  } catch (e) {
+    window.showAlert && window.showAlert('สร้างรูปภาพไม่สำเร็จ: ' + (e.message || e), 'error');
+  } finally {
+    document.body.removeChild(clone);
+  }
+};
+
+// ── Export Excel: 2 ชีท — "รายคน" (ต่อคน/ต่อโครงการ/ต่อช่วง) และ "รายทีม-โครงการ" (ต่อโครงการ/ต่อช่วง พร้อมรายชื่อทีม) ──
+function _wlNotifyExcelSheet(wb, headers, rows, sheetName) {
+  var ws = XLSX.utils.aoa_to_sheet([headers].concat(rows));
+  var range = XLSX.utils.decode_range(ws['!ref'] || 'A1:A1');
+  for (var c = range.s.c; c <= range.e.c; c++) {
+    var addr = XLSX.utils.encode_cell({ r: 0, c: c });
+    if (!ws[addr]) continue;
+    ws[addr].s = { font: { bold: true, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '4361EE' } }, alignment: { horizontal: 'center' } };
+  }
+  ws['!cols'] = headers.map(function(h, i) {
+    var max = h.length * 1.5;
+    rows.forEach(function(row) { var v = String(row[i] == null ? '' : row[i]); if (v.length > max) max = v.length; });
+    return { wch: Math.min(Math.max(max + 2, 8), 60) };
+  });
+  XLSX.utils.book_append_sheet(wb, ws, sheetName.substring(0, 31));
+}
+
+window.wlNotifyExportExcel = function() {
+  if (!window.XLSX) { window.showAlert && window.showAlert('ยังโหลด XLSX library ไม่เสร็จ ลองใหม่อีกครั้ง', 'error'); return; }
+  var rows = window._WL_NOTIFY_ROWS || [];
+  var teamRows = window._WL_NOTIFY_TEAM_ROWS || [];
+  if (!rows.length && !teamRows.length) { window.showAlert && window.showAlert('ไม่มีข้อมูลให้ส่งออก', 'error'); return; }
+
+  var wb = XLSX.utils.book_new();
+
+  var staffHeaders = ['ชื่อพนักงาน', 'ชื่อเล่น', 'ตำแหน่ง', 'แผนก', 'โครงการ', 'รอบ/ช่วง', 'วันที่เข้าไซต์', 'วันที่ออกจากไซต์'];
+  var staffData = [];
+  rows.forEach(function(r) {
+    r.projs.forEach(function(sp) {
+      sp.periods.forEach(function(per) {
+        staffData.push([r.staff.name, r.staff.nickname || '', r.staff.role || '', r.staff.dept || '', sp.p.name, per.label || '-', fd(per.s), fd(per.e)]);
+      });
+    });
+  });
+  _wlNotifyExcelSheet(wb, staffHeaders, staffData, 'รายคน');
+
+  var teamHeaders = ['โครงการ', 'รอบ/ช่วง', 'วันที่เข้าไซต์', 'วันที่ออกจากไซต์', 'จำนวนคน', 'ทีมงาน'];
+  var teamData = [];
+  teamRows.forEach(function(t) {
+    t.entries.forEach(function(en) {
+      teamData.push([t.p.name, en.label || '-', fd(en.s), fd(en.e), en.staff.length, en.staff.map(function(s) { return s.nickname || s.name; }).join(', ')]);
+    });
+  });
+  _wlNotifyExcelSheet(wb, teamHeaders, teamData, 'รายทีม-โครงการ');
+
+  XLSX.writeFile(wb, 'สรุปแจ้งงานเข้าไซต์_' + new Date().toISOString().slice(0, 10) + '.xlsx');
+};

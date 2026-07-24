@@ -66,6 +66,9 @@
   body, #wrap, #main, #content { max-width: 100vw; overflow-x: hidden; }
   #kb-board, .tl-container, .dtable-inner, .af-tabs, .adv-stepper, .lmock { overflow-x: auto; }
 
+  /* ── Calendar: hide add-project button on smartphone ── */
+  #cal-add-proj-btn { display: none !important; }
+
   /* ── Sidebar: slide-in drawer ── */
   #sidebar {
     position: fixed; left: -240px; top: 0; bottom: 0;
