@@ -4,6 +4,16 @@
    .dtable-*, .btn, .kb-* pattern) ให้มากที่สุด เพิ่มเฉพาะ layout ใหม่จริง ๆ
 ================================================================ */
 
+/* ── Dashboard Stat Cards: เดิมใช้ .stat-c/.stat-row generic (แนวตั้ง ไอคอน/label/value เรียงซ้อน) กิน
+   พื้นที่สูงเกินไปเมื่อมีการ์ดพร้อมกันถึง 8 ใบ — เพิ่ม class .imt-stat-* ทับเฉพาะจุดนี้ (ไม่แก้ .stat-c/.stat-row
+   เดิมตรง ๆ กันกระทบหน้าอื่นที่ใช้ชุด stat การ์ดเดียวกัน) ปรับเป็นแนวนอน (ไอคอนซ้าย ข้อความขวา) + ลด padding/ฟอนต์ ── */
+.imt-stat-row { gap: 10px; padding: 14px 20px; }
+.imt-stat-c   { display: flex; align-items: center; gap: 10px; padding: 12px 14px; }
+.imt-stat-c .stat-icon  { width: 32px; height: 32px; font-size: 14px; margin-bottom: 0; flex-shrink: 0; }
+.imt-stat-text          { min-width: 0; }
+.imt-stat-text .stat-k  { font-size: 10px; margin-bottom: 2px; white-space: nowrap; }
+.imt-stat-text .stat-v  { font-size: 17px; margin-bottom: 0; }
+
 /* ── Internal Tab Bar (แทนที่จะเพิ่ม sidebar หลายปุ่ม) ── */
 .imt-tabs {
   display: flex; flex-direction: column;
@@ -284,6 +294,11 @@
 .imt-print-checklist .ppc-phase     { font-weight: 800; font-size: 13px; }
 .imt-print-checklist .ppc-phase-pct { font-weight: 800; font-size: 11.5px; flex-shrink: 0; }
 
+/* ชื่องาน (Task) เป็นหัวข้อย่อยของ Checklist ที่ซ้อนอยู่ข้างใต้ — ตัวบาง เบากว่าหัว Phase ที่เป็นตัวหนา
+   (ppc-phase 800) เพื่อให้เห็นลำดับชั้นชัดเจน: Phase (หนา) > ชื่องาน (บาง) > Checklist ย่อหน้า (บาง) */
+.imt-print-checklist .ppc-task-row  { display: flex; align-items: baseline; gap: 6px; margin: 8px 0 4px; }
+.imt-print-checklist .ppc-task-name { flex: 1; min-width: 0; white-space: normal; word-break: break-word; font-weight: 600; }
+
 /* แต่ละรายการ 1 บรรทัด: ติ๊ก + ชื่อรายการ (งานที่ยังไม่เสร็จไม่มีช่องวันที่ ทำให้กระชับขึ้นมาก)
    งานที่เสร็จแล้วต่อวันที่ทำเสร็จไว้ท้ายชื่อในบรรทัดเดียวกัน */
 .imt-print-checklist .ppc-row       { display: flex; align-items: baseline; gap: 6px; margin-bottom: 6px; }
@@ -291,6 +306,14 @@
 .imt-print-checklist .ppc-item      { flex: 1; min-width: 0; white-space: normal; word-break: break-word; font-weight: 600; }
 .imt-print-checklist .ppc-item::before { content: '- '; }
 .imt-print-checklist .ppc-row-done .ppc-item { font-weight: 500; color: #333; }
+
+/* แถวย่อย (Checklist ซ้อนใต้ชื่องาน): ใช้ไอคอนติ๊ก ☑/☐ ของแต่ละรายการเองแทนจุดสีสถานะของ Task ที่ซ้ำกันทุก
+   แถวแบบเดิม (ไม่สื่อความหมายเพิ่ม) — ตัดขีด "- " หน้าชื่อออกเพราะไอคอนติ๊กทำหน้าที่เป็นตัวนำแถวอยู่แล้ว */
+.imt-print-checklist .ppc-row.ppc-sub { margin-left: 16px; }
+.imt-print-checklist .ppc-sub .ppc-item::before { content: none; }
+.imt-print-checklist .ppc-ck-ic     { font-size: 1.05em; color: #9aa0ab; }
+.imt-print-checklist .ppc-ck-ic.done { color: #16a34a; }
+
 .imt-print-checklist .ppc-date      { flex-shrink: 0; white-space: nowrap; font-size: .88em; color: #16a34a; font-weight: 700; }
 
 /* ── Report Tab: Hero (ring ความคืบหน้ารวม + สถิติเด่น) ── */

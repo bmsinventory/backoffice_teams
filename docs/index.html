@@ -197,7 +197,7 @@
         <span class="ni">🏨</span><span class="nl">จัดหาที่พัก</span>
       </div>
       <div class="nav-btn" onclick="window.goView('impl_tracker',this)">
-        <span class="ni">🛠️</span><span class="nl">ติดตามโครงการติดตั้ง</span>
+        <span class="ni">🛠️</span><span class="nl">ติดตามสถานะโครงการ</span>
       </div>
       <div class="sb-sec">ต้นทุน</div>
       <div class="nav-btn" onclick="window.goView('timesheet',this)">
@@ -1664,6 +1664,22 @@
   </div>
 </div>
 
+<!-- FORM TRACKER — Template ชื่อเอกสารมาตรฐาน (ใช้ร่วมกันทุกโครงการ) -->
+<div class="overlay" id="m-ftk-template">
+  <div class="modal md">
+    <div class="m-head">
+      <div class="m-icon" style="background:rgba(6,166,160,.12)">📐</div>
+      <div class="m-title" id="m-ftk-template-title">Template ชื่อเอกสาร</div>
+      <button class="m-x" onclick="window.closeM('m-ftk-template')">✕</button>
+    </div>
+    <div class="m-body" id="m-ftk-template-body" style="max-height:60vh;overflow-y:auto;"></div>
+    <div class="m-foot">
+      <button class="btn btn-ghost" onclick="window.closeM('m-ftk-template')">ปิด</button>
+      <button class="btn btn-pri" id="m-ftk-template-import" onclick="window.ftkImportFromTemplate()">📥 นำเข้ารายการที่เลือก</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="m-imt-phase">
   <div class="modal md">
     <div class="m-head">
@@ -2252,6 +2268,7 @@
 <script src="src/config/app.config.js"></script>
 <script src="src/config/routes.config.js"></script>
 <script src="src/config/impl-tracker.config.js"></script>
+<script src="src/config/form-tracker.config.js"></script>
 <script src="src/config/expense-form.config.js"></script>
 <script src="src/config/site-deploy-form.config.js"></script>
 <script src="src/config/site-notice-form.config.js"></script>
@@ -2271,6 +2288,7 @@
 <script src="src/services/realtime.service.js"></script>
 <script src="src/services/auth.service.js"></script>
 <script src="src/services/impl-tracker.service.js"></script>
+<script src="src/services/form-tracker.service.js"></script>
 <script src="src/services/expense-form.service.js"></script>
 <script src="src/services/site-deploy-form.service.js"></script>
 <script src="src/services/site-notice-form.service.js"></script>
@@ -2300,6 +2318,7 @@
 <script type="module" src="js/hospital.js"></script>
 <script type="module" src="js/contract.js"></script>
 <script type="module" src="js/worklog.js"></script>
+<script type="module" src="js/form-tracker.js"></script>
 <script type="module" src="js/impl-tracker.js"></script>
 <script src="js/budget.js"></script>
 <script src="js/export.js"></script>

@@ -7,11 +7,20 @@ window.askDel=function(type,id,label){window.delTarget={type:type,id:id};documen
 window.execDelete=async function(){
   if(!window.delTarget)return;if(!window.auth.currentUser)return;
   var t=window.delTarget.type,id=window.delTarget.id;
-  var _delModMap={project:'projects',advance:'advance',lodging:'lodging',timesheet:'timesheet',cost:'cost',leave:'leave',contract:'contract',imt_project:'impl_tracker',imt_phase:'impl_tracker',imt_task:'impl_tracker',imt_template:'impl_tracker'};
+  var _delModMap={project:'projects',advance:'advance',lodging:'lodging',timesheet:'timesheet',cost:'cost',leave:'leave',contract:'contract',imt_project:'impl_tracker',imt_phase:'impl_tracker',imt_task:'impl_tracker',imt_template:'impl_tracker',form_group:'impl_tracker',form_item:'impl_tracker',form_template:'impl_tracker'};
   if(['staff','type','position','group','user','stage','department'].includes(t)){if(!window.canDel('admin'))return;}
   else if(_delModMap[t]){if(!window.canDel(_delModMap[t]))return;}
   else{if(!window.isAdmin())return;}
-  var sheetMap={project:'PROJECTS',advance:'ADVANCES',staff:'STAFF',type:'PTYPES',user:'USERS',position:'POSITIONS',group:'PGROUPS',lodging:'LODGINGS',stage:'STAGES',timesheet:'TIMESHEETS',cost:'COSTS',department:'DEPARTMENTS',contract:'CONTRACTS',imt_project:'IMPL_PROJECTS',imt_phase:'IMPL_PHASES',imt_task:'IMPL_TASKS',imt_template:'IMPL_TEMPLATES'};
+  var sheetMap={project:'PROJECTS',advance:'ADVANCES',staff:'STAFF',type:'PTYPES',user:'USERS',position:'POSITIONS',group:'PGROUPS',lodging:'LODGINGS',stage:'STAGES',timesheet:'TIMESHEETS',cost:'COSTS',department:'DEPARTMENTS',contract:'CONTRACTS',imt_project:'IMPL_PROJECTS',imt_phase:'IMPL_PHASES',imt_task:'IMPL_TASKS',imt_template:'IMPL_TEMPLATES',form_group:'FORM_GROUPS',form_item:'FORM_ITEMS',form_template:'FORM_TEMPLATES'};
+  function _ftkCascadeGroup(groupId){
+    window.FORM_ITEMS.filter(x=>x.groupId===groupId).forEach(i=>deleteDoc(getDocRef('FORM_ITEMS',i.id)));
+    window.FORM_ITEMS=window.FORM_ITEMS.filter(x=>x.groupId!==groupId);
+  }
+  // ── เรียกตอนลบโครงการ (imt_project) ด้วย เพื่อล้างแบบฟอร์ม/คลังที่ผูกกับโครงการนั้นไปพร้อมกัน ──
+  function _ftkCascadeProject(projectId){
+    window.FORM_GROUPS.filter(x=>x.projectId===projectId).forEach(g=>{_ftkCascadeGroup(g.id);deleteDoc(getDocRef('FORM_GROUPS',g.id));});
+    window.FORM_GROUPS=window.FORM_GROUPS.filter(x=>x.projectId!==projectId);
+  }
   function _imtCascadeTask(taskId){
     window.IMPL_CHECKLIST_ITEMS.filter(x=>x.taskId===taskId).forEach(c=>deleteDoc(getDocRef('IMPL_CHECKLIST_ITEMS',c.id)));
     window.IMPL_COMMENTS.filter(x=>x.taskId===taskId).forEach(c=>deleteDoc(getDocRef('IMPL_COMMENTS',c.id)));
@@ -42,6 +51,7 @@ window.execDelete=async function(){
     window.IMPL_ISSUES.filter(x=>x.projectId===id).forEach(i=>deleteDoc(getDocRef('IMPL_ISSUES',i.id)));
     window.IMPL_RISKS.filter(x=>x.projectId===id).forEach(r=>deleteDoc(getDocRef('IMPL_RISKS',r.id)));
     window.IMPL_ACTIVITY_LOG.filter(x=>x.projectId===id).forEach(a=>deleteDoc(getDocRef('IMPL_ACTIVITY_LOG',a.id)));
+    _ftkCascadeProject(id);
     window.IMPL_PHASES=window.IMPL_PHASES.filter(x=>x.projectId!==id);
     window.IMPL_ISSUES=window.IMPL_ISSUES.filter(x=>x.projectId!==id);
     window.IMPL_RISKS=window.IMPL_RISKS.filter(x=>x.projectId!==id);
@@ -52,6 +62,9 @@ window.execDelete=async function(){
   else if(t==='imt_phase'){_imtCascadePhase(id);window.IMPL_PHASES=window.IMPL_PHASES.filter(x=>x.id!==id);}
   else if(t==='imt_task'){_imtCascadeTask(id);window.IMPL_TASKS=window.IMPL_TASKS.filter(x=>x.id!==id);}
   else if(t==='imt_template')window.IMPL_TEMPLATES=window.IMPL_TEMPLATES.filter(x=>x.id!==id);
+  else if(t==='form_group'){_ftkCascadeGroup(id);window.FORM_GROUPS=window.FORM_GROUPS.filter(x=>x.id!==id);}
+  else if(t==='form_item')window.FORM_ITEMS=window.FORM_ITEMS.filter(x=>x.id!==id);
+  else if(t==='form_template')window.FORM_TEMPLATES=window.FORM_TEMPLATES.filter(x=>x.id!==id);
   window.closeM('m-del');window.delTarget=null;window.renderAll();
   if(t==='staff')window.admTab('staff');else if(['type','user','position','group','stage'].includes(t))window.admTab(t+'s');
   if(t==='department')window.admTab('dept');
@@ -62,6 +75,12 @@ window.execDelete=async function(){
     // realtime sync ของแต่ละตารางอาจตามไม่ทันทันที ทำให้เปิดโครงการอื่นดูตอนนั้นพอดีเห็นข้อมูลว่างชั่วคราว
     // (ข้อมูลจริงไม่ได้หายไปไหนในฐานข้อมูล) — เรียก re-render ซ้ำอีกครั้งหลังรอ sync นิ่งแล้ว กันผู้ใช้ต้องกด F5 เอง ──
     setTimeout(function(){window.renderAll();},1500);
+  }
+  if(t==='form_template'){
+    // ── ลบรายชื่อ Template ระหว่างเปิด modal m-ftk-template ค้างอยู่พอดี (เช่น admin ลบทิ้งกลางคัน) —
+    // renderAll() ไม่แตะ DOM ในนี้เพราะ modal ไม่ได้อยู่ใต้ view ไหน ต้อง refresh เองแยกต่างหาก ──
+    var tm=document.getElementById('m-ftk-template');
+    if(tm&&tm.classList.contains('on'))window.renderFtkTemplateModal&&window.renderFtkTemplateModal();
   }
 }
 

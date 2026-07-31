@@ -24,7 +24,7 @@
     { id:'hospital',     label:'รายชื่อ รพ.',     icon:'🏥' },
     { id:'contract',     label:'ข้อมูลสัญญา',     icon:'📄' },
     { id:'worklog',      label:'บันทึกงาน',       icon:'📝' },
-    { id:'impl_tracker', label:'ติดตามโครงการติดตั้ง', icon:'🛠️' },
+    { id:'impl_tracker', label:'ติดตามสถานะโครงการ', icon:'🛠️' },
   ];
 
   // ── Route Map: moduleId → viewId ──

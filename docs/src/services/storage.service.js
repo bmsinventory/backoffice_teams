@@ -17,6 +17,19 @@
       try { localStorage.removeItem('_bms_rem'); } catch {}
     },
 
+    // ── Remembered Password (เฉพาะตอนติ๊ก "จดจำการเข้าสู่ระบบ") — เข้ารหัสเบา ๆ ด้วย base64 กันสายตา
+    // เผลอเห็นตรง ๆ ใน localStorage เท่านั้น ไม่ใช่การเข้ารหัสจริง (เปิด devtools อ่านได้เหมือนเดิม) —
+    // encodeURIComponent ก่อน btoa กันรหัสผ่านที่มีอักษรไทย/Unicode ทำให้ btoa error ──
+    getRememberedPassword: function () {
+      try { var raw = localStorage.getItem('_bms_rem_p'); return raw ? decodeURIComponent(atob(raw)) : null; } catch { return null; }
+    },
+    setRememberedPassword: function (password) {
+      try { localStorage.setItem('_bms_rem_p', btoa(encodeURIComponent(password))); } catch {}
+    },
+    clearRememberedPassword: function () {
+      try { localStorage.removeItem('_bms_rem_p'); } catch {}
+    },
+
     // ── Dark Mode ──
     getTheme: function () {
       try { return localStorage.getItem('_bms_theme') || 'system'; } catch { return 'system'; }

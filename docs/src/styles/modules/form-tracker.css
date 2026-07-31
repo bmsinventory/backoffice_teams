@@ -1,0 +1,213 @@
+/**
+ * form-tracker.css — สไตล์แท็บ "แบบฟอร์ม" ในหน้า "ติดตามโครงการติดตั้ง" (impl_tracker)
+ * ไม่มี picker/หน้าเลือกโครงการของตัวเอง (ใช้ project switcher ของ impl-tracker.css ร่วมกัน) — มีแค่ชุด
+ * ftk-* สำหรับส่วนตาราง Group/Item ของตัวเอง ใช้ component ทั่วไปร่วมกับทั้งระบบตามปกติ:
+ * .btn / .f-input / .tag / .pbar / .dtable-inner / .t-sel / .toolbar
+ */
+
+/* ── Header: แถบความคืบหน้ารวมของแบบฟอร์มในโครงการ ── */
+.ftk-header {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 14px 24px; border-bottom: 1px solid var(--border); background: var(--surface2);
+}
+.ftk-header-title { font-size: 14.5px; font-weight: 700; }
+.ftk-header-pbar  { display: flex; align-items: center; gap: 8px; width: 130px; flex-shrink: 0; }
+.ftk-header-pbar .pbar { flex: 1; }
+.ftk-header-pbar span  { font-size: 11.5px; font-weight: 700; flex-shrink: 0; }
+
+/* ── Filter Bar ── */
+.ftk-filterbar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 12px 24px; border-bottom: 1px solid var(--border);
+}
+.ftk-hidedone-chk {
+  display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--txt2);
+  white-space: nowrap; cursor: pointer;
+}
+
+.ftk-scroll { padding: 16px 24px; overflow-y: auto; flex: 1; }
+
+/* ── Group (คลัง) ── */
+.ftk-group      { margin-bottom: 18px; }
+.ftk-group-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 10px 4px; font-size: 13.5px; font-weight: 700;
+}
+.ftk-group-icon { flex-shrink: 0; }
+.ftk-group-name-input {
+  flex: 1; min-width: 0; border: 1px solid transparent; background: transparent;
+  padding: 4px 8px; border-radius: 6px; font-size: 13.5px; font-family: inherit; font-weight: 700; color: var(--txt);
+}
+.ftk-group-name-input:hover, .ftk-group-name-input:focus { border-color: var(--border); background: var(--surface2); outline: none; }
+.ftk-group-name-input:disabled { cursor: default; }
+.ftk-group-meta { font-size: 11.5px; font-weight: 700; color: var(--txt3); flex-shrink: 0; }
+.ftk-group-addbar { padding: 4px; }
+
+/* ── ตารางแบบฟอร์ม: แก้ไข inline ทุกคอลัมน์ (ลำดับ/ชื่อ/ประเภท/สถานะ/ผู้จัดทำ/วันที่รับเอกสาร/วันที่ดำเนินการ/
+   หมายเหตุ) — ขนาดตัวอักษรอ้างอิงตาม .dtable td (13px) / .t-sel (12px) / .f-input (13px) เดียวกับตารางอื่น ๆ
+   ในระบบ — table-layout ปล่อยเป็น auto (ค่า default) แต่ละคอลัมน์กว้างตามเนื้อหาจริง ไม่ fix พิกเซล ยกเว้น
+   คอลัมน์ "แบบฟอร์ม" (.ftk-name-input) ที่ตั้งใจให้ยืดกินพื้นที่ที่เหลือทั้งหมดเป็นคอลัมน์หลัก ── */
+.ftk-table       { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ftk-table th    { text-align: left; padding: 8px 10px; font-size: 11px; color: var(--txt3); font-weight: 700; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.ftk-table td    { padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.ftk-table tr:last-child td { border-bottom: none; }
+.ftk-table th.ftk-no, .ftk-table td.ftk-no { width: 1%; padding-right: 4px; text-align: center; color: var(--txt3); font-size: 12px; white-space: nowrap; }
+/* ── ชื่อแบบฟอร์ม: textarea แถวเดียวที่ขยายสูงอัตโนมัติ (JS resize ใน form-tracker.js) แทน input เดิม
+   ที่ตัดข้อความยาว ๆ ทิ้งเงียบ ๆ — resize:none/overflow:hidden กันผู้ใช้ลากขยายเองหรือเห็น scrollbar ── */
+.ftk-name-input {
+  display: block; width: 100%; min-width: 180px; border: 1px solid transparent; background: transparent;
+  padding: 6px 8px; border-radius: 6px; font-size: 13px; font-family: inherit; font-weight: 400; color: var(--txt);
+  white-space: normal; overflow-wrap: break-word; line-height: 1.4; resize: none; overflow: hidden;
+}
+.ftk-name-input:hover, .ftk-name-input:focus { border-color: var(--border); background: var(--surface2); outline: none; }
+/* ── dropdown ประเภท/สถานะ/ผู้จัดทำ: width:auto ให้กว้างตามข้อความที่เลือกจริง (สั้น/ยาวต่างกันตามตัวเลือก)
+   ไม่ยืดเต็มคอลัมน์เหมือนเดิม — min-width กันเหลือแคบเกินจนกดยาก ── */
+.ftk-sel {
+  width: auto; min-width: 64px; max-width: 100%; border: none; border-radius: 6px; padding: 6px 8px;
+  font-size: 12px; font-family: inherit; font-weight: 400; cursor: pointer; appearance: none;
+}
+.ftk-sel:disabled { cursor: default; opacity: .8; }
+/* ── ตัวหนาเฉพาะ dropdown ประเภท/สถานะที่ทำหน้าที่เป็น pill สี (อ่านง่ายขึ้นบนพื้นสี) — dropdown "ผู้จัดทำ"
+   ไม่มีพื้นสี ใช้ .ftk-sel เฉย ๆ ไม่ต้องหนา ── */
+.ftk-sel-pill { font-weight: 700; }
+.ftk-date { white-space: nowrap; font-size: 11.5px; color: var(--txt3); font-weight: 400; }
+/* ── "วันที่รับเอกสาร": native <input type=date> โชว์ปี ค.ศ. เสมอ (ปรับเป็น พ.ศ. ผ่าน CSS/HTML ไม่ได้เลย
+   เป็นข้อจำกัดของ browser) — ซ่อน input จริงไว้แบบโปร่งใสทับเต็มพื้นที่ (คลิก/แตะได้ปกติ เปิด native date
+   picker ปกติทุกอย่าง) แล้วโชว์ .ftk-date-display ที่ format เป็น พ.ศ. ด้วย fd() ทับไว้ด้านบนแทน ── */
+.ftk-date-picker { position: relative; display: block; }
+.ftk-date-input {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  opacity: 0; border: none; padding: 0; margin: 0; cursor: pointer;
+}
+.ftk-date-input:disabled { cursor: default; }
+.ftk-date-display {
+  display: block; padding: 6px 8px; border: 1px solid transparent; border-radius: 6px;
+  font-size: 12.5px; font-family: inherit; color: var(--txt); white-space: nowrap; pointer-events: none;
+}
+.ftk-date-picker:hover .ftk-date-display      { border-color: var(--border); background: var(--surface2); }
+.ftk-date-picker:focus-within .ftk-date-display { border-color: var(--violet); background: var(--surface); }
+/* ── width:auto บน <input> ไม่ได้แปลว่า "หดตามเนื้อหา" เหมือน <select> — เบราว์เซอร์ถอยไปใช้ค่า default
+   ของ input (เทียบเท่า size="20" ~180px) ทุกแถวไม่ว่าจะมีข้อความ "—" สั้น ๆ หรือไม่ ทำให้คอลัมน์นี้กว้างเกิน
+   จำเป็นและแย่งพื้นที่จากคอลัมน์ "แบบฟอร์ม" ไป — ตั้งความกว้างตายตัวที่กระชับแทน ── */
+.ftk-note {
+  width: 110px; border: 1px solid transparent; background: transparent;
+  padding: 6px 8px; border-radius: 6px; font-size: 13px; font-family: inherit; color: var(--txt);
+}
+.ftk-note:hover, .ftk-note:focus { border-color: var(--border); background: var(--surface2); outline: none; }
+.ftk-quickadd td { padding: 6px 8px; }
+.ftk-quickadd input { border: 1px dashed var(--border2); }
+
+/* ── Empty States ── */
+.ftk-empty-hero  { text-align: center; padding: 48px 20px 28px; }
+.ftk-empty-icon  { font-size: 40px; margin-bottom: 10px; }
+.ftk-empty-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+.ftk-empty-sub   { font-size: 12px; color: var(--txt3); }
+
+/* ── Template Modal (m-ftk-template): รายชื่อเอกสารมาตรฐาน — จัดการ (ลบ) หรือติ๊กเลือกดึงมาใช้ ── */
+.ftk-tpl-list { display: flex; flex-direction: column; gap: 2px; }
+.ftk-tpl-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 7px 8px; border-radius: 8px; font-size: 12.5px;
+}
+.ftk-tpl-row:hover { background: var(--surface2); }
+.ftk-tpl-row-dim { opacity: .55; }
+.ftk-tpl-row-dim small { color: var(--txt3); font-weight: 600; }
+.ftk-tpl-chklbl { display: flex; align-items: center; gap: 8px; cursor: pointer; flex: 1; min-width: 0; }
+.ftk-tpl-chklbl input[type="checkbox"] { flex-shrink: 0; width: 15px; height: 15px; cursor: pointer; }
+.ftk-tpl-chklbl span { word-break: break-word; }
+
+/* ================================================================
+   PRINT SUMMARY / IMAGE (.ftk-print-page → .ftkp-*): สรุป "บันทึกเป็นรูปภาพ" — ออกแบบเป็นเอกสารแนวตั้ง
+   สัดส่วน A4 (form-tracker.js ตั้งความกว้าง clone ไว้ 794px = A4 @96dpi ตอนจับภาพ) เป็นภาพส่งต่อทางไลน์/
+   อีเมล ไม่ใช่กระดาษพิมพ์จริง จึงออกแบบให้มีสีสัน/การ์ด/เงาได้เต็มที่ (ไม่ใช้ชุด .ppc-* ขาวดำของ impl-tracker)
+   โทนสีอ้างอิงจากตัวแปรแบรนด์ของแอป (--violet #7c5cfc / --indigo #4361ee / --teal #06d6a0) แบบ hardcode
+   เป็น hex ตรง ๆ เพราะ html2canvas บางเวอร์ชันอ่านค่า CSS custom property จาก element ที่ clone แล้วนอกจอ
+   ไม่แน่นอน ── ไล่จากบนลงล่าง: แถบหัวไล่สี → hero % + stat mini-tile 3 ใบ → กราฟแท่งแยกสถานะ/ประเภท
+   (เต็มความกว้าง เรียงต่อกันในแนวตั้ง) → การ์ดรายละเอียดต่อคลัง (คอลัมน์เดียว อ่านง่ายกว่าบนหน้าแคบ) → ท้ายเอกสาร
+   ================================================================ */
+.ftkp-doc { background: #ffffff; font-family: 'Plus Jakarta Sans','Noto Sans Thai',sans-serif; color: #1a1d2e; }
+
+.ftkp-header      { background: linear-gradient(135deg,#7c5cfc,#4361ee); padding: 32px 36px 28px; color: #fff; }
+.ftkp-header-eyebrow { font-size: 12.5px; font-weight: 700; letter-spacing: .4px; opacity: .85; margin-bottom: 8px; }
+.ftkp-header-title   { font-size: 26px; font-weight: 800; line-height: 1.3; margin-bottom: 8px; }
+.ftkp-header-sub     { font-size: 12.5px; opacity: .92; line-height: 1.6; }
+
+.ftkp-body { padding: 28px 36px 8px; }
+
+/* ── Hero: % รวมตัวใหญ่ + progress bar ในการ์ดไล่สีอ่อน + stat mini-tile 3 ใบ ── */
+.ftkp-hero {
+  background: linear-gradient(135deg,#f2effe,#eafaf5); border: 1px solid #e4e7ed; border-radius: 18px;
+  padding: 22px 24px; margin-bottom: 20px;
+}
+.ftkp-hero-pct-row  { display: flex; align-items: baseline; gap: 12px; margin-bottom: 10px; }
+.ftkp-hero-pct      { font-size: 44px; font-weight: 800; color: #7c5cfc; line-height: 1; }
+.ftkp-hero-pct-lbl  { font-size: 13px; font-weight: 700; color: #5a6075; }
+.ftkp-hero-bar-track { height: 14px; background: rgba(255,255,255,.7); border-radius: 8px; overflow: hidden; }
+.ftkp-hero-bar-fill  { height: 100%; border-radius: 8px; background: linear-gradient(90deg,#7c5cfc,#4361ee); }
+
+.ftkp-stats     { display: flex; gap: 12px; margin-top: 18px; }
+.ftkp-stat      { flex: 1; display: flex; align-items: center; gap: 10px; background: #fff; border: 1px solid #e4e7ed; border-radius: 12px; padding: 12px 14px; }
+.ftkp-stat-icon { width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
+.ftkp-stat b    { display: block; font-size: 19px; font-weight: 800; line-height: 1.1; }
+.ftkp-stat span { display: block; font-size: 10.5px; color: #5a6075; font-weight: 600; margin-top: 2px; }
+
+/* ── กราฟแท่ง: แยกตามสถานะ / แยกตามประเภท — เต็มความกว้าง เรียงต่อกันในแนวตั้ง ── */
+.ftkp-panel       { background: #f8f9fb; border: 1px solid #e4e7ed; border-radius: 16px; padding: 18px 20px; margin-bottom: 16px; }
+.ftkp-panel-title { font-size: 13.5px; font-weight: 800; margin-bottom: 14px; }
+.ftkp-bar-row      { margin-bottom: 12px; }
+.ftkp-bar-row:last-child { margin-bottom: 0; }
+.ftkp-bar-row-top  { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-size: 12px; }
+.ftkp-bar-dot      { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.ftkp-bar-label    { font-weight: 700; flex: 1; min-width: 0; }
+.ftkp-bar-val      { font-weight: 800; flex-shrink: 0; }
+.ftkp-bar-track    { height: 10px; background: #e4e7ed; border-radius: 6px; overflow: hidden; }
+.ftkp-bar-fill     { height: 100%; border-radius: 6px; }
+
+/* ── รายละเอียดต่อคลัง: การ์ดคอลัมน์เดียว เรียงจากบนลงล่าง — สีขอบซ้าย/ตัวเลข % อ้างอิงความคืบหน้าคลังนั้น ── */
+.ftkp-detail-title { font-size: 14px; font-weight: 800; margin: 4px 0 12px; }
+.ftkp-group         { background: #fff; border: 1px solid #e4e7ed; border-radius: 14px; margin-bottom: 14px; overflow: hidden; }
+.ftkp-group-head     { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px; border-left: 5px solid #9ba3b8; background: #f8f9fb; }
+.ftkp-group-name     { font-size: 13px; font-weight: 800; }
+.ftkp-group-pct      { font-size: 12px; font-weight: 800; flex-shrink: 0; }
+.ftkp-item-row       { display: flex; align-items: center; gap: 10px; padding: 9px 16px; border-top: 1px solid #f0f1f4; font-size: 11.5px; }
+.ftkp-item-dot       { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.ftkp-item-name      { flex: 1; min-width: 0; font-weight: 600; }
+.ftkp-item-name.done { color: #5a6075; font-weight: 500; }
+.ftkp-item-meta      { flex-shrink: 0; color: #9ba3b8; font-size: 10.5px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ftkp-item-date      { flex-shrink: 0; font-weight: 700; color: #06d6a0; font-size: 10.5px; white-space: nowrap; }
+
+.ftkp-footer { text-align: center; font-size: 10.5px; color: #9ba3b8; padding: 18px 20px 26px; }
+
+/* ================================================================
+   RESPONSIVE — Mobile-first: ตาราง .ftk-table แปลงเป็นการ์ดต่อแถวใต้ 768px
+   (ตาราง 9 คอลัมน์ scroll ทางขวาบนจอเล็กใช้งานยาก) — เก็บโครงสร้าง <table>/<td> เดิมไว้ทั้งหมด ใช้
+   data-label ที่ผูกไว้ในแต่ละ td (ดู form-tracker.js) แสดงแทนหัวตารางที่ซ่อนไป
+   ================================================================ */
+@media (max-width: 768px) {
+  .ftk-header { padding: 10px 14px; gap: 8px; }
+  .ftk-filterbar { padding: 8px 12px; }
+  .ftk-scroll { padding: 12px 14px; }
+  .ftk-group-head { flex-wrap: wrap; }
+
+  .ftk-table                          { display: block; }
+  .ftk-table thead                    { display: none; }
+  .ftk-table tbody                    { display: flex; flex-direction: column; gap: 10px; }
+  .ftk-table tr                       { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; background: var(--surface); border: 1.5px solid var(--border); border-radius: 12px; padding: 12px; }
+  .ftk-table td                       { display: block; padding: 0; border: none; }
+  .ftk-table td::before               { content: attr(data-label); display: block; font-size: 10px; font-weight: 700; color: var(--txt3); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 2px; }
+  /* "ลำดับ" ไม่ต้องโชว์ซ้ำบนการ์ด — ลำดับการวางการ์ดจากบนลงล่างสื่อความหมายอยู่แล้ว */
+  .ftk-table td.ftk-no                { display: none; }
+  /* "แบบฟอร์ม" (td ตัวที่ 2 นับรวม ลำดับ ที่ซ่อนไว้) ทำหน้าที่เป็นหัวการ์ดแทน — เต็มความกว้าง ไม่ต้องมี label ซ้ำ */
+  .ftk-table td:nth-child(2)          { grid-column: 1 / -1; padding-bottom: 8px; border-bottom: 1px solid var(--border); margin-bottom: 2px; }
+  .ftk-table td:nth-child(2)::before  { display: none; }
+  /* "หมายเหตุ" และปุ่ม "ลบ" (คอลัมน์สุดท้าย) กว้างเต็มการ์ด ปุ่มลบไม่ต้องมี label ซ้ำ (ไอคอนสื่อความหมายพอแล้ว) */
+  .ftk-table td.ftk-note-cell         { grid-column: 1 / -1; }
+  .ftk-table td:last-child            { grid-column: 1 / -1; text-align: right; }
+  .ftk-table td:last-child::before    { display: none; }
+  .ftk-table .ftk-sel,
+  .ftk-table .ftk-note,
+  .ftk-table .ftk-date-picker         { width: 100%; }
+  /* แถว "+ พิมพ์ชื่อแบบฟอร์มแล้วกด Enter..." ไม่ใช่การ์ดข้อมูล — คืนกลับเป็นแถวเรียบ ๆ ปกติ */
+  .ftk-table tr.ftk-quickadd          { display: flex; flex-direction: column; gap: 8px; background: transparent; border: none; padding: 8px 0 0; }
+  .ftk-table tr.ftk-quickadd td       { display: block; padding: 0; }
+}

@@ -82,10 +82,15 @@
       return;
     }
 
-    // Remember me
+    // Remember me — จำทั้ง username และ password (base64 เบา ๆ ใน StorageService) เมื่อติ๊กไว้
     var remEl = document.getElementById('l-rem');
-    if (remEl && remEl.checked) window.StorageService.setRememberedUser(usr.username);
-    else window.StorageService.clearRememberedUser();
+    if (remEl && remEl.checked) {
+      window.StorageService.setRememberedUser(usr.username);
+      window.StorageService.setRememberedPassword(password);
+    } else {
+      window.StorageService.clearRememberedUser();
+      window.StorageService.clearRememberedPassword();
+    }
 
     // Set current user & switch to app view
     window.cu = usr;
@@ -182,7 +187,9 @@
     if (errEl) errEl.style.display = 'none';
     if (infoEl) infoEl.style.display = 'none';
     var remUser = window.StorageService.getRememberedUser();
+    var remPass = window.StorageService.getRememberedPassword();
     if (remUser && uEl) uEl.value = remUser;
+    if (remPass && pEl) pEl.value = remPass;
   };
 
   // ── Toggle login password show/hide ──
@@ -208,6 +215,7 @@
   seedDatabaseIfEmpty().then(function () {
     window.RealtimeService && window.RealtimeService.setup();
     window.ImplTrackerService && window.ImplTrackerService.setup();
+    window.FormTrackerService && window.FormTrackerService.setup();
   }).catch(function (e) {
     console.warn('[auth.service] init error:', e.message);
   });

@@ -10,6 +10,7 @@
 
   // ── Lookup Helpers ──
   function imtProject(id) { return window.IMPL_PROJECTS.find(function (p) { return p.id === id; }); }
+  window.imtProject = imtProject; // ── ให้ form-tracker.js (แท็บ "แบบฟอร์ม") เรียกใช้ได้ ไม่ต้อง lookup ซ้ำ ──
   function imtPhase(id)   { return window.IMPL_PHASES.find(function (p) { return p.id === id; }); }
   function imtTask(id)    { return window.IMPL_TASKS.find(function (t) { return t.id === id; }); }
   function imtPhasesOf(pid)    { return window.IMPL_PHASES.filter(function (p) { return p.projectId === pid; }).sort(function (a,b) { return a.order - b.order; }); }
@@ -72,6 +73,7 @@
     return sids.map(function (sid) { return window.gSt(sid); })
       .filter(function (s) { return s && s.id && !seen[s.id] && (seen[s.id] = true); });
   }
+  window.imtProjectTeamStaff = imtProjectTeamStaff; // ── ใช้ร่วมกับแท็บ "แบบฟอร์ม" (form-tracker.js) กันซ้ำ ──
 
   // ── Markup ของ combobox "ผู้รับผิดชอบ" — รูปแบบเดียวกับ combobox เลือกโครงการ (ค้นหา + คลิกเลือก
   // + position:fixed กันโดน overflow ของ modal ตัด) แทน input+datalist เดิม (บาง browser ไม่โชว์ label) ──
@@ -160,15 +162,19 @@
   var TABS = [
     { id:'dashboard', label:'ภาพรวมทุกโครงการ', icon:'📊' },
     { id:'workspace', label:'งาน',              icon:'🗃️' },
+    { id:'forms',     label:'แบบฟอร์ม',          icon:'📄' },
     { id:'calendar',  label:'Calendar',          icon:'📅' },
     { id:'report',    label:'Report',            icon:'📈' },
     { id:'templates', label:'Template',          icon:'📐' },
   ];
   // แท็บที่ต้องใช้ project switcher (ทุกแท็บยกเว้น dashboard ซึ่งเป็นมุมมองรวมทุกโครงการอยู่แล้ว)
-  var TABS_NEED_PROJECT = ['workspace','calendar','report'];
+  var TABS_NEED_PROJECT = ['workspace','forms','calendar','report'];
 
   window.imtGoTab = function (tab) {
     window.imtTab = tab;
+    // ── แท็บที่ต้องมีโครงการ (งาน/แบบฟอร์ม/Calendar/Report) แต่ยังไม่มีโครงการ "กำลังดู" อยู่ — auto-select ให้
+    // แทนที่จะโผล่หน้าเปล่า ๆ ให้เลือกเอง (เริ่มแอปยังคงอยู่ที่ Dashboard ตามปกติ ไม่ถูกเรียกจุดนี้จนกว่าจะกดเข้าแท็บ) ──
+    if (TABS_NEED_PROJECT.indexOf(tab) !== -1 && !window.imtCurrentProjectId) _imtAutoSelectProject();
     window.renderImplTracker();
   };
 
@@ -200,12 +206,23 @@
     var pid = window.imtCurrentProjectId;
     var proj = pid ? imtProject(pid) : null;
     if (!proj) return ''; // ยังไม่เลือกโครงการ — แต่ละแท็บมี empty-state picker ของตัวเองอยู่แล้ว ไม่ต้องซ้ำ
-    var opts = window.IMPL_PROJECTS.map(function (p) { return '<option value="'+p.id+'"'+(p.id===pid?' selected':'')+'>'+esc(p.name)+'</option>'; }).join('');
+    // ── ตัวกรอง "แสดงเฉพาะโครงการที่ยังไม่เสร็จ" ในตัวเลือก "กำลังดู" — ค่าเริ่มต้นติ๊กไว้ (undefined !== false → true)
+    // ซ่อนโครงการที่เสร็จแล้ว 100% ออกจากรายการให้สลับ แต่ยังคงโครงการที่กำลังดูอยู่ตอนนี้ไว้เสมอ (unshift ไม่หาย
+    // จากตัวเลือกแม้จะเป็นโครงการที่เสร็จแล้ว) กันไม่ให้ dropdown แสดงค่าว่างเปล่าตอนกำลังดูโครงการที่เสร็จอยู่พอดี ──
+    var hideDoneProjects = window.imtHideDoneProjects !== false;
+    var switchableProjects = window.IMPL_PROJECTS.filter(function (p) {
+      return !hideDoneProjects || p.id === pid || imtProjectHealth(p).level !== 'done';
+    });
+    var opts = switchableProjects.map(function (p) { return '<option value="'+p.id+'"'+(p.id===pid?' selected':'')+'>'+esc(p.name)+'</option>'; }).join('');
+    var hideDoneChk = '<label class="imt-hidedone-chk" style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--txt2);white-space:nowrap;cursor:pointer;margin-left:auto;">'
+      + '<input type="checkbox" '+(hideDoneProjects?'checked':'')+' onchange="window.imtToggleHideDoneProjects(this.checked)"> แสดงเฉพาะโครงการที่ยังไม่เสร็จ'
+      + '</label>';
     return '<div class="imt-switcher">'
       + '<span class="imt-switcher-back" onclick="window.imtGoTab(\'dashboard\')">◀ ทุกโครงการ</span>'
       + '<span class="imt-switcher-lbl">กำลังดู:</span>'
       + '<select class="f-input imt-switcher-sel" onchange="window.imtSwitchProject(this.value)">' + opts + '</select>'
       + '<div class="imt-switcher-progress"><div class="imt-switcher-pbar">'+pbarHtml(window.calcProjectProgress(proj))+'</div><span style="font-size:11.5px;font-weight:700;">'+window.calcProjectProgress(proj)+'%</span></div>'
+      + hideDoneChk
       + '</div>';
   }
 
@@ -222,14 +239,29 @@
     el.innerHTML = tabsRow + renderProjectSwitcher();
   }
 
+  // ── เลือกโครงการที่ยังไม่เสร็จ/ไม่ถูกยกเลิก และมีวันสิ้นสุดใกล้ที่สุด (เร่งด่วนที่สุด) ให้เป็นโครงการ "กำลังดู"
+  // อัตโนมัติ — เรียกจาก imtGoTab ตอนกดเข้าแท็บที่ต้องมีโครงการเท่านั้น (ดูจุดเรียกด้านบน) ──
+  function _imtAutoSelectProject() {
+    if (!window.IMPL_PROJECTS || !window.IMPL_PROJECTS.length) return;
+    var ongoing = window.IMPL_PROJECTS.filter(function (p) {
+      var lvl = imtProjectHealth(p).level;
+      return p.end && lvl !== 'done' && lvl !== 'cancelled';
+    });
+    var pool = ongoing.length ? ongoing : window.IMPL_PROJECTS.filter(function (p) { return p.end; });
+    if (!pool.length) return;
+    pool.sort(function (a, b) { return pd(a.end) - pd(b.end); });
+    window.imtCurrentProjectId = pool[0].id;
+  }
+
   // ── Main Dispatcher ──
   window.renderImplTracker = function () {
     renderTabs();
     var mount = document.getElementById('imt-content');
     if (!mount) return;
     var fns = {
-      dashboard: renderImtDashboard, workspace: renderImtWorkspace, calendar: renderImtCalendar,
-      report: renderImtReport, templates: renderImtTemplates,
+      dashboard: renderImtDashboard, workspace: renderImtWorkspace,
+      forms: function (m) { window.renderImtForms && window.renderImtForms(m); },
+      calendar: renderImtCalendar, report: renderImtReport, templates: renderImtTemplates,
     };
     (fns[window.imtTab] || renderImtDashboard)(mount);
   };
@@ -337,6 +369,13 @@
     window.renderImplTracker();
   };
 
+  // ── ซ่อนโครงการที่เสร็จแล้ว 100% ออกจากรายการ/ตัวกรองโครงการ ค่าเริ่มต้นติ๊กไว้ (undefined !== false → true)
+  // ใช้ร่วมกันทั้ง Dashboard (การ์ดสุขภาพโครงการ) และ projectPicker (ตัวกรองโครงการในแท็บ งาน/Calendar/Report) ──
+  window.imtToggleHideDoneProjects = function (checked) {
+    window.imtHideDoneProjects = checked;
+    window.renderImplTracker();
+  };
+
   // เปิด Task modal จาก Dashboard (ยังไม่ได้เลือกโครงการอยู่) — ต้อง set imtCurrentProjectId ก่อน
   // ไม่งั้น saveImtTask จะบันทึกด้วย project_id ผิด (อ้างอิง imtCurrentProjectId เดิมที่ค้างอยู่)
   window.imtOpenTaskFromDash = function (taskId, projectId) {
@@ -372,9 +411,10 @@
       { k:'ใกล้ครบกำหนด',     v:dueSoonCount,         icon:'⏳', color:'var(--amber)' },
     ];
 
+    // ── การ์ดแนวนอน (ไอคอนซ้าย + label/value ซ้อนขวา) แทนแนวตั้งเดิม ให้กระชับกว่าเมื่อมีการ์ดพร้อมกัน 8 ใบ ──
     var statCards = stats.map(function (s) {
-      return '<div class="stat-c"><div class="stat-icon" style="background:'+s.color+'18;color:'+s.color+'">'+s.icon+'</div>'
-        + '<div class="stat-k">'+s.k+'</div><div class="stat-v">'+s.v+'</div></div>';
+      return '<div class="stat-c imt-stat-c"><div class="stat-icon" style="background:'+s.color+'18;color:'+s.color+'">'+s.icon+'</div>'
+        + '<div class="imt-stat-text"><div class="stat-k">'+s.k+'</div><div class="stat-v">'+s.v+'</div></div></div>';
     }).join('');
 
     var statusCounts = window.IMPL_STATUS.map(function (st) {
@@ -412,12 +452,18 @@
       return '<div class="imt-health-chip'+(filter===c.id?' on':'')+'" onclick="window.imtSetDashHealthFilter(\''+c.id+'\')">'+c.label+' <b>'+c.n+'</b></div>';
     }).join('');
 
+    var hideDoneProjects = window.imtHideDoneProjects !== false;
+    var hideDoneProjectsChk = '<label class="imt-hidedone-chk" style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--txt2);white-space:nowrap;cursor:pointer;margin-left:auto;">'
+      + '<input type="checkbox" '+(hideDoneProjects?'checked':'')+' onchange="window.imtToggleHideDoneProjects(this.checked)"> แสดงเฉพาะโครงการที่ยังไม่เสร็จ'
+      + '</label>';
+
     var shown = filter === 'all' ? health : health.filter(function (x) { return x.h.level === filter; });
+    if (hideDoneProjects) shown = shown.filter(function (x) { return x.h.level !== 'done'; });
     var healthGrid = shown.length ? shown.map(function (x) { return imtHealthCardHtml(x.p, x.h); }).join('')
       : '<div style="grid-column:1/-1;text-align:center;color:var(--txt3);font-size:12px;padding:24px;">ไม่มีโครงการในหมวดนี้</div>';
 
     var healthSection = window.IMPL_PROJECTS.length
-      ? '<div class="imt-health-strip">'+chipsHtml+'</div><div class="imt-pgrid">'+healthGrid+'</div>'
+      ? '<div class="imt-health-strip">'+chipsHtml+hideDoneProjectsChk+'</div><div class="imt-pgrid">'+healthGrid+'</div>'
       : '';
 
     var healthById = {};
@@ -506,7 +552,7 @@
       +   '<div class="dtable-inner" style="padding:18px;"><div class="sec-label" style="margin-bottom:12px;">⏰ งานเกินกำหนด (ทุกโครงการ)</div>'+overdueHtml+'</div>'
       +   '<div class="dtable-inner" style="padding:18px;"><div class="sec-label" style="margin-bottom:12px;">📅 กำหนดการ 7 วันข้างหน้า</div>'+upcomingHtml+'</div>'
       + '</div>'
-      + '<div class="stat-row" style="grid-template-columns:repeat(4,1fr);">'+statCards+'</div>'
+      + '<div class="stat-row imt-stat-row" style="grid-template-columns:repeat(4,1fr);">'+statCards+'</div>'
       + '<div class="imt-dash-grid">'
       +   '<div class="dtable-inner" style="padding:18px;"><div class="sec-label" style="margin-bottom:12px;">👤 ภาระงาน PM</div>'+pmHtml+'</div>'
       +   '<div class="dtable-inner" style="padding:18px;"><div class="sec-label" style="margin-bottom:12px;">🔁 Phase ที่มักมีปัญหาซ้ำ</div>'+phaseHtml+'</div>'
@@ -869,11 +915,19 @@
     window.renderImplTracker();
   };
 
+  window.imtProjectPicker = function () { return projectPicker(); }; // ── ใช้ร่วมกับแท็บ "แบบฟอร์ม" ──
   function projectPicker() {
+    var hideDoneProjects = window.imtHideDoneProjects !== false;
     var rows = window.IMPL_PROJECTS.slice().sort(function (a,b) { return IMT_HEALTH_ORDER[imtProjectHealth(a).level] - IMT_HEALTH_ORDER[imtProjectHealth(b).level]; });
+    if (hideDoneProjects) rows = rows.filter(function (p) { return imtProjectHealth(p).level !== 'done'; });
     var cards = rows.map(function (p) { return imtHealthCardHtml(p, null, { expandable:true }); }).join('')
-      || '<div style="grid-column:1/-1;text-align:center;color:var(--txt3);font-size:13px;padding:60px 20px;">ยังไม่มีโครงการ — กด "+ เพิ่มโครงการ" ที่มุมขวาบนเพื่อเริ่มต้น</div>';
-    return '<div class="imt-pgrid" style="max-width:1000px;margin:0 auto;padding-top:20px;">'+cards+'</div>';
+      || (window.IMPL_PROJECTS.length
+        ? '<div style="grid-column:1/-1;text-align:center;color:var(--txt3);font-size:13px;padding:60px 20px;">🎉 ทุกโครงการเสร็จแล้ว 100% — ยกเลิกติ๊ก "แสดงเฉพาะโครงการที่ยังไม่เสร็จ" ด้านบนเพื่อดูโครงการทั้งหมด</div>'
+        : '<div style="grid-column:1/-1;text-align:center;color:var(--txt3);font-size:13px;padding:60px 20px;">ยังไม่มีโครงการ — กด "+ เพิ่มโครงการ" ที่มุมขวาบนเพื่อเริ่มต้น</div>');
+    var hideDoneProjectsChk = '<label class="imt-hidedone-chk" style="display:flex;align-items:center;justify-content:center;gap:6px;font-size:12.5px;color:var(--txt2);white-space:nowrap;cursor:pointer;margin-bottom:12px;">'
+      + '<input type="checkbox" '+(hideDoneProjects?'checked':'')+' onchange="window.imtToggleHideDoneProjects(this.checked)"> แสดงเฉพาะโครงการที่ยังไม่เสร็จ'
+      + '</label>';
+    return '<div style="max-width:1000px;margin:0 auto;padding-top:20px;">'+hideDoneProjectsChk+'<div class="imt-pgrid">'+cards+'</div></div>';
   }
 
   function renderPhaseAccordion(ph, idx, total) {
@@ -1230,6 +1284,7 @@
       priority: document.getElementById('imt-t-priority').value,
       status: newStatus,
       sort_order: isNew ? (imtTasksOfPhase(finalPhaseId).length + 1) : imtTask(id).order,
+      updated_at: new Date().toISOString(),
     };
     window.closeM('m-imt-task');
     window.imtApplyLocal('IMPL_TASKS', id, row);
@@ -1252,8 +1307,9 @@
     var ck = imtChecklistOf(id);
     var ops = ck.filter(function (c) { return !c.done; });
     for (var i = 0; i < ops.length; i++) await window.imtToggleChecklist(ops[i].id, true);
-    window.imtApplyLocal('IMPL_TASKS', id, imtTaskRow(t, { status:'done' }));
-    await window.updateDoc(window.getDocRef('IMPL_TASKS', id), { status:'done' });
+    var nowIso = new Date().toISOString();
+    window.imtApplyLocal('IMPL_TASKS', id, imtTaskRow(t, { status:'done', updated_at:nowIso }));
+    await window.updateDoc(window.getDocRef('IMPL_TASKS', id), { status:'done', updated_at:nowIso });
     window.imtLogActivity(t.projectId, 'task', id, 'status_change', 'ทำเครื่องหมาย "'+t.name+'" เสร็จแล้ว');
     window.closeM('m-imt-task');
     window.renderImplTracker();
@@ -1273,8 +1329,9 @@
     // ── Task ที่มี Checklist แค่ 1 รายการ: ติ๊กเสร็จ = งานเสร็จเลย เปลี่ยนสถานะเป็น "เสร็จแล้ว" อัตโนมัติ
     // ทำเฉพาะตอนติ๊ก "เข้า" เท่านั้น (ไม่ทำตอนติ๊กออก กันไปบังคับดึงสถานะกลับโดยที่ผู้ใช้ไม่ได้สั่ง) ──
     if (t && done && imtChecklistOf(t.id).length === 1 && t.status !== 'done') {
-      window.imtApplyLocal('IMPL_TASKS', t.id, imtTaskRow(t, { status:'done' }));
-      await window.updateDoc(window.getDocRef('IMPL_TASKS', t.id), { status:'done' });
+      var taskDoneIso = new Date().toISOString();
+      window.imtApplyLocal('IMPL_TASKS', t.id, imtTaskRow(t, { status:'done', updated_at:taskDoneIso }));
+      await window.updateDoc(window.getDocRef('IMPL_TASKS', t.id), { status:'done', updated_at:taskDoneIso });
       window.imtLogActivity(t.projectId, 'task', t.id, 'status_change', 'เปลี่ยนสถานะ "'+t.name+'" เป็น '+imtStatus('done').label);
     }
     if (document.getElementById('m-imt-task').classList.contains('on')) window.openImtTaskModal(window.imtEditTaskId, window.imtEditPhaseId);
@@ -1346,9 +1403,10 @@
     var t = imtTask(taskId);
     if (!t || !window.canEdit(window.IMPL_MODULE)) return;
     var oldStatus = t.status;
-    window.imtApplyLocal('IMPL_TASKS', taskId, imtTaskRow(t, { status:statusId }));
+    var dropIso = new Date().toISOString();
+    window.imtApplyLocal('IMPL_TASKS', taskId, imtTaskRow(t, { status:statusId, updated_at:dropIso }));
     window.renderImplTracker();
-    await window.updateDoc(window.getDocRef('IMPL_TASKS', taskId), { status:statusId }).catch(window.showDbError);
+    await window.updateDoc(window.getDocRef('IMPL_TASKS', taskId), { status:statusId, updated_at:dropIso }).catch(window.showDbError);
     if (oldStatus !== statusId) window.imtLogActivity(t.projectId, 'task', taskId, 'status_change', 'ลาก "'+t.name+'" ไปที่ '+imtStatus(statusId).label);
   };
 
@@ -1548,11 +1606,29 @@
       var itemRows = [];
       imtTasksOfPhase(ph.id).forEach(function (t) {
         var tst = imtStatus(t.status);
-        imtChecklistOf(t.id).forEach(function (c) {
-          // งานที่ยังไม่เสร็จ: แสดงแค่ติ๊ก+ชื่อบรรทัดเดียว (ไม่มีช่องวันที่ให้กรอกอีกต่อไป — ใช้เป็น
-          // ภาพสรุปสำหรับดู ไม่ใช่ฟอร์มให้เขียนด้วยมือ) ส่วนงานที่เสร็จแล้วต่อวันที่ทำเสร็จไว้ท้ายชื่อ
-          itemRows.push('<div class="ppc-row'+(c.done ? ' ppc-row-done' : '')+'">'
+        var ck = imtChecklistOf(t.id);
+        // ── Task ไม่มี Checklist เลย: เดิมแถวของ Task นี้จะหายไปจากรายงานทั้งหมด (ลูปด้านล่างวนตาม
+        // Checklist เท่านั้น) — ให้แสดงชื่องานเป็นบรรทัดเดียวแทน ใช้วันที่อัปเดตล่าสุดของ Task เอง
+        // (updatedAt) แทน doneDate ของ Checklist ที่ไม่มีให้ใช้ในกรณีนี้ ──
+        if (!ck.length) {
+          itemRows.push('<div class="ppc-row'+(t.status==='done' ? ' ppc-row-done' : '')+'">'
             + '<span class="ppc-status-ic" title="'+esc(tst.label)+'">'+tst.icon+'</span>'
+            + '<span class="ppc-item">'+esc(t.name)+'</span>'
+            + (t.status==='done' && t.updatedAt ? '<span class="ppc-date">'+fd(t.updatedAt)+'</span>' : '')
+            + '</div>');
+          return;
+        }
+        // ── Task มี Checklist: แสดงชื่องานเป็นหัวข้อย่อย (ตัวบาง เบากว่าหัว Phase ที่เป็นตัวหนา) แล้วซ้อน
+        // Checklist แต่ละรายการเป็นแถวย่อหน้าไว้ข้างใต้ ให้เห็นชัดว่า Checklist ไหนเป็นของ Task ไหน ──
+        itemRows.push('<div class="ppc-task-row"><span class="ppc-status-ic" title="'+esc(tst.label)+'">'+tst.icon+'</span><span class="ppc-task-name">'+esc(t.name)+'</span></div>');
+        // ── ซ่อนรายการ Checklist ที่ชื่อซ้ำกับชื่อ Task เป๊ะ (มักเกิดจากตอนสร้าง Checklist พิมพ์ชื่องานซ้ำ
+        // เป็นรายการแรก) กันไม่ให้ขึ้นซ้ำกับหัวข้อ Task ที่เพิ่งแสดงไปด้านบนแล้ว ──
+        ck.filter(function (c) { return c.name.trim() !== t.name.trim(); }).forEach(function (c) {
+          // ── แถวย่อยใช้ไอคอนติ๊ก ☑/☐ ตามสถานะของ Checklist แต่ละรายการเอง (ไม่ใช่ไอคอนสถานะของ Task ที่ซ้ำ
+          // เหมือนกันทุกแถวแบบเดิม ไม่สื่อความหมายเพิ่มอะไรเลย) ให้เห็นชัดว่ารายการไหนเสร็จ/ยังไม่เสร็จจริง ──
+          var ckIcon = c.done ? '☑' : '☐';
+          itemRows.push('<div class="ppc-row ppc-sub'+(c.done ? ' ppc-row-done' : '')+'">'
+            + '<span class="ppc-status-ic ppc-ck-ic'+(c.done?' done':'')+'">'+ckIcon+'</span>'
             + '<span class="ppc-item">'+esc(c.name)+'</span>'
             + (c.done && c.doneDate ? '<span class="ppc-date">'+fd(c.doneDate)+'</span>' : '')
             + '</div>');
@@ -1586,8 +1662,8 @@
       + '<div class="ppc-header-card">'
       +   '<div class="ppc-title">'+esc(proj.name)+'</div>'
       +   '<div class="ppc-subtitle">'
-      +     (proj.hospitalName ? '🏥 '+esc(proj.hospitalName)+' · ' : '')
-      +     (proj.pm ? 'PM: '+esc(proj.pm)+' · ' : '')
+      +     (proj.hospitalName ? '👤 PM: '+esc(proj.hospitalName)+' · ' : '')
+      +     (proj.pm ? '🔧 ผู้ติดตั้ง: '+esc(proj.pm)+' · ' : '')
       +     'งานทั้งหมด '+tasks.length+' · พิมพ์เมื่อ '+fd(new Date().toISOString())
       +   '</div>'
       +   '<div class="ppc-progress-row"><div class="ppc-progress-num">'+overallPct+'%</div>'

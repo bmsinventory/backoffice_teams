@@ -610,3 +610,119 @@ VALUES ('impl-attachments', 'impl-attachments', true)
 ON CONFLICT (id) DO NOTHING;
 
 -- Seed template ("TPL_INV_STD") + storage policies: ดู supabase-migration-impl-tracker.sql
+
+-- ================================================================
+-- FORM TRACKER (form_tracker) — ส่วนย่อย "แบบฟอร์ม" ในหน้า "ติดตามโครงการติดตั้ง" (impl_tracker)
+-- ไม่มี "โครงการแบบฟอร์ม" เป็นเอนทิตีของตัวเอง — ผูกตรงกับ impl_projects.id (project_id) เลย
+-- เพราะเป็นข้อมูลของโครงการติดตั้งเดียวกัน ไม่ต้องมีโครงการซ้อนโครงการอีกชั้น
+-- Group (คลัง) → Item (แบบฟอร์มแต่ละใบ) เป็นลำดับชั้นเดียว (ไม่มี Checklist/Comment/Attachment ซ้อนอีกชั้น
+-- เพราะแบบฟอร์ม 1 ใบถือเป็นหน่วยเสร็จ/ไม่เสร็จเดียว)
+-- ================================================================
+DROP TABLE IF EXISTS form_projects CASCADE;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'form_groups' AND column_name = 'form_project_id') THEN
+    ALTER TABLE form_groups RENAME COLUMN form_project_id TO project_id;
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'form_items' AND column_name = 'form_project_id') THEN
+    ALTER TABLE form_items RENAME COLUMN form_project_id TO project_id;
+  END IF;
+END $$;
+
+CREATE TABLE IF NOT EXISTS form_groups (
+  id              TEXT PRIMARY KEY,
+  project_id      TEXT NOT NULL,
+  group_name      TEXT DEFAULT '',
+  sort_order      INTEGER DEFAULT 99,
+  created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS form_items (
+  id              TEXT PRIMARY KEY,
+  project_id      TEXT NOT NULL,
+  group_id        TEXT NOT NULL,
+  form_name       TEXT DEFAULT '',
+  form_type       TEXT DEFAULT '',
+  status          TEXT DEFAULT 'not_started',
+  owner           TEXT DEFAULT '',
+  received_date   DATE,
+  description     TEXT DEFAULT '',
+  sort_order      INTEGER DEFAULT 99,
+  created_at      TIMESTAMPTZ DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ── Migration: เพิ่มคอลัมน์ "วันที่รับเอกสาร" ให้ตารางที่สร้างไปแล้วก่อนมีคอลัมน์นี้ ──
+ALTER TABLE form_items ADD COLUMN IF NOT EXISTS received_date DATE;
+
+-- ── Template: รายชื่อเอกสารแบบฟอร์มมาตรฐาน (ใช้ร่วมกันทุกโครงการ/ทุกคลัง — ไม่ผูกกับ project_id/group_id)
+-- ตั้งไว้ล่วงหน้าเพื่อดึงมาเพิ่มเป็นแบบฟอร์มในคลังไหนก็ได้แบบเร็ว แทนพิมพ์ชื่อเองทีละใบ ──
+CREATE TABLE IF NOT EXISTS form_templates (
+  id         TEXT PRIMARY KEY,
+  name       TEXT DEFAULT '',
+  sort_order INTEGER DEFAULT 99,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_form_groups_project_id ON form_groups (project_id);
+CREATE INDEX IF NOT EXISTS idx_form_items_project_id  ON form_items (project_id);
+CREATE INDEX IF NOT EXISTS idx_form_items_group_id    ON form_items (group_id);
+
+ALTER TABLE form_groups    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE form_items     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE form_templates ENABLE ROW LEVEL SECURITY;
+
+DO $$
+DECLARE
+  tbl TEXT;
+  tbls TEXT[] := ARRAY['form_groups','form_items','form_templates'];
+BEGIN
+  FOREACH tbl IN ARRAY tbls LOOP
+    EXECUTE format('DROP POLICY IF EXISTS "anon_all_%s" ON %I', tbl, tbl);
+    EXECUTE format(
+      'CREATE POLICY "anon_all_%s" ON %I FOR ALL TO anon USING (true) WITH CHECK (true)',
+      tbl, tbl
+    );
+  END LOOP;
+END $$;
+
+DO $$
+DECLARE
+  tbl TEXT;
+  tbls TEXT[] := ARRAY['form_groups','form_items','form_templates'];
+BEGIN
+  FOREACH tbl IN ARRAY tbls LOOP
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_publication_tables
+      WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = tbl
+    ) THEN
+      EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE %I', tbl);
+    END IF;
+  END LOOP;
+END $$;
+
+-- ── Seed: รายชื่อเอกสารมาตรฐานงานจัดซื้อจัดจ้าง (แก้ไข/เพิ่ม/ลบเพิ่มเติมได้ภายหลังจากหน้า UI) ──
+INSERT INTO form_templates (id, name, sort_order) VALUES
+  ('FTPL01', 'ขออนุมัติแต่งตั้งคณะกรรมการจัดทำรายละเอียดคุณลักษณะเฉพาะ', 1),
+  ('FTPL02', 'ขออนุมัติเบิกจ่ายเงิน', 2),
+  ('FTPL03', 'ขออนุมัติประกาศผู้ชนะการเสนอราคา', 3),
+  ('FTPL04', 'ขออนุมัติหลักการ', 4),
+  ('FTPL05', 'คำสั่งแต่งตั้งคณะกรรมการจัดทำรายละเอียดคุณลักษณะเฉพาะ', 5),
+  ('FTPL06', 'คำสั่งแต่งตั้งคณะกรรมการจัดทำรายละเอียดคุณลักษณะเฉพาะและคณะกรรมการตรวจรับพัสดุ', 6),
+  ('FTPL07', 'คำสั่งแต่งตั้งคณะกรรมการตรวจรับพัสดุ', 7),
+  ('FTPL08', 'บันทึกการต่อรองราคา', 8),
+  ('FTPL09', 'แบบแสดงความบริสุทธิ์ใจในการจัดซื้อจัดจ้าง', 9),
+  ('FTPL10', 'ใบตรวจรับพัสดุ', 10),
+  ('FTPL11', 'ใบเบิกพัสดุ', 11),
+  ('FTPL12', 'ใบส่งมอบงาน/พัสดุ', 12),
+  ('FTPL13', 'ใบสั่งจ้าง', 13),
+  ('FTPL14', 'ใบสั่งซื้อ', 14),
+  ('FTPL15', 'ประกาศผู้ชนะการเสนอราคา', 15),
+  ('FTPL16', 'รายงานขอซื้อขอจ้าง', 16),
+  ('FTPL17', 'รายงานผลการจัดทำรายละเอียดคุณลักษณะเฉพาะ', 17),
+  ('FTPL18', 'รายงานผลการตรวจรับพัสดุ', 18),
+  ('FTPL19', 'รายงานผลการพิจารณาและขออนุมัติสั่งซื้อสั่งจ้าง', 19),
+  ('FTPL20', 'รายละเอียดคุณลักษณะเฉพาะ', 20),
+  ('FTPL21', 'รายละเอียดคุณลักษณะเฉพาะของพัสดุ', 21),
+  ('FTPL22', 'รายละเอียดคุณลักษณะเฉพาะของยา', 22)
+ON CONFLICT (id) DO NOTHING;

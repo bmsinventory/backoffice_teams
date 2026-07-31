@@ -213,9 +213,12 @@
   // ── DOM Ready: restore remembered login + bind login form ──
   document.addEventListener('DOMContentLoaded', function () {
     var remUser = window.StorageService && window.StorageService.getRememberedUser();
+    var remPass = window.StorageService && window.StorageService.getRememberedPassword();
     var uEl  = document.getElementById('lu');
+    var pEl  = document.getElementById('lp');
     var remEl = document.getElementById('l-rem');
     if (remUser && uEl) { uEl.value = remUser; if (remEl) remEl.checked = true; }
+    if (remPass && pEl) { pEl.value = remPass; }
 
     // Enter key on username/password inputs → login
     ['lu', 'lp'].forEach(function (id) {
