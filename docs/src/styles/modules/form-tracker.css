@@ -181,32 +181,58 @@
 /* ================================================================
    RESPONSIVE — Mobile-first: ตาราง .ftk-table แปลงเป็นการ์ดต่อแถวใต้ 768px
    (ตาราง 9 คอลัมน์ scroll ทางขวาบนจอเล็กใช้งานยาก) — เก็บโครงสร้าง <table>/<td> เดิมไว้ทั้งหมด ใช้
-   data-label ที่ผูกไว้ในแต่ละ td (ดู form-tracker.js) แสดงแทนหัวตารางที่ซ่อนไป
+   data-label ที่ผูกไว้ในแต่ละ td (ดู form-tracker.js) แสดงแทนหัวตารางที่ซ่อนไป การ์ดจัดด้วย
+   grid-template-areas ตามตำแหน่ง td จริง (ชื่อ → ประเภท/สถานะ คู่กัน → ผู้จัดทำ/วันที่รับเอกสาร คู่กัน →
+   วันที่ดำเนินการ → หมายเหตุ) ให้กระชับกว่าเดิมที่ไล่ label+value ทีละแถวยาว ๆ 8 ช่อง ปุ่มลบย้ายไปลอย
+   มุมขวาบนของการ์ดแทนการกินพื้นที่เต็มแถวแยกต่างหาก
    ================================================================ */
 @media (max-width: 768px) {
   .ftk-header { padding: 10px 14px; gap: 8px; }
+  .ftk-header-title { font-size: 13px; }
+  .ftk-btn-desktop { display: none !important; }
   .ftk-filterbar { padding: 8px 12px; }
   .ftk-scroll { padding: 12px 14px; }
   .ftk-group-head { flex-wrap: wrap; }
 
   .ftk-table                          { display: block; }
   .ftk-table thead                    { display: none; }
-  .ftk-table tbody                    { display: flex; flex-direction: column; gap: 10px; }
-  .ftk-table tr                       { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; background: var(--surface); border: 1.5px solid var(--border); border-radius: 12px; padding: 12px; }
-  .ftk-table td                       { display: block; padding: 0; border: none; }
-  .ftk-table td::before               { content: attr(data-label); display: block; font-size: 10px; font-weight: 700; color: var(--txt3); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 2px; }
+  .ftk-table tbody                    { display: flex; flex-direction: column; gap: 8px; }
+  .ftk-table tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas: "name name" "type status" "owner recv" "done done" "note note";
+    gap: 5px 10px;
+    position: relative;
+    background: var(--surface); border: 1.5px solid var(--border); border-radius: 12px;
+    padding: 10px 34px 10px 10px;
+  }
+  .ftk-table td                       { display: block; padding: 0; border: none; min-width: 0; }
+  .ftk-table td::before               { content: attr(data-label); display: block; font-size: 9px; font-weight: 700; color: var(--txt3); text-transform: uppercase; letter-spacing: .3px; margin-bottom: 1px; }
   /* "ลำดับ" ไม่ต้องโชว์ซ้ำบนการ์ด — ลำดับการวางการ์ดจากบนลงล่างสื่อความหมายอยู่แล้ว */
   .ftk-table td.ftk-no                { display: none; }
-  /* "แบบฟอร์ม" (td ตัวที่ 2 นับรวม ลำดับ ที่ซ่อนไว้) ทำหน้าที่เป็นหัวการ์ดแทน — เต็มความกว้าง ไม่ต้องมี label ซ้ำ */
-  .ftk-table td:nth-child(2)          { grid-column: 1 / -1; padding-bottom: 8px; border-bottom: 1px solid var(--border); margin-bottom: 2px; }
+  /* "แบบฟอร์ม" ทำหน้าที่เป็นหัวการ์ด — เต็มความกว้าง ตัวหนา ไม่ต้องมี label ซ้ำ */
+  .ftk-table td:nth-child(2)          { grid-area: name; padding-bottom: 6px; border-bottom: 1px solid var(--border); margin-bottom: 1px; }
   .ftk-table td:nth-child(2)::before  { display: none; }
-  /* "หมายเหตุ" และปุ่ม "ลบ" (คอลัมน์สุดท้าย) กว้างเต็มการ์ด ปุ่มลบไม่ต้องมี label ซ้ำ (ไอคอนสื่อความหมายพอแล้ว) */
-  .ftk-table td.ftk-note-cell         { grid-column: 1 / -1; }
-  .ftk-table td:last-child            { grid-column: 1 / -1; text-align: right; }
+  .ftk-table td:nth-child(2) .ftk-name-input { font-size: 13.5px; font-weight: 700; padding: 0; }
+  /* ประเภท/สถานะ คู่กันแถวเดียว, ผู้จัดทำ/วันที่รับเอกสาร คู่กันอีกแถว — ลดจำนวนแถวจาก 6 label เหลือ 3 */
+  .ftk-table td:nth-child(3)          { grid-area: type; }
+  .ftk-table td:nth-child(4)          { grid-area: status; }
+  .ftk-table td:nth-child(5)          { grid-area: owner; }
+  .ftk-table td:nth-child(6)          { grid-area: recv; }
+  .ftk-table td:nth-child(7)          { grid-area: done; }
+  /* "หมายเหตุ" กว้างเต็มการ์ด และซ่อนไปเลยถ้าไม่มีข้อความ (ไม่เปลืองพื้นที่โชว์ "—" เปล่า ๆ ) */
+  .ftk-table td.ftk-note-cell         { grid-area: note; }
+  .ftk-table td.ftk-note-cell:has(.ftk-note[value=""]) { display: none; }
+  /* ปุ่ม "ลบ" ลอยมุมขวาบนของการ์ดแทนแถวแยก — ไม่กินพื้นที่แนวตั้งเพิ่ม */
+  .ftk-table td:last-child            { position: absolute; top: 8px; right: 6px; grid-area: unset; }
   .ftk-table td:last-child::before    { display: none; }
   .ftk-table .ftk-sel,
   .ftk-table .ftk-note,
   .ftk-table .ftk-date-picker         { width: 100%; }
+  .ftk-table .ftk-sel                 { font-size: 11.5px; padding: 5px 6px; }
+  .ftk-table .ftk-date-display        { font-size: 11px; padding: 5px 6px; }
+  .ftk-table .ftk-note                { font-size: 12px; padding: 5px 6px; }
+  .ftk-table .ftk-date                { font-size: 11px; }
   /* แถว "+ พิมพ์ชื่อแบบฟอร์มแล้วกด Enter..." ไม่ใช่การ์ดข้อมูล — คืนกลับเป็นแถวเรียบ ๆ ปกติ */
   .ftk-table tr.ftk-quickadd          { display: flex; flex-direction: column; gap: 8px; background: transparent; border: none; padding: 8px 0 0; }
   .ftk-table tr.ftk-quickadd td       { display: block; padding: 0; }

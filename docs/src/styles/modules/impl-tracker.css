@@ -406,6 +406,11 @@
      บวก select บวกปุ่มย้อนกลับ รวมกันเกินความกว้างจอเล็กเสมอ) */
   .imt-switcher { padding: 8px 12px; gap: 8px; }
   .imt-switcher-sel { max-width: none; flex: 1 1 140px; min-width: 0; }
+  /* responsive.css บังคับ .f-input เป็น 16px !important บนมือถือ (กัน iOS auto-zoom ตอนแตะ select) —
+     select ตัวนี้มีคลาส .f-input ด้วยเลยติดไปด้วย ทำให้รายการใน dropdown ฟอนต์ใหญ่กว่า UI ส่วนอื่น
+     ตั้ง font-size บน <option> แยกต่างหากให้เท่า UI ปกติ (เบราว์เซอร์ที่วาด dropdown เองอย่าง Chrome/Firefox/
+     Edge จะใช้ค่านี้ ส่วน iOS ใช้ picker ของระบบซึ่งไม่สนใจ font-size อยู่แล้ว จึงไม่กระทบการกัน zoom) */
+  .imt-switcher-sel option { font-size: 13px; }
   .imt-switcher-lbl { display: none; }
   .imt-switcher-progress { flex: 1 1 100%; order: 3; }
   .imt-switcher-pbar { width: auto; flex: 1; }

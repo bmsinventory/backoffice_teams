@@ -383,8 +383,8 @@
       + '<div class="ftk-header-title">📄 แบบฟอร์มของโครงการนี้</div>'
       + '<div class="ftk-header-pbar">'+pbarHtml(overallPct)+'<span>'+overallPct+'%</span></div>'
       + '<div style="flex:1"></div>'
-      + '<button class="btn btn-ghost btn-sm" onclick="window.openFtkTemplateModal(null)" title="จัดการรายชื่อเอกสารมาตรฐาน">📐 Template</button>'
-      + '<button class="btn btn-xls btn-sm" onclick="window.exportFtkReport()">📥 Excel</button>'
+      + '<button class="btn btn-ghost btn-sm ftk-btn-desktop" onclick="window.openFtkTemplateModal(null)" title="จัดการรายชื่อเอกสารมาตรฐาน">📐 Template</button>'
+      + '<button class="btn btn-xls btn-sm ftk-btn-desktop" onclick="window.exportFtkReport()">📥 Excel</button>'
       + '<button class="btn btn-pri btn-sm" onclick="window.exportFtkReportImage()">📷 บันทึกเป็นรูปภาพ</button>'
       + '</div>';
 
