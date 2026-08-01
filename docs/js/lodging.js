@@ -96,7 +96,7 @@ window.renderLodging=function(){
         ${amenityD.length?`<div style="font-size:10px;margin-top:3px;">${amenityD.join(' ')}</div>`:''}
         <div style="font-size:12px;font-weight:800;color:var(--indigo);text-align:right;margin-top:4px;">${fc(l.dTotal)}</div>
         ${l.dDeposit?`<div style="font-size:10px;color:var(--txt3);margin-top:3px;padding-top:3px;border-top:1px dashed var(--indigo)20;">🔐 มัดจำ ${fc(l.dDeposit)}${l.dDepositNote?' · '+esc(l.dDepositNote):''}</div>`:''}
-        ${window.canEdit('lodging')&&hasDRate?`<div style="margin-top:6px;display:flex;gap:4px;">${!isAppD
+        ${window.canApprove('lodging')&&hasDRate?`<div style="margin-top:6px;display:flex;gap:4px;">${!isAppD
           ?`<button onclick="event.stopPropagation();window.approveLdType('${p.id}','${l.id}','daily')" style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;border:1px solid var(--indigo);background:var(--indigo)15;color:var(--indigo);cursor:pointer;flex:1;">✅ อนุมัติรายวัน</button>`
           :`<button onclick="event.stopPropagation();window.unapproveLdType('${p.id}','${l.id}','daily')" style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;border:1px solid var(--coral);background:var(--coral)15;color:var(--coral);cursor:pointer;flex:1;">↩ ยกเลิก</button>`}
         </div>`:''}
@@ -114,7 +114,7 @@ window.renderLodging=function(){
             (l.mWater||l.mElectric)?`<div style="font-size:10px;color:var(--txt2);">${l.mWater?'💧 '+l.mWater:''}${l.mWater&&l.mElectric?' · ':''}${l.mElectric?'⚡ '+l.mElectric:''}</div>`:''}
           ${l.mExtras?`<div style="font-size:10px;color:var(--txt2);">📦 ${l.mExtras}</div>`:''}
         </div>`:''}
-        ${window.canEdit('lodging')&&hasMRate?`<div style="margin-top:6px;display:flex;gap:4px;">${!isAppM
+        ${window.canApprove('lodging')&&hasMRate?`<div style="margin-top:6px;display:flex;gap:4px;">${!isAppM
           ?`<button onclick="event.stopPropagation();window.approveLdType('${p.id}','${l.id}','monthly')" style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;border:1px solid var(--coral);background:var(--coral)15;color:var(--coral);cursor:pointer;flex:1;">✅ อนุมัติรายเดือน</button>`
           :`<button onclick="event.stopPropagation();window.unapproveLdType('${p.id}','${l.id}','monthly')" style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;border:1px solid var(--amber);background:var(--amber)15;color:var(--amber);cursor:pointer;flex:1;">↩ ยกเลิก</button>`}
         </div>`:''}
@@ -178,7 +178,7 @@ window.renderLodging=function(){
 
 // ── Approve by type (daily / monthly) — independent ──
 window.approveLdType=async function(pid,ldId,type){
-  if(!window.canEdit('lodging'))return;
+  if(!window.canApprove('lodging'))return;
   var field=type==='daily'?'approved_daily':'approved_monthly';
   var localField=type==='daily'?'approvedDaily':'approvedMonthly';
   // clear same type from other options
@@ -191,7 +191,7 @@ window.approveLdType=async function(pid,ldId,type){
   window.renderLodging();
 }
 window.unapproveLdType=async function(pid,ldId,type){
-  if(!window.canEdit('lodging'))return;
+  if(!window.canApprove('lodging'))return;
   var field=type==='daily'?'approved_daily':'approved_monthly';
   var localField=type==='daily'?'approvedDaily':'approvedMonthly';
   var l=window.LODGINGS.find(x=>x.id===ldId);
@@ -313,15 +313,17 @@ window.openLodgingGroupModal=function(pid){
     var isAppD=l.approvedDaily==='yes';var isAppM=l.approvedMonthly==='yes';
     var hasDRate=l.dsQty>0||l.ddQty>0;var hasMRate=l.msQty>0||l.mdQty>0;
     var parsedMapUrl=l.mapUrl?(l.mapUrl.startsWith('http')?l.mapUrl:'https://maps.google.com/?q='+encodeURIComponent(l.mapUrl)):'';
-    var actBtns=window.canEdit('lodging')?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px dashed var(--border);">
-      ${hasDRate?(!isAppD
+    var approveBtns=window.canApprove('lodging')?`${hasDRate?(!isAppD
         ?`<button class="btn btn-sm" style="background:#4361ee15;color:var(--indigo);border:1px solid #4361ee30;font-weight:700;" onclick="window.approveLdType('${pid}','${l.id}','daily')">✅ อนุมัติรายวัน</button>`
         :`<button class="btn btn-sm" style="background:var(--coral)15;color:var(--coral);border:1px solid var(--coral)30;font-weight:700;" onclick="window.unapproveLdType('${pid}','${l.id}','daily')">↩ ยกเลิกรายวัน</button>`):''}
       ${hasMRate?(!isAppM
         ?`<button class="btn btn-sm" style="background:var(--coral)15;color:var(--coral);border:1px solid var(--coral)30;font-weight:700;" onclick="window.approveLdType('${pid}','${l.id}','monthly')">✅ อนุมัติรายเดือน</button>`
-        :`<button class="btn btn-sm" style="background:var(--amber)15;color:var(--amber);border:1px solid var(--amber)30;font-weight:700;" onclick="window.unapproveLdType('${pid}','${l.id}','monthly')">↩ ยกเลิกรายเดือน</button>`):''}
-      <button class="btn btn-ghost btn-sm" onclick="window.showLdForm('${pid}','${l.id}')">✏️</button>
-      <button class="btn btn-red btn-sm" onclick="window.askDel('lodging','${l.id}','${l.name||'ตัวเลือก '+(i+1)}')">🗑</button>
+        :`<button class="btn btn-sm" style="background:var(--amber)15;color:var(--amber);border:1px solid var(--amber)30;font-weight:700;" onclick="window.unapproveLdType('${pid}','${l.id}','monthly')">↩ ยกเลิกรายเดือน</button>`):''}`:'';
+    var editBtns=window.canEdit('lodging')?`<button class="btn btn-ghost btn-sm" onclick="window.showLdForm('${pid}','${l.id}')">✏️</button>
+      <button class="btn btn-red btn-sm" onclick="window.askDel('lodging','${l.id}','${l.name||'ตัวเลือก '+(i+1)}')">🗑</button>`:'';
+    var actBtns=(approveBtns||editBtns)?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px dashed var(--border);">
+      ${approveBtns}
+      ${editBtns}
     </div>`:'';
     html+=`<div style="border:2px solid ${isAppD||isAppM?'var(--teal)':'var(--border)'};border-radius:12px;padding:14px;background:${isAppD||isAppM?'#06d6a006':'var(--surface)'};">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">

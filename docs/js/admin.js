@@ -429,6 +429,12 @@ function renderAdmRoles(c, titleEl) {
       : {overview:ro,kanban:ro,projects:ro,advance:ro,lodging:ro,workload:ro,calendar:ro,leave:ro,timesheet:ro,cost:ro,availability:ro,holiday:none,admin:none};
     return !!(def[modId]||{})[action];
   }
+  // ── สิทธิ์ "อนุมัติที่พัก" แยกจาก edit — ถ้ายังไม่เคยตั้งค่านี้ไว้ชัดเจน (undefined) ยึดตามสิทธิ์ "แก้" เดิม
+  // ไปก่อน (ดู logic เดียวกันใน permission.util.js window.can) กันปุ่มอนุมัติหายไปทันทีตอน deploy ครั้งแรก ──
+  function getLodgingApprove(role) {
+    if(rp[role] && rp[role].lodging && rp[role].lodging.approve !== undefined) return !!rp[role].lodging.approve;
+    return getPerm(role, 'lodging', 'edit');
+  }
 
   var actions = [{id:'view',label:'ดู',color:'var(--teal)'},{id:'add',label:'เพิ่ม',color:'var(--violet)'},{id:'edit',label:'แก้',color:'var(--amber)'},{id:'del',label:'ลบ',color:'var(--coral)'}];
 
@@ -495,6 +501,22 @@ function renderAdmRoles(c, titleEl) {
           <tbody>${rows}</tbody>
         </table>
       </div>
+      <div style="margin-top:20px;border:1px solid var(--border);border-radius:14px;padding:16px 18px;">
+        <div style="font-size:13px;font-weight:700;margin-bottom:4px;">🔑 สิทธิ์กดอนุมัติที่พัก</div>
+        <div style="font-size:11.5px;color:var(--txt3);margin-bottom:12px;">แยกจากสิทธิ์ "แก้" — กำหนดว่า Role ไหนกดปุ่ม ✅ อนุมัติ/ยกเลิกอนุมัติ ในหน้าที่พักได้บ้าง (Role ที่ยังไม่เคยตั้งค่านี้จะยึดตามสิทธิ์ "แก้" เดิมไปก่อน)</div>
+        <div style="display:flex;gap:18px;flex-wrap:wrap;">
+          ${roles.map(function(role){
+            var rc={pm:'var(--violet)',viewer:'var(--teal)'};
+            var checked = getLodgingApprove(role) ? 'checked' : '';
+            return `<label style="display:flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer;">
+              <input type="checkbox" class="perm-cb" ${checked}
+                data-role="${role}" data-mod="lodging" data-act="approve"
+                id="pcb-${role}-lodging-approve" style="width:16px;height:16px;accent-color:${rc[role]||'var(--indigo)'};cursor:pointer;">
+              <span style="color:${rc[role]||'var(--txt)'};font-weight:600;">${window.roleLabel(role)}</span>
+            </label>`;
+          }).join('')}
+        </div>
+      </div>
       <div style="margin-top:18px;display:flex;gap:10px;justify-content:flex-end;">
         <button class="btn btn-ghost" onclick="window.resetRolePerms()">↩️ รีเซ็ตเป็นค่าเริ่มต้น</button>
         <button class="btn btn-pri" onclick="window.saveRolePerms()">💾 บันทึกสิทธิ์</button>
@@ -534,6 +556,8 @@ window.saveRolePerms = async function() {
         data[role][mod.id][a]=el?el.checked:false;
       });
     });
+    var apEl=document.getElementById('pcb-'+role+'-lodging-approve');
+    if(apEl) data[role].lodging.approve = apEl.checked;
   });
   try {
     await setDoc(getDocRef('SETTINGS','role_permissions'), data);

@@ -41,14 +41,19 @@
     var rp      = window.ROLE_PERMISSIONS && window.ROLE_PERMISSIONS[role];
     var modPerm = rp ? rp[module] : null;
     if (!modPerm) modPerm = _roleDefaultPerms(role)[module] || {};
+    // ── "approve" ยังไม่มีคอลัมน์แยกในตาราง role_permissions เดิม (มีแค่ view/add/edit/del) — Role ที่
+    // ยังไม่เคยถูกตั้งค่านี้ไว้อย่างชัดเจน (undefined ไม่ใช่ false) ให้ยึดตามสิทธิ์ "แก้" (edit) เดิมไปก่อน
+    // กันสิทธิ์อนุมัติหายไปทันทีตอน deploy ครั้งแรกก่อน admin จะเข้ามากำหนดเอง (ดู admin.js renderAdmRoles) ──
+    if (action === 'approve' && modPerm.approve === undefined) return !!modPerm.edit;
     return !!modPerm[action];
   };
 
   // ── Shorthand Checkers ──
-  window.canView = function (m) { return window.can('view', m); };
-  window.canAdd  = function (m) { return window.can('add',  m); };
-  window.canEdit = function (m) { return window.can('edit', m); };
-  window.canDel  = function (m) { return window.can('del',  m); };
+  window.canView    = function (m) { return window.can('view',    m); };
+  window.canAdd     = function (m) { return window.can('add',     m); };
+  window.canEdit    = function (m) { return window.can('edit',    m); };
+  window.canDel     = function (m) { return window.can('del',     m); };
+  window.canApprove = function (m) { return window.can('approve', m); };
 
   // ── Role Helpers ──
   window.isAdmin = function () { return window.cu && window.cu.role === 'admin'; };
