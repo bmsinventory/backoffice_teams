@@ -1,0 +1,11 @@
+{
+  "name": "backoffice-teams-migration",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "migrate-storage": "node migrate-storage.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2"
+  }
+}

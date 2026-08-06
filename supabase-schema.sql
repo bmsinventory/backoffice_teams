@@ -726,3 +726,157 @@ INSERT INTO form_templates (id, name, sort_order) VALUES
   ('FTPL21', 'รายละเอียดคุณลักษณะเฉพาะของพัสดุ', 21),
   ('FTPL22', 'รายละเอียดคุณลักษณะเฉพาะของยา', 22)
 ON CONFLICT (id) DO NOTHING;
+
+-- ================================================================
+-- SITE FORMS — แบบฟอร์มหน้างาน 3 ประเภท (แจ้งเข้าปฏิบัติงาน / เคลียร์ค่าใช้จ่าย / แจ้งความจำนงเข้าดำเนินงาน)
+-- เพิ่มผ่าน SQL Editor ตรงๆ ตอนแรก แล้วเพิ่งย้อนกลับมาบันทึกไว้ในไฟล์นี้ทีหลัง
+-- ================================================================
+CREATE TABLE IF NOT EXISTS expense_clearing_forms (
+  id                    TEXT PRIMARY KEY,
+  form_no               TEXT DEFAULT '',
+  project_id            TEXT DEFAULT '',
+  category_key          TEXT DEFAULT 'other',
+  category_other_note   TEXT DEFAULT '',
+  staff_name            TEXT DEFAULT '',
+  staff_phone           TEXT DEFAULT '',
+  work_start            DATE,
+  work_end              DATE,
+  work_location         TEXT DEFAULT '',
+  assigned_task         TEXT DEFAULT '',
+  requested_amount      NUMERIC DEFAULT 0,
+  people_count          INTEGER DEFAULT 1,
+  travel_fuel_toll      NUMERIC DEFAULT 0,
+  travel_transport      NUMERIC DEFAULT 0,
+  travel_other          NUMERIC DEFAULT 0,
+  lodging_nights        INTEGER DEFAULT 0,
+  lodging_rooms         INTEGER DEFAULT 0,
+  lodging_rate          NUMERIC DEFAULT 0,
+  workers               JSONB DEFAULT '[]',
+  others                JSONB DEFAULT '[]',
+  total_amount          NUMERIC DEFAULT 0,
+  note_schedule_signed  BOOLEAN DEFAULT false,
+  note_letter_sent      BOOLEAN DEFAULT false,
+  created_at            TIMESTAMPTZ DEFAULT NOW(),
+  updated_at            TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS site_deploy_forms (
+  id                      TEXT PRIMARY KEY,
+  dept_key                TEXT DEFAULT 'other',
+  dept_other_note         TEXT DEFAULT '',
+  hospital_id             TEXT DEFAULT '',
+  site_location            TEXT DEFAULT '',
+  province                TEXT DEFAULT '',
+  work_open_new_site      BOOLEAN DEFAULT false,
+  work_per_contract       BOOLEAN DEFAULT false,
+  work_other              BOOLEAN DEFAULT false,
+  work_other_note         TEXT DEFAULT '',
+  contract_no             TEXT DEFAULT '',
+  work_revisit            BOOLEAN DEFAULT false,
+  revisit_no              TEXT DEFAULT '',
+  revisit_total           TEXT DEFAULT '',
+  work_fix_issue          BOOLEAN DEFAULT false,
+  work_close_contract     BOOLEAN DEFAULT false,
+  customer_name           TEXT DEFAULT '',
+  customer_dept           TEXT DEFAULT '',
+  customer_email          TEXT DEFAULT '',
+  customer_phone          TEXT DEFAULT '',
+  preparation_notes       TEXT DEFAULT '',
+  adv_slip_count          NUMERIC,
+  adv_collected_amount    NUMERIC,
+  adv_total_amount        NUMERIC,
+  adv_remaining_amount    NUMERIC,
+  adv_used_amount         NUMERIC,
+  adv_uncleared_count     NUMERIC,
+  preparer_name           TEXT DEFAULT '',
+  preparer_date           DATE,
+  created_at              TIMESTAMPTZ DEFAULT NOW(),
+  updated_at              TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS site_notice_forms (
+  id                    TEXT PRIMARY KEY,
+  doc_no                TEXT DEFAULT '',
+  doc_date              DATE,
+  requester_name        TEXT DEFAULT '',
+  requester_position    TEXT DEFAULT '',
+  requester_dept        TEXT DEFAULT '',
+  attach_copies         TEXT DEFAULT '',
+  attach_sheets         TEXT DEFAULT '',
+  system_key            TEXT DEFAULT 'other',
+  system_other_note     TEXT DEFAULT '',
+  task_install          BOOLEAN DEFAULT false,
+  task_revisit          BOOLEAN DEFAULT false,
+  revisit_no            TEXT DEFAULT '',
+  revisit_total         TEXT DEFAULT '',
+  task_reply_lecturer   BOOLEAN DEFAULT false,
+  task_ma               BOOLEAN DEFAULT false,
+  ma_no                 TEXT DEFAULT '',
+  ma_total              TEXT DEFAULT '',
+  task_present          BOOLEAN DEFAULT false,
+  present_type          TEXT DEFAULT '',
+  task_other            BOOLEAN DEFAULT false,
+  task_other_note       TEXT DEFAULT '',
+  task_survey           BOOLEAN DEFAULT false,
+  task_delivery         BOOLEAN DEFAULT false,
+  delivery_no           TEXT DEFAULT '',
+  delivery_total        TEXT DEFAULT '',
+  task_copydata         BOOLEAN DEFAULT false,
+  copydata_status       TEXT DEFAULT '',
+  work_start            DATE,
+  work_end              DATE,
+  site_location          TEXT DEFAULT '',
+  attendees             JSONB DEFAULT '[]',
+  addressee_key         TEXT DEFAULT 'hospital_director',
+  addressee_other_note  TEXT DEFAULT '',
+  purpose_key           TEXT DEFAULT 'inform',
+  contract_no           TEXT DEFAULT '',
+  contract_amount       NUMERIC,
+  contract_date         DATE,
+  quote_no              TEXT DEFAULT '',
+  deliver_mail          BOOLEAN DEFAULT false,
+  deliver_email         BOOLEAN DEFAULT false,
+  email_to              TEXT DEFAULT '',
+  email_cc              TEXT DEFAULT '',
+  created_at            TIMESTAMPTZ DEFAULT NOW(),
+  updated_at            TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ecf_project_id  ON expense_clearing_forms (project_id);
+CREATE INDEX IF NOT EXISTS idx_ecf_created_at  ON expense_clearing_forms (created_at);
+CREATE INDEX IF NOT EXISTS idx_sdf_hospital_id ON site_deploy_forms (hospital_id);
+CREATE INDEX IF NOT EXISTS idx_sdf_created_at  ON site_deploy_forms (created_at);
+CREATE INDEX IF NOT EXISTS idx_snl_created_at  ON site_notice_forms (created_at);
+
+ALTER TABLE expense_clearing_forms ENABLE ROW LEVEL SECURITY;
+ALTER TABLE site_deploy_forms      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE site_notice_forms      ENABLE ROW LEVEL SECURITY;
+
+DO $$
+DECLARE
+  tbl TEXT;
+  tbls TEXT[] := ARRAY['expense_clearing_forms','site_deploy_forms','site_notice_forms'];
+BEGIN
+  FOREACH tbl IN ARRAY tbls LOOP
+    EXECUTE format('DROP POLICY IF EXISTS "anon_all_%s" ON %I', tbl, tbl);
+    EXECUTE format(
+      'CREATE POLICY "anon_all_%s" ON %I FOR ALL TO anon USING (true) WITH CHECK (true)',
+      tbl, tbl
+    );
+  END LOOP;
+END $$;
+
+DO $$
+DECLARE
+  tbl TEXT;
+  tbls TEXT[] := ARRAY['expense_clearing_forms','site_deploy_forms','site_notice_forms'];
+BEGIN
+  FOREACH tbl IN ARRAY tbls LOOP
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_publication_tables
+      WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = tbl
+    ) THEN
+      EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE %I', tbl);
+    END IF;
+  END LOOP;
+END $$;

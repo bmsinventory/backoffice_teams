@@ -1,0 +1,11 @@
+{
+  "name": "backoffice-teams-deploy-scripts",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate-keys": "node generate-keys.mjs"
+  },
+  "dependencies": {
+    "jsonwebtoken": "^9"
+  }
+}

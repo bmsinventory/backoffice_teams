@@ -1,0 +1,6 @@
+.git
+.claude
+.gitignore
+README.md
+migration/
+supabase-schema.sql
