@@ -18,6 +18,3 @@ Thumbs.db
 
 # Migration script output
 migration/failed-uploads.json
-
-# Generated at container runtime by docker-entrypoint.sh from env-config.template.js
-docs/env-config.js
