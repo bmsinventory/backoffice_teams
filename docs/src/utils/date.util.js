@@ -14,6 +14,99 @@
            (d.getFullYear() + 543);
   };
 
+  // ── ช่องเลือกวันที่ที่ "แสดงผลเป็น พ.ศ." — ใช้แทน <input type="date"> ตรง ๆ ──
+  // ค่าใน .value ยังเป็น ค.ศ. (YYYY-MM-DD) เหมือนเดิม, id เดิมใช้ได้ปกติ
+  // ตัวอย่าง: html += window.beDateField('pf-start', p ? p.start : '', { onchange:'window.foo()', disabled:!ce });
+  // opts: { onchange, oninput, disabled, placeholder, inputCls, dispStyle, wrapStyle }
+  window.beDateField = function (id, value, opts) {
+    opts = opts || {};
+    var v   = value || '';
+    var ph  = opts.placeholder || 'วว/ดด/ปปปป';
+    var dis = opts.disabled ? ' disabled' : '';
+    var ex  = opts.onchange ? String(opts.onchange) : '';
+    var exi = opts.oninput  ? String(opts.oninput)  : '';
+    var idA = id ? ' id="' + id + '"' : '';
+    var inCls = 'be-date-input' + (opts.inputCls ? ' ' + opts.inputCls : '');
+    var wSty  = opts.wrapStyle ? ' style="' + opts.wrapStyle + '"' : '';
+    var dSty  = opts.dispStyle ? ' style="' + opts.dispStyle + '"' : '';
+    return '<span class="be-date"' + wSty + '>'
+      +   '<input type="date" class="' + inCls + '"' + idA + ' value="' + v + '" data-ph="' + ph + '"' + dis
+      +     ' onclick="try{this.showPicker&&this.showPicker()}catch(e){}"'
+      +     (exi ? ' oninput="window.beDateSync(this);' + exi + '"' : '')
+      +     ' onchange="window.beDateSync(this);' + ex + '">'
+      +   '<span class="f-input be-date-display' + (v ? '' : ' is-empty') + '"' + dSty + '>' + (v ? window.fd(v) : ph) + '</span>'
+      + '</span>';
+  };
+
+  // รีเฟรชข้อความ พ.ศ. หลัง .value เปลี่ยน (เรียกอัตโนมัติจาก onchange; เรียกเองหลัง set .value ในโค้ด)
+  window.beDateSync = function (elOrId) {
+    var el = typeof elOrId === 'string' ? document.getElementById(elOrId) : elOrId;
+    if (!el || !el.parentNode) return;
+    var disp = el.parentNode.querySelector('.be-date-display');
+    if (!disp) return;
+    var v = el.value || '';
+    disp.textContent = v ? window.fd(v) : (el.getAttribute('data-ph') || 'วว/ดด/ปปปป');
+    disp.classList.toggle('is-empty', !v);
+  };
+
+  // ── Auto-upgrade: หุ้ม <input type="date"> ทุกตัวในหน้าให้แสดงผลเป็น พ.ศ. อัตโนมัติ ──
+  // ครอบคลุมทั้ง HTML static และช่องที่ JS สร้างขึ้นภายหลัง (ผ่าน MutationObserver) โดยไม่ต้องแก้ทีละจุด
+  // ยกเว้น .ftk-date-input (form-tracker มี overlay ของตัวเอง) และช่องที่สร้างด้วย beDateField() อยู่แล้ว
+  var _valDesc = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
+  function _bePatchValue(inp) {
+    if (inp.__beVal || !_valDesc) return;
+    inp.__beVal = true;
+    Object.defineProperty(inp, 'value', {
+      configurable: true,
+      get: function () { return _valDesc.get.call(this); },
+      set: function (v) { _valDesc.set.call(this, v); try { window.beDateSync(this); } catch (e) {} },
+    });
+  }
+  function _beWrap(inp) {
+    var css = inp.getAttribute('style') || '';
+    inp.removeAttribute('style');
+    inp.classList.add('be-date-input');
+    if (!inp.getAttribute('data-ph')) inp.setAttribute('data-ph', 'วว/ดด/ปปปป');
+    var wrap = document.createElement('span');
+    wrap.className = 'be-date';
+    if (css) wrap.setAttribute('style', css);
+    var disp = document.createElement('span');
+    disp.className = 'f-input be-date-display';
+    if (css) disp.setAttribute('style', css);
+    inp.parentNode.insertBefore(wrap, inp);
+    wrap.appendChild(inp);
+    wrap.appendChild(disp);
+    inp.addEventListener('change', function () { window.beDateSync(inp); });
+    inp.addEventListener('input',  function () { window.beDateSync(inp); });
+    inp.addEventListener('click',  function () { try { inp.showPicker && inp.showPicker(); } catch (e) {} });
+    window.beDateSync(inp);
+  }
+  window.beUpgradeDates = function (root) {
+    root = root || document;
+    var list = root.querySelectorAll ? root.querySelectorAll('input[type="date"]:not([data-be-up])') : [];
+    for (var i = 0; i < list.length; i++) {
+      var inp = list[i];
+      inp.setAttribute('data-be-up', '1');
+      if (inp.classList.contains('ftk-date-input')) continue;
+      _bePatchValue(inp);
+      if (inp.closest && inp.closest('.be-date')) continue; // beDateField() สร้างโครงไว้แล้ว
+      _beWrap(inp);
+    }
+  };
+  function _beBoot() {
+    window.beUpgradeDates(document);
+    if (window.__beObs || !window.MutationObserver) return;
+    var pending = false;
+    window.__beObs = new MutationObserver(function () {
+      if (pending) return;
+      pending = true;
+      requestAnimationFrame(function () { pending = false; window.beUpgradeDates(document); });
+    });
+    window.__beObs.observe(document.body || document.documentElement, { childList: true, subtree: true });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _beBoot);
+  else _beBoot();
+
   // ── Parse: ISO string → Date object (safe) ──
   window.pd = function (s) {
     if (!s) return new Date('1970-01-01');

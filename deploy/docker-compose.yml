@@ -1,12 +1,17 @@
+# frontend container สำหรับ backoffice-teams
+# หมายเหตุ: บนเซิร์ฟเวอร์จริง (10.95.10.108) API ถูก proxy แบบ same-origin ผ่าน
+# Nginx Proxy Manager → SUPABASE_URL จึงเป็นโดเมนหน้าเว็บเอง ไม่ใช่ subdomain แยก
 version: "3.9"
 
 services:
   frontend:
+    # อย่าใช้ :latest อย่างเดียวบน production — pin เวอร์ชันวันที่ไว้ด้วยเพื่อ rollback
     image: hub.hosxp.net/bms/backoffice-teams-frontend:latest
     container_name: backoffice_teams_frontend
     restart: always
     environment:
-      SUPABASE_URL: "https://zsxllqiygochmldmtpgc.supabase.co"
-      SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpzeGxscWl5Z29jaG1sZG10cGdjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MDcwODcsImV4cCI6MjA5NTk4MzA4N30.UOJCTHO0jjMRW21unnB3xUqlBjRp-S2s-JMYZuzkWOw"
+      # docker-entrypoint.sh เอาค่านี้ไปสร้าง env-config.js ใหม่ทุกครั้งที่ container start
+      SUPABASE_URL: "https://backoffice-teams.bmscloud.in.th"
+      SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzg2MDY5OTg0LCJleHAiOjE5NDM3NDk5ODR9.87h6yNOOf2UIVLygJp-hap-Y0n37xQ7OzPfv7HTlrbY"
     ports:
       - "8089:80"

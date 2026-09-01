@@ -214,8 +214,8 @@ window.updateAllMemDates=function(){
     var mid=div.id.slice(3);
     var ms=document.getElementById('ms-'+mid);
     var me=document.getElementById('me-'+mid);
-    if(ms&&sdt&&(!ms.value||ms.value===origS))ms.value=sdt;
-    if(me&&edt&&(!me.value||me.value===origE))me.value=edt;
+    if(ms&&sdt&&(!ms.value||ms.value===origS)){ms.value=sdt;window.beDateSync(ms);}
+    if(me&&edt&&(!me.value||me.value===origE)){me.value=edt;window.beDateSync(me);}
     if(ms&&me)window.checkMemOverlap(mid);
   });
   // อัพเดท baseline เพื่อให้ sync ครั้งถัดไปทำงานได้ถูก (กรณีเปลี่ยนวันซ้ำหลายรอบ)
@@ -276,7 +276,7 @@ window.openProjModal=function(id){
   if(isExecStg&&p&&p.start&&p.end){var sD=pd(p.start);var eD=pd(p.end);var tMs=eD-sD;if(tMs>0)displayProg=Math.min(100,Math.max(0,Math.round((now2-sD)/tMs*100)));}
   var pVal=p?(isExecStg?displayProg:p.progress):0;
   var progTabHtml=p?('<div style="display:flex;align-items:center;gap:7px;margin-left:auto;padding-left:10px;border-left:1px solid var(--border);white-space:nowrap;"><span style="font-size:11px;color:var(--txt2);">ความคืบหน้า</span><span id="prog-lbl" style="font-size:13px;font-weight:700;color:var(--violet);">'+pVal+'%</span>'+(isExecStg?'<span style="font-size:10px;color:var(--txt3);" title="คำนวนอัตโนมัติ">⚡</span>':'')+(window.canEdit('projects')?'<input type="range" id="pf-prog" min="0" max="100" value="'+pVal+'" style="width:72px;accent-color:var(--violet);cursor:pointer;"'+(isExecStg?' disabled':' oninput="document.getElementById(\'prog-lbl\').textContent=this.value+\'%\'"')+'>':'')+'</div>'):'';
-  var memberRows=mems.map(function(m){var st=gSt(m.sid);var j=window.STAFF.findIndex(function(s){return s.id===m.sid;});var overlaps=getStaffOverlaps(m.sid,m.s,m.e,window.editPid);var warnText=overlaps.length>0?overlapWarnText(overlaps):'';return`<div class="m-row" id="mr-${m.id}" data-sid="${m.sid}" style="padding:7px 8px;border-radius:8px;margin-bottom:4px;background:var(--surface2);"><div style="display:flex;align-items:center;gap:7px;"><div style="width:26px;height:26px;border-radius:50%;background:${avC(Math.max(j,0))};color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${st.name.charAt(0)}</div><span style="flex:1;font-size:11px;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${esc(st.name)}${st.nickname?` <span style="color:var(--txt3);font-weight:400;">(${esc(st.nickname)})</span>`:''}</span>${window.canEdit('projects')?`<button class="btn btn-red btn-sm" style="padding:2px 7px;font-size:11px;" onclick="window.pkuDeselect('${m.id}')">✕</button>`:''}</div>${window.canEdit('projects')?`<input type="hidden" id="msid-${m.id}" value="${m.sid}"><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:5px;padding-left:33px;"><input type="date" class="f-input" style="padding:4px 6px;font-size:10px;" id="ms-${m.id}" value="${m.s}" onchange="window.checkMemOverlap('${m.id}')"><input type="date" class="f-input" style="padding:4px 6px;font-size:10px;" id="me-${m.id}" value="${m.e}" onchange="window.checkMemOverlap('${m.id}')"></div><div id="mwarn-${m.id}" style="font-size:10px;color:var(--coral);margin-top:3px;padding-left:33px;display:${warnText?'block':'none'}">${warnText}</div>`:''}</div>`;}).join('');
+  var memberRows=mems.map(function(m){var st=gSt(m.sid);var j=window.STAFF.findIndex(function(s){return s.id===m.sid;});var overlaps=getStaffOverlaps(m.sid,m.s,m.e,window.editPid);var warnText=overlaps.length>0?overlapWarnText(overlaps):'';return`<div class="m-row" id="mr-${m.id}" data-sid="${m.sid}" style="padding:7px 8px;border-radius:8px;margin-bottom:4px;background:var(--surface2);"><div style="display:flex;align-items:center;gap:7px;"><div style="width:26px;height:26px;border-radius:50%;background:${avC(Math.max(j,0))};color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${st.name.charAt(0)}</div><span style="flex:1;font-size:11px;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${esc(st.name)}${st.nickname?` <span style="color:var(--txt3);font-weight:400;">(${esc(st.nickname)})</span>`:''}</span>${window.canEdit('projects')?`<button class="btn btn-red btn-sm" style="padding:2px 7px;font-size:11px;" onclick="window.pkuDeselect('${m.id}')">✕</button>`:''}</div>${window.canEdit('projects')?`<input type="hidden" id="msid-${m.id}" value="${m.sid}"><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:5px;padding-left:33px;">${window.beDateField('ms-'+m.id,m.s,{onchange:"window.checkMemOverlap('"+m.id+"')",dispStyle:'padding:4px 6px;font-size:10px;'})}${window.beDateField('me-'+m.id,m.e,{onchange:"window.checkMemOverlap('"+m.id+"')",dispStyle:'padding:4px 6px;font-size:10px;'})}</div><div id="mwarn-${m.id}" style="font-size:10px;color:var(--coral);margin-top:3px;padding-left:33px;display:${warnText?'block':'none'}">${warnText}</div>`:''}</div>`;}).join('');
   var ce=window.canEdit('projects'),ceA=ce?'':'disabled';
   var hasDates=!!(p&&p.start&&p.end)||mems.length>0;
   var tabBar='<div id="pf-tabs" style="display:flex;gap:6px;align-items:center;padding:12px 24px;border-bottom:1px solid var(--border);margin:-24px -24px 20px;background:var(--surface);position:sticky;top:-24px;z-index:5;">'
@@ -295,11 +295,11 @@ window.openProjModal=function(id){
     +'<div class="f-group"><label class="f-label">ประเภท *</label><select class="f-input" id="pf-type-modal" '+ceA+'>'+typOpts+'</select></div>'
     +'<div class="f-group"><label class="f-label">เจ้าของไซต์ *</label><select class="f-input" id="pf-owner" '+ceA+'>'+ownerOpts+'</select></div>'
     +'<div class="f-group"><label class="f-label">ชื่อผู้ติดตั้ง *</label><select class="f-input" id="pf-installer" '+ceA+'>'+installerOpts+'</select></div>'
-    +'<div class="f-group"><label class="f-label">วันเริ่ม *</label><input type="date" class="f-input" id="pf-start" value="'+(p?p.start:'')+'" onchange="window.updateAllMemDates();window.updateTeamTabVisibility();" '+ceA+'></div>'
-    +'<div class="f-group"><label class="f-label">วันสิ้นสุด *</label><input type="date" class="f-input" id="pf-end" value="'+(p?p.end:'')+'" onchange="window.updateAllMemDates();window.updateTeamTabVisibility();" '+ceA+'></div>'
+    +'<div class="f-group"><label class="f-label">วันเริ่ม *</label>'+window.beDateField('pf-start',(p?p.start:''),{onchange:'window.updateAllMemDates();window.updateTeamTabVisibility();',disabled:!ce})+'</div>'
+    +'<div class="f-group"><label class="f-label">วันสิ้นสุด *</label>'+window.beDateField('pf-end',(p?p.end:''),{onchange:'window.updateAllMemDates();window.updateTeamTabVisibility();',disabled:!ce})+'</div>'
     +'<div class="f-group" id="pf-no-revisit-grp" style="display:none;grid-column:1/-1;"><label class="f-label">Revisit</label><div style="display:flex;align-items:center;gap:10px;padding:10px 14px;height:40px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);box-sizing:border-box;"><input type="checkbox" id="pf-no-revisit" '+(p&&p.noRevisit?'checked ':'')+ceA+' style="width:16px;height:16px;accent-color:var(--coral);cursor:pointer;" onchange="window._pfToggleRevisit()"><label for="pf-no-revisit" style="font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;">📅 ไม่ต้อง Revisit</label></div></div>'
-    +'<div class="f-group" id="pf-revisit1-grp"><label class="f-label">Revisit 1</label><input type="date" class="f-input" id="pf-revisit1" value="'+(p?p.revisit1:'')+'" '+ceA+'></div>'
-    +'<div class="f-group" id="pf-revisit2-grp"><label class="f-label">Revisit 2</label><input type="date" class="f-input" id="pf-revisit2" value="'+(p?p.revisit2:'')+'" '+ceA+'></div>'
+    +'<div class="f-group" id="pf-revisit1-grp"><label class="f-label">Revisit 1</label>'+window.beDateField('pf-revisit1',(p?p.revisit1:''),{disabled:!ce})+'</div>'
+    +'<div class="f-group" id="pf-revisit2-grp"><label class="f-label">Revisit 2</label>'+window.beDateField('pf-revisit2',(p?p.revisit2:''),{disabled:!ce})+'</div>'
     +'</div>'
     +'<div id="pf-contract-wrap" style="display:none;margin-top:4px;">'
     +'<div class="f-group"><label class="f-label">🔗 ผูกสัญญา</label>'
@@ -373,8 +373,8 @@ window.pkuSelect=function(sid){
     +'</div>'
     +'<input type="hidden" id="msid-'+mid+'" value="'+sid+'">'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:5px;padding-left:33px;">'
-    +'<input type="date" class="f-input" style="padding:4px 6px;font-size:10px;" id="ms-'+mid+'" value="'+sdt+'" onchange="window.checkMemOverlap(\''+mid+'\')">'
-    +'<input type="date" class="f-input" style="padding:4px 6px;font-size:10px;" id="me-'+mid+'" value="'+edt+'" onchange="window.checkMemOverlap(\''+mid+'\')">'
+    +window.beDateField('ms-'+mid,sdt,{onchange:"window.checkMemOverlap('"+mid+"')",dispStyle:'padding:4px 6px;font-size:10px;'})
+    +window.beDateField('me-'+mid,edt,{onchange:"window.checkMemOverlap('"+mid+"')",dispStyle:'padding:4px 6px;font-size:10px;'})
     +'</div>'
     +'<div id="mwarn-'+mid+'" style="font-size:10px;margin-top:3px;padding-left:33px;display:'+(combinedWarn?'block':'none')+'">'+combinedWarn+'</div>';
   list.appendChild(div);
@@ -418,7 +418,7 @@ window._pfToggleRevisit=function(){
   var r1g=document.getElementById('pf-revisit1-grp');var r2g=document.getElementById('pf-revisit2-grp');
   if(r1g)r1g.style.display=noRev?'none':'';
   if(r2g)r2g.style.display=noRev?'none':'';
-  if(noRev){var endDate=(document.getElementById('pf-end')||{}).value||'';var i1=document.getElementById('pf-revisit1');var i2=document.getElementById('pf-revisit2');if(i1)i1.value=endDate;if(i2)i2.value=endDate;}
+  if(noRev){var endDate=(document.getElementById('pf-end')||{}).value||'';var i1=document.getElementById('pf-revisit1');var i2=document.getElementById('pf-revisit2');if(i1){i1.value=endDate;window.beDateSync(i1);}if(i2){i2.value=endDate;window.beDateSync(i2);}}
 };
 
 window.updateProjFormByGroup=function(initialParentId){
@@ -596,7 +596,7 @@ window.addMem=function(){
   var mid='M'+uid();var sdt=(document.getElementById('pf-start')||{}).value||'';var edt=(document.getElementById('pf-end')||{}).value||'';
   var overlaps=getStaffOverlaps(sid,sdt,edt,window.editPid);var warnText=overlaps.length>0?overlapWarnText(overlaps):'';
   var list=document.getElementById('mem-list');var div=document.createElement('div');div.className='m-row';div.id='mr-'+mid;
-  div.innerHTML=`<div style="display:flex;align-items:center;gap:8px;width:100%"><div class="av" style="background:${avC(Math.max(j,0))}">${s.name.charAt(0)}</div><span style="flex:1;font-size:12px;font-weight:600">${esc(s.name)}</span><input type="hidden" id="msid-${mid}" value="${sid}"><input type="date" class="f-input" style="width:130px;padding:6px 8px;font-size:11px" id="ms-${mid}" value="${sdt}" onchange="window.checkMemOverlap('${mid}')"><span style="color:var(--txt3)">→</span><input type="date" class="f-input" style="width:130px;padding:6px 8px;font-size:11px" id="me-${mid}" value="${edt}" onchange="window.checkMemOverlap('${mid}')"><button class="btn btn-red btn-sm" onclick="window.rmMem('${mid}')">✕</button></div><div id="mwarn-${mid}" style="font-size:10px;color:var(--coral);width:100%;margin-top:4px;padding-left:36px;display:${warnText?'block':'none'}">${warnText}</div>`;
+  div.innerHTML=`<div style="display:flex;align-items:center;gap:8px;width:100%"><div class="av" style="background:${avC(Math.max(j,0))}">${s.name.charAt(0)}</div><span style="flex:1;font-size:12px;font-weight:600">${esc(s.name)}</span><input type="hidden" id="msid-${mid}" value="${sid}">${window.beDateField('ms-'+mid,sdt,{onchange:"window.checkMemOverlap('"+mid+"')",wrapStyle:'width:130px',dispStyle:'padding:6px 8px;font-size:11px'})}<span style="color:var(--txt3)">→</span>${window.beDateField('me-'+mid,edt,{onchange:"window.checkMemOverlap('"+mid+"')",wrapStyle:'width:130px',dispStyle:'padding:6px 8px;font-size:11px'})}<button class="btn btn-red btn-sm" onclick="window.rmMem('${mid}')">✕</button></div><div id="mwarn-${mid}" style="font-size:10px;color:var(--coral);width:100%;margin-top:4px;padding-left:36px;display:${warnText?'block':'none'}">${warnText}</div>`;
   list.appendChild(div);
 }
 window.rmMem=function(mid){
@@ -837,9 +837,9 @@ window._buildVisitRow = function(v, no) {
         +'<span style="cursor:pointer;color:var(--coral);font-size:11px;flex-shrink:0;" onclick="window.vtPkuRemove(\''+vid+'\',\''+sid+'\')">✕</span>'
       +'</div>'
       +'<div style="display:flex;gap:3px;margin-top:4px;align-items:center;">'
-        +'<input type="date" class="v-mem-s f-input" value="'+ms+'" oninput="this.closest(\'.v-team-tag\').setAttribute(\'data-s\',this.value)" style="flex:1;padding:2px 4px;font-size:9px;height:22px;min-width:0;" title="วันเริ่มงาน">'
+        +window.beDateField('',ms,{inputCls:'v-mem-s',oninput:"this.closest('.v-team-tag').setAttribute('data-s',this.value)",wrapStyle:'flex:1;min-width:0',dispStyle:'padding:2px 4px;font-size:9px;height:22px;'})
         +'<span style="color:var(--txt3);font-size:9px;flex-shrink:0;">→</span>'
-        +'<input type="date" class="v-mem-e f-input" value="'+me+'" oninput="this.closest(\'.v-team-tag\').setAttribute(\'data-e\',this.value)" style="flex:1;padding:2px 4px;font-size:9px;height:22px;min-width:0;" title="วันสิ้นสุดงาน">'
+        +window.beDateField('',me,{inputCls:'v-mem-e',oninput:"this.closest('.v-team-tag').setAttribute('data-e',this.value)",wrapStyle:'flex:1;min-width:0',dispStyle:'padding:2px 4px;font-size:9px;height:22px;'})
       +'</div>'
     +'</div>';
   }).join('');
@@ -851,8 +851,8 @@ window._buildVisitRow = function(v, no) {
       <button class="btn btn-red btn-sm" type="button" onclick="this.closest('.visit-row').remove();window.reNumberVisits()">✕ ลบรอบ</button>
     </div>
     <div class="f-grid" style="gap:8px;">
-      <div class="f-group"><label class="f-label" style="font-size:11px">วันเริ่มรอบ</label><input type="date" class="f-input v-start" value="${v&&v.start?v.start:''}" onchange="window.vtSyncMemDates('${vid}',this,'s')"></div>
-      <div class="f-group"><label class="f-label" style="font-size:11px">วันสิ้นสุดรอบ</label><input type="date" class="f-input v-end" value="${v&&v.end?v.end:''}" onchange="window.vtSyncMemDates('${vid}',this,'e')"></div>
+      <div class="f-group"><label class="f-label" style="font-size:11px">วันเริ่มรอบ</label>${window.beDateField('',(v&&v.start?v.start:''),{inputCls:'v-start',onchange:"window.vtSyncMemDates('"+vid+"',this,'s')"})}</div>
+      <div class="f-group"><label class="f-label" style="font-size:11px">วันสิ้นสุดรอบ</label>${window.beDateField('',(v&&v.end?v.end:''),{inputCls:'v-end',onchange:"window.vtSyncMemDates('"+vid+"',this,'e')"})}</div>
       <div class="f-group"><label class="f-label" style="font-size:11px">วัตถุประสงค์</label><input type="text" class="f-input v-purpose" value="${esc(v&&v.purpose?v.purpose:'')}" placeholder="เช่น สำรวจพื้นที่, ติดตั้ง..."></div>
       <div class="f-group"><label class="f-label" style="font-size:11px">สถานะ</label>
         <select class="f-input v-status">
@@ -906,9 +906,9 @@ window.vtPkuAdd=function(vid,sid){
     +'<span style="cursor:pointer;color:var(--coral);font-size:11px;flex-shrink:0;" onclick="window.vtPkuRemove(\''+vid+'\',\''+sid+'\')">✕</span>'
   +'</div>'
   +'<div style="display:flex;gap:3px;margin-top:4px;align-items:center;">'
-    +'<input type="date" class="v-mem-s f-input" value="'+vs+'" oninput="this.closest(\'.v-team-tag\').setAttribute(\'data-s\',this.value)" style="flex:1;padding:2px 4px;font-size:9px;height:22px;min-width:0;" title="วันเริ่มงาน">'
+    +window.beDateField('',vs,{inputCls:'v-mem-s',oninput:"this.closest('.v-team-tag').setAttribute('data-s',this.value)",wrapStyle:'flex:1;min-width:0',dispStyle:'padding:2px 4px;font-size:9px;height:22px;'})
     +'<span style="color:var(--txt3);font-size:9px;flex-shrink:0;">→</span>'
-    +'<input type="date" class="v-mem-e f-input" value="'+ve+'" oninput="this.closest(\'.v-team-tag\').setAttribute(\'data-e\',this.value)" style="flex:1;padding:2px 4px;font-size:9px;height:22px;min-width:0;" title="วันสิ้นสุดงาน">'
+    +window.beDateField('',ve,{inputCls:'v-mem-e',oninput:"this.closest('.v-team-tag').setAttribute('data-e',this.value)",wrapStyle:'flex:1;min-width:0',dispStyle:'padding:2px 4px;font-size:9px;height:22px;'})
   +'</div>';
   selBox.appendChild(tag);
   var avItem=document.querySelector('#vt-avail-'+vid+' .vt-avail-item[data-sid="'+sid+'"]');
@@ -976,7 +976,7 @@ window.vtSyncMemDates = function(vid, input, field) {
     if (!cur || cur === origVal) {
       tag.setAttribute(tagAttr, newVal);
       var inp = tag.querySelector(memInput);
-      if (inp) inp.value = newVal;
+      if (inp) { inp.value = newVal; window.beDateSync(inp); }
     }
   });
   // อัพเดท orig ให้ตรงกับค่าใหม่

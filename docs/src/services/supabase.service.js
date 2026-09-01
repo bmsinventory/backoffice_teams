@@ -8,6 +8,12 @@
  */
 (function () {
 
+  // LOCAL TEST MODE เปิดอยู่ → local-db.service.js จัดการ data layer ทั้งหมดแล้ว ข้ามตัวเอง
+  if (window.__LOCAL_DB_ACTIVE__) {
+    console.log('[supabase.service] ข้าม — กำลังใช้ LOCAL TEST MODE (local-db.service.js)');
+    return;
+  }
+
   var cfg = window.API_CONFIG || {};
   var SUPABASE_URL      = cfg.supabaseUrl      || window.SUPABASE_URL      || 'https://YOUR-PROJECT.supabase.co';
   var SUPABASE_ANON_KEY = cfg.supabaseAnonKey  || window.SUPABASE_ANON_KEY || 'YOUR-ANON-KEY';

@@ -2284,6 +2284,9 @@
 
 <!-- 3. Services Layer (ต้องโหลดหลัง utils) -->
 <script src="src/services/storage.service.js"></script>
+<!-- LOCAL TEST MODE: ถ้าเปิดผ่าน localhost (หรือ window.LOCAL_TEST_MODE=true) จะใช้ localStorage แทน Supabase
+     ต้องโหลดก่อน supabase.service.js — ตัวนั้นมี guard เช็ค window.__LOCAL_DB_ACTIVE__ แล้วข้ามตัวเอง -->
+<script src="src/services/local-db.service.js"></script>
 <script src="src/services/supabase.service.js"></script>
 <script src="src/services/realtime.service.js"></script>
 <script src="src/services/auth.service.js"></script>
