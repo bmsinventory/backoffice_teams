@@ -1,7 +1,7 @@
 /**
- * realtime.service.js — Supabase Realtime Listeners
+ * realtime.service.js — Realtime Listeners
  * รับข้อมูลแบบ Real-time จากทุก collection และ update global stores
- * ต้องโหลดหลัง supabase.service.js และ app.config.js
+ * ต้องโหลดหลัง db.service.js และ app.config.js
  */
 (function () {
 
@@ -15,7 +15,7 @@
     return (y >= 2500 ? (y - 543) : y) + m[2];
   }
 
-  // ── Transform Functions: raw Supabase doc → app object ──
+  // ── Transform Functions: raw DB doc → app object ──
   var transform = {
     STAGES: function (d) {
       return { id:d.stage_id||d.id, label:d.label_th||d.label, color:d.color_hex||d.color, order:d.order||99, autoRule:d.auto_rule||'', autoOffset:Number(d.auto_offset||0), setProgress:Number(d.set_progress||-1) };
@@ -78,7 +78,7 @@
 
   // ── Optimistic Local Update Helpers ──
   // Call these right after setDoc/deleteDoc so the UI updates instantly
-  // without waiting for the Supabase realtime snapshot to come back.
+  // without waiting for the realtime snapshot to come back.
   window._applyLocalDoc = function (collection, id, rawData) {
     var arr = window[collection];
     if (!Array.isArray(arr)) return;

@@ -17,19 +17,19 @@
       overview:ro, kanban:full, projects:full, advance:full, expense_form:full, lodging:full,
       workload:ro, calendar:full, leave:full, timesheet:ro, cost:ro,
       availability:ro, holiday:ro, admin:none, targets:none, hospital:ro, contract:full,
-      impl_tracker:full,
+      impl_tracker:full, helpdesk:{ view:true, add:true, edit:true, del:false },
     };
     if (role === 'viewer') return {
       overview:ro, kanban:ro, projects:none, advance:full, expense_form:full, lodging:full,
       workload:ro, calendar:ro, leave:vadd, timesheet:ro, cost:ro,
       availability:ro, holiday:none, admin:none, targets:none, hospital:ro, contract:ro,
-      impl_tracker:ro,
+      impl_tracker:ro, helpdesk:ro,
     };
     return {
       overview:ro, kanban:ro, projects:ro, advance:ro, expense_form:ro, lodging:ro,
       workload:ro, calendar:ro, leave:ro, timesheet:ro, cost:ro,
       availability:ro, holiday:none, admin:none, targets:none, hospital:ro, contract:ro,
-      impl_tracker:ro,
+      impl_tracker:ro, helpdesk:ro,
     };
   }
 

@@ -91,6 +91,7 @@
         contract:   'renderContract',
         worklog:    'renderWorkLog',
         impl_tracker: 'renderImplTracker',
+        helpdesk:   'renderHelpdesk',
       };
       if (id === 'overview' || id === 'kanban' || id === 'projects') {
         window.runAutoStage && window.runAutoStage(true);

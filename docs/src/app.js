@@ -3,12 +3,12 @@
  * เริ่มต้นระบบ: setup user session, render all modules, PWA install
  *
  * Load Order ที่ถูกต้อง (ดู index.html):
- *   1. Supabase SDK
+ *   1. PostgREST client library
  *   2. src/config/api.config.js
  *   3. src/config/app.config.js
  *   4. src/config/routes.config.js
  *   5. src/utils/*.util.js
- *   6. src/services/supabase.service.js
+ *   6. src/services/db.service.js
  *   7. src/services/storage.service.js
  *   8. src/services/realtime.service.js
  *   9. src/services/auth.service.js
@@ -70,7 +70,7 @@
       'overview','kanban','projects','advance','lodging',
       'workload','availability','calendar','leave','timesheet',
       'cost','budget','targets','hospital','contract','worklog','holiday',
-      'impl_tracker',
+      'impl_tracker','helpdesk',
     ];
     navModules.forEach(function (m) {
       var btn = document.querySelector('.nav-btn[onclick*="\'' + m + '\'"]');
@@ -147,6 +147,7 @@
       'view-targets':      'renderTargets',
       'view-worklog':      'renderWorkLog',
       'view-impl-tracker': 'renderImplTracker',
+      'view-helpdesk':     'renderHelpdesk',
     };
 
     Object.keys(renders).forEach(function (viewId) {

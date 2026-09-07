@@ -37,7 +37,7 @@
   window.isDbLoaded  = false;
   window.cu          = null;
 
-  // ── Default Settings (overridden by Supabase SETTINGS doc) ──
+  // ── Default Settings (overridden by SETTINGS doc from backend) ──
   window.SETTINGS = {
     allowance_weekday_normal: 350,
     allowance_holiday_normal: 650,

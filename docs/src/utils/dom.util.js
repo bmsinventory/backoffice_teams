@@ -21,21 +21,20 @@
 
   // ── Database Error Display ──
   window.showDbError = function (err) {
-    console.error('Supabase Error:', err);
+    console.error('Database Error:', err);
     var errMsg   = err && err.message ? window.esc(err.message) : '';
     var isNoTable = errMsg.includes('does not exist') || errMsg.includes('relation') || errMsg.includes('42P01');
 
-    var msg = '<div style="color:var(--coral);font-weight:bold;font-size:16px;margin-bottom:10px;">❌ ไม่สามารถเชื่อมต่อ Supabase ได้</div>';
+    var msg = '<div style="color:var(--coral);font-weight:bold;font-size:16px;margin-bottom:10px;">❌ ไม่สามารถเชื่อมต่อฐานข้อมูลได้</div>';
     msg += '<div style="font-size:13px;color:var(--txt);text-align:left;background:var(--surface2);padding:14px;border-radius:8px;border:1px solid var(--border);max-width:520px;line-height:1.7;">';
 
     if (isNoTable) {
-      msg += '<strong style="color:var(--coral);">⚠ ตารางยังไม่ถูกสร้างใน Supabase</strong><br><br>';
-      msg += 'กรุณารัน <code>supabase-schema.sql</code> ใน Supabase SQL Editor ก่อน:<br>';
-      msg += '<a href="https://supabase.com/dashboard" target="_blank" style="color:var(--violet);font-weight:600;">→ เปิด Supabase Dashboard</a><br><br>';
+      msg += '<strong style="color:var(--coral);">⚠ ตารางยังไม่ถูกสร้างในฐานข้อมูล</strong><br><br>';
+      msg += 'กรุณารัน <code>db-schema.sql</code> ใน SQL Editor ของฐานข้อมูลก่อน<br><br>';
     } else {
       msg += '<strong>ตรวจสอบ:</strong><br>';
-      msg += '1. รัน <code>supabase-schema.sql</code> ใน SQL Editor แล้วหรือไม่<br>';
-      msg += '2. <code>SUPABASE_URL</code> และ <code>SUPABASE_ANON_KEY</code> ถูกต้อง<br>';
+      msg += '1. รัน <code>db-schema.sql</code> ใน SQL Editor แล้วหรือไม่<br>';
+      msg += '2. <code>SUPABASE_URL</code> และ <code>SUPABASE_ANON_KEY</code> (ENV) ถูกต้อง<br>';
       msg += '3. RLS policy อนุญาต <code>anon</code> หรือไม่<br>';
     }
     if (errMsg) msg += '<code style="font-size:11px;color:var(--coral);word-break:break-all;">' + errMsg + '</code>';
@@ -86,7 +85,7 @@
   // dismissible toast, so a missing/unmigrated table on a background feature
   // (e.g. site_deploy_forms) doesn't lock users out of the rest of the app.
   window.showDbErrorSoft = function (err, label) {
-    console.error('[Supabase Background Sync Error]' + (label ? ' (' + label + ')' : '') + ':', err);
+    console.error('[DB Background Sync Error]' + (label ? ' (' + label + ')' : '') + ':', err);
     var msg = (label ? window.esc(label) + ': ' : '') + 'ซิงค์ข้อมูลบางส่วนไม่สำเร็จ (ดูรายละเอียดใน Console)';
     window.showToast(msg, 'warn');
   };

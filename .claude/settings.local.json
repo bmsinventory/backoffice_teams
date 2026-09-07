@@ -59,7 +59,26 @@
       "Bash(node snl_test.js)",
       "Bash(tail -30 /tmp/snl_http.log)",
       "Bash(lsof -ti:8791)",
-      "Bash(xargs -r kill)"
+      "Bash(xargs -r kill)",
+      "Bash(node --check docs/js/helpdesk.js)",
+      "Bash(node --check docs/src/config/helpdesk.config.js)",
+      "Bash(node --check docs/src/services/helpdesk.service.js)",
+      "Bash(node -e \"new Function\\(require\\('fs'\\).readFileSync\\('docs/help.html','utf8'\\).match\\(/<script>\\([\\\\s\\\\S]*\\)<\\\\/script>\\\\s*<\\\\/body>/\\)[1]\\); console.log\\('help.html inline JS OK'\\)\")",
+      "Bash(grep -c 'DO \\\\$\\\\$' supabase-schema.sql)",
+      "Bash(grep -c 'END \\\\$\\\\$;' supabase-schema.sql)",
+      "Bash(node -e \"const c=require\\('fs'\\).readFileSync\\('docs/src/styles/modules/helpdesk.css','utf8'\\); const o=\\(c.match\\(/{/g\\)||[]\\).length,x=\\(c.match\\(/}/g\\)||[]\\).length; console.log\\('css braces',o,x, o===x?'OK':'MISMATCH'\\)\")",
+      "Bash(node -e ' *)",
+      "Bash(grep -v ':0$')",
+      "Bash(sort -t: -k2 -rn)",
+      "Bash(git mv *)",
+      "Bash(perl -i -pe ' *)",
+      "Bash(perl -i -pe 's/\\\\bsb\\\\./db./g' docs/help.html)",
+      "Bash(perl -i -pe 's/\\\\bsupabase-migration-/db-migration-/g' db-schema.sql)",
+      "Bash(node -e \"const c=require\\('fs'\\).readFileSync\\('docs/src/styles/modules/helpdesk.css','utf8'\\);const o=\\(c.match\\(/{/g\\)||[]\\).length,x=\\(c.match\\(/}/g\\)||[]\\).length;console.log\\('css braces',o,x,o===x?'OK':'MISMATCH'\\)\")",
+      "Bash(node --check \"C:/Users/BMS/AppData/Local/Temp/claude/d-----------------------backoffice-teams---supabase/583c1637-5ae4-44cb-800a-c109f772a993/scratchpad/hd-import.js\")",
+      "Bash(node -e \"const h=require\\('fs'\\).readFileSync\\('docs/index.html','utf8'\\);const o=\\(h.match\\(/<div\\\\b/g\\)||[]\\).length,c=\\(h.match\\(/<\\\\/div>/g\\)||[]\\).length;console.log\\('index.html div',o,c,o===c?'BALANCED':'DIFF'\\);console.log\\('m-hd-import present:',h.includes\\('id=\\\\\"m-hd-import\\\\\"'\\),h.includes\\('m-hd-import-run'\\)\\)\")",
+      "Bash(node --check docs/js/modals.js)",
+      "Bash(node -e \"const h=require\\('fs'\\).readFileSync\\('docs/index.html','utf8'\\);const o=\\(h.match\\(/<div\\\\b/g\\)||[]\\).length,c=\\(h.match\\(/<\\\\/div>/g\\)||[]\\).length;console.log\\('div',o,c,o===c?'OK':'DIFF'\\);console.log\\('HELPDESK option:',h.includes\\('value=\\\\\"HELPDESK\\\\\"'\\)\\);console.log\\('still has hdOpenImport btn:',h.includes\\('hdOpenImport'\\)\\)\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\BMS\\Desktop\\backoffice-teams\\public"

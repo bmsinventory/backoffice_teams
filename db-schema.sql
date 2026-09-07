@@ -1,6 +1,7 @@
 -- =============================================================
--- Backoffice Teams — Supabase Schema
--- รันใน Supabase Dashboard → SQL Editor
+-- Backoffice Teams — Backend DB Schema
+-- รันใน SQL Editor ของฐานข้อมูล (PostgreSQL)
+-- หมายเหตุ: publication ชื่อ `supabase_realtime` เป็น object จริงของ Realtime service — ห้ามเปลี่ยนชื่อ
 -- =============================================================
 
 -- ── STAGES ──────────────────────────────────────────────────
@@ -458,7 +459,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE settings;
 -- =============================================================
 -- IMPLEMENTATION TRACKER (impl_tracker) — Module ติดตามงานโครงการติดตั้งระบบ
 -- Project → Phase → Task → Checklist, แยกอิสระจากตาราง projects เดิม (คนละความหมาย)
--- รายละเอียดเต็ม + seed template: ดู supabase-migration-impl-tracker.sql
+-- รายละเอียดเต็ม + seed template: ดู db-migration-impl-tracker.sql
 -- =============================================================
 CREATE TABLE IF NOT EXISTS impl_templates (
   id            TEXT PRIMARY KEY,
@@ -609,7 +610,7 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('impl-attachments', 'impl-attachments', true)
 ON CONFLICT (id) DO NOTHING;
 
--- Seed template ("TPL_INV_STD") + storage policies: ดู supabase-migration-impl-tracker.sql
+-- Seed template ("TPL_INV_STD") + storage policies: ดู db-migration-impl-tracker.sql
 
 -- ================================================================
 -- FORM TRACKER (form_tracker) — ส่วนย่อย "แบบฟอร์ม" ในหน้า "ติดตามโครงการติดตั้ง" (impl_tracker)

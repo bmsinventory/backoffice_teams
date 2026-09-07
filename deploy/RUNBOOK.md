@@ -63,7 +63,7 @@ docker compose ps   # ทุก service ต้อง Up/healthy
 
 ```bash
 docker compose exec -T db psql -U postgres -d postgres \
-  < /path/to/backoffice_teams-supabase/supabase-schema.sql
+  < /path/to/backoffice_teams-supabase/db-schema.sql
 ```
 
 ตรวจว่าตาราง/RLS/bucket ถูกสร้างครบ (เปิด Supabase Studio ที่ `http://<SERVER_IP>:8000` ล็อกอินด้วย DASHBOARD_USERNAME/PASSWORD ที่ตั้งไว้ ดูใน Table Editor + Storage)
@@ -131,7 +131,16 @@ docker compose exec -T db psql -U postgres -d postgres \
 environment:
   SUPABASE_URL: "https://api.<DOMAIN>"
   SUPABASE_ANON_KEY: "<ANON_KEY จาก Phase 2>"
+  # ── ปุ่ม AI ช่วยวิเคราะห์ (HelpDesk) — เว้นว่าง VLLM_UPSTREAM = ปิดฟีเจอร์ ──
+  VLLM_UPSTREAM: "https://vllm-gemma.bmscloud.in.th"   # endpoint MedGemma (OpenAI-compatible)
+  VLLM_API_KEY: "<vLLM api key จริง — อย่า commit>"
 ```
+
+- `docker-entrypoint.sh` สร้าง `/etc/nginx/conf.d/default.conf` จาก template ตอน start:
+  ตั้ง `VLLM_UPSTREAM` → เปิด `location /helpdesk-ai/` (reverse-proxy + ใส่ `Authorization: Bearer <key>`) ·
+  เว้นว่าง → ตัด block นี้ทิ้ง (nginx สตาร์ทได้ปกติ, ปุ่ม AI ในแอปขึ้น "ยังไม่เปิดใช้ AI")
+- **frontend เห็นแค่ path `/helpdesk-ai/` (same-origin)** — ไม่มี string `vllm-gemma` / api key ใน `docs/`
+- ต้องแน่ใจว่า container `backoffice_teams_frontend` route ไปถึง `vllm-gemma.bmscloud.in.th` ได้
 
 ```bash
 docker compose up -d   # ไม่ต้อง rebuild image — env var อ่านใหม่ตอน container start

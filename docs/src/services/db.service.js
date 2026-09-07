@@ -1,6 +1,6 @@
 /**
- * supabase.service.js — Supabase API Adapter (Firebase Firestore-compatible API)
- * ต้องโหลดหลัง Supabase SDK และ api.config.js
+ * db.service.js — Backend DB API Adapter (Firebase Firestore-compatible API)
+ * ต้องโหลดหลัง PostgREST client library และ api.config.js
  *
  * Exposes บน window:
  *   getColRef, getDocRef, setDoc, updateDoc, deleteDoc,
@@ -10,26 +10,27 @@
 
   // LOCAL TEST MODE เปิดอยู่ → local-db.service.js จัดการ data layer ทั้งหมดแล้ว ข้ามตัวเอง
   if (window.__LOCAL_DB_ACTIVE__) {
-    console.log('[supabase.service] ข้าม — กำลังใช้ LOCAL TEST MODE (local-db.service.js)');
+    console.log('[db.service] ข้าม — กำลังใช้ LOCAL TEST MODE (local-db.service.js)');
     return;
   }
 
   var cfg = window.API_CONFIG || {};
-  var SUPABASE_URL      = cfg.supabaseUrl      || window.SUPABASE_URL      || 'https://YOUR-PROJECT.supabase.co';
-  var SUPABASE_ANON_KEY = cfg.supabaseAnonKey  || window.SUPABASE_ANON_KEY || 'YOUR-ANON-KEY';
+  var DB_URL = cfg.dbUrl || window.SUPABASE_URL      || 'https://YOUR-PROJECT.example';
+  var DB_KEY = cfg.dbKey || window.SUPABASE_ANON_KEY || 'YOUR-ANON-KEY';
   var PAGE_SIZE         = cfg.paginationSize   || 1000;
   var DEBOUNCE_MS       = cfg.realtimeDebounceMs || 350;
 
+  // window.supabase = global ของ PostgREST client library ที่ vendor มา (คงชื่อ vendor ไว้)
   if (!window.supabase) {
-    console.error('[supabase.service] Supabase SDK ยังไม่ถูกโหลด — ใส่ script tag SDK ก่อน');
+    console.error('[db.service] client library ยังไม่ถูกโหลด — ใส่ script tag ก่อน');
     return;
   }
 
-  var _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  var _sb = window.supabase.createClient(DB_URL, DB_KEY, {
     realtime: { params: { eventsPerSecond: cfg.realtimeEventsPerSecond || 10 } },
   });
 
-  // ── Collection Name Map (Firestore → Supabase table) ──
+  // ── Collection Name Map (Firestore → DB table) ──
   var COL_MAP = {
     STAGES:'stages', PTYPES:'ptypes', PGROUPS:'pgroups',
     POSITIONS:'positions', DEPARTMENTS:'departments', STAFF:'staff',
@@ -69,7 +70,7 @@
     };
   }
 
-  // ── Paginated Fetch (Supabase default limit = 1000 rows/request) ──
+  // ── Paginated Fetch (PostgREST default limit = 1000 rows/request) ──
   async function _fullList(sbTable) {
     var all = [], page = 0;
     while (true) {
@@ -89,7 +90,7 @@
       var records = await _fullList(ref._sb);
       return _makeColSnap(ref._fs, records);
     } catch (e) {
-      console.error('[supabase.service] getDocs error [' + ref._sb + ']:', e);
+      console.error('[db.service] getDocs error [' + ref._sb + ']:', e);
       return { docs:[], empty:true };
     }
   };
@@ -112,7 +113,7 @@
         }
       } catch (e) {
         if (onError) onError(e);
-        else console.error('[supabase.service] onSnapshot error [' + sbTable + ']:', e);
+        else console.error('[db.service] onSnapshot error [' + sbTable + ']:', e);
       }
     }
 
@@ -128,7 +129,7 @@
     var channel = _sb.channel(channelName)
       .on('postgres_changes', { event:'*', schema:'public', table:sbTable }, function () { _debouncedFetch(); })
       .subscribe(function (status) {
-        if (status === 'CHANNEL_ERROR') console.warn('[supabase.service] Realtime subscribe error [' + sbTable + ']');
+        if (status === 'CHANNEL_ERROR') console.warn('[db.service] Realtime subscribe error [' + sbTable + ']');
       });
 
     return function () { _sb.removeChannel(channel); };
@@ -166,7 +167,7 @@
     if (res.error) throw res.error;
   };
 
-  // ── Batch (sequential — Supabase has no atomic batch) ──
+  // ── Batch (sequential — PostgREST has no atomic batch) ──
   window.writeBatch = function () {
     var ops = [];
     return {
@@ -187,6 +188,6 @@
   // ── Raw Client ──
   window.getDb = function () { return _sb; };
 
-  console.log('[supabase.service] Connected →', SUPABASE_URL);
+  console.log('[db.service] Connected →', DB_URL);
 
 })();

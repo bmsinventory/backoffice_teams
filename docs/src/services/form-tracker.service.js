@@ -1,13 +1,13 @@
 /**
  * form-tracker.service.js — Form Tracker: Data Layer
- * ต้องโหลดหลัง supabase.service.js + form-tracker.config.js
+ * ต้องโหลดหลัง db.service.js + form-tracker.config.js
  * ลงทะเบียน onSnapshot ของตัวเอง (ไม่แก้ realtime.service.js เดิม) แบบ background
  * เหมือนแพทเทิร์นของ impl-tracker.service.js — re-render ผ่าน window.renderImplTracker()
  * เพราะแท็บ "แบบฟอร์ม" เป็นส่วนหนึ่งของหน้า impl_tracker แล้ว (ไม่มี view/หน้าของตัวเอง)
  */
 (function () {
 
-  // ── Transform: raw Supabase row → app object ──
+  // ── Transform: raw DB row → app object ──
   var transform = {
     FORM_GROUPS: function (d) {
       return { id:d.id, projectId:d.project_id, name:d.group_name||'', order:Number(d.sort_order)||99, createdAt:d.created_at||'' };

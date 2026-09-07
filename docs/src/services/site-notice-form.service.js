@@ -1,12 +1,12 @@
 /**
  * site-notice-form.service.js — Site Notice Letter (หนังสือแจ้งออกไซต์): Data Layer
- * ต้องโหลดหลัง supabase.service.js + site-notice-form.config.js
+ * ต้องโหลดหลัง db.service.js + site-notice-form.config.js
  * ลงทะเบียน onSnapshot ของตัวเอง (ไม่แก้ realtime.service.js เดิม) แบบ background
  * (ไม่ block loader หลัก เหมือน WORK_LOGS/CONTRACTS/HOSPITALS/IMPL_.../EXPENSE_CLEARING_FORMS/SITE_DEPLOY_FORMS)
  */
 (function () {
 
-  // ── Transform: raw Supabase row → app object ──
+  // ── Transform: raw DB row → app object ──
   function transform(d) {
     return {
       id: d.id,

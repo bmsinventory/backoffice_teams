@@ -1,7 +1,7 @@
 /**
  * impl-tracker.js — Implementation Tracker: Render Functions
  * Module: ติดตามงานโครงการติดตั้งระบบ (Project → Phase → Task → Checklist)
- * ใช้ window.getColRef/getDocRef/setDoc/updateDoc/deleteDoc (supabase.service.js เดิม)
+ * ใช้ window.getColRef/getDocRef/setDoc/updateDoc/deleteDoc (db.service.js เดิม)
  * และ window.calcTaskProgress/calcPhaseProgress/calcProjectProgress/imtLogActivity ฯลฯ
  * (impl-tracker.service.js) — ห้ามเรียก setDoc ตรง ๆ โดยไม่ผ่าน optimistic update
  */
@@ -1523,7 +1523,7 @@
     var toolbar = '<div class="toolbar">'
       + '<input type="date" class="f-input" id="imt-ai-date" style="max-width:150px;" value="'+esc(aiDate)+'" oninput="window.imtAiSelectedDate=this.value">'
       + '<button class="btn btn-pri btn-sm" onclick="window.imtGenerateAiWeekSummary()">✨ สรุปด้วย AI</button>'
-      // ── ตั้งค่า API Key ให้เฉพาะ Admin เห็น/แก้ได้ — Key ใช้ร่วมกันทั้งระบบผ่าน Supabase (SETTINGS.app.imt_ai_key)
+      // ── ตั้งค่า API Key ให้เฉพาะ Admin เห็น/แก้ได้ — Key ใช้ร่วมกันทั้งระบบผ่านฐานข้อมูลส่วนกลาง (SETTINGS.app.imt_ai_key)
       // คนอื่นไม่ต้องกรอก Key เองแล้ว จึงไม่มีเหตุผลให้เห็นปุ่มนี้ ──
       + (window.isAdmin() ? '<button class="btn btn-ghost btn-sm" onclick="window.imtOpenAiKeyModal()" title="ตั้งค่า API Key (Admin เท่านั้น)">🔑 API Key</button>' : '')
       + '<div style="flex:1"></div>'
@@ -1755,11 +1755,11 @@
 
   // ================================================================
   // AI WEEKLY SUMMARY — เลือกวัน → สรุป "ทำไปแล้ว" (วันนั้น) + "ยังไม่ได้ทำ" (สัปดาห์ปัจจุบัน) ด้วย Gemini (ฟรี)
-  // Key เก็บส่วนกลางใน Supabase (SETTINGS.app.imt_ai_key → window.IMT_AI_KEY ผ่าน realtime.service.js)
+  // Key เก็บส่วนกลางในฐานข้อมูล (SETTINGS.app.imt_ai_key → window.IMT_AI_KEY ผ่าน realtime.service.js)
   // เฉพาะ Admin เท่านั้นที่ตั้ง/แก้ Key ได้ (ปุ่ม "🔑 API Key" ซ่อนจาก role อื่นในหน้า Report) ผู้ใช้อื่นทุกคน
   // ใช้ "สรุปด้วย AI" ได้ทันทีโดยไม่ต้องกรอก Key เอง — ไม่ commit ลง source code (repo นี้เป็น public repo
-  // จึงห้ามฝัง API key ไว้ในซอร์สโค้ดเด็ดขาด แต่ Supabase เป็น runtime data ไม่ใช่ source code) ──
-  var IMT_AI_KEY_STORAGE = 'imt_gemini_key'; // เดิม (ก่อนย้ายมา Supabase) — เก็บไว้แค่ migrate ค่าเก่าครั้งเดียว
+  // จึงห้ามฝัง API key ไว้ในซอร์สโค้ดเด็ดขาด แต่เป็น runtime data ไม่ใช่ source code) ──
+  var IMT_AI_KEY_STORAGE = 'imt_gemini_key'; // เดิม (ก่อนย้ายมาเก็บส่วนกลาง) — เก็บไว้แค่ migrate ค่าเก่าครั้งเดียว
   // ลองหลายโมเดลตามลำดับ เผื่อบางโมเดลโควตาเต็ม/ไม่เปิดให้ใช้กับ Key นี้ (ข้อผิดพลาด 404/429)
   // — ถ้า Key ผิดหรือไม่มีสิทธิ์เลย (401/403) จะหยุดลองทันทีเพราะโมเดลอื่นก็จะพังเหมือนกัน
   // "gemini-flash-latest" เป็น alias ที่ Google เปลี่ยนให้ชี้รุ่นล่าสุดเองเรื่อย ๆ ไว้ลองก่อนเป็นด่านแรก
@@ -1819,7 +1819,7 @@
     // ปุ่มเปิด modal นี้ซ่อนจาก non-admin อยู่แล้ว แต่กันเหนียวไว้เผื่อถูกเรียกทางอื่น (defense in depth)
     if (!window.isAdmin()) { window.showAlert && window.showAlert('เฉพาะ Admin เท่านั้นที่ตั้งค่า API Key ได้', 'error'); return; }
     var input = document.getElementById('imt-ai-key-input');
-    // เผื่อเครื่องนี้เคยตั้งค่าแบบเดิม (localStorage) ไว้ก่อนย้ายมา Supabase — โชว์ให้กรอกต่อได้เลยไม่ต้องหาใหม่
+    // เผื่อเครื่องนี้เคยตั้งค่าแบบเดิม (localStorage) ไว้ก่อนย้ายมาเก็บส่วนกลาง — โชว์ให้กรอกต่อได้เลยไม่ต้องหาใหม่
     if (input) input.value = window.IMT_AI_KEY || localStorage.getItem(IMT_AI_KEY_STORAGE) || '';
     window.openM('m-imt-ai-key');
   };
@@ -1832,7 +1832,7 @@
     window.IMT_AI_KEY = val; // อัปเดตทันทีในเครื่องนี้ ไม่ต้องรอ realtime echo กลับมาก่อนถึงจะใช้ได้
     try {
       await window.setDoc(window.getDocRef('SETTINGS', 'app'), { imt_ai_key: val }, { merge:true });
-      localStorage.removeItem(IMT_AI_KEY_STORAGE); // เลิกใช้ค่าเก่าเฉพาะเครื่อง ยึด Supabase เป็นแหล่งเดียวจากนี้ไป
+      localStorage.removeItem(IMT_AI_KEY_STORAGE); // เลิกใช้ค่าเก่าเฉพาะเครื่อง ยึดฐานข้อมูลส่วนกลางเป็นแหล่งเดียวจากนี้ไป
       window.showAlert && window.showAlert('บันทึก API Key แล้ว — ใช้งานได้ทุกคนในระบบทันที', 'success');
       if (window.imtAiPendingGenerate) { window.imtAiPendingGenerate = false; window.imtGenerateAiWeekSummary(); }
     } catch (e) {
@@ -1849,7 +1849,7 @@
     var selDate = (dateInput && dateInput.value) || new Date().toISOString().slice(0,10);
     window.imtAiSelectedDate = selDate;
 
-    // ── Key ส่วนกลางจาก Supabase (window.IMT_AI_KEY) — ใช้ได้ทันทีทุก role ไม่ต้องกรอกเอง
+    // ── Key ส่วนกลางจากฐานข้อมูล (window.IMT_AI_KEY) — ใช้ได้ทันทีทุก role ไม่ต้องกรอกเอง
     // ถ้ายังไม่มีค่า: Admin เปิด modal ตั้งค่าได้เลย ส่วน role อื่นแค่แจ้งให้ไปขอ Admin (ไม่มีสิทธิ์ตั้งเอง) ──
     var apiKey = window.IMT_AI_KEY || '';
     if (!apiKey) {

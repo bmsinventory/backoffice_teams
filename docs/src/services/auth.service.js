@@ -1,7 +1,7 @@
 /**
  * auth.service.js — Authentication Service
  * จัดการ login, logout, user session, และ seed data
- * ต้องโหลดหลัง supabase.service.js และ utils/
+ * ต้องโหลดหลัง db.service.js และ utils/
  */
 (function () {
 
@@ -19,7 +19,7 @@
     { id:'U3', username:'viewer', password:'view1234', role:'viewer', name:'Viewer User',       active:true },
   ];
 
-  // ── Seed Database (ถ้า Supabase ว่างเปล่า) ──
+  // ── Seed Database (ถ้าฐานข้อมูลว่างเปล่า) ──
   async function seedDatabaseIfEmpty() {
     try {
       var deptsSnap = await window.getDocs(window.getColRef('DEPARTMENTS'));

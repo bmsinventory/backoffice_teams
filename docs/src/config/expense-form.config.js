@@ -11,8 +11,8 @@
 
   // ── Global Data Store ──
   // ชื่อ global ตรงกับชื่อ table แบบ UPPERCASE (getColRef fallback lower-case ชื่อ collection
-  // เป็นชื่อ table โดยอัตโนมัติเมื่อไม่มีอยู่ใน COL_MAP ของ supabase.service.js — ห้ามเปลี่ยนชื่อนี้
-  // โดยไม่ตรงกับชื่อ table ใน supabase-migration-expense-clearing.sql)
+  // เป็นชื่อ table โดยอัตโนมัติเมื่อไม่มีอยู่ใน COL_MAP ของ db.service.js — ห้ามเปลี่ยนชื่อนี้
+  // โดยไม่ตรงกับชื่อ table ใน db-migration-expense-clearing.sql)
   window.EXPENSE_CLEARING_FORMS = [];
 
   // ── 7 หมวดโครงการตายตัวตามช่อง checkbox บนฟอร์มกระดาษ (ไม่ผูกกับ window.PTYPES

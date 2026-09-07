@@ -1,13 +1,13 @@
 /**
- * local-db.service.js — LOCAL TEST MODE (ไม่ต้องมี Supabase / ไม่ต้องต่อเน็ต)
+ * local-db.service.js — LOCAL TEST MODE (ไม่ต้องมี backend / ไม่ต้องต่อเน็ต)
  *
- * แทนที่ supabase.service.js ทั้งชุด โดยเก็บข้อมูลไว้ใน localStorage ของเบราว์เซอร์
+ * แทนที่ db.service.js ทั้งชุด โดยเก็บข้อมูลไว้ใน localStorage ของเบราว์เซอร์
  * ใช้สำหรับ "กดเล่นทดสอบ" ก่อนอัปขึ้นฐานจริง — ข้อมูลไม่ออกไปไหน อยู่แค่ในเครื่องนี้
  *
  * เปิดใช้เมื่อ: ตั้ง window.LOCAL_TEST_MODE = true ใน env-config.js (opt-in เท่านั้น)
  * ค่าปกติ = ต่อ backend จริงตาม SUPABASE_URL เสมอ
  *
- * Exposes บน window เหมือน supabase.service.js เป๊ะ:
+ * Exposes บน window เหมือน db.service.js เป๊ะ:
  *   getColRef, getDocRef, setDoc, updateDoc, deleteDoc,
  *   writeBatch, getDocs, onSnapshot, getDb
  * เพิ่มพิเศษ:
@@ -19,13 +19,13 @@
   // (ค่าปกติ = ต่อ backend จริงตาม SUPABASE_URL เสมอ แม้บน localhost)
   if (window.LOCAL_TEST_MODE !== true) return;
 
-  // บอก supabase.service.js ให้ข้ามตัวเอง (มี guard เช็ค flag นี้ที่หัวไฟล์)
+  // บอก db.service.js ให้ข้ามตัวเอง (มี guard เช็ค flag นี้ที่หัวไฟล์)
   window.__LOCAL_DB_ACTIVE__ = true;
 
   var KEY = '__ldb__';       // prefix ของตารางข้อมูล
   var FKEY = '__ldbfile__';  // prefix ของไฟล์แนบ
 
-  // ── Collection Name Map (ให้ตรงกับ supabase.service.js) ──
+  // ── Collection Name Map (ให้ตรงกับ db.service.js) ──
   var COL_MAP = {
     STAGES:'stages', PTYPES:'ptypes', PGROUPS:'pgroups',
     POSITIONS:'positions', DEPARTMENTS:'departments', STAFF:'staff',
@@ -60,7 +60,7 @@
     }, 60);
   }
 
-  // ── Ref Objects (Firebase-compatible — เหมือน supabase.service.js) ──
+  // ── Ref Objects (Firebase-compatible — เหมือน db.service.js) ──
   window.getColRef = function (colName) {
     return { _type:'col', _fs:colName, _sb:_sbName(colName) };
   };
@@ -68,7 +68,7 @@
     return { _type:'doc', _fs:colName, _sb:_sbName(colName), _id:docId };
   };
 
-  // ── Snapshot Builders (คัดลอกจาก supabase.service.js) ──
+  // ── Snapshot Builders (คัดลอกจาก db.service.js) ──
   function _makeColSnap(fsName, records) {
     return {
       docs: (records || []).map(function (r) {
@@ -153,7 +153,7 @@
     _write(ref._sb, _read(ref._sb).filter(function (r) { return r.id !== ref._id; }));
   };
 
-  // ── Batch (sequential — เหมือน supabase.service.js, ไม่สน argument ที่ส่งมา) ──
+  // ── Batch (sequential — เหมือน db.service.js, ไม่สน argument ที่ส่งมา) ──
   window.writeBatch = function () {
     var ops = [];
     return {

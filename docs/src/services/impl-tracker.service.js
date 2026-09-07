@@ -1,12 +1,12 @@
 /**
  * impl-tracker.service.js — Implementation Tracker: Data Layer & Business Logic
- * ต้องโหลดหลัง supabase.service.js + impl-tracker.config.js
+ * ต้องโหลดหลัง db.service.js + impl-tracker.config.js
  * ลงทะเบียน onSnapshot ของตัวเอง (ไม่แก้ realtime.service.js เดิม) แบบ background
  * (ไม่ block loader หลัก เหมือน WORK_LOGS/CONTRACTS/HOSPITALS)
  */
 (function () {
 
-  // ── Transform: raw Supabase row → app object ──
+  // ── Transform: raw DB row → app object ──
   var transform = {
     IMPL_TEMPLATES: function (d) {
       return { id:d.id, name:d.template_name||'', description:d.description||'', structure:d.structure||{} };
@@ -173,7 +173,7 @@
 
   // ── Apply Template: clone Phase/Task/Checklist structure ให้โครงการใหม่ (+ คำนวณวันที่ Task อัตโนมัติ)
   // ต้อง imtApplyLocal ทุกแถวที่สร้างด้วย (เหมือนฟังก์ชัน mutation อื่นทุกตัวในระบบ) ไม่ใช่ยิง batch.set()
-  // ไปที่ Supabase อย่างเดียว — ไม่งั้น window.IMPL_PHASES/TASKS/CHECKLIST_ITEMS ในหน้าเว็บจะยังไม่รู้จักแถวใหม่
+  // ไปที่ฐานข้อมูลอย่างเดียว — ไม่งั้น window.IMPL_PHASES/TASKS/CHECKLIST_ITEMS ในหน้าเว็บจะยังไม่รู้จักแถวใหม่
   // จนกว่า realtime subscription จะ fetch กลับมา (มีดีเลย์ + อาจถูก _ownWrite บังสกัดการ re-render ไว้ 2 วิ
   // ระหว่างเขียนหลายสิบแถวติดกัน) ทำให้ต้องกด F5 ถึงจะเห็น Phase/Task ที่เพิ่งสร้างจาก Template ──
   window.imtApplyTemplate = async function (templateId, projectId, projectStart, projectEnd) {
@@ -224,7 +224,7 @@
     if (opCount > 0) await batch.commit();
   };
 
-  // ── Attachment Upload (Supabase Storage bucket: impl-attachments) ──
+  // ── Attachment Upload (Storage bucket: impl-attachments) ──
   window.imtUploadAttachment = async function (taskId, file) {
     var sb = window.getDb();
     var path = taskId + '/' + Date.now() + '_' + file.name;

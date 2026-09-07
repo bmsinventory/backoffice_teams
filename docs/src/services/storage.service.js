@@ -46,7 +46,7 @@
       try { localStorage.setItem('_bms_sb_slim', slim ? '1' : '0'); } catch {}
     },
 
-    // ── Target Groups (cached from Supabase) ──
+    // ── Target Groups (cached from backend) ──
     getTargetGroups: function () {
       try {
         var raw = localStorage.getItem('_tgt_groups');

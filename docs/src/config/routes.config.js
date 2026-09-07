@@ -25,6 +25,7 @@
     { id:'contract',     label:'ข้อมูลสัญญา',     icon:'📄' },
     { id:'worklog',      label:'บันทึกงาน',       icon:'📝' },
     { id:'impl_tracker', label:'ติดตามสถานะโครงการ', icon:'🛠️' },
+    { id:'helpdesk',     label:'ศูนย์ช่วยเหลือ',   icon:'🎧' },
   ];
 
   // ── Route Map: moduleId → viewId ──
@@ -48,6 +49,7 @@
     worklog:      'view-worklog',
     budget:       'view-budget',
     impl_tracker: 'view-impl-tracker',
+    helpdesk:     'view-helpdesk',
   };
 
   // ── Default Route ──
