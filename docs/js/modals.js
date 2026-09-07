@@ -7,11 +7,11 @@ window.askDel=function(type,id,label){window.delTarget={type:type,id:id};documen
 window.execDelete=async function(){
   if(!window.delTarget)return;if(!window.auth.currentUser)return;
   var t=window.delTarget.type,id=window.delTarget.id;
-  var _delModMap={project:'projects',advance:'advance',lodging:'lodging',timesheet:'timesheet',cost:'cost',leave:'leave',contract:'contract',imt_project:'impl_tracker',imt_phase:'impl_tracker',imt_task:'impl_tracker',imt_template:'impl_tracker',form_group:'impl_tracker',form_item:'impl_tracker',form_template:'impl_tracker'};
+  var _delModMap={project:'projects',advance:'advance',lodging:'lodging',timesheet:'timesheet',cost:'cost',leave:'leave',contract:'contract',imt_project:'impl_tracker',imt_phase:'impl_tracker',imt_task:'impl_tracker',imt_template:'impl_tracker',form_group:'impl_tracker',form_item:'impl_tracker',form_template:'impl_tracker',hdcat:'helpdesk'};
   if(['staff','type','position','group','user','stage','department'].includes(t)){if(!window.canDel('admin'))return;}
   else if(_delModMap[t]){if(!window.canDel(_delModMap[t]))return;}
   else{if(!window.isAdmin())return;}
-  var sheetMap={project:'PROJECTS',advance:'ADVANCES',staff:'STAFF',type:'PTYPES',user:'USERS',position:'POSITIONS',group:'PGROUPS',lodging:'LODGINGS',stage:'STAGES',timesheet:'TIMESHEETS',cost:'COSTS',department:'DEPARTMENTS',contract:'CONTRACTS',imt_project:'IMPL_PROJECTS',imt_phase:'IMPL_PHASES',imt_task:'IMPL_TASKS',imt_template:'IMPL_TEMPLATES',form_group:'FORM_GROUPS',form_item:'FORM_ITEMS',form_template:'FORM_TEMPLATES'};
+  var sheetMap={project:'PROJECTS',advance:'ADVANCES',staff:'STAFF',type:'PTYPES',user:'USERS',position:'POSITIONS',group:'PGROUPS',lodging:'LODGINGS',stage:'STAGES',timesheet:'TIMESHEETS',cost:'COSTS',department:'DEPARTMENTS',contract:'CONTRACTS',imt_project:'IMPL_PROJECTS',imt_phase:'IMPL_PHASES',imt_task:'IMPL_TASKS',imt_template:'IMPL_TEMPLATES',form_group:'FORM_GROUPS',form_item:'FORM_ITEMS',form_template:'FORM_TEMPLATES',hdcat:'HELPDESK_CATEGORIES'};
   function _ftkCascadeGroup(groupId){
     window.FORM_ITEMS.filter(x=>x.groupId===groupId).forEach(i=>deleteDoc(getDocRef('FORM_ITEMS',i.id)));
     window.FORM_ITEMS=window.FORM_ITEMS.filter(x=>x.groupId!==groupId);
@@ -65,9 +65,11 @@ window.execDelete=async function(){
   else if(t==='form_group'){_ftkCascadeGroup(id);window.FORM_GROUPS=window.FORM_GROUPS.filter(x=>x.id!==id);}
   else if(t==='form_item')window.FORM_ITEMS=window.FORM_ITEMS.filter(x=>x.id!==id);
   else if(t==='form_template')window.FORM_TEMPLATES=window.FORM_TEMPLATES.filter(x=>x.id!==id);
+  else if(t==='hdcat')window.HELPDESK_CATEGORIES=window.HELPDESK_CATEGORIES.filter(x=>x.id!==id);
   window.closeM('m-del');window.delTarget=null;window.renderAll();
   if(t==='staff')window.admTab('staff');else if(['type','user','position','group','stage'].includes(t))window.admTab(t+'s');
   if(t==='department')window.admTab('dept');
+  if(t==='hdcat')window.admTab('hd_options');
   if(t==='lodging'&&window.currentLdPid)window.openLodgingGroupModal(window.currentLdPid);
   deleteDoc(getDocRef(sheetMap[t],id)).catch(e=>window.showDbError(e));
   if(t==='imt_project'){
@@ -111,6 +113,15 @@ window.updateImportPreview=function(){
     if(titleEl)titleEl.textContent='นำเข้าข้อมูล (Excel)';
     return;
   }
+  if(type==='HELPDESK'){
+    if(fileInput)fileInput.accept='.xlsx,.xls,.csv';
+    if(fileLabel)fileLabel.textContent='2. เลือกไฟล์ Excel (.xlsx / .xls / .csv)';
+    if(msgEl)msgEl.innerHTML='1 แถว = 1 Ticket เก่า · จับคู่ รพ./หมวด/เจ้าหน้าที่อัตโนมัติ · จะมีหน้าพรีวิวก่อนยืนยัน · <b>ไม่รองรับ</b> "ลบข้อมูลเดิมก่อน"';
+    if(formatBox)formatBox.textContent='hospital, reporter_name, phone, line_group, source_system, category, subject, description, priority, status, assignee, resolution, resolved_by, created_at, resolved_at (ดูคำอธิบายในไฟล์ Template)';
+    if(templateBtn)templateBtn.textContent='📄 โหลดไฟล์ Template (.xlsx)';
+    if(titleEl)titleEl.textContent='นำเข้าปัญหาเก่า HelpDesk (Excel)';
+    return;
+  }
   if(type==='HOSPITAL_CONTACTS'){
     if(fileInput)fileInput.accept='.xlsx,.xls,.csv';
     if(fileLabel)fileLabel.textContent='2. เลือกไฟล์ Excel (.xlsx / .xls / .csv)';
@@ -132,7 +143,7 @@ window.openImportModal=function(){
   document.getElementById('import-file').value='';
   var activeView=document.querySelector('.view.on');
   var viewId=activeView?activeView.id.replace('view-',''):'';
-  var typeMap={hospital:'HOSPITALS',staff:'STAFF',advance:'ADVANCES',contract:'CONTRACTS'};
+  var typeMap={hospital:'HOSPITALS',staff:'STAFF',advance:'ADVANCES',contract:'CONTRACTS',helpdesk:'HELPDESK'};
   document.getElementById('import-type').value=typeMap[viewId]||'PROJECTS';
   window.updateImportPreview();
   window.openM('m-import');
@@ -142,6 +153,7 @@ window.downloadTemplate=function(){
   if(type==='HOSPITALS'){window.downloadHospitalTemplate();return;}
   if(type==='HOSPITAL_CONTACTS'){window.downloadHospitalContactsTemplate();return;}
   if(type==='HOSPITAL_PRODUCTS'){window.downloadHospitalProductsTemplate();return;}
+  if(type==='HELPDESK'){window.hdDownloadImportTemplate&&window.hdDownloadImportTemplate();return;}
   const schema=window.IMPORT_SCHEMAS[type];if(!schema)return;const csvContent="data:text/csv;charset=utf-8,\uFEFF"+schema.headers.join(",")+"\n"+schema.example.join(",");const link=document.createElement("a");link.setAttribute("href",encodeURI(csvContent));link.setAttribute("download",`Template_${type}.csv`);document.body.appendChild(link);link.click();document.body.removeChild(link);
 }
 window.execImport=async function(){
@@ -185,6 +197,7 @@ window.execImport=async function(){
       }catch(err){document.getElementById('import-msg').innerHTML='<span style="color:var(--coral)">❌ เกิดข้อผิดพลาด: '+err.message+'</span>';}
     };reader.readAsText(file);return;
   }
+  if(selType==='HELPDESK'){window.closeM('m-import');window.hdImportFromFile&&window.hdImportFromFile(fileInput.files[0]);return;}
   if(selType==='HOSPITALS'){window.closeM('m-import');await window.importHospitalsFromFile(fileInput.files[0]);return;}
   if(selType==='HOSPITAL_CONTACTS'){window.closeM('m-import');await window.importHospitalContactsFromFile(fileInput.files[0]);return;}
   if(selType==='HOSPITAL_PRODUCTS'){window.closeM('m-import');await window.importHospitalProductsFromFile(fileInput.files[0]);return;}

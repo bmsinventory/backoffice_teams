@@ -881,3 +881,192 @@ BEGIN
     END IF;
   END LOOP;
 END $$;
+
+-- ================================================================
+-- HELPDESK — ศูนย์ช่วยเหลือ (เก็บเฉพาะปัญหาลูกค้า / โรงพยาบาล)
+-- โมดูล 'helpdesk' ในแอป + หน้า public docs/help.html (ติดตาม + ประเมินผ่านลิงก์ token)
+-- idempotent — รันซ้ำได้ทั้งไฟล์ (เหมือน section SITE FORMS ด้านบน)
+-- ================================================================
+CREATE TABLE IF NOT EXISTS helpdesk_categories (
+  id                   TEXT PRIMARY KEY,
+  name                 TEXT DEFAULT '',
+  parent_id            TEXT DEFAULT '',
+  default_priority     TEXT DEFAULT 'p3',
+  default_assignee_id  TEXT DEFAULT '',
+  default_team         TEXT DEFAULT '',
+  active               BOOLEAN DEFAULT true,
+  sort                 NUMERIC DEFAULT 0,
+  created_at           TIMESTAMPTZ DEFAULT NOW(),
+  updated_at           TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS helpdesk_sla_policies (
+  id                    TEXT PRIMARY KEY,
+  priority              TEXT UNIQUE,
+  first_response_mins   NUMERIC DEFAULT 240,   -- นาทีทำการ (business_hours_only=true) หรือ นาทีปฏิทิน (false)
+  resolution_mins       NUMERIC DEFAULT 4320,  -- 1 วันทำการ = 540 นาที (08:30–17:30)
+  business_hours_only   BOOLEAN DEFAULT true,
+  active                BOOLEAN DEFAULT true,
+  created_at            TIMESTAMPTZ DEFAULT NOW(),
+  updated_at            TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS helpdesk_tickets (
+  id                     TEXT PRIMARY KEY,
+  ticket_no              TEXT UNIQUE,
+  channel                TEXT DEFAULT 'line',      -- line | web | phone | import
+  hospital_id            TEXT DEFAULT '',          -- FK hospitals.id (บังคับในระดับแอป)
+  reporter_name          TEXT DEFAULT '',
+  reporter_phone         TEXT DEFAULT '',
+  reporter_email         TEXT DEFAULT '',
+  reporter_position      TEXT DEFAULT '',
+  reporter_dept          TEXT DEFAULT '',
+  line_group_ref         TEXT DEFAULT '',
+  source_system          TEXT DEFAULT '',
+  category_id            TEXT DEFAULT '',
+  subject                TEXT DEFAULT '',
+  description            TEXT DEFAULT '',
+  priority               TEXT DEFAULT 'p3',        -- p1 | p2 | p3 | p4
+  status                 TEXT DEFAULT 'new',       -- new triage assigned in_progress pending_user resolved closed reopened cancelled
+  assignee_id            TEXT DEFAULT '',          -- FK staff.id
+  team                   TEXT DEFAULT '',
+  sla_policy_id          TEXT DEFAULT '',
+  first_response_at      TIMESTAMPTZ,
+  first_response_due     TIMESTAMPTZ,
+  resolution_due         TIMESTAMPTZ,
+  resolved_at            TIMESTAMPTZ,
+  closed_at              TIMESTAMPTZ,
+  pending_since          TIMESTAMPTZ,
+  pending_total_mins     NUMERIC DEFAULT 0,
+  frt_breached           BOOLEAN DEFAULT false,
+  resolution_breached    BOOLEAN DEFAULT false,
+  reopened_count         NUMERIC DEFAULT 0,
+  csat_score             NUMERIC,                  -- cache จาก helpdesk_ratings (1–5)
+  access_token           TEXT UNIQUE,              -- กุญแจลิงก์ help.html?t=<token>
+  public_view_expires_at TIMESTAMPTZ,
+  rated_at               TIMESTAMPTZ,
+  tags                   JSONB DEFAULT '[]',
+  created_by             TEXT DEFAULT '',          -- staff.id ที่กด "+ แจ้งแทน" ('' = ลูกค้ากรอกฟอร์มเว็บเอง)
+  created_at             TIMESTAMPTZ DEFAULT NOW(),
+  updated_at             TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS helpdesk_ticket_events (
+  id           TEXT PRIMARY KEY,
+  ticket_id    TEXT DEFAULT '',
+  type         TEXT DEFAULT 'comment',   -- comment status_change assignment field_change attachment rating system
+  actor_type   TEXT DEFAULT 'agent',     -- reporter | agent | system
+  actor_id     TEXT DEFAULT '',
+  body         TEXT DEFAULT '',
+  meta         JSONB DEFAULT '{}',
+  is_internal  BOOLEAN DEFAULT false,    -- true = โน้ตภายใน ไม่แสดงใน help.html
+  created_at   TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS helpdesk_attachments (
+  id           TEXT PRIMARY KEY,
+  ticket_id    TEXT DEFAULT '',
+  event_id     TEXT DEFAULT '',
+  file_name    TEXT DEFAULT '',
+  file_url     TEXT DEFAULT '',
+  mime         TEXT DEFAULT '',
+  size_bytes   NUMERIC DEFAULT 0,
+  uploaded_by  TEXT DEFAULT '',
+  created_at   TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS helpdesk_ratings (
+  id                TEXT PRIMARY KEY,
+  ticket_id         TEXT UNIQUE,
+  score             NUMERIC DEFAULT 0,     -- 1–5
+  comment           TEXT DEFAULT '',
+  would_recommend   BOOLEAN,
+  via_token         TEXT DEFAULT '',
+  ip_hash           TEXT DEFAULT '',
+  created_at        TIMESTAMPTZ DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_hd_tickets_status     ON helpdesk_tickets (status);
+CREATE INDEX IF NOT EXISTS idx_hd_tickets_assignee   ON helpdesk_tickets (assignee_id);
+CREATE INDEX IF NOT EXISTS idx_hd_tickets_hospital   ON helpdesk_tickets (hospital_id);
+CREATE INDEX IF NOT EXISTS idx_hd_tickets_token      ON helpdesk_tickets (access_token);
+CREATE INDEX IF NOT EXISTS idx_hd_tickets_created_at ON helpdesk_tickets (created_at);
+CREATE INDEX IF NOT EXISTS idx_hd_events_ticket_id   ON helpdesk_ticket_events (ticket_id);
+
+ALTER TABLE helpdesk_categories     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE helpdesk_sla_policies   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE helpdesk_tickets        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE helpdesk_ticket_events  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE helpdesk_attachments    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE helpdesk_ratings        ENABLE ROW LEVEL SECURITY;
+
+DO $$
+DECLARE
+  tbl TEXT;
+  tbls TEXT[] := ARRAY['helpdesk_categories','helpdesk_sla_policies','helpdesk_tickets','helpdesk_ticket_events','helpdesk_attachments','helpdesk_ratings'];
+BEGIN
+  FOREACH tbl IN ARRAY tbls LOOP
+    EXECUTE format('DROP POLICY IF EXISTS "anon_all_%s" ON %I', tbl, tbl);
+    EXECUTE format(
+      'CREATE POLICY "anon_all_%s" ON %I FOR ALL TO anon USING (true) WITH CHECK (true)',
+      tbl, tbl
+    );
+  END LOOP;
+END $$;
+
+DO $$
+DECLARE
+  tbl TEXT;
+  tbls TEXT[] := ARRAY['helpdesk_categories','helpdesk_sla_policies','helpdesk_tickets','helpdesk_ticket_events','helpdesk_attachments','helpdesk_ratings'];
+BEGIN
+  FOREACH tbl IN ARRAY tbls LOOP
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_publication_tables
+      WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = tbl
+    ) THEN
+      EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE %I', tbl);
+    END IF;
+  END LOOP;
+END $$;
+
+-- ── Seed: SLA policy เริ่มต้น (แก้ตัวเลขได้ภายหลัง) ──
+-- resolution_mins คิดเป็น "นาทีทำการ" เมื่อ business_hours_only=true (1 วันทำการ = 540 นาที)
+INSERT INTO helpdesk_sla_policies (id, priority, first_response_mins, resolution_mins, business_hours_only) VALUES
+  ('SLA_P1', 'p1',   30,  240, false),
+  ('SLA_P2', 'p2',   60,  540, true),
+  ('SLA_P3', 'p3',  240, 1620, true),
+  ('SLA_P4', 'p4',  540, 3780, true)
+ON CONFLICT (id) DO NOTHING;
+
+-- ── Seed: หมวดปัญหาเริ่มต้น (แก้ไข/เพิ่ม/ลบผ่าน DB ได้ภายหลัง) ──
+INSERT INTO helpdesk_categories (id, name, default_priority, sort) VALUES
+  ('CAT_LOGIN',   'เข้าใช้งาน / ล็อกอินไม่ได้',        'p2', 1),
+  ('CAT_HOSXP',   'BMS-HOSxP / XE ทำงานผิดปกติ',       'p2', 2),
+  ('CAT_REPORT',  'รายงาน / พิมพ์เอกสาร',              'p3', 3),
+  ('CAT_DATA',    'ข้อมูลผิดพลาด / ขอแก้ไขข้อมูล',     'p3', 4),
+  ('CAT_HOWTO',   'สอบถามวิธีใช้งาน',                  'p4', 5),
+  ('CAT_REQUEST', 'ขอปรับแต่ง / เพิ่มความสามารถ',      'p4', 6),
+  ('CAT_OTHER',   'อื่น ๆ',                            'p3', 9)
+ON CONFLICT (id) DO NOTHING;
+
+-- ── Migration: คอลัมน์เก็บ override ป้าย/สี ของ Priority / สถานะ / ความเร่งด่วน HelpDesk
+-- (id ชุดคงที่ตาย logic SLA/workflow อยู่ — Admin ปรับได้แค่ label/color/icon ไม่ใช่เพิ่ม-ลบรายการ) ──
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS helpdesk_priority_overrides JSONB DEFAULT '{}';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS helpdesk_status_overrides   JSONB DEFAULT '{}';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS helpdesk_urgency_overrides  JSONB DEFAULT '{}';
+
+-- ── Storage bucket สำหรับไฟล์แนบ HelpDesk (รูปหน้าจอ / ไฟล์ error) ──
+-- ต้องมี schema `storage` ของ Storage service อยู่แล้ว (self-hosted Supabase stack)
+DO $$
+BEGIN
+  INSERT INTO storage.buckets (id, name, public)
+  VALUES ('helpdesk', 'helpdesk', true)
+  ON CONFLICT (id) DO NOTHING;
+
+  EXECUTE 'DROP POLICY IF EXISTS "hd_bucket_all" ON storage.objects';
+  EXECUTE 'CREATE POLICY "hd_bucket_all" ON storage.objects FOR ALL TO anon '
+        || 'USING (bucket_id = ''helpdesk'') WITH CHECK (bucket_id = ''helpdesk'')';
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'ข้าม storage bucket/policy (%) — ให้สร้าง bucket helpdesk (public) + policy anon เองใน Studio', SQLERRM;
+END $$;

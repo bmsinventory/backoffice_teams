@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>ศูนย์ช่วยเหลือ — ติดตามการแจ้งปัญหา</title>
+<meta name="theme-color" content="#1e3a8a">
+<link rel="icon" type="image/png" href="img/icon_app.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f4f6f9; --surface:#ffffff; --ink:#1b2130; --ink2:#5b6377; --ink3:#8a90a0;
+    --line:#e2e5ec; --accent:#4361ee; --accent-soft:#eef1fe;
+    --ok:#0f9d6e; --warn:#c9820c; --bad:#e5484d;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#12151d; --surface:#1a1e27; --ink:#e7e9f0; --ink2:#98a0b2; --ink3:#6f7686;
+      --line:#2a2f3c; --accent:#8298ff; --accent-soft:#20263b;
+      --ok:#3ecf8e; --warn:#e0a94a; --bad:#ff6b70;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Noto Sans Thai',system-ui,sans-serif;font-size:15px;line-height:1.7}
+  .wrap{max-width:720px;margin:0 auto;padding:24px 16px 60px}
+  header.top{display:flex;align-items:center;gap:10px;margin-bottom:20px}
+  header.top img{width:34px;height:34px;object-fit:contain}
+  header.top b{font-size:16px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin-bottom:16px}
+  .card h2{font-size:15px;margin:0 0 12px}
+  label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:12px 0 4px}
+  label:first-child{margin-top:0}
+  input,select,textarea{width:100%;font:inherit;font-size:14px;padding:9px 11px;
+    border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--ink)}
+  input.invalid,select.invalid,textarea.invalid{border-color:var(--bad);box-shadow:0 0 0 3px rgba(229,72,77,.16)}
+  /* ป้องกัน iOS Safari auto-zoom ตอนแตะฟิลด์ (เกิดเมื่อ font-size ของ input < 16px) */
+  @media (max-width:640px){ input,select,textarea{font-size:16px} }
+  .req{color:var(--bad);font-weight:700}
+  textarea{resize:vertical}
+  button{font:inherit;font-weight:600;cursor:pointer;border:none;border-radius:10px;padding:10px 18px}
+  .btn-pri{background:var(--accent);color:#fff}
+  .btn-ghost{background:transparent;border:1px solid var(--line);color:var(--ink2)}
+  .row{display:flex;gap:16px;flex-wrap:wrap;align-items:start}
+  .col{flex:1;min-width:260px}
+  .pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:700}
+  .muted{color:var(--ink3);font-size:12px}
+  .tl{list-style:none;margin:0;padding:0}
+  .tl li{padding:10px 0;border-bottom:1px dashed var(--line)}
+  .tl li:last-child{border-bottom:none}
+  .tl .who{font-size:11px;color:var(--ink3)}
+  .tl .body{white-space:pre-wrap;font-size:14px}
+  .tl .mine{color:var(--accent)}
+  .stars{font-size:30px;letter-spacing:6px;cursor:pointer;user-select:none;color:var(--ink3)}
+  .stars b{color:var(--warn);font-weight:400}
+  .hidden{display:none}
+  .notice{padding:14px 16px;border-radius:10px;background:var(--accent-soft);color:var(--ink);font-size:13.5px}
+  .err{background:rgba(229,72,77,.12);color:var(--bad)}
+  .ok{background:rgba(15,157,110,.12);color:var(--ok)}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <img src="img/BMS_T.png" alt="BMS">
+    <b>ศูนย์ช่วยเหลือ · BMS</b>
+  </header>
+  <div id="app"><div class="notice">กำลังโหลด...</div></div>
+</div>
+
+<script src="env-config.js"></script>
+<!-- PostgREST client library (supabase-js UMD) — exposes window.supabase -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+(function () {
+  var app = document.getElementById('app');
+  var db;
+  try {
+    db = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+  } catch (e) {
+    app.innerHTML = '<div class="notice err">เชื่อมต่อระบบไม่ได้ กรุณาลองใหม่ภายหลัง</div>';
+    return;
+  }
+
+  var qs = new URLSearchParams(location.search);
+  var token = qs.get('t') || '';
+  var isNew = qs.get('new') === '1';
+
+  var STATUS = {
+    new:{l:'รับเรื่องแล้ว',c:'#8a90a0'}, triage:{l:'กำลังจัดหมวดหมู่',c:'#7c5cfc'},
+    assigned:{l:'มอบหมายผู้ดูแลแล้ว',c:'#4361ee'}, in_progress:{l:'กำลังดำเนินการ',c:'#4361ee'},
+    pending_user:{l:'รอข้อมูลจากคุณ',c:'#c9820c'}, resolved:{l:'แก้ไขเรียบร้อย',c:'#0f9d6e'},
+    closed:{l:'ปิดงาน',c:'#5b6377'}, reopened:{l:'เปิดเรื่องใหม่',c:'#e5484d'}, cancelled:{l:'ยกเลิก',c:'#8a90a0'}
+  };
+  var PRIO = { p1:'เร่งด่วนมาก', p2:'เร่งด่วน', p3:'ปกติ', p4:'ต่ำ' };
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+  function dt(s){ if(!s) return '-'; var d=new Date(s); if(isNaN(d)) return '-';
+    return d.getDate()+'/'+(d.getMonth()+1)+'/'+(d.getFullYear()+543)+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+  function token40(){ var s='',ch='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+    for(var i=0;i<40;i++) s+=ch.charAt(Math.floor(Math.random()*ch.length)); return s; }
+  var ATT_ACCEPT='.jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.txt', ATT_MAX=15*1024*1024;
+  var ATT_HINT='รองรับ: รูปภาพ (jpg, jpeg, png, gif, webp) · PDF · Word (doc, docx) · Excel (xls, xlsx) · txt — ไม่เกิน 15MB/ไฟล์';
+  function isImg(m,n){ return /^image\//.test(m||'') || /\.(jpe?g|png|gif|webp)$/i.test(n||''); }
+  async function uploadAtts(ticketId, eventId, fileList){
+    for(var i=0;i<(fileList?fileList.length:0);i++){
+      var f=fileList[i];
+      if(f.size>ATT_MAX) continue;
+      var path=ticketId+'/'+Date.now()+'_'+String(f.name).replace(/[^\w.\-]+/g,'_');
+      var up=await db.storage.from('helpdesk').upload(path,f,{contentType:f.type||'application/octet-stream'});
+      if(up.error) continue;
+      var pub=db.storage.from('helpdesk').getPublicUrl(path);
+      await db.from('helpdesk_attachments').insert({
+        id:'HDA'+Date.now()+Math.floor(Math.random()*1000),
+        ticket_id:ticketId, event_id:eventId||'', file_name:f.name,
+        file_url:pub.data.publicUrl, mime:f.type||'', size_bytes:f.size, uploaded_by:''
+      });
+    }
+  }
+  // ── Searchable Combobox (มือถือ+เดสก์ท็อป) — ใช้ร่วมกันทั้ง "โรงพยาบาล" (รายการเดี่ยว) และ
+  // "ระบบที่ใช้งาน" (จัดกลุ่มตามกลุ่ม Product) พิมพ์ค้นหาแบบเดียวกับหน้า Admin ในแอปหลัก แต่จำกัด
+  // ความสูง dropdown ไว้ไม่ให้กินพื้นที่มากเกินไปบนฟอร์มสั้น ๆ หน้านี้ ──
+  function hi(txt, q){
+    if(!q) return esc(txt);
+    var lt=txt.toLowerCase(), lq=q.toLowerCase(), out='', i=0;
+    while(i<txt.length){
+      var x=lt.indexOf(lq,i);
+      if(x<0){ out+=esc(txt.slice(i)); break; }
+      out+=esc(txt.slice(i,x))+'<mark style="background:#ffd60a66;border-radius:2px;padding:0 1px;">'+esc(txt.slice(x,x+lq.length))+'</mark>';
+      i=x+lq.length;
+    }
+    return out;
+  }
+  function comboMarkup(id, placeholder){
+    return '<div id="'+id+'-wrap" style="position:relative;">'
+      + '<input id="'+id+'-inp" type="text" autocomplete="off" spellcheck="false" placeholder="'+esc(placeholder)+'" style="padding-right:30px;cursor:pointer;">'
+      + '<span style="position:absolute;right:11px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:11px;color:var(--ink3);">▼</span>'
+      + '<input type="hidden" id="'+id+'">'
+      + '<div id="'+id+'-drop" style="display:none;position:fixed;z-index:9500;background:var(--surface);border:1.5px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);overflow:hidden;">'
+      + '<div id="'+id+'-list" style="max-height:220px;overflow-y:auto;"></div>'
+      + '</div></div>';
+  }
+  // items: [{id,label,group?}] · opts: { grouped:bool, groups:[{id,label,color}] }
+  function initCombo(id, items, opts){
+    opts = opts || {};
+    var inp=document.getElementById(id+'-inp'), drop=document.getElementById(id+'-drop'),
+      lst=document.getElementById(id+'-list'), hid=document.getElementById(id);
+    if(!inp||!drop||!lst||!hid) return;
+    var IH=34, HH=26;
+    var gmap={}, gord=[];
+    if(opts.grouped){
+      (opts.groups||[]).forEach(function(g){ gmap[g.id]={id:g.id,label:g.label,color:g.color,items:[]}; gord.push(g.id); });
+      items.forEach(function(it){
+        var gid = gmap[it.group] ? it.group : '__x__';
+        if(!gmap[gid]){ gmap[gid]={id:gid,label:'อื่น ๆ',color:'#8a90a0',items:[]}; gord.push(gid); }
+        gmap[gid].items.push(it);
+      });
+      gord = gord.filter(function(gid){ return gmap[gid] && gmap[gid].items.length; });
+    }
+    var selId = hid.value || '', selLabel = '', col = new Set(), q = '', fi = -1, flat = [], dt = null, isOpen = false;
+    var initItem = items.find(function(it){ return it.id === selId; });
+    selLabel = initItem ? initItem.label : '';
+    function bFlat(sq){
+      var f=[], lq=sq.toLowerCase();
+      if(!opts.grouped){ items.forEach(function(it){ if(!sq || it.label.toLowerCase().indexOf(lq)!==-1) f.push({k:'i',it:it}); }); return f; }
+      if(sq){ items.forEach(function(it){ if(it.label.toLowerCase().indexOf(lq)!==-1) f.push({k:'i',it:it}); }); }
+      else { gord.forEach(function(gid){
+        var g=gmap[gid]; if(!g||!g.items.length) return;
+        f.push({k:'h',gid:gid,label:g.label,color:g.color,count:g.items.length});
+        if(!col.has(gid)) g.items.forEach(function(it){ f.push({k:'i',it:it}); });
+      }); }
+      return f;
+    }
+    function render(){
+      if(!flat.length){ lst.innerHTML='<div style="padding:14px 12px;text-align:center;color:var(--ink3);font-size:12px;">ไม่พบรายการ'+(q?'<br><small style="opacity:.7">'+esc(q)+'</small>':'')+'</div>'; return; }
+      lst.innerHTML = flat.map(function(row, idx){
+        if(row.k==='h'){
+          var cc = col.has(row.gid);
+          return '<div class="cmb-h" data-gid="'+esc(row.gid)+'" style="height:'+HH+'px;display:flex;align-items:center;gap:7px;padding:0 10px;cursor:pointer;font-size:10px;font-weight:700;background:var(--bg);border-bottom:1px solid var(--line);color:'+row.color+';user-select:none;">'
+            + '<span style="width:7px;height:7px;border-radius:50%;background:'+row.color+';flex-shrink:0;"></span>'
+            + '<span>'+esc(row.label)+'</span><span style="font-size:9px;color:var(--ink3);margin-left:2px;">('+row.count+')</span>'
+            + '<span style="margin-left:auto;font-size:9px;opacity:.5;">'+(cc?'▶':'▼')+'</span></div>';
+        }
+        var foc = idx===fi, isSel = row.it.id===selId;
+        return '<div class="cmb-i" data-id="'+esc(row.it.id)+'" data-idx="'+idx+'" style="height:'+IH+'px;display:flex;align-items:center;padding:0 12px;cursor:pointer;font-size:13.5px;border-bottom:1px solid rgba(0,0,0,.04);background:'+(foc?'var(--accent-soft)':isSel?'rgba(15,157,110,.08)':'transparent')+';color:var(--ink);">'
+          + (isSel?'<span style="color:var(--ok);margin-right:6px;font-size:10px;flex-shrink:0;">✓</span>':'')
+          + hi(row.it.label, q) + '</div>';
+      }).join('');
+    }
+    function positionDrop(){
+      var r = inp.getBoundingClientRect();
+      var availH = window.innerHeight - r.bottom - 14;
+      drop.style.top = (r.bottom+4)+'px';
+      drop.style.left = r.left+'px';
+      drop.style.width = r.width+'px';
+      lst.style.maxHeight = Math.max(120, Math.min(220, availH))+'px';
+    }
+    // scroll listener ต้อง capture:true เพราะ scroll ไม่ bubble — กันตำแหน่ง dropdown (position:fixed)
+    // หลุดจาก input ตอนเลื่อนหน้าจอมือถือ ──
+    function openDrop(){ if(isOpen) return; isOpen=true; q=''; fi=-1; flat=bFlat(''); lst.scrollTop=0; render(); positionDrop(); drop.style.display='block'; window.addEventListener('resize', positionDrop); window.addEventListener('scroll', positionDrop, true); }
+    function closeDrop(){ if(!isOpen) return; isOpen=false; drop.style.display='none'; inp.value=selLabel; window.removeEventListener('resize', positionDrop); window.removeEventListener('scroll', positionDrop, true); }
+    function selItem(it){ selId=it.id; selLabel=it.label; hid.value=it.id; inp.classList.remove('invalid'); closeDrop(); hid.dispatchEvent(new Event('change')); }
+    lst.addEventListener('click', function(e){
+      var h=e.target.closest('.cmb-h'), it=e.target.closest('.cmb-i');
+      if(h){ var gid=h.dataset.gid; if(col.has(gid)) col.delete(gid); else col.add(gid); flat=bFlat(q); fi=-1; render(); }
+      else if(it){ var found=items.find(function(x){ return x.id===it.dataset.id; }); if(found) selItem(found); }
+    });
+    lst.addEventListener('mousemove', function(e){ var it=e.target.closest('.cmb-i'); if(it){ var ni=+it.dataset.idx; if(ni!==fi){ fi=ni; render(); } } });
+    inp.addEventListener('click', function(){ if(isOpen) closeDrop(); else openDrop(); });
+    inp.addEventListener('input', function(){ if(!isOpen) openDrop(); clearTimeout(dt); dt=setTimeout(function(){ q=inp.value.trim(); fi=-1; flat=bFlat(q); lst.scrollTop=0; render(); }, 150); });
+    inp.addEventListener('keydown', function(e){
+      var iis = flat.map(function(row,i){ return row.k==='i'?i:-1; }).filter(function(i){ return i>=0; });
+      if(e.key==='Escape'){ closeDrop(); return; }
+      if(e.key==='Tab'){ closeDrop(); return; }
+      if(!isOpen && (e.key==='ArrowDown'||e.key==='Enter')){ openDrop(); return; }
+      if(e.key==='ArrowDown'){ e.preventDefault(); var ci=iis.indexOf(fi); fi = ci<0?iis[0]:(iis[ci+1]!==undefined?iis[ci+1]:iis[ci]); render(); }
+      else if(e.key==='ArrowUp'){ e.preventDefault(); var ci2=iis.indexOf(fi); fi = ci2<=0?iis[0]:iis[ci2-1]; render(); }
+      else if(e.key==='Enter'){ e.preventDefault(); var row=flat[fi]; if(row&&row.k==='i') selItem(row.it); }
+    });
+    document.addEventListener('mousedown', function(e){ var wrap=document.getElementById(id+'-wrap'); if(wrap && !wrap.contains(e.target) && !drop.contains(e.target)) closeDrop(); });
+    inp.value = selLabel; flat = bFlat(''); render();
+  }
+
+  function attHtml(list){
+    if(!list||!list.length) return '';
+    return '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;">'+list.map(function(a){
+      if(isImg(a.mime,a.file_name)) return '<a href="'+esc(a.file_url)+'" target="_blank"><img src="'+esc(a.file_url)+'" style="width:76px;height:76px;object-fit:cover;border-radius:8px;border:1px solid var(--line);"></a>';
+      return '<a href="'+esc(a.file_url)+'" target="_blank" style="font-size:12px;color:var(--accent);border:1px solid var(--line);border-radius:8px;padding:4px 10px;">📎 '+esc(a.file_name)+'</a>';
+    }).join('')+'</div>';
+  }
+
+  // ══ NEW: ฟอร์มให้ลูกค้าแจ้งเอง ══
+  async function renderNew() {
+    var hosp = [], cats = [], syss = [];
+    try {
+      var hr = await db.from('hospitals').select('id,name,code').order('name');
+      hosp = hr.data || [];
+      var cr = await db.from('helpdesk_categories').select('*').eq('active', true).order('sort');
+      cats = cr.data || [];
+      // "ระบบที่ใช้งาน" ดึงจากคลัง Product เดิม (hsp_products) ไม่มีรายการแยกของตัวเอง
+      var sr = await db.from('hsp_products').select('*').order('name');
+      syss = sr.data || [];
+    } catch (e) {}
+    app.innerHTML =
+      '<div class="card"><h2>แจ้งปัญหาการใช้งานระบบ</h2>'
+      + '<label>โรงพยาบาล <span class="req">*</span></label>' + comboMarkup('f-hosp', 'พิมพ์ค้นหาชื่อโรงพยาบาล...')
+      + '<div class="row"><div class="col"><label>ชื่อ–นามสกุล</label><input id="f-name"></div>'
+      + '<div class="col"><label>เบอร์ติดต่อ / LINE (ไม่บังคับ)</label><input id="f-phone"></div></div>'
+      + '<div class="row"><div class="col"><label>ระบบที่ใช้งาน</label>' + comboMarkup('f-sys', 'พิมพ์ค้นหาระบบที่ใช้งาน...') + '</div>'
+      + '<div class="col"><label>ประเภทปัญหา</label><select id="f-cat"><option value="">—</option>'
+      + cats.map(function(c){ return '<option value="'+c.id+'" data-pri="'+c.default_priority+'">'+esc(c.name)+'</option>'; }).join('') + '</select></div></div>'
+      + '<label>ความเร่งด่วน</label><select id="f-urg"><option value="p3">ทำงานได้แต่มีปัญหา</option><option value="p2">ทำงานไม่ได้เลย</option><option value="p4">สอบถาม / ขอปรับแต่ง</option></select>'
+      + '<label>รายละเอียดปัญหา <span class="req">*</span></label><textarea id="f-desc" rows="5" placeholder="เกิดตอนไหน เมนูใด ข้อความ error ที่พบ"></textarea>'
+      + '<label>แนบรูป / ไฟล์ (ไม่บังคับ · เลือกได้หลายไฟล์)</label><input type="file" id="f-files" multiple accept="'+ATT_ACCEPT+'">'
+      + '<div class="muted" style="margin-top:3px">'+esc(ATT_HINT)+'</div>'
+      + '<div id="f-msg" class="hidden" style="margin-top:12px"></div>'
+      + '<div style="margin-top:16px;text-align:center"><button class="btn-pri" id="f-send" style="padding:11px 32px;">ส่งเรื่อง</button></div>'
+      + '</div>';
+    initCombo('f-hosp', hosp.map(function(h){ return { id:h.id, label:(h.code?h.code+' ':'')+h.name }; }));
+    // กลุ่ม Product เดียวกับที่ใช้ในแอปหลัก (admin.js/hospital.js/helpdesk.js) — แต่ละไฟล์เก็บสำเนาตัวเอง
+    var SYS_GRP = [
+      { id:'his_front',    label:'HIS Front Office',  color:'#2563eb' },
+      { id:'his_back',     label:'HIS Back Office',   color:'#7c3aed' },
+      { id:'interconnect', label:'Interconnection',   color:'#0891b2' },
+      { id:'application',  label:'Application',       color:'#059669' },
+      { id:'smart',        label:'Smart Hospital',    color:'#d97706' },
+    ];
+    initCombo('f-sys', syss.map(function(p){ return { id:p.name, label:p.name, group:p.group }; }), { grouped:true, groups:SYS_GRP });
+    document.getElementById('f-cat').onchange = function(){
+      var o = this.options[this.selectedIndex]; var p = o && o.getAttribute('data-pri');
+      if (p) document.getElementById('f-urg').value = p;
+    };
+    document.getElementById('f-send').onclick = submitNew;
+  }
+
+  function markInv(el, bad){
+    if(!el) return;
+    el.classList.toggle('invalid', !!bad);
+    if(bad && !el._invb){ el._invb=1; ['input','change'].forEach(function(ev){ el.addEventListener(ev, function(){ el.classList.remove('invalid'); }); }); }
+  }
+
+  async function submitNew() {
+    var hospEl = document.getElementById('f-hosp'), hospVisEl = document.getElementById('f-hosp-inp'), descEl = document.getElementById('f-desc');
+    var hospId = hospEl.value;
+    var desc = descEl.value.trim();
+    var msg = document.getElementById('f-msg');
+    function show(t, cls){ msg.className = 'notice ' + (cls||''); msg.textContent = t; msg.classList.remove('hidden'); }
+    var miss = [];
+    markInv(hospVisEl, !hospId); if(!hospId) miss.push(hospVisEl);
+    markInv(descEl, !desc);   if(!desc)   miss.push(descEl);
+    if (miss.length) { show('กรุณากรอกข้อมูลที่จำเป็น (มี * สีแดง) ให้ครบ', 'err'); if(miss[0].focus) miss[0].focus(); return; }
+    var btn = document.getElementById('f-send'); btn.disabled = true; btn.textContent = 'กำลังส่ง...';
+    try {
+      var now = new Date();
+      var be2 = String((now.getFullYear() + 543) % 100).padStart(2,'0');
+      var mm = String(now.getMonth() + 1).padStart(2,'0');
+      var prefix = 'HD' + be2 + mm;
+      var ex = await db.from('helpdesk_tickets').select('ticket_no').like('ticket_no', prefix + '%');
+      var max = 0; (ex.data || []).forEach(function(r){ var n = parseInt((r.ticket_no||'').slice(prefix.length),10); if(!isNaN(n)&&n>max) max=n; });
+      var priority = document.getElementById('f-urg').value || 'p3';
+      var row = {
+        id: 'HD' + Date.now() + Math.floor(Math.random()*1000),
+        ticket_no: prefix + String(max + 1).padStart(4,'0'),
+        channel: 'web',
+        hospital_id: hospId,
+        reporter_name: document.getElementById('f-name').value.trim(),
+        reporter_phone: document.getElementById('f-phone').value.trim(),
+        source_system: document.getElementById('f-sys').value || '',
+        category_id: document.getElementById('f-cat').value || '',
+        subject: desc.slice(0, 60),
+        description: desc,
+        priority: priority,
+        status: 'new',
+        access_token: token40(),
+        created_by: '',
+        created_at: now.toISOString(),
+        updated_at: now.toISOString()
+      };
+      var ins = await db.from('helpdesk_tickets').insert(row);
+      if (ins.error) throw ins.error;
+      var sysEvId = 'HDE' + Date.now() + Math.floor(Math.random()*1000);
+      await db.from('helpdesk_ticket_events').insert({
+        id: sysEvId,
+        ticket_id: row.id, type: 'system', actor_type: 'system',
+        body: 'รับเรื่องผ่านฟอร์มเว็บ', is_internal: false, created_at: now.toISOString()
+      });
+      try { await uploadAtts(row.id, sysEvId, document.getElementById('f-files').files); } catch (ue) {}
+      var url = new URL('help.html?t=' + encodeURIComponent(row.access_token), location.href).href;
+      app.innerHTML = '<div class="card"><h2>✅ รับเรื่องแล้ว — เลขที่ ' + esc(row.ticket_no) + '</h2>'
+        + '<p>บันทึกลิงก์นี้ไว้ติดตามสถานะและตอบข้อมูลเพิ่มเติม ทีมงานจะติดต่อกลับ</p>'
+        + '<p><a href="' + esc(url) + '">' + esc(url) + '</a></p>'
+        + '<div style="margin-top:12px"><button class="btn-ghost" onclick="navigator.clipboard&&navigator.clipboard.writeText(\'' + url + '\')">คัดลอกลิงก์</button> '
+        + '<a class="btn-pri" style="text-decoration:none;display:inline-block" href="' + esc(url) + '">เปิดหน้าติดตาม</a></div></div>';
+    } catch (e) {
+      show('ส่งเรื่องไม่สำเร็จ กรุณาลองใหม่', 'err');
+      btn.disabled = false; btn.textContent = 'ส่งเรื่อง';
+    }
+  }
+
+  // ══ TRACK: ติดตาม + ตอบกลับ + ประเมิน ══
+  var _ticket = null;
+
+  async function loadTrack() {
+    try {
+      var tr = await db.from('helpdesk_tickets').select('*').eq('access_token', token).limit(1);
+      if (tr.error) throw tr.error;
+      _ticket = (tr.data && tr.data[0]) || null;
+    } catch (e) { _ticket = null; }
+    if (!_ticket) {
+      app.innerHTML = '<div class="notice err">ไม่พบรายการนี้ ลิงก์อาจไม่ถูกต้อง</div>';
+      return;
+    }
+    if (_ticket.public_view_expires_at && new Date(_ticket.public_view_expires_at) < new Date()) {
+      app.innerHTML = '<div class="notice">ลิงก์ติดตามนี้หมดอายุแล้ว (เรื่องปิดเกิน 30 วัน) หากยังมีปัญหากรุณาแจ้งใหม่</div>';
+      return;
+    }
+    var evs = [], atts = [];
+    try {
+      var er = await db.from('helpdesk_ticket_events').select('*')
+        .eq('ticket_id', _ticket.id).eq('is_internal', false).order('created_at', { ascending: true });
+      evs = er.data || [];
+      var ar = await db.from('helpdesk_attachments').select('*').eq('ticket_id', _ticket.id).order('created_at', { ascending: true });
+      atts = ar.data || [];
+    } catch (e) {}
+    renderTrack(evs, atts);
+  }
+
+  function renderTrack(evs, atts) {
+    var attByEv = {};
+    (atts || []).forEach(function (a) { (attByEv[a.event_id || ''] = attByEv[a.event_id || ''] || []).push(a); });
+    var t = _ticket;
+    var st = STATUS[t.status] || { l: t.status, c: '#8a90a0' };
+    var canRate = (t.status === 'resolved' || t.status === 'closed') && !t.rated_at;
+    var closedish = t.status === 'closed' || t.status === 'cancelled';
+
+    var rateCard = canRate ? (
+      '<div class="card" id="rate-card"><h2>ให้คะแนนการช่วยเหลือครั้งนี้</h2>'
+      + '<div class="stars" id="stars" data-v="0">☆☆☆☆☆</div>'
+      + '<label>ความคิดเห็นเพิ่มเติม (ไม่บังคับ)</label><textarea id="rate-cm" rows="2"></textarea>'
+      + '<label style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="rate-rec" style="width:auto"> แนะนำบริการนี้ให้เพื่อนร่วมงาน</label>'
+      + '<div id="rate-msg" class="hidden" style="margin-top:10px"></div>'
+      + '<div style="margin-top:14px"><button class="btn-pri" id="rate-send">ส่งคะแนน</button></div></div>'
+    ) : (t.rated_at ? '<div class="card ok notice">ขอบคุณสำหรับคะแนน ' + (t.csat_score || '') + '/5</div>' : '');
+
+    var replyBox = closedish ? '' : (
+      '<div class="card"><h2>ให้ข้อมูลเพิ่มเติม</h2>'
+      + '<textarea id="rep-txt" rows="3" placeholder="พิมพ์ข้อความถึงทีมงาน..."></textarea>'
+      + '<label>แนบรูป / ไฟล์ (ไม่บังคับ)</label><input type="file" id="rep-files" multiple accept="'+ATT_ACCEPT+'">'
+      + '<div class="muted" style="margin-top:3px">'+esc(ATT_HINT)+'</div>'
+      + '<div id="rep-msg" class="hidden" style="margin-top:10px"></div>'
+      + '<div style="margin-top:12px"><button class="btn-pri" id="rep-send">ส่ง</button></div></div>'
+    );
+
+    var reopenBtn = (t.status === 'resolved' || t.status === 'closed') ? (
+      '<div style="margin-top:10px"><button class="btn-ghost" id="reopen-btn">ยังไม่หาย เปิดเรื่องใหม่</button></div>'
+    ) : '';
+
+    app.innerHTML =
+      rateCard
+      + '<div class="card"><div class="row">'
+      + '<div class="col"><div class="muted">เลขที่</div><b>' + esc(t.ticket_no) + '</b></div>'
+      + '<div class="col"><div class="muted">สถานะ</div><span class="pill" style="color:' + st.c + ';background:' + st.c + '22">' + esc(st.l) + '</span></div>'
+      + '<div class="col"><div class="muted">ความเร่งด่วน</div>' + esc(PRIO[t.priority] || t.priority) + '</div>'
+      + '</div>'
+      + '<div style="margin-top:10px"><div class="muted">หัวข้อ</div>' + esc(t.subject || '-') + '</div>'
+      + '<div style="margin-top:6px"><div class="muted">รายละเอียด</div><div style="white-space:pre-wrap">' + esc(t.description || '') + '</div></div>'
+      + '<div class="muted" style="margin-top:10px">แจ้งเมื่อ ' + dt(t.created_at) + (t.resolution_due ? ' · คาดว่าเสร็จภายใน ' + dt(t.resolution_due) : '') + '</div>'
+      + reopenBtn
+      + '</div>'
+      + '<div class="card"><h2>ความคืบหน้า</h2><ul class="tl" id="tl">' + tlHtml(evs, attByEv) + '</ul></div>'
+      + replyBox;
+
+    if (canRate) bindRate();
+    if (!closedish) document.getElementById('rep-send').onclick = submitReply;
+    var rb = document.getElementById('reopen-btn'); if (rb) rb.onclick = submitReopen;
+  }
+
+  function tlHtml(evs, attByEv) {
+    attByEv = attByEv || {};
+    if (!evs.length && !attByEv['']) return '<li class="muted">ยังไม่มีความเคลื่อนไหว</li>';
+    var out = evs.map(function (e) {
+      var who = e.actor_type === 'reporter' ? 'คุณ' : (e.actor_type === 'system' ? 'ระบบ' : 'ทีมงาน');
+      var body;
+      if (e.type === 'status_change' && e.meta) {
+        var to = (STATUS[e.meta.to] || {}).l || e.meta.to;
+        body = 'อัปเดตสถานะเป็น: ' + to;
+      } else body = e.body || '';
+      return '<li><div class="who' + (e.actor_type === 'reporter' ? ' mine' : '') + '">' + esc(who) + ' · ' + dt(e.created_at) + '</div>'
+        + '<div class="body">' + esc(body) + '</div>' + attHtml(attByEv[e.id]) + '</li>';
+    }).join('');
+    if (attByEv['']) out += '<li><div class="who">📎 ไฟล์แนบ</div>' + attHtml(attByEv['']) + '</li>';
+    return out;
+  }
+
+  async function submitReply() {
+    var ta = document.getElementById('rep-txt');
+    var msg = document.getElementById('rep-msg');
+    var filesEl = document.getElementById('rep-files');
+    var files = filesEl && filesEl.files ? filesEl.files : [];
+    var txt = (ta.value || '').trim();
+    function show(t, cls){ msg.className = 'notice ' + (cls||''); msg.textContent = t; msg.classList.remove('hidden'); }
+    if (!txt && !files.length) return show('พิมพ์ข้อความ หรือแนบไฟล์ก่อน', 'err');
+    var btn = document.getElementById('rep-send'); btn.disabled = true; btn.textContent = 'กำลังส่ง...';
+    try {
+      var now = new Date().toISOString();
+      var evId = 'HDE' + Date.now() + Math.floor(Math.random()*1000);
+      var ie = await db.from('helpdesk_ticket_events').insert({
+        id: evId,
+        ticket_id: _ticket.id, type: 'comment', actor_type: 'reporter',
+        body: txt || '(แนบไฟล์)', is_internal: false, created_at: now
+      });
+      if (ie.error) throw ie.error;
+      try { await uploadAtts(_ticket.id, evId, files); } catch (ue) {}
+      await db.from('helpdesk_tickets').update({ updated_at: now }).eq('id', _ticket.id);
+      ta.value = '';
+      loadTrack();
+    } catch (e) {
+      show('ส่งไม่สำเร็จ ลองใหม่อีกครั้ง', 'err');
+      btn.disabled = false; btn.textContent = 'ส่ง';
+    }
+  }
+
+  async function submitReopen() {
+    var btn = document.getElementById('reopen-btn'); btn.disabled = true;
+    try {
+      var now = new Date().toISOString();
+      await db.from('helpdesk_tickets').update({
+        status: 'reopened', resolved_at: null, closed_at: null,
+        reopened_count: (Number(_ticket.reopened_count) || 0) + 1, updated_at: now
+      }).eq('id', _ticket.id);
+      await db.from('helpdesk_ticket_events').insert({
+        id: 'HDE' + Date.now() + Math.floor(Math.random()*1000),
+        ticket_id: _ticket.id, type: 'status_change', actor_type: 'reporter',
+        body: 'ผู้แจ้งเปิดเรื่องใหม่', meta: { from: _ticket.status, to: 'reopened' },
+        is_internal: false, created_at: now
+      });
+      loadTrack();
+    } catch (e) { btn.disabled = false; }
+  }
+
+  function bindRate() {
+    var el = document.getElementById('stars');
+    function paint(n){ el.innerHTML = '<b>' + '★'.repeat(n) + '</b>' + '☆'.repeat(5 - n); el.setAttribute('data-v', n); }
+    el.onclick = function (ev) {
+      var rect = el.getBoundingClientRect();
+      var n = Math.min(5, Math.max(1, Math.ceil((ev.clientX - rect.left) / (rect.width / 5))));
+      paint(n);
+    };
+    document.getElementById('rate-send').onclick = submitRate;
+  }
+
+  async function submitRate() {
+    var n = Number(document.getElementById('stars').getAttribute('data-v')) || 0;
+    var msg = document.getElementById('rate-msg');
+    function show(t, cls){ msg.className = 'notice ' + (cls||''); msg.textContent = t; msg.classList.remove('hidden'); }
+    if (!n) return show('เลือกคะแนนดาวก่อน', 'err');
+    var btn = document.getElementById('rate-send'); btn.disabled = true; btn.textContent = 'กำลังส่ง...';
+    try {
+      var now = new Date().toISOString();
+      var rec = await db.from('helpdesk_ratings').select('id').eq('ticket_id', _ticket.id).limit(1);
+      if (rec.data && rec.data.length) { show('รายการนี้ให้คะแนนแล้ว', 'err'); return; }
+      var ir = await db.from('helpdesk_ratings').insert({
+        id: 'HDR' + Date.now() + Math.floor(Math.random()*1000),
+        ticket_id: _ticket.id, score: n,
+        comment: document.getElementById('rate-cm').value.trim(),
+        would_recommend: document.getElementById('rate-rec').checked,
+        via_token: token, created_at: now, updated_at: now
+      });
+      if (ir.error) throw ir.error;
+      await db.from('helpdesk_tickets').update({ csat_score: n, rated_at: now, updated_at: now }).eq('id', _ticket.id);
+      await db.from('helpdesk_ticket_events').insert({
+        id: 'HDE' + Date.now() + Math.floor(Math.random()*1000),
+        ticket_id: _ticket.id, type: 'rating', actor_type: 'reporter',
+        body: 'ให้คะแนน ' + n + '/5', is_internal: false, created_at: now
+      });
+      _ticket.rated_at = now; _ticket.csat_score = n;
+      loadTrack();
+    } catch (e) {
+      show('ส่งคะแนนไม่สำเร็จ', 'err');
+      btn.disabled = false; btn.textContent = 'ส่งคะแนน';
+    }
+  }
+
+  // ── entry ──
+  if (isNew) renderNew();
+  else if (token) loadTrack();
+  else app.innerHTML =
+    '<div class="card" style="text-align:center;">'
+    + '<h2 style="margin-bottom:6px;">ศูนย์ช่วยเหลือการใช้งานระบบ</h2>'
+    + '<p style="color:var(--ink2);font-size:13.5px;margin:0 0 18px;">แจ้งปัญหาการใช้งานระบบ BMS แล้วติดตามสถานะได้ที่นี่</p>'
+    + '<a class="btn-pri" style="text-decoration:none;display:inline-block;" href="help.html?new=1">+ แจ้งปัญหาใหม่</a>'
+    + '<p class="muted" style="margin-top:16px;">มีเลขที่ Ticket อยู่แล้ว? เปิดจากลิงก์ที่ทีมงานส่งให้ในกลุ่ม LINE</p>'
+    + '</div>';
+})();
+</script>
+</body>
+</html>

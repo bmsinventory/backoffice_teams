@@ -9,6 +9,7 @@ function renderAdm(){
   var c=document.getElementById('adm-body');if(!c)return;var titleEl=document.getElementById('adm-head-title');
   if(window.admCur==='notify'){window.renderNotifySettings();return;}
   if(window.admCur==='roles'){renderAdmRoles(c,titleEl);return;}
+  if(window.admCur==='hd_options'){window.renderHdOptionsAdmin();return;}
   if(window.admCur==='staff'){
     var activeStaff=window.STAFF.filter(function(s){return s.active!==false;});
     var inactiveStaff=window.STAFF.filter(function(s){return s.active===false;});
