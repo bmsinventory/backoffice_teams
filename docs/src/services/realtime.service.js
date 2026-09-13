@@ -375,6 +375,11 @@
           if (_von('view-overview')) window.renderOverview && window.renderOverview();
           if (_von('view-targets'))  window.renderTargets && window.renderTargets();
         }
+        // ── helpdesk.service.js ต้องการ override ของ Priority/สถานะ/ความเร่งด่วนจาก doc เดียวกันนี้ —
+        // ห้ามเปิด onSnapshot ซ้ำบน SETTINGS/app เด็ดขาด (Supabase realtime ไม่ให้เพิ่ม postgres_changes
+        // callback บน channel ที่ subscribe() ไปแล้ว เคยพังจน ImplTrackerService/FormTrackerService.setup()
+        // ที่เรียกต่อจากกันใน auth.service.js ไม่ทำงานเลยทั้งคู่) เรียกผ่านฟังก์ชันนี้แทน ──
+        window.hdApplySettingsOverrides && window.hdApplySettingsOverrides(d);
       });
 
       window.onSnapshot(window.getDocRef('SETTINGS', 'role_permissions'), function (snap) {

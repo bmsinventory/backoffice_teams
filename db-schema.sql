@@ -553,6 +553,26 @@ CREATE TABLE IF NOT EXISTS impl_activity_log (
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- ── ปัญหาการใช้งานโปรแกรมรายโครงการ (แท็บ "ปัญหา") — สรุปปัญหาที่ รพ. แจ้งเข้ามาหลังติดตั้ง/ระหว่างใช้งานจริง
+-- คนละบริบทกับ helpdesk_tickets (ticket ลูกค้าเรียลไทม์มี SLA) — ตารางนี้ผูกกับโครงการ ใช้พิมพ์เอกสารสรุป
+-- ให้ รพ. เซ็นรับทราบเป็นรอบ ๆ แทน Google Sheet แยกไฟล์ต่อโครงการที่ใช้อยู่เดิม ──
+CREATE TABLE IF NOT EXISTS impl_issues (
+  id            TEXT PRIMARY KEY,
+  project_id    TEXT NOT NULL,
+  task_id       TEXT DEFAULT '',   -- อ้างอิง task ที่เกี่ยวข้องได้ (ไม่บังคับ) ส่วนใหญ่ปัญหากลุ่มนี้ไม่ผูกกับ task ใดโดยเฉพาะ
+  department    TEXT DEFAULT '',   -- หน่วยงาน/แผนกของ รพ. ที่แจ้งปัญหา
+  problem       TEXT DEFAULT '',
+  category      TEXT DEFAULT '',   -- กลุ่มปัญหา (window.IMPL_ISSUE_CATEGORY)
+  severity      TEXT DEFAULT 'medium',
+  status        TEXT DEFAULT 'open',   -- open | in_progress | closed (window.IMPL_ISSUE_STATUS)
+  solution      TEXT DEFAULT '',       -- วิธีการแก้ไข
+  received_by   TEXT DEFAULT '',       -- ผู้รับปัญหา
+  fixed_by      TEXT DEFAULT '',       -- ผู้แก้ไข
+  fixed_date    DATE,                  -- วันที่แก้ไขปัญหา
+  created_at    TIMESTAMPTZ DEFAULT NOW(),  -- วันที่รับปัญหา
+  updated_at    TIMESTAMPTZ DEFAULT NOW()
+);
+
 CREATE INDEX IF NOT EXISTS idx_impl_phases_project_id ON impl_phases (project_id);
 CREATE INDEX IF NOT EXISTS idx_impl_tasks_phase_id     ON impl_tasks (phase_id);
 CREATE INDEX IF NOT EXISTS idx_impl_tasks_project_id   ON impl_tasks (project_id);
@@ -561,6 +581,8 @@ CREATE INDEX IF NOT EXISTS idx_impl_checklist_task_id  ON impl_checklist_items (
 CREATE INDEX IF NOT EXISTS idx_impl_comments_task_id   ON impl_comments (task_id);
 CREATE INDEX IF NOT EXISTS idx_impl_attachments_task_id ON impl_attachments (task_id);
 CREATE INDEX IF NOT EXISTS idx_impl_activity_project_id ON impl_activity_log (project_id);
+CREATE INDEX IF NOT EXISTS idx_impl_issues_project_id  ON impl_issues (project_id);
+CREATE INDEX IF NOT EXISTS idx_impl_issues_status      ON impl_issues (status);
 
 ALTER TABLE impl_templates       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE impl_projects        ENABLE ROW LEVEL SECURITY;
@@ -570,13 +592,14 @@ ALTER TABLE impl_checklist_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE impl_comments        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE impl_attachments     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE impl_activity_log    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE impl_issues          ENABLE ROW LEVEL SECURITY;
 
 DO $$
 DECLARE
   tbl TEXT;
   tbls TEXT[] := ARRAY[
     'impl_templates','impl_projects','impl_phases','impl_tasks','impl_checklist_items',
-    'impl_comments','impl_attachments','impl_activity_log'
+    'impl_comments','impl_attachments','impl_activity_log','impl_issues'
   ];
 BEGIN
   FOREACH tbl IN ARRAY tbls LOOP
@@ -593,7 +616,7 @@ DECLARE
   tbl TEXT;
   tbls TEXT[] := ARRAY[
     'impl_templates','impl_projects','impl_phases','impl_tasks','impl_checklist_items',
-    'impl_comments','impl_attachments','impl_activity_log'
+    'impl_comments','impl_attachments','impl_activity_log','impl_issues'
   ];
 BEGIN
   FOREACH tbl IN ARRAY tbls LOOP

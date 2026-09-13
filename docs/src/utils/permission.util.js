@@ -32,6 +32,7 @@
       impl_tracker:ro, helpdesk:ro,
     };
   }
+  window._roleDefaultPerms = _roleDefaultPerms; // ใช้ซ้ำใน admin.js (renderAdmRoles) กันสำเนาเพี้ยนตามกันไม่ทัน
 
   // ── Core Permission Check ──
   window.can = function (action, module) {

@@ -23,8 +23,10 @@
     IMPL_CHECKLIST_ITEMS: function (d) {
       return { id:d.id, taskId:d.task_id, name:d.checklist_name||'', done:d.is_done===true, doneDate:d.done_date||'', doneBy:d.done_by||'', remark:d.remark||'', order:Number(d.sort_order)||99 };
     },
+    // ── ปัญหาการใช้งานโปรแกรมรายโครงการ (แท็บ "ปัญหา") — createdAt = วันที่รับปัญหา, fixedDate = วันที่แก้ไขปัญหา
+    // (คนละแนวคิดกับ IMPL_ISSUES เดิมที่ผูกกับ task/severity ล้วน ๆ — ตอนนี้ปรับให้ตรงกับรายงานสรุปปัญหารายโครงการ) ──
     IMPL_ISSUES: function (d) {
-      return { id:d.id, projectId:d.project_id, taskId:d.task_id||'', title:d.issue_title||'', detail:d.issue_detail||'', severity:d.severity||'medium', owner:d.owner||'', status:d.status||'open', solution:d.solution||'', createdAt:d.created_at||'', closedAt:d.closed_at||'' };
+      return { id:d.id, projectId:d.project_id, taskId:d.task_id||'', department:d.department||'', problem:d.problem||'', category:d.category||'', severity:d.severity||'medium', status:d.status||'open', solution:d.solution||'', receivedBy:d.received_by||'', fixedBy:d.fixed_by||'', fixedDate:d.fixed_date||'', createdAt:d.created_at||'', updatedAt:d.updated_at||'' };
     },
     IMPL_RISKS: function (d) {
       return { id:d.id, projectId:d.project_id, title:d.risk_title||'', detail:d.risk_detail||'', impact:d.impact_level||'medium', probability:d.probability||'medium', mitigation:d.mitigation_plan||'', owner:d.owner||'', status:d.status||'open' };
@@ -119,6 +121,42 @@
     var row = { project_id:projectId, entity_type:entityType, entity_id:entityId, action:action, detail:detail||'', actor:actor };
     window.imtApplyLocal('IMPL_ACTIVITY_LOG', id, Object.assign({ created_at:new Date().toISOString() }, row));
     window.setDoc(window.getDocRef('IMPL_ACTIVITY_LOG', id), row).catch(function (e) { console.error('[impl-tracker] activity log error', e); });
+  };
+
+  // ── ปัญหาการใช้งานโปรแกรมรายโครงการ (แท็บ "ปัญหา") — CRUD ตาม convention เดิม: optimistic ผ่าน
+  // imtApplyLocal/imtRemoveLocal ก่อน แล้วค่อยยิง setDoc/deleteDoc จริง ไม่ต่างจาก Task/Checklist ──
+  window.imtAddIssue = async function (data) {
+    var id = window.imtUid('ISSU');
+    var row = {
+      project_id: data.projectId, task_id: data.taskId || '',
+      department: data.department || '', problem: data.problem || '', category: data.category || '',
+      severity: data.severity || 'medium', status: data.status || 'open', solution: data.solution || '',
+      received_by: data.receivedBy || '', fixed_by: data.fixedBy || '',
+      fixed_date: data.fixedDate || null,
+    };
+    // receivedDate ระบุเองได้ (ย้อนหลัง/นำเข้าข้อมูลเก่า) — ไม่ระบุ ปล่อยให้ DB default NOW() ทำงาน
+    if (data.receivedDate) row.created_at = new Date(data.receivedDate).toISOString();
+    window.imtApplyLocal('IMPL_ISSUES', id, Object.assign({ created_at: row.created_at || new Date().toISOString() }, row));
+    await window.setDoc(window.getDocRef('IMPL_ISSUES', id), row);
+    return id;
+  };
+
+  window.imtUpdateIssue = async function (issueId, data) {
+    var row = {
+      department: data.department || '', problem: data.problem || '', category: data.category || '',
+      severity: data.severity || 'medium', status: data.status || 'open', solution: data.solution || '',
+      received_by: data.receivedBy || '', fixed_by: data.fixedBy || '',
+      fixed_date: data.fixedDate || null, updated_at: new Date().toISOString(),
+    };
+    if (data.receivedDate) row.created_at = new Date(data.receivedDate).toISOString();
+    var cur = window.IMPL_ISSUES.find(function (x) { return x.id === issueId; }) || {};
+    window.imtApplyLocal('IMPL_ISSUES', issueId, Object.assign({ project_id: cur.projectId, task_id: cur.taskId, created_at: cur.createdAt }, row));
+    await window.updateDoc(window.getDocRef('IMPL_ISSUES', issueId), row);
+  };
+
+  window.imtDeleteIssue = async function (issueId) {
+    window.imtRemoveLocal('IMPL_ISSUES', issueId);
+    await window.deleteDoc(window.getDocRef('IMPL_ISSUES', issueId));
   };
 
   // ── ประเมิน "น้ำหนักวัน" ของ Task จากชื่องาน (heuristic, ไม่ต้องเรียก AI ภายนอก/ไม่ต้องใช้ API key) ──

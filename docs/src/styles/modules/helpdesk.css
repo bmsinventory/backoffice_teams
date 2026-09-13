@@ -57,6 +57,40 @@
   box-shadow: 0 0 0 3px rgba(229, 72, 77, .14);
 }
 
+/* ── Dashboard: หัวข้อ section ── */
+#view-helpdesk .hd-sec-title {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; font-weight: 700; color: var(--txt);
+  padding: 6px 24px 12px; margin-top: 4px;
+}
+
+/* ── Dashboard: KPI stat tiles ── */
+#view-helpdesk .hd-kpi-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px; padding: 4px 24px 22px;
+}
+#view-helpdesk .hd-kpi {
+  background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--border2);
+  border-radius: var(--r2); padding: 13px 15px; box-shadow: var(--sh-sm);
+  display: flex; flex-direction: column; gap: 5px; transition: transform .15s, box-shadow .15s;
+}
+#view-helpdesk .hd-kpi:hover { transform: translateY(-2px); box-shadow: var(--sh-md); }
+#view-helpdesk .hd-kpi.hd-acc-good { border-left-color: var(--teal); }
+#view-helpdesk .hd-kpi.hd-acc-warn { border-left-color: var(--amber); }
+#view-helpdesk .hd-kpi.hd-acc-bad  { border-left-color: var(--coral); }
+#view-helpdesk .hd-kpi-top { display: flex; align-items: center; gap: 6px; }
+#view-helpdesk .hd-kpi-icon { font-size: 13px; }
+#view-helpdesk .hd-kpi-lbl { font-size: 11px; font-weight: 600; color: var(--txt3); }
+#view-helpdesk .hd-kpi-val { font-size: 23px; font-weight: 800; color: var(--txt); line-height: 1.15; }
+#view-helpdesk .hd-kpi-sub { font-size: 10.5px; color: var(--txt3); }
+
+/* ── Dashboard: การ์ดกราฟ + empty state ── */
+#view-helpdesk .hd-chart-grid .ov-card { display: flex; flex-direction: column; }
+#view-helpdesk .hd-chart-empty {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  min-height: 160px; color: var(--txt3); font-size: 12px; text-align: center;
+}
+
 /* modal "+ แจ้งแทน" — กว้างขึ้น + ระยะห่างแคบ ไม่ให้กินพื้นที่แนวตั้ง */
 #m-hd .modal.lg { max-width: 840px; }
 #m-hd .m-body { padding: 16px 22px; }

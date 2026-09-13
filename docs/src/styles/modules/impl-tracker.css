@@ -258,8 +258,9 @@
 .imt-cal-daynum { font-weight: 700; margin-bottom: 4px; }
 .imt-cal-item   { font-size: 10px; padding: 2px 5px; border-radius: 5px; margin-bottom: 2px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* ── สรุป Checklist สำหรับ "บันทึกเป็นรูปภาพ" — ซ่อนไว้ไม่ให้เห็นบนหน้าจอปกติ (ใช้เป็นต้นฉบับให้
-   exportImtReportImage() clone ไปสร้างรูปภาพ ไม่มีฟีเจอร์ Print/Save as PDF แล้ว) ── */
+/* ── เนื้อหาที่ใช้เฉพาะตอนพิมพ์/ส่งออกเท่านั้น ซ่อนไว้ไม่ให้เห็นบนหน้าจอปกติ ──
+   1) แท็บ Report: exportImtReportImage() clone ไปสร้างรูปภาพ (ไม่มีฟีเจอร์ Print/PDF)
+   2) แท็บ "ปัญหา": printImtIssues() พิมพ์ตรงผ่าน browser print dialog จริง (ดู @media print ท้ายไฟล์) ── */
 .imt-print-only { display: none; }
 
 .imt-print-checklist {
@@ -315,6 +316,42 @@
 .imt-print-checklist .ppc-ck-ic.done { color: #16a34a; }
 
 .imt-print-checklist .ppc-date      { flex-shrink: 0; white-space: nowrap; font-size: .88em; color: #16a34a; font-weight: 700; }
+
+/* ── แท็บ "ปัญหา": เอกสารสรุปปัญหาการใช้งานโปรแกรมรายโครงการ สำหรับ printImtIssues() (browser print จริง)
+   หัวกระดาษใช้รูป img/BMS-Header.jpg ตัวจริง (โลโก้ + ที่อยู่บริษัทรวมเป็นภาพเดียว) ตามแบบฟอร์มกระดาษเดิม
+   ที่ รพ. เซ็นรับทราบ + แถบชื่อเรื่องสีน้ำเงิน/หัวตารางสีฟ้าอ่อนแบบ Excel ที่ทีมใช้อยู่เดิม ── */
+.imt-idoc { color: #111; font-size: 12px; background: #fff; padding: 6px; }
+.imt-idoc-head { border-bottom: 2.5px solid #1c4587; padding-bottom: 8px; margin-bottom: 0; }
+.imt-idoc-headerimg { display: block; width: 430px; max-width: 60%; height: auto; }
+.imt-idoc-title  { text-align: center; font-weight: 700; font-size: 15.5px; color: #fff; background: #3c78d8; padding: 7px 0; margin: 0 0 10px; }
+.imt-idoc-tbl { width: 100%; font-size: 11.5px; border-collapse: collapse; border: 1px solid #333; }
+.imt-idoc-tbl th, .imt-idoc-tbl td { border: 1px solid #333; padding: 6px 7px; text-align: left; vertical-align: top; }
+.imt-idoc-tbl th { background: #cfe2f3; font-weight: 700; text-align: center; font-size: 11px; }
+.imt-idoc-tbl td.n  { text-align: center; width: 26px; }
+.imt-idoc-tbl td.dt { white-space: nowrap; width: 74px; }
+.imt-idoc-sign { display: flex; justify-content: space-between; gap: 30px; margin-top: 46px; }
+.imt-idoc-sb   { width: 47%; text-align: center; font-size: 12px; }
+.imt-idoc-line { border-bottom: 1px dotted #333; height: 26px; margin-bottom: 6px; }
+.imt-idoc-nm   { font-weight: 600; margin-bottom: 2px; }
+
+/* ════ PRINT: แสดงเฉพาะ #imt-issue-print-doc ตอนสั่งพิมพ์จริง ไม่มี UI แอปติดมาด้วย ════
+   Scoped ด้วย body[data-view="impl_tracker"] (router.js ตั้งให้ทุกครั้งที่สลับ view) กัน rule
+   "ซ่อนทุกอย่างยกเว้นของฉัน" นี้ไปลบเนื้อหาพิมพ์ของ view อื่นโดยไม่ตั้งใจ — pattern เดียวกับ
+   expense-form.css/site-notice-form.css ── */
+@media print {
+  /* Modal ที่ปิดอยู่ (position:static อยู่ท้าย body) — visibility:hidden อย่างเดียวไม่ยุบพื้นที่
+     กล่องทิ้ง ทำให้ล้นไปหน้าที่ 2 เปล่า ๆ ต้องดันออกจาก flow ไปเลย */
+  body[data-view="impl_tracker"] .modal { display: none !important; }
+
+  body[data-view="impl_tracker"] * { visibility: hidden; }
+  body[data-view="impl_tracker"] #imt-issue-print-doc,
+  body[data-view="impl_tracker"] #imt-issue-print-doc * { visibility: visible; }
+  body[data-view="impl_tracker"] #imt-issue-print-doc {
+    display: block !important; position: absolute; top: 0; left: 0; width: 100%;
+    padding: 12mm;
+  }
+  @page { size: A4 landscape; margin: 0; }
+}
 
 /* ── Report Tab: Hero (ring ความคืบหน้ารวม + สถิติเด่น) ── */
 .imt-report-hero {

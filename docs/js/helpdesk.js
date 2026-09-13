@@ -901,11 +901,29 @@ window.hdAiApply = function (mode, field) {
 };
 
 // ── DASHBOARD ──────────────────────────────────────────────────────────
+// การเลือกสีกราฟยึดตาม skill "dataviz": magnitude-across-categories (จัดอันดับหมวด/
+// ผู้รับผิดชอบ/รพ.) ใช้ hue เดียวต่อกราฟ (sequential) — ไม่ใช่หลายสีต่อแท่งเพราะแกนมีชื่อกำกับ
+// อยู่แล้ว ส่วน "เข้า vs ปิด" เป็น 2 series ต้องแยกตัวตนจริงจึงใช้คู่สี categorical ที่ผ่านการ
+// เช็ค CVD/contrast แล้ว (indigo/aqua) Priority ใช้สีที่ Admin ตั้งไว้เอง (เหมือนกันทุกจุดในแอป)
+// อายุ Ticket ค้างใช้โทนสถานะ teal→amber→coral ของแอปเอง (ไล่ระดับความเร่งด่วน) ──
+function hdIsDark() {
+  var cur = document.documentElement.getAttribute('data-theme');
+  return cur === 'dark' || (cur !== 'light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+}
+function hdHexA(hex, a) {
+  var h = String(hex || '').replace('#', '');
+  if (h.length === 3) h = h.split('').map(function (c) { return c + c; }).join('');
+  var n = parseInt(h, 16);
+  if (isNaN(n) || h.length !== 6) return hex;
+  return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+}
+
 function hdDashboardHtml() {
   var all = window.HELPDESK_TICKETS || [];
   var open = all.filter(function (t) { return hdStatus(t.status).open; });
   var now = Date.now();
   var wk = all.filter(function (t) { return now - new Date(t.createdAt || 0) < 7 * 864e5; });
+  var wkPrev = all.filter(function (t) { var age = now - new Date(t.createdAt || 0); return age >= 7 * 864e5 && age < 14 * 864e5; });
   var closedWk = all.filter(function (t) { return t.resolvedAt && now - new Date(t.resolvedAt) < 30 * 864e5; });
   var breach = open.filter(hdOverdue).length;
 
@@ -923,7 +941,8 @@ function hdDashboardHtml() {
   var frt = avgMins(all.filter(function (t) { return t.firstResponseAt; }), 'createdAt', 'firstResponseAt');
   var mttr = avgMins(closedWk, 'createdAt', 'resolvedAt');
   var withRating = all.filter(function (t) { return t.csatScore != null; });
-  var csat = withRating.length ? (withRating.reduce(function (s, t) { return s + t.csatScore; }, 0) / withRating.length).toFixed(1) : '—';
+  var csatNum = withRating.length ? (withRating.reduce(function (s, t) { return s + t.csatScore; }, 0) / withRating.length) : null;
+  var csat = csatNum == null ? '—' : csatNum.toFixed(1);
   var compBase = closedWk.length;
   // P0: คิดจากเวลาจริงเทียบ due (ไม่พึ่ง flag ที่ยังไม่มี cron ตั้ง)
   function metSla(t) {
@@ -934,25 +953,52 @@ function hdDashboardHtml() {
   var comp = compBase ? Math.round(closedWk.filter(metSla).length / compBase * 100) : null;
   var reopen = compBase ? Math.round(closedWk.filter(function (t) { return (t.reopenedCount || 0) > 0; }).length / compBase * 100) : null;
 
-  function kpi(label, val, color) {
-    return '<div class="ov-card" style="text-align:center;"><div style="font-size:11px;color:var(--txt3);">' + label + '</div><div style="font-size:22px;font-weight:800;' + (color ? 'color:' + color + ';' : '') + '">' + val + '</div></div>';
+  var wkSub = '';
+  if (wkPrev.length) {
+    var pct = Math.round((wk.length - wkPrev.length) / wkPrev.length * 100);
+    wkSub = (pct > 0 ? '▲ ' : pct < 0 ? '▼ ' : '● ') + Math.abs(pct) + '% จากสัปดาห์ก่อน (' + wkPrev.length + ')';
+  } else if (wk.length) wkSub = 'สัปดาห์ก่อนไม่มีข้อมูลเทียบ';
+
+  function kpi(icon, label, val, sub, accent) {
+    return '<div class="hd-kpi hd-acc-' + (accent || 'neu') + '">'
+      + '<div class="hd-kpi-top"><span class="hd-kpi-icon">' + icon + '</span><span class="hd-kpi-lbl">' + esc(label) + '</span></div>'
+      + '<div class="hd-kpi-val">' + val + '</div>'
+      + (sub ? '<div class="hd-kpi-sub">' + esc(sub) + '</div>' : '')
+      + '</div>';
   }
-  var kpis = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;padding:16px 24px;">'
-    + kpi('เข้าใหม่ (7 วัน)', wk.length)
-    + kpi('เปิดค้าง', open.length)
-    + kpi('เกิน SLA', breach, breach ? 'var(--coral)' : '')
-    + kpi('FRT เฉลี่ย', fmtDur(frt))
-    + kpi('MTTR เฉลี่ย', fmtDur(mttr))
-    + kpi('ตรงตาม SLA', comp == null ? '—' : comp + '%')
-    + kpi('เปิดซ้ำ', reopen == null ? '—' : reopen + '%')
-    + kpi('CSAT', csat + (csat === '—' ? '' : ' / 5'))
+  var compAccent = comp == null ? 'neu' : comp >= 90 ? 'good' : comp >= 70 ? 'warn' : 'bad';
+  var reopenAccent = reopen == null ? 'neu' : reopen <= 5 ? 'good' : reopen <= 15 ? 'warn' : 'bad';
+  var csatAccent = csatNum == null ? 'neu' : csatNum >= 4.5 ? 'good' : csatNum >= 3.5 ? 'warn' : 'bad';
+  var kpis = '<div class="hd-kpi-grid">'
+    + kpi('📥', 'เข้าใหม่ (7 วัน)', wk.length, wkSub, 'neu')
+    + kpi('📋', 'เปิดค้าง', open.length, '', 'neu')
+    + kpi('🔥', 'เกิน SLA', breach, breach ? 'ต้องเร่งดำเนินการ' : 'ไม่มี — ดีมาก', breach ? 'bad' : 'good')
+    + kpi('⚡', 'FRT เฉลี่ย', fmtDur(frt), 'เวลาตอบกลับครั้งแรก', 'neu')
+    + kpi('🛠️', 'MTTR เฉลี่ย', fmtDur(mttr), 'เวลาแก้ไขเฉลี่ย (30 วัน)', 'neu')
+    + kpi('🎯', 'ตรงตาม SLA', comp == null ? '—' : comp + '%', '30 วันล่าสุด', compAccent)
+    + kpi('♻️', 'เปิดซ้ำ', reopen == null ? '—' : reopen + '%', '30 วันล่าสุด', reopenAccent)
+    + kpi('⭐', 'CSAT', csat + (csat === '—' ? '' : ' / 5'), withRating.length ? withRating.length + ' รีวิว' : 'ยังไม่มีคะแนน', csatAccent)
     + '</div>';
 
-  var charts = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:0 24px 28px;" class="hd-chart-grid">'
-    + '<div class="ov-card"><div class="ov-card-title">Ticket เข้า/ปิด รายวัน (14 วัน)</div><div style="height:220px;position:relative"><canvas id="hd-c-trend"></canvas></div></div>'
-    + '<div class="ov-card"><div class="ov-card-title">แยกตามหมวดปัญหา</div><div style="height:220px;position:relative"><canvas id="hd-c-cat"></canvas></div></div>'
-    + '<div class="ov-card"><div class="ov-card-title">การกระจาย Priority</div><div style="height:200px;position:relative"><canvas id="hd-c-pri"></canvas></div></div>'
-    + '<div class="ov-card"><div class="ov-card-title">อายุ Ticket ค้าง</div><div style="height:200px;position:relative"><canvas id="hd-c-age"></canvas></div></div>'
+  var hasOpenAssigned = open.length > 0;
+  var hasRecentHosp = all.some(function (t) { return t.hospitalId && now - new Date(t.createdAt || 0) < 30 * 864e5; });
+  function chartCard(title, canvasId, height, hasData, emptyMsg) {
+    var body = hasData
+      ? '<div style="height:' + height + 'px;position:relative"><canvas id="' + canvasId + '"></canvas></div>'
+      : '<div class="hd-chart-empty" style="height:' + height + 'px;">' + esc(emptyMsg || 'ยังไม่มีข้อมูล') + '</div>';
+    return '<div class="ov-card"><div class="ov-card-title">' + title + '</div>' + body + '</div>';
+  }
+  var charts = '<div class="hd-sec-title">📈 แนวโน้มและการกระจาย</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:0 24px 8px;" class="hd-chart-grid">'
+    + chartCard('📊 Ticket เข้า/ปิด รายวัน (14 วัน)', 'hd-c-trend', 220, all.length > 0)
+    + chartCard('🗂️ แยกตามหมวดปัญหา', 'hd-c-cat', 220, all.length > 0)
+    + chartCard('🚦 การกระจาย Priority', 'hd-c-pri', 200, all.length > 0)
+    + chartCard('⏳ อายุ Ticket ค้าง (เปิดอยู่)', 'hd-c-age', 200, open.length > 0)
+    + '</div>'
+    + '<div class="hd-sec-title">🧑‍💼 ภาระงาน &amp; Top Reporters</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:0 24px 28px;" class="hd-chart-grid">'
+    + chartCard('👤 ภาระงานตามผู้รับผิดชอบ (เปิดอยู่)', 'hd-c-assignee', 220, hasOpenAssigned)
+    + chartCard('🏥 รพ. ที่แจ้งปัญหาบ่อยที่สุด (30 วัน)', 'hd-c-hosp', 220, hasRecentHosp)
     + '</div>';
 
   // ตารางเสี่ยงเกิน SLA
@@ -964,7 +1010,7 @@ function hdDashboardHtml() {
   }).join('');
   var riskTable = '<div style="padding:0 24px 32px;"><div class="ov-card" style="padding:0;overflow:hidden;"><div class="ov-card-title" style="padding:14px 18px;">⏰ เสี่ยง/เกิน SLA</div><div style="overflow-x:auto;"><table class="t-table" style="min-width:520px;"><thead><tr><th>เลขที่</th><th>หัวข้อ</th><th>ผู้รับผิดชอบ</th><th>SLA คงเหลือ</th></tr></thead><tbody>' + (riskRows || '<tr><td colspan="4" style="text-align:center;color:var(--txt3);padding:24px;">ไม่มี</td></tr>') + '</tbody></table></div></div></div>';
 
-  return kpis + charts + riskTable;
+  return '<div class="hd-sec-title">📊 ภาพรวม</div>' + kpis + charts + riskTable;
 }
 
 function hdRenderCharts() {
@@ -975,8 +1021,20 @@ function hdRenderCharts() {
   var all = window.HELPDESK_TICKETS || [];
   var css = getComputedStyle(document.body);
   var grid = (css.getPropertyValue('--border') || '#e2e5ec').trim();
+  var ink2 = (css.getPropertyValue('--txt2') || '#5a6075').trim();
+  var ink3 = (css.getPropertyValue('--txt3') || '#9ba3b8').trim();
+  var teal = (css.getPropertyValue('--teal') || '#06d6a0').trim();
+  var amber = (css.getPropertyValue('--amber') || '#ffa62b').trim();
+  var coral = (css.getPropertyValue('--coral') || '#ff6b6b').trim();
+  var dark = hdIsDark();
+  // ── palette ผ่าน scripts/validate_palette.js ของ skill dataviz แล้ว (adjacent + all-pairs
+  // CVD และ contrast ผ่านทั้ง light/dark) — ดูคอมเมนต์หัว section ด้านบน ──
+  var vzIn = '#4361ee', vzOut = dark ? '#199e70' : '#1baf7a';
+  var vzCat = '#4361ee', vzAssignee = dark ? '#d95926' : '#eb6834', vzHosp = dark ? '#199e70' : '#1baf7a';
+  var tickOpt = { color: ink3, font: { size: 10.5 } };
+  var legendOpt = { labels: { color: ink2, font: { size: 11 }, boxWidth: 10, usePointStyle: true } };
 
-  // trend 14d
+  // trend 14d — 2 series (เข้า/ปิด) ต้องแยกตัวตนจริง ใช้คู่สี categorical
   var days = [];
   for (var i = 13; i >= 0; i--) { var d = new Date(); d.setDate(d.getDate() - i); days.push(d.toISOString().slice(0, 10)); }
   var inD = days.map(function (day) { return all.filter(function (t) { return (t.createdAt || '').slice(0, 10) === day; }).length; });
@@ -985,47 +1043,80 @@ function hdRenderCharts() {
   if (cTrend) window._hdCharts.trend = new Chart(cTrend, {
     type: 'line',
     data: { labels: days.map(function (d) { return d.slice(5); }), datasets: [
-      { label: 'เข้า', data: inD, borderColor: '#4361ee', backgroundColor: '#4361ee22', tension: .3, fill: true },
-      { label: 'ปิด', data: outD, borderColor: '#06d6a0', backgroundColor: '#06d6a022', tension: .3, fill: true },
+      { label: 'เข้า', data: inD, borderColor: vzIn, backgroundColor: hdHexA(vzIn, .13), borderWidth: 2, tension: .3, fill: true, pointRadius: 0, pointHoverRadius: 4 },
+      { label: 'ปิด', data: outD, borderColor: vzOut, backgroundColor: hdHexA(vzOut, .13), borderWidth: 2, tension: .3, fill: true, pointRadius: 0, pointHoverRadius: 4 },
     ] },
-    options: { responsive: true, maintainAspectRatio: false, scales: { x: { grid: { color: grid } }, y: { beginAtZero: true, grid: { color: grid }, ticks: { precision: 0 } } } },
+    options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      plugins: { legend: Object.assign({ position: 'bottom' }, legendOpt) },
+      scales: { x: { grid: { color: grid, display: false }, ticks: tickOpt }, y: { beginAtZero: true, grid: { color: grid }, ticks: Object.assign({ precision: 0 }, tickOpt) } } },
   });
 
-  // by category
-  var cats = (window.HELPDESK_CATEGORIES || []);
+  // by category — magnitude ระหว่างหมวด (แกนมีชื่อกำกับแล้ว) ใช้ hue เดียว sequential
+  var cats = (window.HELPDESK_CATEGORIES || []).slice().sort(function (a, b) { return a.sort - b.sort; });
   var catLabels = cats.map(function (c) { return c.name; }).concat(['(ไม่ระบุ)']);
   var catData = cats.map(function (c) { return all.filter(function (t) { return t.categoryId === c.id; }).length; })
     .concat([all.filter(function (t) { return !t.categoryId; }).length]);
   var cCat = document.getElementById('hd-c-cat');
   if (cCat) window._hdCharts.cat = new Chart(cCat, {
     type: 'bar',
-    data: { labels: catLabels, datasets: [{ label: 'Ticket', data: catData, backgroundColor: '#7c5cfc' }] },
-    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, grid: { color: grid }, ticks: { precision: 0 } }, y: { grid: { display: false } } } },
+    data: { labels: catLabels, datasets: [{ label: 'Ticket', data: catData, backgroundColor: vzCat, borderRadius: 4, maxBarThickness: 22 }] },
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, grid: { color: grid }, ticks: Object.assign({ precision: 0 }, tickOpt) }, y: { grid: { display: false }, ticks: tickOpt } } },
   });
 
-  // priority donut
+  // priority donut — คงสีที่ Admin ตั้งไว้ (identity เดียวกับ badge ทุกจุดในแอป ไม่สุ่ม palette ใหม่)
   var prLabels = (window.HD_PRIORITY || []).map(function (p) { return p.short; });
   var prData = (window.HD_PRIORITY || []).map(function (p) { return all.filter(function (t) { return t.priority === p.id; }).length; });
   var prCol = (window.HD_PRIORITY || []).map(function (p) { return p.color; });
   var cPri = document.getElementById('hd-c-pri');
   if (cPri) window._hdCharts.pri = new Chart(cPri, {
     type: 'doughnut',
-    data: { labels: prLabels, datasets: [{ data: prData, backgroundColor: prCol }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } },
+    data: { labels: prLabels, datasets: [{ data: prData, backgroundColor: prCol, borderWidth: 2, borderColor: (css.getPropertyValue('--surface') || '#fff').trim() }] },
+    options: { responsive: true, maintainAspectRatio: false, cutout: '65%', plugins: { legend: Object.assign({ position: 'bottom' }, legendOpt) } },
   });
 
-  // aging
+  // aging — ไล่ระดับความเร่งด่วนตามโทนสถานะของแอป (teal→amber→coral) ไม่ใช่สีสุ่มรายบัคเก็ต
   var openT = all.filter(function (t) { return hdStatus(t.status).open; });
-  var buckets = (window.HD_AGING || []).map(function (b) { return 0; });
+  var buckets = (window.HD_AGING || []).map(function () { return 0; });
   openT.forEach(function (t) {
     var ageDays = (Date.now() - new Date(t.createdAt || Date.now())) / 864e5;
-    for (var i = 0; i < window.HD_AGING.length; i++) { if (ageDays <= window.HD_AGING[i].maxDays) { buckets[i]++; break; } }
+    for (var j = 0; j < window.HD_AGING.length; j++) { if (ageDays <= window.HD_AGING[j].maxDays) { buckets[j]++; break; } }
   });
+  var agingColors = [teal, amber, hdHexA(coral, .6), coral];
   var cAge = document.getElementById('hd-c-age');
   if (cAge) window._hdCharts.age = new Chart(cAge, {
     type: 'bar',
-    data: { labels: (window.HD_AGING || []).map(function (b) { return b.label; }), datasets: [{ label: 'ค้าง', data: buckets, backgroundColor: ['#06d6a0', '#4361ee', '#ffa62b', '#e5484d'] }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: grid }, ticks: { precision: 0 } } } },
+    data: { labels: (window.HD_AGING || []).map(function (b) { return b.label; }), datasets: [{ label: 'ค้าง', data: buckets, backgroundColor: agingColors, borderRadius: 4, maxBarThickness: 46 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: tickOpt }, y: { beginAtZero: true, grid: { color: grid }, ticks: Object.assign({ precision: 0 }, tickOpt) } } },
+  });
+
+  // ภาระงานตามผู้รับผิดชอบ (เฉพาะ ticket ที่เปิดอยู่) — เน้น "ยังไม่มอบหมาย" ด้วยสี amber (emphasis)
+  var byAssignee = {};
+  openT.forEach(function (t) { var key = t.assigneeId || '__unassigned__'; byAssignee[key] = (byAssignee[key] || 0) + 1; });
+  var assigneeEntries = Object.keys(byAssignee).map(function (id) {
+    return { name: id === '__unassigned__' ? 'ยังไม่มอบหมาย' : ((gSt(id) || {}).name || id), count: byAssignee[id], unassigned: id === '__unassigned__' };
+  }).sort(function (a, b) { return b.count - a.count; }).slice(0, 8);
+  var cAssignee = document.getElementById('hd-c-assignee');
+  if (cAssignee) window._hdCharts.assignee = new Chart(cAssignee, {
+    type: 'bar',
+    data: { labels: assigneeEntries.map(function (e) { return e.name; }),
+      datasets: [{ label: 'เปิดอยู่', data: assigneeEntries.map(function (e) { return e.count; }),
+        backgroundColor: assigneeEntries.map(function (e) { return e.unassigned ? amber : vzAssignee; }), borderRadius: 4, maxBarThickness: 22 }] },
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, grid: { color: grid }, ticks: Object.assign({ precision: 0 }, tickOpt) }, y: { grid: { display: false }, ticks: tickOpt } } },
+  });
+
+  // รพ. ที่แจ้งปัญหาบ่อยที่สุดใน 30 วัน — ช่วยเห็นว่าที่ไหนต้องการความช่วยเหลือมากเป็นพิเศษ
+  var last30 = all.filter(function (t) { return Date.now() - new Date(t.createdAt || 0) < 30 * 864e5; });
+  var byHosp = {};
+  last30.forEach(function (t) { if (!t.hospitalId) return; byHosp[t.hospitalId] = (byHosp[t.hospitalId] || 0) + 1; });
+  var hospEntries = Object.keys(byHosp).map(function (id) {
+    var h = hdHosp(id);
+    return { name: h ? ((h.code ? h.code + ' ' : '') + h.name) : id, count: byHosp[id] };
+  }).sort(function (a, b) { return b.count - a.count; }).slice(0, 8);
+  var cHosp = document.getElementById('hd-c-hosp');
+  if (cHosp) window._hdCharts.hosp = new Chart(cHosp, {
+    type: 'bar',
+    data: { labels: hospEntries.map(function (e) { return e.name; }), datasets: [{ label: 'Ticket', data: hospEntries.map(function (e) { return e.count; }), backgroundColor: vzHosp, borderRadius: 4, maxBarThickness: 22 }] },
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, grid: { color: grid }, ticks: Object.assign({ precision: 0 }, tickOpt) }, y: { grid: { display: false }, ticks: tickOpt } } },
   });
 }
 

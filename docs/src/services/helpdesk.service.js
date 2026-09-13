@@ -1,8 +1,11 @@
 /**
  * helpdesk.service.js — Helpdesk (ศูนย์ช่วยเหลือ): Data Layer
  * ต้องโหลดหลัง db.service.js + helpdesk.config.js
- * ลงทะเบียน onSnapshot ของตัวเองแบบ background (ไม่แตะ realtime.service.js เดิม)
- * เลียนแบบ pattern ของ site-notice-form.service.js
+ * ลงทะเบียน onSnapshot ของตัวเองแบบ background สำหรับ collection ของ helpdesk เอง (ไม่แตะ
+ * realtime.service.js เดิม) เลียนแบบ pattern ของ site-notice-form.service.js — ข้อยกเว้นเดียวคือ
+ * SETTINGS/app: ห้ามเปิด onSnapshot ซ้ำบน doc เดียวกับที่ realtime.service.js subscribe ไว้แล้ว
+ * (Supabase realtime ไม่รองรับ เคยทำให้ ImplTrackerService/FormTrackerService.setup() พังตามไปด้วย)
+ * จึงแค่ export window.hdApplySettingsOverrides ให้ realtime.service.js เรียกกลับมาแทน ──
  */
 (function () {
 
@@ -349,10 +352,13 @@
     _rerenderIfOpen();
   }, function (e) { window.showDbErrorSoft && window.showDbErrorSoft(e, 'SLA Policy'); });
 
-  // ── Override label/color/icon ของ Priority/สถานะ/ความเร่งด่วน — เก็บแยกจาก SETTINGS/app handler
-  // หลักใน realtime.service.js โดยตั้งใจ (ดูคอมเมนต์หัวไฟล์นี้) ฟัง doc เดียวกันได้ซ้ำไม่มีปัญหา ──
-  window.onSnapshot(window.getDocRef('SETTINGS', 'app'), function (snap) {
-    var d = snap.exists() ? snap.data() : {};
+  // ── Override label/color/icon ของ Priority/สถานะ/ความเร่งด่วน — เก็บใน settings.app เอกสารเดียวกับที่
+  // realtime.service.js subscribe ไว้แล้ว (window.SETTINGS) ห้ามเปิด onSnapshot ซ้ำบน doc เดียวกันเด็ดขาด —
+  // Supabase realtime client ไม่รองรับเพิ่ม postgres_changes callback บน channel ที่ subscribe() ไปแล้ว
+  // (พังแบบ throw ตอน setup จนทำให้ ImplTrackerService/FormTrackerService ที่เรียกต่อจากกันไม่ทำงานเลยทั้งคู่)
+  // realtime.service.js จึงเรียก window.hdApplySettingsOverrides(d) แทนหลัง onSnapshot ของมันทำงานทุกครั้ง ──
+  window.hdApplySettingsOverrides = function (d) {
+    d = d || {};
     window._hdOptionOverrides = {
       priority: d.helpdesk_priority_overrides || {},
       status: d.helpdesk_status_overrides || {},
@@ -362,7 +368,7 @@
     window.HD_STATUS   = hdApplyOptionOverrides(window.HD_STATUS_DEFAULTS,   window._hdOptionOverrides.status,   ['label', 'color', 'icon']);
     window.HD_URGENCY  = hdApplyOptionOverrides(window.HD_URGENCY_DEFAULTS,  window._hdOptionOverrides.urgency,  ['label', 'priority']);
     _rerenderIfOpen();
-  }, function () {});
+  };
 
   window.onSnapshot(window.getColRef('HELPDESK_TICKETS'), function (s) {
     window.HELPDESK_TICKETS = s.docs.map(function (doc) { return tTicket(doc.data()); })

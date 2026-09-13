@@ -49,9 +49,9 @@
   ];
 
   window.IMPL_ISSUE_STATUS = [
-    { id:'open',        label:'เปิดอยู่',     color:'#ff6b6b' },
-    { id:'in_progress', label:'กำลังแก้ไข',  color:'#4361ee' },
-    { id:'closed',       label:'ปิดแล้ว',     color:'#06d6a0' },
+    { id:'open',        label:'รอดำเนินการ',    color:'#ff6b6b', icon:'🔴' },
+    { id:'in_progress', label:'กำลังดำเนินการ', color:'#4361ee', icon:'🔵' },
+    { id:'closed',      label:'ดำเนินการแล้ว',  color:'#06d6a0', icon:'✅' },
   ];
 
   window.IMPL_IMPACT = [

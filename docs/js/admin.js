@@ -420,14 +420,11 @@ function renderAdmRoles(c, titleEl) {
   // helper: get perm value
   function getPerm(role, modId, action) {
     if(rp[role] && rp[role][modId] && rp[role][modId][action] !== undefined) return !!rp[role][modId][action];
-    // fallback default — ตรงกับ _roleDefaultPerms ใน config.js
-    var full={view:true,add:true,edit:true,del:true}, ro={view:true,add:false,edit:false,del:false},
-        none={view:false,add:false,edit:false,del:false}, vadd={view:true,add:true,edit:false,del:false};
-    var def = role==='pm'
-      ? {overview:ro,kanban:full,projects:full,advance:full,lodging:full,workload:ro,calendar:full,leave:full,timesheet:ro,cost:ro,availability:ro,holiday:ro,admin:none}
-      : role==='viewer'
-      ? {overview:ro,kanban:ro,projects:none,advance:full,lodging:full,workload:ro,calendar:ro,leave:vadd,timesheet:ro,cost:ro,availability:ro,holiday:none,admin:none}
-      : {overview:ro,kanban:ro,projects:ro,advance:ro,lodging:ro,workload:ro,calendar:ro,leave:ro,timesheet:ro,cost:ro,availability:ro,holiday:none,admin:none};
+    // fallback default — เรียก _roleDefaultPerms ตัวจริงจาก permission.util.js ตรง ๆ (เดิมมีสำเนาแยกไว้ที่นี่
+    // แต่ตกยุคไม่มี impl_tracker/helpdesk/hospital/contract/expense_form/targets ทำให้ checkbox ในหน้านี้
+    // โชว์ "ปิด" ผิดจากสิทธิ์จริงที่แอปใช้ตอน render — พอกด "บันทึกสิทธิ์" ทั้งที่ไม่ได้ตั้งใจแตะ module พวกนี้เลย
+    // ก็จะเขียนทับเป็น false ถาวรใน DB (ต่างจาก undefined ที่ยัง fallback เป็น default ได้) ──
+    var def = (window._roleDefaultPerms && window._roleDefaultPerms(role)) || {};
     return !!(def[modId]||{})[action];
   }
   // ── สิทธิ์ "อนุมัติที่พัก" แยกจาก edit — ถ้ายังไม่เคยตั้งค่านี้ไว้ชัดเจน (undefined) ยึดตามสิทธิ์ "แก้" เดิม
