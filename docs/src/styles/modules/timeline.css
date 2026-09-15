@@ -81,13 +81,17 @@
 ================================================================ */
 /* min-height:0 จำเป็นสำหรับ flex child ที่ต้องเลื่อนเนื้อหาเอง — ไม่งั้น flexbox จะยึดความสูงตามเนื้อหาจริง
    (ยาวเกิน viewport เท่าไหร่ก็ดันสูงตามนั้น) แทนที่จะหดตามพื้นที่ที่เหลือแล้วให้ overflow-y:auto เลื่อนแทน ── */
-.cal-agenda-wrap { display: none; flex: 1; min-height: 0; overflow-y: auto; padding: 12px; -webkit-overflow-scrolling: touch; }
+.cal-agenda-wrap { display: none; flex: 1; min-height: 0; overflow-y: auto; padding: 12px; padding-bottom: max(12px, env(safe-area-inset-bottom, 0px)); -webkit-overflow-scrolling: touch; }
 
 /* ── การ์ดเดียวครอบทั้งรายการ (ไม่ใช่การ์ดแยกต่อแถว) กันเงา/มุมโค้งของแต่ละแถวมาซ้อนกันจนดูเป็น
    "การ์ดซ้อนการ์ด" — คั่นแต่ละแถวด้วยเส้น border-bottom บางๆ แทน ══ */
 .cal-agenda-list {
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--r2);
   box-shadow: var(--sh-sm); overflow: hidden;
+  /* flex-shrink:0 กัน flexbox บีบการ์ดนี้ให้เตี้ยลงจนพอดีพื้นที่ว่าง (เพราะ overflow:hidden ทำให้
+     min-height อัตโนมัติกลายเป็น 0 ตาม spec) — ถ้าไม่กัน รายการที่ยาวเกินจอจะถูกครอบตัดทิ้งเงียบๆ
+     แทนที่จะดันให้ .cal-agenda-wrap ล้นและเลื่อนดูได้จริง ── */
+  flex-shrink: 0;
 }
 .cal-agenda-row { border-bottom: 1px solid var(--border); }
 .cal-agenda-row:last-child { border-bottom: none; }

@@ -97,7 +97,12 @@ window.renderLeave=function(){
   var fDept=(document.getElementById('reg-dept')||{value:''}).value||'';
   var fStaff=(document.getElementById('leave-filter-staff')||{}).value||'';
   var fType=(document.getElementById('leave-filter-type')||{}).value||'';
-  var fStatus=(document.getElementById('leave-filter-status')||{}).value||'';
+  var statusSel=document.getElementById('leave-filter-status');
+  // ค่าเริ่มต้น: แสดงเฉพาะ "รออนุมัติ" — ติ๊ก "แสดงทั้งหมด" เพื่อดูทุกสถานะ (แล้วค่อยเลือกกรองสถานะ
+  // เฉพาะเจาะจงต่อได้จาก dropdown) ปิด dropdown ไว้ตอนไม่ติ๊ก กันเลือกสถานะขัดกับโหมดเริ่มต้น
+  var showAllLV=!!(document.getElementById('leave-show-all')||{}).checked;
+  if(statusSel){statusSel.disabled=!showAllLV;statusSel.parentElement.style.opacity=showAllLV?'':'.55';}
+  var fStatus=showAllLV?((statusSel||{}).value||''):'pending';
   // VIEWER: force own-staff filter + hide dept/staff filter controls (but keep add button)
   var _isViewer=window.cu&&window.cu.role==='viewer';
   var _deptPar=document.getElementById('reg-dept')?document.getElementById('reg-dept').parentElement:null;
@@ -120,6 +125,7 @@ window.renderLeave=function(){
   }).slice().sort(function(a,b){return(b.startDate||'').localeCompare(a.startDate||'');});
   var el=document.getElementById('leave-list');if(!el)return;
   var isPM=window.canEdit('leave'),isAdmin=window.isAdmin();
+  var isMobileLV=window.matchMedia&&window.matchMedia('(max-width:768px)').matches;
   var today=new Date();today.setHours(0,0,0,0);
   var next7=new Date(today);next7.setDate(next7.getDate()+7);
 
@@ -134,7 +140,7 @@ window.renderLeave=function(){
   }).length;
   var totalDays=list.reduce(function(s,l){return s+lvDays(l);},0);
 
-  var statsHtml='<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px;">';
+  var statsHtml='<div class="lv-stats" style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px;">';
   [
     {icon:'⏳',label:'รออนุมัติ',val:cPending,color:'var(--amber)',bg:'rgba(255,166,43,.1)',urgent:cPending>0},
     {icon:'✅',label:'อนุมัติแล้ว',val:cApproved,color:'var(--teal)',bg:'rgba(6,214,160,.1)'},
@@ -142,12 +148,12 @@ window.renderLeave=function(){
     {icon:'📆',label:'กำลังลา/ใน 7 วัน',val:cUpcoming,color:'var(--sky)',bg:'rgba(76,201,240,.1)'},
     {icon:'📅',label:'วันลารวม',val:totalDays+' วัน',color:'var(--violet)',bg:'rgba(124,92,252,.1)'},
   ].forEach(function(s){
-    statsHtml+='<div class="stat-c" style="padding:14px 16px;'+(s.urgent?'border-color:var(--amber);':'')+'">'
-      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
-      +'<div style="width:32px;height:32px;border-radius:9px;background:'+s.bg+';display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">'+s.icon+'</div>'
-      +'<div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;line-height:1.3;">'+s.label+'</div>'
+    statsHtml+='<div class="stat-c lv-stat" style="padding:14px 16px;'+(s.urgent?'border-color:var(--amber);':'')+'">'
+      +'<div class="lv-stat-top" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
+      +'<div class="lv-stat-icon" style="width:32px;height:32px;border-radius:9px;background:'+s.bg+';display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">'+s.icon+'</div>'
+      +'<div class="lv-stat-label" style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;line-height:1.3;">'+s.label+'</div>'
       +'</div>'
-      +'<div style="font-size:20px;font-weight:800;color:'+s.color+';">'+s.val+'</div>'
+      +'<div class="lv-stat-val" style="font-size:20px;font-weight:800;color:'+s.color+';">'+s.val+'</div>'
       +'</div>';
   });
   statsHtml+='</div>';
@@ -196,22 +202,57 @@ window.renderLeave=function(){
 
     var acts='';
     if(lv.status==='approved'){
-      if(isAdmin)acts='<button onclick="window.openLeaveForm(\''+lv.id+'\')" title="แก้ไข" style="'+btnStyle('var(--surface3)','var(--txt2)')+'">✏️</button>'
-        +'<button onclick="window.deleteLeave(\''+lv.id+'\')" title="ลบ" style="'+btnStyle('rgba(255,107,107,.1)','var(--coral)')+'">🗑</button>';
+      if(isAdmin)acts='<button onclick="event.stopPropagation();window.openLeaveForm(\''+lv.id+'\')" title="แก้ไข" style="'+btnStyle('var(--surface3)','var(--txt2)')+'">✏️</button>'
+        +'<button onclick="event.stopPropagation();window.deleteLeave(\''+lv.id+'\')" title="ลบ" style="'+btnStyle('rgba(255,107,107,.1)','var(--coral)')+'">🗑</button>';
       else acts='<span style="font-size:11px;color:var(--txt3);">🔒</span>';
     } else if(lv.status==='pending'){
-      if(isPM)acts='<button onclick="window.approveLeave(\''+lv.id+'\')" title="อนุมัติ" style="'+btnStyle('rgba(6,214,160,.15)','#05b386')+';font-size:12px;font-weight:700;padding:5px 12px;">✅ อนุมัติ</button>';
-      acts+='<button onclick="window.openLeaveForm(\''+lv.id+'\')" title="แก้ไข" style="'+btnStyle('var(--surface3)','var(--txt2)')+'">✏️</button>'
-        +'<button onclick="window.deleteLeave(\''+lv.id+'\')" title="ลบ" style="'+btnStyle('rgba(255,107,107,.1)','var(--coral)')+'">🗑</button>';
+      if(isPM)acts='<button onclick="event.stopPropagation();window.approveLeave(\''+lv.id+'\')" title="อนุมัติ" style="'+btnStyle('rgba(6,214,160,.15)','#05b386')+';font-size:12px;font-weight:700;padding:5px 12px;">✅ อนุมัติ</button>';
+      acts+='<button onclick="event.stopPropagation();window.openLeaveForm(\''+lv.id+'\')" title="แก้ไข" style="'+btnStyle('var(--surface3)','var(--txt2)')+'">✏️</button>'
+        +'<button onclick="event.stopPropagation();window.deleteLeave(\''+lv.id+'\')" title="ลบ" style="'+btnStyle('rgba(255,107,107,.1)','var(--coral)')+'">🗑</button>';
     } else if(lv.status==='rejected'){
-      if(isPM)acts='<button onclick="window.openLeaveForm(\''+lv.id+'\')" title="แก้ไข" style="'+btnStyle('var(--surface3)','var(--txt2)')+'">✏️</button>'
-        +'<button onclick="window.deleteLeave(\''+lv.id+'\')" title="ลบ" style="'+btnStyle('rgba(255,107,107,.1)','var(--coral)')+'">🗑</button>';
+      if(isPM)acts='<button onclick="event.stopPropagation();window.openLeaveForm(\''+lv.id+'\')" title="แก้ไข" style="'+btnStyle('var(--surface3)','var(--txt2)')+'">✏️</button>'
+        +'<button onclick="event.stopPropagation();window.deleteLeave(\''+lv.id+'\')" title="ลบ" style="'+btnStyle('rgba(255,107,107,.1)','var(--coral)')+'">🗑</button>';
     }
 
     var dotHtml=(isActive?'<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--teal);vertical-align:middle;margin-right:3px;" title="กำลังลาอยู่"></span>':'')
       +(isUpcoming&&!isActive?'<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--amber);vertical-align:middle;margin-right:3px;" title="กำลังจะลา"></span>':'');
 
-    return '<div data-leave-id="'+lv.id+'" style="border:1px solid var(--border);border-left:4px solid '+sColor+';border-radius:10px;background:var(--surface);box-shadow:var(--sh-sm);display:flex;align-items:stretch;overflow:hidden;min-width:0;transition:outline .3s,box-shadow .3s;">'
+    // ── Mobile: แถวลิสต์บางๆ แยกจาก markup ของ desktop ไปเลย (ไม่พึ่ง CSS override ทับกัน
+    // ซึ่งพังมาหลายรอบแล้ว) เหลือแค่ ชื่อ+ประเภท+วันที่ กับจำนวนวัน/สถานะ 1 บรรทัดต่อรายการ
+    // ปุ่มจัดการ (อนุมัติ/แก้ไข/ลบ) แสดงเป็นแถบเล็กต่อท้ายเฉพาะเมื่อมีสิทธิ์ทำอะไรได้จริง
+    // กดที่แถวเพื่อดูรายละเอียดเต็ม (ผู้ทำงานแทน/หมายเหตุ) ผ่าน window.openLeaveDetail ── */
+    if(isMobileLV){
+      var mBtns='';
+      if(lv.status==='pending'){
+        if(isPM)mBtns+='<button onclick="event.stopPropagation();window.approveLeave(\''+lv.id+'\')" style="flex:1;padding:7px;border-radius:8px;border:none;background:rgba(6,214,160,.15);color:#05b386;font-weight:700;font-size:12px;font-family:inherit;">✅ อนุมัติ</button>';
+        mBtns+='<button onclick="event.stopPropagation();window.openLeaveForm(\''+lv.id+'\')" style="'+btnStyle('var(--surface3)','var(--txt2)')+'">✏️</button>'
+          +'<button onclick="event.stopPropagation();window.deleteLeave(\''+lv.id+'\')" style="'+btnStyle('rgba(255,107,107,.1)','var(--coral)')+'">🗑</button>';
+      } else if(lv.status==='approved'&&isAdmin){
+        mBtns+='<button onclick="event.stopPropagation();window.openLeaveForm(\''+lv.id+'\')" style="'+btnStyle('var(--surface3)','var(--txt2)')+'">✏️</button>'
+          +'<button onclick="event.stopPropagation();window.deleteLeave(\''+lv.id+'\')" style="'+btnStyle('rgba(255,107,107,.1)','var(--coral)')+'">🗑</button>';
+      } else if(lv.status==='rejected'&&isPM){
+        mBtns+='<button onclick="event.stopPropagation();window.openLeaveForm(\''+lv.id+'\')" style="'+btnStyle('var(--surface3)','var(--txt2)')+'">✏️</button>'
+          +'<button onclick="event.stopPropagation();window.deleteLeave(\''+lv.id+'\')" style="'+btnStyle('rgba(255,107,107,.1)','var(--coral)')+'">🗑</button>';
+      }
+      var hasBtns=!!mBtns;
+      var mRow='<div data-leave-id="'+lv.id+'" onclick="window.openLeaveDetail(\''+lv.id+'\')" style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-left:3px solid '+sColor+';cursor:pointer;'+(hasBtns?'':'border-bottom:1px solid var(--border);')+'">'
+        +'<div style="flex:1;min-width:0;">'
+          +'<div style="display:flex;align-items:center;gap:4px;">'
+            +dotHtml
+            +'<span style="font-size:13.5px;font-weight:700;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(stf.name)+'</span>'
+          +'</div>'
+          +'<div style="font-size:11.5px;color:var(--txt2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(typeLabel)+' · '+fd(lv.startDate)+(sameDates?'':' → '+fd(lv.endDate))+'</div>'
+        +'</div>'
+        +'<div style="flex-shrink:0;text-align:right;">'
+          +'<div style="font-size:15px;font-weight:800;color:var(--violet);line-height:1.15;">'+days+'<span style="font-size:10px;font-weight:600;color:var(--txt3);"> วัน</span></div>'
+          +'<div style="font-size:10px;font-weight:700;color:'+sColor+';white-space:nowrap;margin-top:1px;">'+sLabel+'</div>'
+        +'</div>'
+      +'</div>';
+      var mActs=hasBtns?('<div style="display:flex;gap:6px;padding:0 12px 9px;border-left:3px solid '+sColor+';border-bottom:1px solid var(--border);">'+mBtns+'</div>'):'';
+      return mRow+mActs;
+    }
+
+    return '<div data-leave-id="'+lv.id+'" onclick="window.openLeaveDetail(\''+lv.id+'\')" style="border:1px solid var(--border);border-left:4px solid '+sColor+';border-radius:10px;background:var(--surface);box-shadow:var(--sh-sm);display:flex;align-items:stretch;overflow:hidden;min-width:0;cursor:pointer;transition:outline .3s,box-shadow .3s;">'
       // Avatar strip
       +'<div style="width:52px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;padding:14px 0 12px;gap:6px;">'
         +'<div style="width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,'+ac[0]+','+ac[1]+');display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;">'+initial+'</div>'
@@ -272,10 +313,14 @@ window.renderLeave=function(){
           +(dRejected>0?'<span style="padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700;background:rgba(255,107,107,.12);color:var(--coral);">❌ '+dRejected+'</span>':'')
         +'</div>'
       +'</div>'
-      // Cards grid for this dept
-      +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:8px;">'
-        +items.map(function(x){var h=makeCard(x.lv,x.stf,globalIdx);globalIdx++;return h;}).join('')
-      +'</div>'
+      // Cards for this dept — มือถือ: ลิสต์แถวบางในกล่องเดียว / desktop: กริดการ์ด
+      +(isMobileLV
+        ?'<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);overflow:hidden;">'
+          +items.map(function(x){var h=makeCard(x.lv,x.stf,globalIdx);globalIdx++;return h;}).join('')
+        +'</div>'
+        :'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:8px;">'
+          +items.map(function(x){var h=makeCard(x.lv,x.stf,globalIdx);globalIdx++;return h;}).join('')
+        +'</div>')
     +'</div>';
   });
 

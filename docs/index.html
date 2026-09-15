@@ -617,12 +617,12 @@
         <!-- Filters + leave cards -->
         <div id="leave-panel-register" style="overflow-y:auto;flex:1;">
           <div style="padding:14px 24px 0;">
-            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px 18px;display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
-              <div>
+            <div class="lv-filter-bar" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px 18px;display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
+              <div class="lv-filter-item">
                 <div class="ldb-lbl">ปี</div>
                 <select class="t-sel" id="reg-year" onchange="window.renderLeave()"></select>
               </div>
-              <div>
+              <div class="lv-filter-item">
                 <div class="ldb-lbl">เดือน</div>
                 <select class="t-sel" id="reg-month" onchange="window.renderLeave()">
                   <option value="">ทุกเดือน</option>
@@ -632,19 +632,19 @@
                   <option value="10">ต.ค.</option><option value="11">พ.ย.</option><option value="12">ธ.ค.</option>
                 </select>
               </div>
-              <div>
+              <div class="lv-filter-item">
                 <div class="ldb-lbl">แผนก</div>
                 <select class="t-sel" id="reg-dept" onchange="window.regDeptChange()">
                   <option value="">ทุกแผนก</option>
                 </select>
               </div>
-              <div>
+              <div class="lv-filter-item">
                 <div class="ldb-lbl">พนักงาน</div>
                 <select class="t-sel" id="leave-filter-staff" onchange="window.renderLeave()">
                   <option value="">ทุกคน</option>
                 </select>
               </div>
-              <div>
+              <div class="lv-filter-item">
                 <div class="ldb-lbl">ประเภทการลา</div>
                 <select class="t-sel" id="leave-filter-type" onchange="window.renderLeave()">
                   <option value="">ทุกประเภท</option>
@@ -656,7 +656,7 @@
                   <option value="other">📝 อื่นๆ</option>
                 </select>
               </div>
-              <div>
+              <div class="lv-filter-item">
                 <div class="ldb-lbl">สถานะ</div>
                 <select class="t-sel" id="leave-filter-status" onchange="window.renderLeave()">
                   <option value="">ทุกสถานะ</option>
@@ -665,7 +665,10 @@
                   <option value="rejected">❌ ไม่อนุมัติ</option>
                 </select>
               </div>
-              <div style="margin-left:auto;align-self:flex-end;">
+              <label class="lv-filter-item" style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--txt2);cursor:pointer;white-space:nowrap;align-self:center;">
+                <input type="checkbox" id="leave-show-all" onchange="window.renderLeave()"> แสดงทั้งหมด
+              </label>
+              <div class="lv-filter-xls" style="margin-left:auto;align-self:flex-end;">
                 <button class="btn btn-xls btn-sm" onclick="window.exportLeaves()" title="Export Excel">📥 Excel</button>
               </div>
             </div>
