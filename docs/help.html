@@ -39,26 +39,96 @@
   @media (max-width:640px){ input,select,textarea{font-size:16px} }
   .req{color:var(--bad);font-weight:700}
   textarea{resize:vertical}
-  button{font:inherit;font-weight:600;cursor:pointer;border:none;border-radius:10px;padding:10px 18px}
+  button{font:inherit;font-weight:600;cursor:pointer;border:none;border-radius:10px;padding:11px 18px;min-height:44px}
   .btn-pri{background:var(--accent);color:#fff}
   .btn-ghost{background:transparent;border:1px solid var(--line);color:var(--ink2)}
   .row{display:flex;gap:16px;flex-wrap:wrap;align-items:start}
   .col{flex:1;min-width:260px}
-  .pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:700}
   .muted{color:var(--ink3);font-size:12px}
-  .tl{list-style:none;margin:0;padding:0}
-  .tl li{padding:10px 0;border-bottom:1px dashed var(--line)}
-  .tl li:last-child{border-bottom:none}
-  .tl .who{font-size:11px;color:var(--ink3)}
-  .tl .body{white-space:pre-wrap;font-size:14px}
-  .tl .mine{color:var(--accent)}
-  .stars{font-size:30px;letter-spacing:6px;cursor:pointer;user-select:none;color:var(--ink3)}
-  .stars b{color:var(--warn);font-weight:400}
+  .stars{display:inline-flex;gap:6px}
+  .stars .star{font-size:34px;line-height:1;padding:2px;background:none;border:none;cursor:pointer;
+    color:var(--line);min-height:auto;transition:color .15s,transform .1s}
+  .stars .star:hover{transform:scale(1.15)}
+  .stars .star.filled{color:var(--warn)}
   .hidden{display:none}
   .notice{padding:14px 16px;border-radius:10px;background:var(--accent-soft);color:var(--ink);font-size:13.5px}
   .err{background:rgba(229,72,77,.12);color:var(--bad)}
   .ok{background:rgba(15,157,110,.12);color:var(--ok)}
   a{color:var(--accent)}
+
+  /* ── หน้า "รับเรื่องแล้ว" หลังส่งฟอร์มสำเร็จ ── */
+  .success-card{text-align:center;padding:32px 24px}
+  .success-icon{width:60px;height:60px;border-radius:50%;background:rgba(15,157,110,.14);color:var(--ok);
+    display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:700;margin:0 auto 16px;
+    animation:success-pop .35s cubic-bezier(.34,1.56,.64,1)}
+  @keyframes success-pop{from{transform:scale(0);opacity:0}to{transform:scale(1);opacity:1}}
+  .success-card h2{font-size:18px;margin:0 0 6px}
+  .success-ticket{display:inline-block;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12.5px;
+    letter-spacing:.03em;color:var(--accent);background:var(--accent-soft);padding:4px 12px;border-radius:999px;margin-bottom:14px}
+  .success-desc{color:var(--ink2);font-size:13.5px;line-height:1.6;margin:0 0 20px}
+  .link-box{display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--line);
+    border-radius:11px;padding:9px 9px 9px 14px;margin-bottom:20px;text-align:left}
+  .link-box input{flex:1;min-width:0;border:none;background:transparent;padding:0;font-size:12.5px;
+    color:var(--ink2);font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+  .link-box input:focus{outline:none}
+  .link-copy-btn{flex-shrink:0;min-height:auto;background:var(--surface);border:1px solid var(--line);
+    border-radius:8px;padding:8px 10px;font-size:13px;color:var(--ink2);transition:background .15s,color .15s,border-color .15s}
+  .link-copy-btn.copied{background:rgba(15,157,110,.14);border-color:transparent;color:var(--ok)}
+  .success-card .btn-pri{text-decoration:none;display:inline-flex;align-items:center;gap:7px;padding:12px 28px}
+
+  /* ── การ์ดสรุปผล — โชว์บนสุดตอนงานเสร็จแล้ว ให้ผู้ประเมินเห็นภาพรวมได้ในแวบเดียว ── */
+  .summary-card{border-color:rgba(15,157,110,.35)}
+  .summary-card h2{color:var(--ok)}
+  .summary-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px 20px}
+  @media (max-width:480px){ .summary-grid{grid-template-columns:1fr} }
+  .summary-grid .k{font-size:11px;color:var(--ink3);font-weight:600;margin-bottom:2px}
+  .summary-grid .v{font-size:14px;color:var(--ink)}
+  .summary-note{margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+  .summary-note .k{font-size:11px;color:var(--ink3);font-weight:600;margin-bottom:6px}
+  .summary-note .v{font-size:13.5px;line-height:1.6;background:var(--bg);padding:10px 13px;border-radius:10px;white-space:pre-wrap}
+
+  /* ── Ticket header: badges + stepper + info grid ── */
+  .t-card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px;margin-bottom:16px}
+  .t-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+  .t-no{font-size:11px;color:var(--ink3);font-weight:700;letter-spacing:.03em}
+  .t-subject{font-size:19px;font-weight:700;margin-top:3px;line-height:1.35}
+  .badges{display:flex;gap:6px;flex-wrap:wrap}
+  .badge{display:inline-flex;align-items:center;padding:4px 11px;border-radius:999px;font-size:12.5px;font-weight:700;white-space:nowrap}
+
+  .stepper{display:flex;margin:22px 0 4px}
+  .step{flex:1;text-align:center;position:relative;font-size:11px;color:var(--ink3)}
+  .step::before{content:'';position:absolute;top:13px;left:-50%;width:100%;height:2px;background:var(--line);z-index:1}
+  .step:first-child::before{display:none}
+  .step .sd{width:26px;height:26px;border-radius:50%;background:var(--bg);border:2px solid var(--line);
+    display:flex;align-items:center;justify-content:center;margin:0 auto 6px;font-size:12px;font-weight:800;color:var(--ink3);
+    position:relative;z-index:2;transition:background .2s,border-color .2s}
+  .step .sl{display:block;padding:0 2px;line-height:1.3}
+  .step.done .sd{background:var(--ok);border-color:var(--ok);color:#fff}
+  .step.done::before{background:var(--ok)}
+  .step.done .sl{color:var(--ink2)}
+  .step.now .sd{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 0 0 4px var(--accent-soft)}
+  .step.now .sl{color:var(--ink);font-weight:700}
+
+  .alert-wait{display:flex;gap:10px;align-items:center;padding:12px 14px;border-radius:11px;
+    background:rgba(201,130,12,.12);color:var(--warn);font-size:13.5px;font-weight:600;margin-top:16px}
+
+  .info-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px 20px;margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
+  @media (max-width:480px){ .info-grid{grid-template-columns:1fr} }
+  .info-grid .k{font-size:11px;color:var(--ink3);font-weight:600;margin-bottom:2px}
+  .info-grid .v{font-size:14px;color:var(--ink)}
+  .desc-box{margin-top:16px;padding:14px 16px;background:var(--bg);border-radius:11px;white-space:pre-wrap;font-size:14px;line-height:1.6}
+
+  /* ── Timeline (vertical, icon per event) ── */
+  .tl2{list-style:none;margin:0;padding:0}
+  .tl2 li{position:relative;padding:0 0 20px 40px}
+  .tl2 li:not(:last-child)::before{content:'';position:absolute;left:14px;top:29px;bottom:0;width:2px;background:var(--line)}
+  .tl2 li:last-child{padding-bottom:0}
+  .tl2 .ic{position:absolute;left:0;top:0;width:29px;height:29px;border-radius:50%;background:var(--accent-soft);
+    display:flex;align-items:center;justify-content:center;font-size:14px}
+  .tl2 .who{font-size:12px;color:var(--ink3);margin-bottom:4px;padding-top:5px}
+  .tl2 .who b{color:var(--ink2);font-weight:700}
+  .tl2 .who.mine b{color:var(--accent)}
+  .tl2 .body{white-space:pre-wrap;font-size:14px;background:var(--bg);padding:10px 13px;border-radius:10px}
 </style>
 </head>
 <body>
@@ -73,6 +143,9 @@
 <script src="env-config.js"></script>
 <!-- PostgREST client library (supabase-js UMD) — exposes window.supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<!-- ใช้แค่ default array ของความเร่งด่วน (HD_URGENCY_DEFAULTS) ให้ตรงกับหน้า "+ แจ้งแทน" ในแอปหลัก
+     ไฟล์นี้เป็นแค่ constant ล้วน ไม่มี side-effect/dependency กับไฟล์อื่น จึงโหลดในหน้า public นี้ได้ปลอดภัย -->
+<script src="src/config/helpdesk.config.js"></script>
 <script>
 (function () {
   var app = document.getElementById('app');
@@ -94,7 +167,27 @@
     pending_user:{l:'รอข้อมูลจากคุณ',c:'#c9820c'}, resolved:{l:'แก้ไขเรียบร้อย',c:'#0f9d6e'},
     closed:{l:'ปิดงาน',c:'#5b6377'}, reopened:{l:'เปิดเรื่องใหม่',c:'#e5484d'}, cancelled:{l:'ยกเลิก',c:'#8a90a0'}
   };
-  var PRIO = { p1:'เร่งด่วนมาก', p2:'เร่งด่วน', p3:'ปกติ', p4:'ต่ำ' };
+  var PRIO = {
+    p1:{l:'เร่งด่วนมาก',c:'#e5484d'}, p2:{l:'เร่งด่วน',c:'#c9820c'},
+    p3:{l:'ปกติ',c:'#4361ee'}, p4:{l:'ต่ำ',c:'#5b6377'}
+  };
+  // ── Stepper แบบง่าย 4 ขั้น ครอบสถานะทั้งหมด (cancelled ไม่เข้าลำดับ แสดงเป็น badge แยก) ──
+  var STEPS = ['รับเรื่อง', 'มอบหมายแล้ว', 'กำลังดำเนินการ', 'เสร็จสิ้น'];
+  function stepOf(status) {
+    if (status === 'new' || status === 'triage') return 0;
+    if (status === 'assigned') return 1;
+    if (status === 'in_progress' || status === 'pending_user' || status === 'reopened') return 2;
+    if (status === 'resolved' || status === 'closed') return 3;
+    return -1;
+  }
+  function stepperHtml(status) {
+    var idx = stepOf(status);
+    if (idx < 0) return '';
+    return '<div class="stepper">' + STEPS.map(function (label, i) {
+      var cls = i < idx ? 'done' : (i === idx ? 'now' : '');
+      return '<div class="step ' + cls + '"><div class="sd">' + (i < idx ? '✓' : (i + 1)) + '</div><span class="sl">' + esc(label) + '</span></div>';
+    }).join('') + '</div>';
+  }
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
   function dt(s){ if(!s) return '-'; var d=new Date(s); if(isNaN(d)) return '-';
     return d.getDate()+'/'+(d.getMonth()+1)+'/'+(d.getFullYear()+543)+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
@@ -230,9 +323,52 @@
     }).join('')+'</div>';
   }
 
+  // ความเร่งด่วน — ดึงจาก default array เดียวกับหน้า "+ แจ้งแทน" ในแอปหลัก (window.HD_URGENCY_DEFAULTS
+  // จาก helpdesk.config.js) แล้ว merge กับ override ที่ Admin ตั้งไว้ (settings.app.helpdesk_urgency_overrides)
+  // เรียงจาก Priority ต่ำสุดมาก่อนเหมือนกัน — ตรงกับ hdOpenModal ใน js/helpdesk.js
+  async function loadUrgencyOptions() {
+    var overrides = {};
+    try {
+      var r = await db.from('settings').select('helpdesk_urgency_overrides,notify_helpdesk_token').eq('id', 'app').limit(1);
+      if (r.data && r.data[0]) {
+        overrides = r.data[0].helpdesk_urgency_overrides || {};
+        _hdNotifyToken = r.data[0].notify_helpdesk_token || '';
+      }
+    } catch (e) {}
+    var defaults = window.HD_URGENCY_DEFAULTS || [];
+    var merged = defaults.map(function (base) {
+      var ov = overrides[base.id], out = Object.assign({}, base);
+      if (ov) ['label', 'priority'].forEach(function (f) { if (ov[f] !== undefined && ov[f] !== null && String(ov[f]) !== '') out[f] = ov[f]; });
+      return out;
+    });
+    return merged.sort(function (a, b) { return parseInt(b.priority.slice(1), 10) - parseInt(a.priority.slice(1), 10); });
+  }
+
+  // ── ปุ่ม "โทรด่วน" (Jitsi) — trigger ที่ priority ของความเร่งด่วน "ทำงานไม่ได้เลย" (blocked) ──
+  var _criticalPriority = 'p2';
+  function setCriticalPriority(urg) {
+    var u = (urg || []).find(function (x) { return x.id === 'blocked'; });
+    _criticalPriority = (u && u.priority) || 'p2';
+  }
+  function jitsiUrl(ticketNo) { return 'https://jitsi1.hosxp.net/' + encodeURIComponent(ticketNo); }
+  // Token ตั้งค่าที่ Admin Panel → 🔔 ตั้งค่าการแจ้งเตือน (settings.notify_helpdesk_token) — โหลดมาพร้อม
+  // loadUrgencyOptions() ด้านบน · หน้านี้ไม่มี login เหมือนแอปหลัก แต่ RLS ของตาราง settings เปิดกว้าง
+  // (anon อ่านได้อยู่แล้วเหมือน token แจ้งเตือนอื่น ๆ ของระบบ) จึงเรียกยิง BMS Notify ตรง ๆ ได้เลย
+  var _hdNotifyToken = '';
+  async function sendHdUrgentNotify(content) {
+    if (!_hdNotifyToken) return;
+    try {
+      await fetch('https://api-notify.bmscloud.in.th/api/v1/push-notify', {
+        method: 'POST',
+        headers: { 'Token': _hdNotifyToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: content, receiver: null })
+      });
+    } catch (e) {}
+  }
+
   // ══ NEW: ฟอร์มให้ลูกค้าแจ้งเอง ══
   async function renderNew() {
-    var hosp = [], cats = [], syss = [];
+    var hosp = [], cats = [], syss = [], urg = [];
     try {
       var hr = await db.from('hospitals').select('id,name,code').order('name');
       hosp = hr.data || [];
@@ -241,16 +377,19 @@
       // "ระบบที่ใช้งาน" ดึงจากคลัง Product เดิม (hsp_products) ไม่มีรายการแยกของตัวเอง
       var sr = await db.from('hsp_products').select('*').order('name');
       syss = sr.data || [];
+      urg = await loadUrgencyOptions();
+      setCriticalPriority(urg);
     } catch (e) {}
     app.innerHTML =
       '<div class="card"><h2>แจ้งปัญหาการใช้งานระบบ</h2>'
       + '<label>โรงพยาบาล <span class="req">*</span></label>' + comboMarkup('f-hosp', 'พิมพ์ค้นหาชื่อโรงพยาบาล...')
-      + '<div class="row"><div class="col"><label>ชื่อ–นามสกุล</label><input id="f-name"></div>'
-      + '<div class="col"><label>เบอร์ติดต่อ / LINE (ไม่บังคับ)</label><input id="f-phone"></div></div>'
-      + '<div class="row"><div class="col"><label>ระบบที่ใช้งาน</label>' + comboMarkup('f-sys', 'พิมพ์ค้นหาระบบที่ใช้งาน...') + '</div>'
-      + '<div class="col"><label>ประเภทปัญหา</label><select id="f-cat"><option value="">—</option>'
+      + '<div class="row"><div class="col"><label>ชื่อ–นามสกุล <span class="req">*</span></label><input id="f-name"></div>'
+      + '<div class="col"><label>เบอร์ติดต่อ / LINE <span class="req">*</span></label><input id="f-phone"></div></div>'
+      + '<div class="row"><div class="col"><label>ระบบที่ใช้งาน <span class="req">*</span></label>' + comboMarkup('f-sys', 'พิมพ์ค้นหาระบบที่ใช้งาน...') + '</div>'
+      + '<div class="col"><label>ประเภทปัญหา <span class="req">*</span></label><select id="f-cat"><option value="">--เลือกหมวดปัญหา--</option>'
       + cats.map(function(c){ return '<option value="'+c.id+'" data-pri="'+c.default_priority+'">'+esc(c.name)+'</option>'; }).join('') + '</select></div></div>'
-      + '<label>ความเร่งด่วน</label><select id="f-urg"><option value="p3">ทำงานได้แต่มีปัญหา</option><option value="p2">ทำงานไม่ได้เลย</option><option value="p4">สอบถาม / ขอปรับแต่ง</option></select>'
+      + '<label>ความเร่งด่วน <span class="req">*</span></label><select id="f-urg">'
+      + urg.map(function(u,i){ return '<option value="'+u.priority+'"'+(i===0?' selected':'')+'>'+esc(u.label)+'</option>'; }).join('') + '</select>'
       + '<label>รายละเอียดปัญหา <span class="req">*</span></label><textarea id="f-desc" rows="5" placeholder="เกิดตอนไหน เมนูใด ข้อความ error ที่พบ"></textarea>'
       + '<label>แนบรูป / ไฟล์ (ไม่บังคับ · เลือกได้หลายไฟล์)</label><input type="file" id="f-files" multiple accept="'+ATT_ACCEPT+'">'
       + '<div class="muted" style="margin-top:3px">'+esc(ATT_HINT)+'</div>'
@@ -282,12 +421,24 @@
 
   async function submitNew() {
     var hospEl = document.getElementById('f-hosp'), hospVisEl = document.getElementById('f-hosp-inp'), descEl = document.getElementById('f-desc');
+    var nameEl = document.getElementById('f-name'), phoneEl = document.getElementById('f-phone');
+    var sysEl = document.getElementById('f-sys'), sysVisEl = document.getElementById('f-sys-inp');
+    var catEl = document.getElementById('f-cat'), urgEl = document.getElementById('f-urg');
     var hospId = hospEl.value;
     var desc = descEl.value.trim();
+    var name = nameEl.value.trim();
+    var phone = phoneEl.value.trim();
+    var sysVal = sysEl.value;
+    var catVal = catEl.value;
     var msg = document.getElementById('f-msg');
     function show(t, cls){ msg.className = 'notice ' + (cls||''); msg.textContent = t; msg.classList.remove('hidden'); }
     var miss = [];
     markInv(hospVisEl, !hospId); if(!hospId) miss.push(hospVisEl);
+    markInv(nameEl, !name); if(!name) miss.push(nameEl);
+    markInv(phoneEl, !phone); if(!phone) miss.push(phoneEl);
+    markInv(sysVisEl, !sysVal); if(!sysVal) miss.push(sysVisEl);
+    markInv(catEl, !catVal); if(!catVal) miss.push(catEl);
+    markInv(urgEl, !urgEl.value); if(!urgEl.value) miss.push(urgEl);
     markInv(descEl, !desc);   if(!desc)   miss.push(descEl);
     if (miss.length) { show('กรุณากรอกข้อมูลที่จำเป็น (มี * สีแดง) ให้ครบ', 'err'); if(miss[0].focus) miss[0].focus(); return; }
     var btn = document.getElementById('f-send'); btn.disabled = true; btn.textContent = 'กำลังส่ง...';
@@ -298,16 +449,16 @@
       var prefix = 'HD' + be2 + mm;
       var ex = await db.from('helpdesk_tickets').select('ticket_no').like('ticket_no', prefix + '%');
       var max = 0; (ex.data || []).forEach(function(r){ var n = parseInt((r.ticket_no||'').slice(prefix.length),10); if(!isNaN(n)&&n>max) max=n; });
-      var priority = document.getElementById('f-urg').value || 'p3';
+      var priority = urgEl.value || 'p3';
       var row = {
         id: 'HD' + Date.now() + Math.floor(Math.random()*1000),
         ticket_no: prefix + String(max + 1).padStart(4,'0'),
         channel: 'web',
         hospital_id: hospId,
-        reporter_name: document.getElementById('f-name').value.trim(),
-        reporter_phone: document.getElementById('f-phone').value.trim(),
-        source_system: document.getElementById('f-sys').value || '',
-        category_id: document.getElementById('f-cat').value || '',
+        reporter_name: name,
+        reporter_phone: phone,
+        source_system: sysVal,
+        category_id: catVal,
         subject: desc.slice(0, 60),
         description: desc,
         priority: priority,
@@ -319,6 +470,16 @@
       };
       var ins = await db.from('helpdesk_tickets').insert(row);
       if (ins.error) throw ins.error;
+      if (priority === _criticalPriority) {
+        sendHdUrgentNotify(
+          '🔴 **ตั๋วด่วนที่สุด — ทำงานไม่ได้เลย**'
+          + '\n🎫 เลขที่: **' + row.ticket_no + '**'
+          + '\n🏢 โรงพยาบาล: ' + ((hospVisEl && hospVisEl.value) || '-')
+          + '\n👤 ผู้แจ้ง: ' + name + (phone ? ' · ' + phone : '')
+          + '\n📝 ' + desc.slice(0, 200)
+          + '\n📞 เข้าร่วมคุยสด: ' + jitsiUrl(row.ticket_no)
+        );
+      }
       var sysEvId = 'HDE' + Date.now() + Math.floor(Math.random()*1000);
       await db.from('helpdesk_ticket_events').insert({
         id: sysEvId,
@@ -327,11 +488,23 @@
       });
       try { await uploadAtts(row.id, sysEvId, document.getElementById('f-files').files); } catch (ue) {}
       var url = new URL('help.html?t=' + encodeURIComponent(row.access_token), location.href).href;
-      app.innerHTML = '<div class="card"><h2>✅ รับเรื่องแล้ว — เลขที่ ' + esc(row.ticket_no) + '</h2>'
-        + '<p>บันทึกลิงก์นี้ไว้ติดตามสถานะและตอบข้อมูลเพิ่มเติม ทีมงานจะติดต่อกลับ</p>'
-        + '<p><a href="' + esc(url) + '">' + esc(url) + '</a></p>'
-        + '<div style="margin-top:12px"><button class="btn-ghost" onclick="navigator.clipboard&&navigator.clipboard.writeText(\'' + url + '\')">คัดลอกลิงก์</button> '
-        + '<a class="btn-pri" style="text-decoration:none;display:inline-block" href="' + esc(url) + '">เปิดหน้าติดตาม</a></div></div>';
+      app.innerHTML =
+        '<div class="card success-card">'
+        + '<div class="success-icon">✓</div>'
+        + '<h2>รับเรื่องเรียบร้อยแล้ว</h2>'
+        + '<div class="success-ticket">เลขที่ตั๋ว ' + esc(row.ticket_no) + '</div>'
+        + '<p class="success-desc">บันทึกลิงก์นี้ไว้ติดตามสถานะและตอบข้อมูลเพิ่มเติม<br>ทีมงานจะติดต่อกลับโดยเร็วที่สุด</p>'
+        + '<div class="link-box"><input id="track-url-inp" readonly value="' + esc(url) + '" onclick="this.select()">'
+        + '<button class="link-copy-btn" id="track-copy-btn" type="button" title="คัดลอกลิงก์">📋 คัดลอก</button></div>'
+        + '<a class="btn-pri" href="' + esc(url) + '">📍 เปิดหน้าติดตาม</a>'
+        + '</div>';
+      document.getElementById('track-copy-btn').onclick = function () {
+        var b = this;
+        navigator.clipboard && navigator.clipboard.writeText(url).then(function () {
+          b.textContent = '✅ คัดลอกแล้ว'; b.classList.add('copied');
+          setTimeout(function () { b.textContent = '📋 คัดลอก'; b.classList.remove('copied'); }, 2000);
+        });
+      };
     } catch (e) {
       show('ส่งเรื่องไม่สำเร็จ กรุณาลองใหม่', 'err');
       btn.disabled = false; btn.textContent = 'ส่งเรื่อง';
@@ -340,6 +513,7 @@
 
   // ══ TRACK: ติดตาม + ตอบกลับ + ประเมิน ══
   var _ticket = null;
+  var _ticketHospName = '';
 
   async function loadTrack() {
     try {
@@ -355,35 +529,77 @@
       app.innerHTML = '<div class="notice">ลิงก์ติดตามนี้หมดอายุแล้ว (เรื่องปิดเกิน 30 วัน) หากยังมีปัญหากรุณาแจ้งใหม่</div>';
       return;
     }
-    var evs = [], atts = [];
+    var evs = [], atts = [], hospName = '', catName = '';
     try {
       var er = await db.from('helpdesk_ticket_events').select('*')
         .eq('ticket_id', _ticket.id).eq('is_internal', false).order('created_at', { ascending: true });
       evs = er.data || [];
       var ar = await db.from('helpdesk_attachments').select('*').eq('ticket_id', _ticket.id).order('created_at', { ascending: true });
       atts = ar.data || [];
+      if (_ticket.hospital_id) {
+        var hr = await db.from('hospitals').select('name,code').eq('id', _ticket.hospital_id).limit(1);
+        if (hr.data && hr.data[0]) hospName = (hr.data[0].code ? hr.data[0].code + ' ' : '') + hr.data[0].name;
+      }
+      if (_ticket.category_id) {
+        var cr = await db.from('helpdesk_categories').select('name').eq('id', _ticket.category_id).limit(1);
+        if (cr.data && cr.data[0]) catName = cr.data[0].name;
+      }
+      setCriticalPriority(await loadUrgencyOptions());
     } catch (e) {}
-    renderTrack(evs, atts);
+    renderTrack(evs, atts, hospName, catName);
   }
 
-  function renderTrack(evs, atts) {
+  function renderTrack(evs, atts, hospName, catName) {
+    _ticketHospName = hospName || '';
     var attByEv = {};
     (atts || []).forEach(function (a) { (attByEv[a.event_id || ''] = attByEv[a.event_id || ''] || []).push(a); });
     var t = _ticket;
     var st = STATUS[t.status] || { l: t.status, c: '#8a90a0' };
+    var pr = PRIO[t.priority] || { l: t.priority, c: '#8a90a0' };
     var canRate = (t.status === 'resolved' || t.status === 'closed') && !t.rated_at;
     var closedish = t.status === 'closed' || t.status === 'cancelled';
+    var isDone = t.status === 'resolved' || t.status === 'closed'; // งานเสร็จแล้ว (ไม่รวม cancelled ซึ่งไม่มีผลงานให้สรุป)
+    var inactive = closedish || t.status === 'resolved'; // ปิดงานแล้วไม่ว่าด้วยเหตุผลใด — ใช้ซ่อนฟีเจอร์ที่ทำได้เฉพาะตอนงานยังเปิดอยู่
+
+    var lastStaffNote = '';
+    (evs || []).slice().reverse().some(function (e) {
+      if (e.type === 'comment' && e.actor_type !== 'reporter') { lastStaffNote = e.body || ''; return true; }
+      return false;
+    });
+    function fmtDuration(startIso, endIso) {
+      if (!startIso || !endIso) return '-';
+      var mins = Math.round((new Date(endIso) - new Date(startIso)) / 60000);
+      if (isNaN(mins) || mins < 0) return '-';
+      var days = Math.floor(mins / 1440), hrs = Math.floor((mins % 1440) / 60), m = mins % 60;
+      var parts = [];
+      if (days) parts.push(days + ' วัน');
+      if (hrs) parts.push(hrs + ' ชม.');
+      if (!days && m) parts.push(m + ' นาที');
+      return parts.length ? parts.join(' ') : 'ไม่ถึง 1 นาที';
+    }
+    var summaryCard = isDone ? (
+      '<div class="card summary-card"><h2>✅ สรุปผลการช่วยเหลือ</h2>'
+      + '<div class="summary-grid">'
+      + '<div><div class="k">เรื่อง</div><div class="v">' + esc(t.subject || '-') + '</div></div>'
+      + '<div><div class="k">โรงพยาบาล</div><div class="v">' + esc(hospName || '-') + '</div></div>'
+      + '<div><div class="k">แจ้งเมื่อ</div><div class="v">' + dt(t.created_at) + '</div></div>'
+      + '<div><div class="k">' + (t.status === 'closed' ? 'ปิดงานเมื่อ' : 'แก้ไขเสร็จเมื่อ') + '</div><div class="v">' + dt(t.resolved_at || t.closed_at) + '</div></div>'
+      + '<div><div class="k">ระยะเวลาดำเนินการ</div><div class="v">' + fmtDuration(t.created_at, t.resolved_at || t.closed_at) + '</div></div>'
+      + '</div>'
+      + (lastStaffNote ? '<div class="summary-note"><div class="k">สรุปจากทีมงาน</div><div class="v">' + esc(lastStaffNote) + '</div></div>' : '')
+      + '</div>'
+    ) : '';
 
     var rateCard = canRate ? (
       '<div class="card" id="rate-card"><h2>ให้คะแนนการช่วยเหลือครั้งนี้</h2>'
-      + '<div class="stars" id="stars" data-v="0">☆☆☆☆☆</div>'
+      + '<div class="stars" id="stars" data-v="0">' + [1,2,3,4,5].map(function(i){ return '<button type="button" class="star" data-i="'+i+'">★</button>'; }).join('') + '</div>'
       + '<label>ความคิดเห็นเพิ่มเติม (ไม่บังคับ)</label><textarea id="rate-cm" rows="2"></textarea>'
       + '<label style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="rate-rec" style="width:auto"> แนะนำบริการนี้ให้เพื่อนร่วมงาน</label>'
       + '<div id="rate-msg" class="hidden" style="margin-top:10px"></div>'
       + '<div style="margin-top:14px"><button class="btn-pri" id="rate-send">ส่งคะแนน</button></div></div>'
-    ) : (t.rated_at ? '<div class="card ok notice">ขอบคุณสำหรับคะแนน ' + (t.csat_score || '') + '/5</div>' : '');
+    ) : (t.rated_at ? '<div class="card ok notice">🙏 ขอบคุณสำหรับคะแนน ' + (t.csat_score || 0) + '/5</div>' : '');
 
-    var replyBox = closedish ? '' : (
+    var replyBox = inactive ? '' : (
       '<div class="card"><h2>ให้ข้อมูลเพิ่มเติม</h2>'
       + '<textarea id="rep-txt" rows="3" placeholder="พิมพ์ข้อความถึงทีมงาน..."></textarea>'
       + '<label>แนบรูป / ไฟล์ (ไม่บังคับ)</label><input type="file" id="rep-files" multiple accept="'+ATT_ACCEPT+'">'
@@ -393,29 +609,110 @@
     );
 
     var reopenBtn = (t.status === 'resolved' || t.status === 'closed') ? (
-      '<div style="margin-top:10px"><button class="btn-ghost" id="reopen-btn">ยังไม่หาย เปิดเรื่องใหม่</button></div>'
+      '<div style="margin-top:14px"><button class="btn-ghost" id="reopen-btn">↺ ยังไม่หาย เปิดเรื่องใหม่</button></div>'
     ) : '';
 
-    app.innerHTML =
-      rateCard
-      + '<div class="card"><div class="row">'
-      + '<div class="col"><div class="muted">เลขที่</div><b>' + esc(t.ticket_no) + '</b></div>'
-      + '<div class="col"><div class="muted">สถานะ</div><span class="pill" style="color:' + st.c + ';background:' + st.c + '22">' + esc(st.l) + '</span></div>'
-      + '<div class="col"><div class="muted">ความเร่งด่วน</div>' + esc(PRIO[t.priority] || t.priority) + '</div>'
+    var alertBox = t.status === 'cancelled'
+      ? '<div class="alert-wait" style="background:rgba(138,144,160,.16);color:var(--ink2)">🚫 เรื่องนี้ถูกยกเลิกแล้ว</div>'
+      : (t.status === 'pending_user' ? '<div class="alert-wait">⏳ ทีมงานรอข้อมูลเพิ่มเติมจากคุณ — ตอบกลับด้านล่างเพื่อดำเนินการต่อ</div>' : '');
+
+    var showCall = t.priority === _criticalPriority && !inactive;
+    var callCard = showCall ? (
+      '<div class="card" id="call-card"><h2>📞 เร่งด่วนมาก — คุยสดกับทีมงานได้ทันที</h2>'
+      + '<p class="muted" style="margin:0 0 10px">กดปุ่มด้านล่างเพื่อเข้าห้องวิดีโอคอลกับทีมงาน (ต้องอนุญาตกล้อง/ไมค์)</p>'
+      + '<button class="btn-pri" id="call-start-btn">📞 เริ่มคุยสดกับทีมงาน</button>'
+      + '<div id="call-frame" style="margin-top:14px;border-radius:11px;overflow:hidden;display:none;height:480px;"></div>'
       + '</div>'
-      + '<div style="margin-top:10px"><div class="muted">หัวข้อ</div>' + esc(t.subject || '-') + '</div>'
-      + '<div style="margin-top:6px"><div class="muted">รายละเอียด</div><div style="white-space:pre-wrap">' + esc(t.description || '') + '</div></div>'
-      + '<div class="muted" style="margin-top:10px">แจ้งเมื่อ ' + dt(t.created_at) + (t.resolution_due ? ' · คาดว่าเสร็จภายใน ' + dt(t.resolution_due) : '') + '</div>'
+    ) : '';
+
+    var infoRows = [
+      hospName ? ['โรงพยาบาล', hospName] : null,
+      catName ? ['ประเภทปัญหา', catName] : null,
+      t.source_system ? ['ระบบที่ใช้งาน', t.source_system] : null,
+      t.reporter_name ? ['ผู้แจ้ง', t.reporter_name] : null,
+      t.reporter_phone ? ['เบอร์ติดต่อ / LINE', t.reporter_phone] : null,
+      ['แจ้งเมื่อ', dt(t.created_at)],
+      (t.resolution_due && !closedish) ? ['คาดว่าเสร็จภายใน', dt(t.resolution_due)] : null,
+    ].filter(Boolean);
+
+    app.innerHTML =
+      summaryCard
+      + rateCard
+      + callCard
+      + '<div class="t-card">'
+      + '<div class="t-top">'
+      + '<div><div class="t-no">เลขที่ ' + esc(t.ticket_no) + '</div><div class="t-subject">' + esc(t.subject || '-') + '</div></div>'
+      + '<div class="badges">'
+      + '<span class="badge" style="color:' + st.c + ';background:' + st.c + '22">' + esc(st.l) + '</span>'
+      + '<span class="badge" style="color:' + pr.c + ';background:' + pr.c + '22">' + esc(pr.l) + '</span>'
+      + '</div></div>'
+      + stepperHtml(t.status)
+      + alertBox
+      + '<div class="info-grid">' + infoRows.map(function (r) { return '<div><div class="k">' + esc(r[0]) + '</div><div class="v">' + esc(r[1]) + '</div></div>'; }).join('') + '</div>'
+      + '<div class="desc-box">' + esc(t.description || '') + '</div>'
       + reopenBtn
       + '</div>'
-      + '<div class="card"><h2>ความคืบหน้า</h2><ul class="tl" id="tl">' + tlHtml(evs, attByEv) + '</ul></div>'
+      + '<div class="card"><h2>ความคืบหน้า</h2><ul class="tl2" id="tl">' + tlHtml(evs, attByEv) + '</ul></div>'
       + replyBox;
 
     if (canRate) bindRate();
     if (!closedish) document.getElementById('rep-send').onclick = submitReply;
     var rb = document.getElementById('reopen-btn'); if (rb) rb.onclick = submitReopen;
+    if (showCall) document.getElementById('call-start-btn').onclick = startHdCall;
   }
 
+  // ── เริ่มคุยสด: embed Jitsi ด้วย External API เพื่อดัก event "เข้าห้องสำเร็จจริง" ──
+  // (ปุ่มลิงก์เปิดแท็บใหม่เฉยๆ ตรวจจับไม่ได้ว่าลูกค้าเข้าห้องสำเร็จหรือไม่ จึงต้อง embed แทน)
+  var _jitsiScriptLoading = null;
+  function loadJitsiScript() {
+    if (window.JitsiMeetExternalAPI) return Promise.resolve();
+    if (_jitsiScriptLoading) return _jitsiScriptLoading;
+    _jitsiScriptLoading = new Promise(function (resolve, reject) {
+      var s = document.createElement('script');
+      s.src = 'https://jitsi1.hosxp.net/external_api.js';
+      s.onload = resolve;
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+    return _jitsiScriptLoading;
+  }
+  async function startHdCall() {
+    var btn = document.getElementById('call-start-btn');
+    var frame = document.getElementById('call-frame');
+    btn.disabled = true; btn.textContent = 'กำลังเชื่อมต่อ...';
+    try {
+      await loadJitsiScript();
+    } catch (e) {
+      btn.disabled = false; btn.textContent = '📞 เริ่มคุยสดกับทีมงาน';
+      alert('เชื่อมต่อระบบวิดีโอคอลไม่ได้ กรุณาลองใหม่ภายหลัง');
+      return;
+    }
+    frame.style.display = 'block';
+    btn.style.display = 'none';
+    var t = _ticket;
+    var api = new JitsiMeetExternalAPI('jitsi1.hosxp.net', {
+      roomName: t.ticket_no,
+      parentNode: frame,
+      width: '100%', height: 480,
+      userInfo: { displayName: t.reporter_name || 'ผู้แจ้งปัญหา' }
+    });
+    var notified = false;
+    api.addEventListener('videoConferenceJoined', function () {
+      if (notified) return;
+      notified = true;
+      var now = new Date().toISOString();
+      db.from('helpdesk_tickets').update({ call_joined_at: now }).eq('id', t.id).then(function () {}, function () {});
+      sendHdUrgentNotify(
+        '📞 **ลูกค้าเข้าห้องคุยสดแล้ว**'
+        + '\n🎫 เลขที่: **' + t.ticket_no + '**'
+        + '\n👤 ผู้แจ้ง: ' + (t.reporter_name || '-') + (t.reporter_phone ? ' · ' + t.reporter_phone : '')
+        + '\n🏢 โรงพยาบาล: ' + (_ticketHospName || '-')
+        + '\n📞 เข้าร่วมคุยสด: ' + jitsiUrl(t.ticket_no)
+      );
+    });
+  }
+
+  var EVENT_ICON = { comment:'💬', status_change:'🔄', assignment:'📌', field_change:'✏️', attachment:'📎', rating:'⭐', system:'⚙️' };
   function tlHtml(evs, attByEv) {
     attByEv = attByEv || {};
     if (!evs.length && !attByEv['']) return '<li class="muted">ยังไม่มีความเคลื่อนไหว</li>';
@@ -426,10 +723,11 @@
         var to = (STATUS[e.meta.to] || {}).l || e.meta.to;
         body = 'อัปเดตสถานะเป็น: ' + to;
       } else body = e.body || '';
-      return '<li><div class="who' + (e.actor_type === 'reporter' ? ' mine' : '') + '">' + esc(who) + ' · ' + dt(e.created_at) + '</div>'
+      var icon = EVENT_ICON[e.type] || '💬';
+      return '<li><div class="ic">' + icon + '</div><div class="who' + (e.actor_type === 'reporter' ? ' mine' : '') + '"><b>' + esc(who) + '</b> · ' + dt(e.created_at) + '</div>'
         + '<div class="body">' + esc(body) + '</div>' + attHtml(attByEv[e.id]) + '</li>';
     }).join('');
-    if (attByEv['']) out += '<li><div class="who">📎 ไฟล์แนบ</div>' + attHtml(attByEv['']) + '</li>';
+    if (attByEv['']) out += '<li><div class="ic">📎</div><div class="who">ไฟล์แนบ</div>' + attHtml(attByEv['']) + '</li>';
     return out;
   }
 
@@ -481,12 +779,15 @@
 
   function bindRate() {
     var el = document.getElementById('stars');
-    function paint(n){ el.innerHTML = '<b>' + '★'.repeat(n) + '</b>' + '☆'.repeat(5 - n); el.setAttribute('data-v', n); }
-    el.onclick = function (ev) {
-      var rect = el.getBoundingClientRect();
-      var n = Math.min(5, Math.max(1, Math.ceil((ev.clientX - rect.left) / (rect.width / 5))));
-      paint(n);
-    };
+    var starEls = Array.prototype.slice.call(el.querySelectorAll('.star'));
+    function paint(n) {
+      starEls.forEach(function (s) { s.classList.toggle('filled', +s.dataset.i <= n); });
+    }
+    starEls.forEach(function (s) {
+      s.addEventListener('click', function () { el.setAttribute('data-v', s.dataset.i); paint(+s.dataset.i); });
+      s.addEventListener('mouseenter', function () { paint(+s.dataset.i); });
+    });
+    el.addEventListener('mouseleave', function () { paint(Number(el.getAttribute('data-v')) || 0); });
     document.getElementById('rate-send').onclick = submitRate;
   }
 

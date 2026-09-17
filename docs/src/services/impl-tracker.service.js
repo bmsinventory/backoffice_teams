@@ -26,7 +26,7 @@
     // ── ปัญหาการใช้งานโปรแกรมรายโครงการ (แท็บ "ปัญหา") — createdAt = วันที่รับปัญหา, fixedDate = วันที่แก้ไขปัญหา
     // (คนละแนวคิดกับ IMPL_ISSUES เดิมที่ผูกกับ task/severity ล้วน ๆ — ตอนนี้ปรับให้ตรงกับรายงานสรุปปัญหารายโครงการ) ──
     IMPL_ISSUES: function (d) {
-      return { id:d.id, projectId:d.project_id, taskId:d.task_id||'', department:d.department||'', problem:d.problem||'', category:d.category||'', severity:d.severity||'medium', status:d.status||'open', solution:d.solution||'', receivedBy:d.received_by||'', fixedBy:d.fixed_by||'', fixedDate:d.fixed_date||'', createdAt:d.created_at||'', updatedAt:d.updated_at||'' };
+      return { id:d.id, projectId:d.project_id, taskId:d.task_id||'', department:d.department||'', reportedBy:d.reported_by||'', problem:d.problem||'', category:d.category||'', severity:d.severity||'medium', status:d.status||'open', solution:d.solution||'', receivedBy:d.received_by||'', fixedBy:d.fixed_by||'', fixedDate:d.fixed_date||'', createdAt:d.created_at||'', updatedAt:d.updated_at||'' };
     },
     IMPL_RISKS: function (d) {
       return { id:d.id, projectId:d.project_id, title:d.risk_title||'', detail:d.risk_detail||'', impact:d.impact_level||'medium', probability:d.probability||'medium', mitigation:d.mitigation_plan||'', owner:d.owner||'', status:d.status||'open' };
@@ -129,7 +129,7 @@
     var id = window.imtUid('ISSU');
     var row = {
       project_id: data.projectId, task_id: data.taskId || '',
-      department: data.department || '', problem: data.problem || '', category: data.category || '',
+      department: data.department || '', reported_by: data.reportedBy || '', problem: data.problem || '', category: data.category || '',
       severity: data.severity || 'medium', status: data.status || 'open', solution: data.solution || '',
       received_by: data.receivedBy || '', fixed_by: data.fixedBy || '',
       fixed_date: data.fixedDate || null,
@@ -143,7 +143,7 @@
 
   window.imtUpdateIssue = async function (issueId, data) {
     var row = {
-      department: data.department || '', problem: data.problem || '', category: data.category || '',
+      department: data.department || '', reported_by: data.reportedBy || '', problem: data.problem || '', category: data.category || '',
       severity: data.severity || 'medium', status: data.status || 'open', solution: data.solution || '',
       received_by: data.receivedBy || '', fixed_by: data.fixedBy || '',
       fixed_date: data.fixedDate || null, updated_at: new Date().toISOString(),

@@ -355,6 +355,7 @@ CREATE TABLE IF NOT EXISTS settings (
   notify_token               TEXT DEFAULT '',
   notify_advance_token       TEXT DEFAULT '',
   notify_project_token       TEXT DEFAULT '',
+  notify_helpdesk_token      TEXT DEFAULT '',
   year_targets               JSONB DEFAULT '[]',
   tgt_grouped                BOOLEAN DEFAULT false,
   allowance_weekday_normal   NUMERIC DEFAULT 350,
@@ -561,6 +562,7 @@ CREATE TABLE IF NOT EXISTS impl_issues (
   project_id    TEXT NOT NULL,
   task_id       TEXT DEFAULT '',   -- อ้างอิง task ที่เกี่ยวข้องได้ (ไม่บังคับ) ส่วนใหญ่ปัญหากลุ่มนี้ไม่ผูกกับ task ใดโดยเฉพาะ
   department    TEXT DEFAULT '',   -- หน่วยงาน/แผนกของ รพ. ที่แจ้งปัญหา
+  reported_by   TEXT DEFAULT '',   -- ผู้แจ้งปัญหา (ชื่อคน รพ. ที่แจ้งเข้ามา)
   problem       TEXT DEFAULT '',
   category      TEXT DEFAULT '',   -- กลุ่มปัญหา (window.IMPL_ISSUE_CATEGORY)
   severity      TEXT DEFAULT 'medium',
@@ -572,6 +574,9 @@ CREATE TABLE IF NOT EXISTS impl_issues (
   created_at    TIMESTAMPTZ DEFAULT NOW(),  -- วันที่รับปัญหา
   updated_at    TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- ── Migration: คอลัมน์ผู้แจ้งปัญหา (เพิ่มทีหลัง CREATE TABLE เดิม สำหรับ instance ที่สร้างตารางนี้ไปแล้ว) ──
+ALTER TABLE impl_issues ADD COLUMN IF NOT EXISTS reported_by TEXT DEFAULT '';
 
 CREATE INDEX IF NOT EXISTS idx_impl_phases_project_id ON impl_phases (project_id);
 CREATE INDEX IF NOT EXISTS idx_impl_tasks_phase_id     ON impl_tasks (phase_id);
@@ -970,6 +975,7 @@ CREATE TABLE IF NOT EXISTS helpdesk_tickets (
   rated_at               TIMESTAMPTZ,
   tags                   JSONB DEFAULT '[]',
   created_by             TEXT DEFAULT '',          -- staff.id ที่กด "+ แจ้งแทน" ('' = ลูกค้ากรอกฟอร์มเว็บเอง)
+  call_joined_at         TIMESTAMPTZ,              -- เวลาที่ลูกค้ากดเข้าห้องคุยสด Jitsi สำเร็จจริง (ปุ่ม "โทรด่วน")
   created_at             TIMESTAMPTZ DEFAULT NOW(),
   updated_at             TIMESTAMPTZ DEFAULT NOW()
 );
@@ -1078,6 +1084,16 @@ ON CONFLICT (id) DO NOTHING;
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS helpdesk_priority_overrides JSONB DEFAULT '{}';
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS helpdesk_status_overrides   JSONB DEFAULT '{}';
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS helpdesk_urgency_overrides  JSONB DEFAULT '{}';
+
+-- ── Migration: ปุ่ม "โทรด่วน" (Jitsi) — เก็บเวลาที่ลูกค้ากดเข้าห้องคุยสดสำเร็จจริง
+-- ใช้แยกแยะ "กดปุ่ม" กับ "เข้าห้องสำเร็จ" เพื่อยิง BMS Notify เฉพาะตอนเข้าห้องจริง ──
+ALTER TABLE helpdesk_tickets ADD COLUMN IF NOT EXISTS call_joined_at TIMESTAMPTZ;
+
+-- ── Migration: token แจ้งเตือน Helpdesk (ตั๋วด่วนที่สุด / ลูกค้าเข้าห้องคุยสดแล้ว) — ตั้งค่าที่
+-- Admin Panel → 🔔 ตั้งค่าการแจ้งเตือน เหมือน notify_token/notify_advance_token/notify_project_token
+-- หมายเหตุ: RLS ของตารางนี้เปิดกว้าง (FOR ALL TO anon) เหมือน 3 token เดิม — anon key รู้ค่านี้ได้
+-- ถ้า query ตรง (ความเสี่ยงเดิมของโปรเจกต์ ไม่ใช่สิ่งใหม่ที่ token นี้เพิ่มขึ้นมา) ──
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS notify_helpdesk_token TEXT DEFAULT '';
 
 -- ── Storage bucket สำหรับไฟล์แนบ HelpDesk (รูปหน้าจอ / ไฟล์ error) ──
 -- ต้องมี schema `storage` ของ Storage service อยู่แล้ว (self-hosted Supabase stack)

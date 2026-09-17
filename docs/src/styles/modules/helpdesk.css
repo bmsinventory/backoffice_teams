@@ -91,6 +91,34 @@
   min-height: 160px; color: var(--txt3); font-size: 12px; text-align: center;
 }
 
+/* ── หน้ารายละเอียด Ticket: การ์ดรายละเอียดปัญหา + แผงข้อมูลผู้แจ้ง + ไทม์ไลน์ (ปรับให้ดูง่ายขึ้น) ── */
+#view-helpdesk .hd-desc-card { white-space: pre-wrap; font-size: 13.5px; line-height: 1.75; color: var(--txt2); }
+
+/* แผง "ข้อมูล Ticket" — สถานะ/Priority/ผู้รับผิดชอบ/หมวด เรียง 2 คอลัมน์แทนการเรียงเต็มความกว้างทีละแถว
+   ลดความสูง + ลดความรู้สึกว่าต้อง "กรอกฟอร์ม" เพราะส่วนใหญ่มีค่าเลือกไว้อยู่แล้ว แค่ดู/เปลี่ยนบางครั้ง */
+#view-helpdesk .hd-field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 10px; margin-bottom: 2px; }
+#view-helpdesk .hd-field-grid .hd-lbl { margin-top: 0; }
+#view-helpdesk .hd-field-grid select.hd-sel-tinted { font-weight: 700; border-width: 1.5px; }
+
+#view-helpdesk .hd-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 11px 14px; font-size: 12.5px; }
+#view-helpdesk .hd-info-grid .full { grid-column: 1 / -1; }
+#view-helpdesk .hd-info-grid .k { color: var(--txt3); font-size: 10.5px; font-weight: 600; margin-bottom: 2px; }
+#view-helpdesk .hd-info-grid .v { color: var(--txt); }
+
+#view-helpdesk .hd-tl { list-style: none; margin: 0; padding: 0; }
+#view-helpdesk .hd-tl li { position: relative; padding: 0 0 16px 34px; }
+#view-helpdesk .hd-tl li:not(:last-child)::before {
+  content: ''; position: absolute; left: 12px; top: 24px; bottom: 0; width: 2px; background: var(--border);
+}
+#view-helpdesk .hd-tl li:last-child { padding-bottom: 0; }
+#view-helpdesk .hd-tl .ic {
+  position: absolute; left: 0; top: 0; width: 25px; height: 25px; border-radius: 50%;
+  background: var(--surface2); display: flex; align-items: center; justify-content: center; font-size: 12px;
+}
+#view-helpdesk .hd-tl .who { font-size: 11px; color: var(--txt3); margin-bottom: 4px; padding-top: 4px; }
+#view-helpdesk .hd-tl .who b { color: var(--txt2); font-weight: 700; }
+#view-helpdesk .hd-tl .body { white-space: pre-wrap; font-size: 13px; background: var(--surface2); padding: 8px 12px; border-radius: 9px; }
+
 /* modal "+ แจ้งแทน" — กว้างขึ้น + ระยะห่างแคบ ไม่ให้กินพื้นที่แนวตั้ง */
 #m-hd .modal.lg { max-width: 840px; }
 #m-hd .m-body { padding: 16px 22px; }

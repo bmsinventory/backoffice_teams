@@ -11,6 +11,14 @@ function hdPri(id)    { return (window.HD_PRIORITY || []).find(function (p) { re
 function hdCat(id)    { return (window.HELPDESK_CATEGORIES || []).find(function (c) { return c.id === id; }) || null; }
 function hdHosp(id)   { return (window.HOSPITALS || []).find(function (h) { return h.id === id; }) || null; }
 
+// ปุ่ม "โทรด่วน" (Jitsi) + แจ้งเตือนทีมงาน — trigger ที่ priority ของความเร่งด่วน "ทำงานไม่ได้เลย" (blocked)
+// อ่านจาก window.HD_URGENCY สด ๆ (merge override ของ Admin แล้ว) แทนที่จะ hardcode 'p2' ตรง ๆ
+function hdCriticalPriority() {
+  var u = (window.HD_URGENCY || []).find(function (x) { return x.id === 'blocked'; });
+  return (u && u.priority) || 'p2';
+}
+function hdJitsiUrl(ticketNo) { return 'https://jitsi1.hosxp.net/' + encodeURIComponent(ticketNo); }
+
 function hdDT(iso) {
   if (!iso) return '-';
   var d = new Date(iso);
@@ -104,7 +112,7 @@ window.renderHelpdesk = function () {
   hdRenderList(root);
 };
 
-window.hdGo = function (tab) { window.hdTab = tab; window.hdOpenId = null; window.renderHelpdesk(); };
+window.hdGo = function (tab) { window.hdTab = tab; window.hdOpenId = null; window.hdPage = 1; window.renderHelpdesk(); };
 window.hdOpen = function (id) { window.hdOpenId = id; window.renderHelpdesk(); };
 window.hdBack = function () { window.hdOpenId = null; window.renderHelpdesk(); };
 
@@ -159,15 +167,8 @@ function hdFiltered(mineOnly) {
 function hdQueueHtml(mineOnly) {
   var f = window.hdFilter || {};
   var rows = hdFiltered(mineOnly);
-  // เรียง: เกิน SLA ก่อน → เวลาคงเหลือน้อย → ใหม่สุด
-  rows.sort(function (a, b) {
-    var oa = hdOverdue(a) ? 0 : 1, ob = hdOverdue(b) ? 0 : 1;
-    if (oa !== ob) return oa - ob;
-    var da = a.resolutionDue ? new Date(a.resolutionDue) : 8.64e15;
-    var db = b.resolutionDue ? new Date(b.resolutionDue) : 8.64e15;
-    if (+da !== +db) return da - db;
-    return (b.createdAt || '').localeCompare(a.createdAt || '');
-  });
+  // เรียงตามเลขที่แจ้ง (ticketNo) จากมากไปน้อย — ล่าสุดขึ้นก่อน
+  rows.sort(function (a, b) { return (b.ticketNo || '').localeCompare(a.ticketNo || ''); });
 
   var all = window.HELPDESK_TICKETS || [];
   var openCnt = all.filter(function (t) { return hdStatus(t.status).open; }).length;
@@ -184,6 +185,8 @@ function hdQueueHtml(mineOnly) {
     .map(function (s) { return '<option value="' + s.id + '"' + (f.status === s.id ? ' selected' : '') + '>' + s.icon + ' ' + s.label + '</option>'; }).join('');
   var prOpts = '<option value="">Priority: ทั้งหมด</option>' + (window.HD_PRIORITY || [])
     .map(function (p) { return '<option value="' + p.id + '"' + (f.priority === p.id ? ' selected' : '') + '>' + esc(p.label) + '</option>'; }).join('');
+  var pageSize = window.hdPageSize || 50;
+  var pageSizeOpts = [50, 100, 500, 1000].map(function (n) { return '<option value="' + n + '"' + (pageSize === n ? ' selected' : '') + '>' + n + ' แถว/หน้า</option>'; }).join('');
 
   var toolbar =
     '<div class="toolbar" style="position:sticky;top:0;z-index:10;background:var(--surface);flex-wrap:wrap;">'
@@ -192,6 +195,8 @@ function hdQueueHtml(mineOnly) {
     + '<select class="t-sel" onchange="window.hdSetFilter(\'priority\',this.value)">' + prOpts + '</select>'
     + '<select class="t-sel" onchange="window.hdSetFilter(\'assignee\',this.value)">' + staffOpts + '</select>'
     + '<select class="t-sel" onchange="window.hdSetFilter(\'category\',this.value)">' + catOpts + '</select>'
+    + '<div style="flex:1"></div>'
+    + '<select class="t-sel" onchange="window.hdSetPageSize(this.value)">' + pageSizeOpts + '</select>'
     + '</div>';
 
   var summary =
@@ -202,13 +207,20 @@ function hdQueueHtml(mineOnly) {
     + '<span style="color:var(--amber);">รอผู้แจ้ง <b>' + pending + '</b></span>'
     + '</div>';
 
-  var trs = rows.map(function (t) {
+  var totalRows = rows.length;
+  var totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+  window.hdPage = Math.min(Math.max(1, window.hdPage || 1), totalPages);
+  var page = window.hdPage;
+  var pageRows = rows.slice((page - 1) * pageSize, page * pageSize);
+
+  var trs = pageRows.map(function (t, i) {
     var st = hdStatus(t.status), pr = hdPri(t.priority), sla = hdSlaCell(t);
     var h = hdHosp(t.hospitalId);
     var rowBg = sla.cls === 'bad' ? 'background:rgba(229,72,77,.06);' : sla.cls === 'warn' ? 'background:rgba(201,130,12,.06);' : '';
     return '<tr style="cursor:pointer;' + rowBg + '" onclick="window.hdOpen(\'' + t.id + '\')">'
+      + '<td style="font-size:12px;color:var(--txt3);">' + ((page - 1) * pageSize + i + 1) + '</td>'
       + '<td style="white-space:nowrap;font-family:var(--mono,monospace);font-size:12px;">' + esc(t.ticketNo) + '</td>'
-      + '<td>' + esc(t.subject || (t.description || '').slice(0, 60) || '(ไม่มีหัวข้อ)') + '</td>'
+      + '<td style="max-width:360px;white-space:normal;">' + esc(t.description || '(ไม่มีรายละเอียด)') + '</td>'
       + '<td style="font-size:12px;">' + esc((h && h.name) || '-') + (t.reporterName ? '<br><span style="color:var(--txt3)">' + esc(t.reporterName) + '</span>' : '') + '</td>'
       + '<td><span class="hd-pill" style="color:' + pr.color + ';background:' + pr.color + '1e;">' + esc(pr.short) + '</span></td>'
       + '<td><span class="hd-pill" style="color:' + st.color + ';background:' + st.color + '1e;">' + st.icon + ' ' + esc(st.label) + '</span></td>'
@@ -221,15 +233,37 @@ function hdQueueHtml(mineOnly) {
   var table =
     '<div class="dtable-wrap" style="padding:0 12px 28px;"><div class="dtable-inner"><table style="min-width:900px;">'
     + '<thead><tr>'
-    + '<th>เลขที่</th><th>หัวข้อ</th><th>รพ. / ผู้แจ้ง</th><th>Priority</th><th>สถานะ</th><th>ผู้รับผิดชอบ</th><th>SLA คงเหลือ</th><th>อัปเดตล่าสุด</th>'
-    + '</tr></thead><tbody>' + (trs || '<tr><td colspan="8" style="text-align:center;color:var(--txt3);padding:40px;">ไม่มี Ticket</td></tr>') + '</tbody></table></div></div>';
+    + '<th>ลำดับ</th><th>เลขที่</th><th>รายละเอียด</th><th>รพ. / ผู้แจ้ง</th><th>Priority</th><th>สถานะ</th><th>ผู้รับผิดชอบ</th><th>SLA คงเหลือ</th><th>อัปเดตล่าสุด</th>'
+    + '</tr></thead><tbody>' + (trs || '<tr><td colspan="9" style="text-align:center;color:var(--txt3);padding:40px;">ไม่มี Ticket</td></tr>') + '</tbody></table></div></div>';
 
-  return toolbar + summary + table;
+  var pager = totalPages > 1
+    ? '<div style="display:flex;justify-content:flex-end;align-items:center;gap:10px;padding:0 24px 24px;">'
+      + '<span style="font-size:12px;color:var(--txt3);">หน้า ' + page + ' / ' + totalPages + ' (ทั้งหมด ' + totalRows + ' รายการ)</span>'
+      + '<button class="btn btn-ghost btn-sm"' + (page <= 1 ? ' disabled' : '') + ' onclick="window.hdGoPage(-1)">← ย้อนกลับ</button>'
+      + '<button class="btn btn-ghost btn-sm"' + (page >= totalPages ? ' disabled' : '') + ' onclick="window.hdGoPage(1)">ถัดไป →</button>'
+      + '</div>'
+    : '';
+
+  return toolbar + summary + table + pager;
 }
+
+window.hdSetPageSize = function (val) {
+  window.hdPageSize = parseInt(val, 10) || 50;
+  window.hdPage = 1;
+  var b = document.getElementById('hd-body');
+  if (b) b.innerHTML = hdQueueHtml((window.hdTab || 'queue') === 'mine');
+};
+
+window.hdGoPage = function (delta) {
+  window.hdPage = (window.hdPage || 1) + delta;
+  var b = document.getElementById('hd-body');
+  if (b) b.innerHTML = hdQueueHtml((window.hdTab || 'queue') === 'mine');
+};
 
 window.hdSetFilter = function (key, val) {
   window.hdFilter = window.hdFilter || {};
   window.hdFilter[key] = val;
+  window.hdPage = 1;
   var b = document.getElementById('hd-body');
   if (b) b.innerHTML = hdQueueHtml((window.hdTab || 'queue') === 'mine');
   if (key === 'q') { var i = document.getElementById('hd-q'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }
@@ -258,6 +292,7 @@ function hdRenderDetail(root, t) {
     + '<span class="hd-pill" style="color:' + pr.color + ';background:' + pr.color + '1e;">' + esc(pr.short) + '</span>'
     + '<div style="flex:1"></div>'
     + (canEdit ? '<button class="btn btn-ghost btn-sm" onclick="window.hdAiRunDetail(\'' + t.id + '\',this)">🤖 AI วิเคราะห์</button>' : '')
+    + (t.priority === hdCriticalPriority() ? '<button class="btn btn-pri btn-sm" style="background:var(--coral,#e5484d)" onclick="window.open(\'' + hdJitsiUrl(t.ticketNo) + '\',\'_blank\')">📞 เข้าร่วมสาย</button>' : '')
     + '<button class="btn btn-ghost btn-sm" onclick="window.hdCopyLink(\'' + t.id + '\')">🔗 คัดลอกลิงก์</button>'
     + '<button class="btn btn-ghost btn-sm" onclick="window.hdCopyMsg(\'' + t.id + '\')">📋 คัดลอกข้อความ</button>'
     + '</div>'
@@ -266,10 +301,10 @@ function hdRenderDetail(root, t) {
     //  LEFT
     + '<div>'
     + '<div class="ov-card" style="margin-bottom:14px;">'
-    + '<div style="font-weight:700;margin-bottom:6px;">' + esc(t.subject || '(ไม่มีหัวข้อ)') + '</div>'
-    + '<div style="white-space:pre-wrap;font-size:13px;color:var(--txt2);">' + esc(t.description || '') + '</div>'
+    + '<div class="ov-card-title">รายละเอียดปัญหา</div>'
+    + '<div class="hd-desc-card">' + esc(t.description || '(ไม่มีรายละเอียด)') + '</div>'
     + '</div>'
-    + '<div class="ov-card"><div class="ov-card-title">💬 บทสนทนา / ไทม์ไลน์</div><div id="hd-events" style="max-height:none;">กำลังโหลด...</div>'
+    + '<div class="ov-card"><div class="ov-card-title">💬 บทสนทนา / ไทม์ไลน์</div><ul id="hd-events" class="hd-tl" style="max-height:none;"><li class="who">กำลังโหลด...</li></ul>'
     + (canEdit
       ? '<div style="border-top:1px solid var(--border);margin-top:10px;padding-top:10px;">'
       + '<textarea id="hd-reply" rows="3" class="f-input" style="width:100%;resize:vertical;" placeholder="พิมพ์ข้อความ..."></textarea>'
@@ -286,27 +321,31 @@ function hdRenderDetail(root, t) {
     + '</div>'
     //  RIGHT
     + '<div class="ov-card">'
-    + '<div class="ov-card-title">รายละเอียด</div>'
-    + '<label class="hd-lbl">สถานะ</label><select class="t-sel" style="width:100%" onchange="window.hdSetField(\'' + t.id + '\',\'status\',this.value)"' + dis + '>' + stSel + '</select>'
-    + '<label class="hd-lbl">Priority</label><select class="t-sel" style="width:100%" onchange="window.hdSetField(\'' + t.id + '\',\'priority\',this.value)"' + dis + '>' + prSel + '</select>'
-    + '<label class="hd-lbl">ผู้รับผิดชอบ</label><select class="t-sel" style="width:100%" onchange="window.hdSetField(\'' + t.id + '\',\'assigneeId\',this.value)"' + dis + '>' + asSel + '</select>'
-    + '<label class="hd-lbl">หมวดปัญหา</label><select class="t-sel" style="width:100%" onchange="window.hdSetField(\'' + t.id + '\',\'categoryId\',this.value)"' + dis + '>' + catSel + '</select>'
-    + '<hr style="border:none;border-top:1px solid var(--border);margin:12px 0;">'
-    + '<div style="font-size:12px;line-height:1.9;">'
-    + '<div><b>นาฬิกา SLA</b></div>'
-    + '<div>ตอบครั้งแรก: ' + (t.firstResponseAt ? '<span class="hd-pill hd-ok">ตอบแล้ว ' + hdDT(t.firstResponseAt) + '</span>' : (t.firstResponseDue ? 'ครบกำหนด ' + hdDT(t.firstResponseDue) : '-')) + '</div>'
-    + '<div>ปิดงาน: <span class="hd-pill hd-' + sla.cls + '">' + esc(sla.txt) + '</span>' + (t.resolutionDue ? ' <span style="color:var(--txt3)">(' + hdDT(t.resolutionDue) + ')</span>' : '') + '</div>'
-    + '<hr style="border:none;border-top:1px solid var(--border);margin:12px 0;">'
-    + '<div><b>ผู้แจ้ง</b></div>'
-    + '<div>' + esc(t.reporterName || '-') + (t.reporterPhone ? ' · ' + esc(t.reporterPhone) : '') + '</div>'
-    + '<div>รพ.: ' + esc((h && h.name) || '-') + '</div>'
-    + (t.sourceSystem ? '<div>ระบบ: ' + esc(t.sourceSystem) + '</div>' : '')
-    + (t.lineGroupRef ? '<div>กลุ่ม LINE: ' + esc(t.lineGroupRef) + '</div>' : '')
-    + '<div>ช่องทาง: ' + esc(((window.HD_CHANNEL || []).find(function (c) { return c.id === t.channel; }) || { label: t.channel }).label) + '</div>'
-    + '<div>แจ้งเมื่อ: ' + hdDT(t.createdAt) + '</div>'
-    + (t.csatScore != null ? '<div>คะแนน CSAT: <b>' + t.csatScore + '/5</b></div>' : '')
+    + '<div class="ov-card-title">ข้อมูล Ticket</div>'
+    + '<div class="hd-field-grid">'
+    + '<div><label class="hd-lbl">สถานะ</label><select class="t-sel hd-sel-tinted" style="width:100%;color:' + st.color + ';border-color:' + st.color + '55;background:' + st.color + '14;" onchange="window.hdSetField(\'' + t.id + '\',\'status\',this.value)"' + dis + '>' + stSel + '</select></div>'
+    + '<div><label class="hd-lbl">Priority</label><select class="t-sel hd-sel-tinted" style="width:100%;color:' + pr.color + ';border-color:' + pr.color + '55;background:' + pr.color + '14;" onchange="window.hdSetField(\'' + t.id + '\',\'priority\',this.value)"' + dis + '>' + prSel + '</select></div>'
+    + '<div><label class="hd-lbl">ผู้รับผิดชอบ</label><select class="t-sel" style="width:100%" onchange="window.hdSetField(\'' + t.id + '\',\'assigneeId\',this.value)"' + dis + '>' + asSel + '</select></div>'
+    + '<div><label class="hd-lbl">หมวดปัญหา</label><select class="t-sel" style="width:100%" onchange="window.hdSetField(\'' + t.id + '\',\'categoryId\',this.value)"' + dis + '>' + catSel + '</select></div>'
     + '</div>'
-    + (canEdit && (window.canDel && window.canDel('helpdesk')) ? '<hr style="border:none;border-top:1px solid var(--border);margin:12px 0;"><button class="btn btn-ghost btn-sm" style="color:var(--coral)" onclick="window.hdDelete(\'' + t.id + '\')">ลบ Ticket</button>' : '')
+    + '<hr style="border:none;border-top:1px solid var(--border);margin:16px 0 12px;">'
+    + '<div class="ov-card-title" style="margin-bottom:10px;">⏱ นาฬิกา SLA</div>'
+    + '<div class="hd-info-grid">'
+    + '<div class="full"><div class="k">ตอบครั้งแรก</div><div class="v">' + (t.firstResponseAt ? '<span class="hd-pill hd-ok">ตอบแล้ว ' + hdDT(t.firstResponseAt) + '</span>' : (t.firstResponseDue ? 'ครบกำหนด ' + hdDT(t.firstResponseDue) : '-')) + '</div></div>'
+    + '<div class="full"><div class="k">ปิดงาน</div><div class="v"><span class="hd-pill hd-' + sla.cls + '">' + esc(sla.txt) + '</span>' + (t.resolutionDue ? ' <span style="color:var(--txt3)">(' + hdDT(t.resolutionDue) + ')</span>' : '') + '</div></div>'
+    + '</div>'
+    + '<hr style="border:none;border-top:1px solid var(--border);margin:16px 0 12px;">'
+    + '<div class="ov-card-title" style="margin-bottom:10px;">👤 ผู้แจ้ง</div>'
+    + '<div class="hd-info-grid">'
+    + '<div class="full"><div class="k">ชื่อ / ติดต่อ</div><div class="v">' + esc(t.reporterName || '-') + (t.reporterPhone ? ' · ' + esc(t.reporterPhone) : '') + '</div></div>'
+    + '<div class="full"><div class="k">โรงพยาบาล</div><div class="v">' + esc((h && h.name) || '-') + '</div></div>'
+    + (t.sourceSystem ? '<div><div class="k">ระบบ</div><div class="v">' + esc(t.sourceSystem) + '</div></div>' : '')
+    + '<div><div class="k">ช่องทาง</div><div class="v">' + esc(((window.HD_CHANNEL || []).find(function (c) { return c.id === t.channel; }) || { label: t.channel }).label) + '</div></div>'
+    + (t.lineGroupRef ? '<div class="full"><div class="k">กลุ่ม LINE</div><div class="v">' + esc(t.lineGroupRef) + '</div></div>' : '')
+    + '<div><div class="k">แจ้งเมื่อ</div><div class="v">' + hdDT(t.createdAt) + '</div></div>'
+    + (t.csatScore != null ? '<div><div class="k">คะแนน CSAT</div><div class="v"><b>' + t.csatScore + '/5</b></div></div>' : '')
+    + '</div>'
+    + (canEdit && (window.canDel && window.canDel('helpdesk')) ? '<hr style="border:none;border-top:1px solid var(--border);margin:16px 0 12px;"><button class="btn btn-ghost btn-sm" style="color:var(--coral)" onclick="window.hdDelete(\'' + t.id + '\')">ลบ Ticket</button>' : '')
     + '</div>'
     + '</div>';
 
@@ -333,19 +372,18 @@ async function hdLoadEvents(t) {
   if (!document.getElementById('hd-events')) return;
   var byEvent = {};
   (atts || []).forEach(function (a) { (byEvent[a.event_id || ''] = byEvent[a.event_id || ''] || []).push(a); });
-  if (!evs.length && !atts.length) { box.innerHTML = '<div style="color:var(--txt3);font-size:12px;padding:8px 0;">ยังไม่มีความเคลื่อนไหว</div>'; return; }
+  if (!evs.length && !atts.length) { box.innerHTML = '<li class="who" style="padding-top:0;">ยังไม่มีความเคลื่อนไหว</li>'; return; }
   var html = evs.map(function (e) {
     var meta = (window.HD_EVENT_TYPE || {})[e.type] || { icon: '•' };
     var who = e.actor_type === 'reporter' ? 'ผู้แจ้ง' : e.actor_type === 'system' ? 'ระบบ' : ((gSt(e.actor_id) || {}).name || 'ทีมงาน');
     var intern = e.is_internal ? ' <span class="hd-pill hd-warn">ภายใน</span>' : '';
     var bodyTxt = e.type === 'status_change' && e.meta ? ('เปลี่ยนสถานะ ' + (hdStatus(e.meta.from).label || e.meta.from || '') + ' → ' + (hdStatus(e.meta.to).label || e.meta.to || '')) : (e.body || '');
-    return '<div style="padding:8px 0;border-bottom:1px dashed var(--border);font-size:12.5px;">'
-      + '<div style="color:var(--txt3);font-size:11px;">' + meta.icon + ' ' + esc(who) + intern + ' · ' + hdDT(e.created_at) + '</div>'
-      + '<div style="white-space:pre-wrap;">' + esc(bodyTxt) + '</div>'
+    return '<li><div class="ic">' + meta.icon + '</div><div class="who"><b>' + esc(who) + '</b>' + intern + ' · ' + hdDT(e.created_at) + '</div>'
+      + '<div class="body">' + esc(bodyTxt) + '</div>'
       + hdAttachHtml(byEvent[e.id])
-      + '</div>';
+      + '</li>';
   }).join('');
-  if (byEvent['']) html += '<div style="padding:8px 0;font-size:12.5px;"><div style="color:var(--txt3);font-size:11px;">📎 ไฟล์แนบ</div>' + hdAttachHtml(byEvent['']) + '</div>';
+  if (byEvent['']) html += '<li><div class="ic">📎</div><div class="who">ไฟล์แนบ</div>' + hdAttachHtml(byEvent['']) + '</li>';
   box.innerHTML = html;
 }
 
@@ -682,35 +720,39 @@ function hdSysComboMarkup(hiddenValue) {
 window.hdOpenModal = function (id) {
   window.hdEditId = id || null;
   var t = id ? hdTicket(id) : null;
-  var catOpts = '<option value="">— หมวด (auto ตั้ง Priority) —</option>' + (window.HELPDESK_CATEGORIES || [])
+  var catOpts = '<option value="">--เลือกหมวดปัญหา--</option>' + (window.HELPDESK_CATEGORIES || [])
     .map(function (c) { return '<option value="' + c.id + '" data-pri="' + c.defaultPriority + '"' + (t && t.categoryId === c.id ? ' selected' : '') + '>' + esc(c.name) + '</option>'; }).join('');
-  var urgOpts = (window.HD_URGENCY || []).map(function (u) { return '<option value="' + u.priority + '">' + esc(u.label) + '</option>'; }).join('');
-  var prOpts = (window.HD_PRIORITY || []).map(function (p) { return '<option value="' + p.id + '"' + ((t ? t.priority : 'p3') === p.id ? ' selected' : '') + '>' + esc(p.label) + '</option>'; }).join('');
-  var asOpts = '<option value="">— ยังไม่มอบหมาย —</option>'
-    + (window.cu && (window.cu.staffId || window.cu.staff_id) ? '<option value="' + (window.cu.staffId || window.cu.staff_id) + '">มอบหมายให้ตัวเอง</option>' : '')
-    + (window.STAFF || []).filter(function (s) { return s.active; }).map(function (s) { return '<option value="' + s.id + '">' + esc(s.name) + '</option>'; }).join('');
+  // ความเร่งด่วนเรียงจาก Priority ต่ำสุดมาก่อน (ป้องกันเลือก default เป็นเคสด่วนโดยไม่ตั้งใจ) — ค่าแรกในลิสต์ = ค่า default
+  var urgSorted = (window.HD_URGENCY || []).slice().sort(function (a, b) { return parseInt(b.priority.slice(1), 10) - parseInt(a.priority.slice(1), 10); });
+  var defaultUrgPriority = urgSorted.length ? urgSorted[0].priority : 'p4';
+  var urgOpts = urgSorted.map(function (u, i) { return '<option value="' + u.priority + '"' + (i === 0 ? ' selected' : '') + '>' + esc(u.label) + '</option>'; }).join('');
+  var priSorted = (window.HD_PRIORITY || []).slice().sort(function (a, b) { return parseInt(b.id.slice(1), 10) - parseInt(a.id.slice(1), 10); });
+  var prOpts = priSorted.map(function (p) { return '<option value="' + p.id + '"' + ((t ? t.priority : defaultUrgPriority) === p.id ? ' selected' : '') + '>' + esc(p.label) + '</option>'; }).join('');
+  var curStaffId = (window.cu && (window.cu.staffId || window.cu.staff_id)) || '';
+  var defaultAssignee = t ? (t.assigneeId || '') : curStaffId; // ticket ใหม่ default มอบหมายให้คน Login เอง (แสดงชื่อจริง) / แก้ไข ticket คงค่าเดิมไว้
+  var asOpts = '<option value=""' + (defaultAssignee === '' ? ' selected' : '') + '>— ยังไม่มอบหมาย —</option>'
+    + (window.STAFF || []).filter(function (s) { return s.active; }).map(function (s) { return '<option value="' + s.id + '"' + (defaultAssignee === s.id ? ' selected' : '') + '>' + esc(s.name) + '</option>'; }).join('');
 
   var full = ' style="grid-column:span 2"';
   var catUrg = t
-    ? '<div class="f-group"' + full + '><label class="f-label">หมวดปัญหา</label><select id="hdf-cat" class="f-input" onchange="window.hdModalCatChange()">' + catOpts + '</select></div>'
-    : '<div class="f-group"><label class="f-label">หมวดปัญหา</label><select id="hdf-cat" class="f-input" onchange="window.hdModalCatChange()">' + catOpts + '</select></div>'
-      + '<div class="f-group"><label class="f-label">ความเร่งด่วน (ผู้แจ้งบอก)</label><select id="hdf-urg" class="f-input" onchange="window.hdModalUrgChange()"><option value="">—</option>' + urgOpts + '</select></div>';
+    ? '<div class="f-group"' + full + '><label class="f-label">หมวดปัญหา <span class="hd-req">*</span></label><select id="hdf-cat" class="f-input" onchange="window.hdModalCatChange()">' + catOpts + '</select></div>'
+    : '<div class="f-group"><label class="f-label">หมวดปัญหา <span class="hd-req">*</span></label><select id="hdf-cat" class="f-input" onchange="window.hdModalCatChange()">' + catOpts + '</select></div>'
+      + '<div class="f-group"><label class="f-label">ความเร่งด่วน (ผู้แจ้งบอก) <span class="hd-req">*</span></label><select id="hdf-urg" class="f-input" onchange="window.hdModalUrgChange()">' + urgOpts + '</select></div>';
 
   document.getElementById('m-hd-title').textContent = t ? ('แก้ไข ' + t.ticketNo) : '+ แจ้งแทนลูกค้า (จาก LINE)';
   document.getElementById('m-hd-body').innerHTML =
     '<div class="f-grid">'
     + '<div class="f-group"' + full + '><label class="f-label">โรงพยาบาล <span class="hd-req">*</span></label>' + hdHospComboMarkup(t ? t.hospitalId : '') + '</div>'
     + '<div class="f-group"><label class="f-label">กลุ่ม LINE ที่แจ้งเข้ามา</label><input id="hdf-line" class="f-input" value="' + esc(t ? t.lineGroupRef : '') + '"></div>'
-    + '<div class="f-group"><label class="f-label">ระบบที่ใช้งาน</label>' + hdSysComboMarkup(t ? t.sourceSystem : '') + '</div>'
-    + '<div class="f-group"><label class="f-label">ชื่อผู้แจ้ง</label><input id="hdf-name" class="f-input" value="' + esc(t ? t.reporterName : '') + '"></div>'
+    + '<div class="f-group"><label class="f-label">ระบบที่ใช้งาน <span class="hd-req">*</span></label>' + hdSysComboMarkup(t ? t.sourceSystem : '') + '</div>'
+    + '<div class="f-group"><label class="f-label">ชื่อผู้แจ้ง <span class="hd-req">*</span></label><input id="hdf-name" class="f-input" value="' + esc(t ? t.reporterName : '') + '"></div>'
     + '<div class="f-group"><label class="f-label">เบอร์ / LINE (ถ้ามี)</label><input id="hdf-phone" class="f-input" value="' + esc(t ? t.reporterPhone : '') + '"></div>'
     + catUrg
-    + '<div class="f-group"' + full + '><label class="f-label">หัวข้อ (สั้น ๆ)</label><input id="hdf-subject" class="f-input" value="' + esc(t ? t.subject : '') + '"></div>'
     + '<div class="f-group"' + full + '><label class="f-label">รายละเอียดปัญหา <span class="hd-req">*</span> <span style="color:var(--txt3);font-weight:400">(วางข้อความจากแชตได้เลย)</span></label><textarea id="hdf-desc" rows="3" class="f-input">' + esc(t ? t.description : '') + '</textarea>'
       + '<button type="button" class="btn btn-ghost btn-sm" style="margin-top:6px;" onclick="window.hdAiRunModal(this)">🤖 AI วิเคราะห์ (หมวด / Priority / แนวทางแก้)</button>'
       + '<div id="hdf-ai-out"></div></div>'
     + '<div class="f-group"><label class="f-label">Priority</label><select id="hdf-pri" class="f-input">' + prOpts + '</select></div>'
-    + '<div class="f-group"><label class="f-label">ผู้รับผิดชอบ</label><select id="hdf-assignee" class="f-input">' + asOpts + '</select></div>'
+    + '<div class="f-group"><label class="f-label">ผู้รับผิดชอบ <span class="hd-req">*</span></label><select id="hdf-assignee" class="f-input">' + asOpts + '</select></div>'
     + (t ? '' : '<div class="f-group"' + full + '><label class="f-label">แนบไฟล์ / รูป <span style="color:var(--txt3);font-weight:400">(เลือกได้หลายไฟล์)</span></label>'
       + '<input type="file" id="hdf-files" class="f-input" multiple accept="' + (window.HD_ATTACH_ACCEPT || '') + '">'
       + '<div style="font-size:11px;color:var(--txt3);margin-top:3px;">' + esc(window.HD_ATTACH_HINT || '') + '</div></div>')
@@ -738,10 +780,21 @@ function hdMarkInvalid(el, bad) {
 
 window.hdSaveTicket = async function () {
   var hospEl = document.getElementById('hdf-hosp'), hospVisEl = document.getElementById('hdf-hosp-cmb-input'), descEl = document.getElementById('hdf-desc');
+  var nameEl = document.getElementById('hdf-name'), catEl = document.getElementById('hdf-cat'), urgEl = document.getElementById('hdf-urg');
+  var sysEl = document.getElementById('hdf-sys'), sysVisEl = document.getElementById('hdf-sys-cmb-input'), assigneeEl = document.getElementById('hdf-assignee');
   var hosp = (hospEl || {}).value || '';
   var desc = ((descEl || {}).value || '').trim();
+  var reporterName = ((nameEl || {}).value || '').trim();
+  var categoryId = (catEl || {}).value || '';
+  var sourceSystem = (sysEl || {}).value || '';
+  var assignee = (assigneeEl || {}).value || '';
   var miss = [];
   hdMarkInvalid(hospVisEl, !hosp); if (!hosp) miss.push(hospVisEl);
+  hdMarkInvalid(nameEl, !reporterName); if (!reporterName) miss.push(nameEl);
+  hdMarkInvalid(catEl, !categoryId); if (!categoryId) miss.push(catEl);
+  if (urgEl) { hdMarkInvalid(urgEl, !urgEl.value); if (!urgEl.value) miss.push(urgEl); }
+  hdMarkInvalid(sysVisEl, !sourceSystem); if (!sourceSystem) miss.push(sysVisEl);
+  hdMarkInvalid(assigneeEl, !assignee); if (!assignee) miss.push(assigneeEl);
   hdMarkInvalid(descEl, !desc); if (!desc) miss.push(descEl);
   if (miss.length) {
     window.showAlert && window.showAlert('กรุณากรอกข้อมูลที่จำเป็น (มี * สีแดง) ให้ครบ', 'warn');
@@ -749,16 +802,15 @@ window.hdSaveTicket = async function () {
     return;
   }
   var priority = (document.getElementById('hdf-pri') || {}).value || 'p3';
-  var subject = ((document.getElementById('hdf-subject') || {}).value || '').trim() || desc.slice(0, 60);
-  var assignee = (document.getElementById('hdf-assignee') || {}).value || '';
+  var subject = desc.slice(0, 60);
 
   var common = {
     hospital_id: hosp,
     line_group_ref: ((document.getElementById('hdf-line') || {}).value || '').trim(),
-    reporter_name: ((document.getElementById('hdf-name') || {}).value || '').trim(),
+    reporter_name: reporterName,
     reporter_phone: ((document.getElementById('hdf-phone') || {}).value || '').trim(),
-    source_system: (document.getElementById('hdf-sys') || {}).value || '',
-    category_id: (document.getElementById('hdf-cat') || {}).value || '',
+    source_system: sourceSystem,
+    category_id: categoryId,
     subject: subject,
     description: desc,
     priority: priority,
@@ -803,6 +855,17 @@ window.hdSaveTicket = async function () {
     window.hdApplyLocal(id, row);
     var sysEv = await window.hdAddEvent(id, { type: 'system', actorType: 'system', body: 'สร้าง Ticket จากช่องทาง LINE' });
     if (assignee) await window.hdAddEvent(id, { type: 'assignment', body: 'มอบหมายให้ ' + ((gSt(assignee) || {}).name || '') });
+    if (priority === hdCriticalPriority() && window.sendHdUrgentNotify) {
+      var hName = (hdHosp(hosp) || {}).name || '-';
+      window.sendHdUrgentNotify(
+        '🔴 **ตั๋วด่วนที่สุด — ทำงานไม่ได้เลย**'
+        + '\n🎫 เลขที่: **' + row.ticket_no + '**'
+        + '\n🏢 โรงพยาบาล: ' + hName
+        + '\n👤 ผู้แจ้ง: ' + (reporterName || '-') + (common.reporter_phone ? ' · ' + common.reporter_phone : '')
+        + '\n📝 ' + desc.slice(0, 200)
+        + '\n📞 เข้าร่วมคุยสด: ' + hdJitsiUrl(row.ticket_no)
+      );
+    }
 
     var fEl = document.getElementById('hdf-files');
     if (fEl && fEl.files && fEl.files.length) {

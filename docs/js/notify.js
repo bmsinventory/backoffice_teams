@@ -67,6 +67,18 @@ window.renderNotifySettings=function(){
         ['💰','ปิดโครงการ/จ่ายเงินแล้ว + มูลค่าโครงการ (Stage: close)']
       ]
     })
+    +_tokenCard({
+      id:'notify-helpdesk-token',
+      title:'📞 แจ้งเตือน Helpdesk (ตั๋วด่วนที่สุด / โทรด่วน)',
+      desc:'Token สำหรับแจ้งเตือนตอนมีตั๋วระดับ "ทำงานไม่ได้เลย" เข้าใหม่ และตอนลูกค้ากดเข้าห้องคุยสด (Jitsi) สำเร็จจริง',
+      tokenVar:window.NOTIFY_HELPDESK_TOKEN||'',
+      saveFunc:'saveNotifyHelpdeskToken',
+      testFunc:'testNotifyHelpdesk',
+      events:[
+        ['🔴','ตั๋วด่วนที่สุดเข้าใหม่ (ทำงานไม่ได้เลย)'],
+        ['📞','ลูกค้ากดเข้าห้องคุยสดสำเร็จ']
+      ]
+    })
     +'</div>';
 };
 
@@ -108,6 +120,16 @@ window.saveNotifyProjectToken=async function(){
   try{
     await setDoc(getDocRef('SETTINGS','app'),{notify_project_token:val},{merge:true});
     window.NOTIFY_PROJECT_TOKEN=val;
+    if(msg){msg.textContent='✅ บันทึกแล้ว';setTimeout(function(){msg.textContent='';},2500);}
+  }catch(e){window.showDbError(e);}
+};
+
+window.saveNotifyHelpdeskToken=async function(){
+  var val=(document.getElementById('notify-helpdesk-token-input')||{}).value||'';
+  var msg=document.getElementById('notify-helpdesk-token-msg');
+  try{
+    await setDoc(getDocRef('SETTINGS','app'),{notify_helpdesk_token:val},{merge:true});
+    window.NOTIFY_HELPDESK_TOKEN=val;
     if(msg){msg.textContent='✅ บันทึกแล้ว';setTimeout(function(){msg.textContent='';},2500);}
   }catch(e){window.showDbError(e);}
 };
@@ -170,6 +192,13 @@ window.testNotifyProject = async function() {
     window.NOTIFY_PROJECT_TOKEN || '',
     '🚀 **ทดสอบ: เริ่มดำเนินการโครงการแล้ว**\n' + _projNotifyBlock(fake),
     'notify-project-token-msg'
+  );
+};
+window.testNotifyHelpdesk = async function() {
+  await _testWithFeedback(
+    window.NOTIFY_HELPDESK_TOKEN || '',
+    '🔴 **ทดสอบ: ตั๋วด่วนที่สุด — ทำงานไม่ได้เลย**\n🎫 เลขที่: [ทดสอบ]\n🏢 โรงพยาบาล: ทดสอบ',
+    'notify-helpdesk-token-msg'
   );
 };
 
@@ -300,6 +329,18 @@ window.checkDailyNotifications=async function(){
       _notiMark('proj_end',p.id);
     }
   }
+};
+
+// ── HELPDESK URGENT NOTIFY (ตั๋วด่วนที่สุด / ลูกค้าเข้าห้องคุยสดแล้ว) ─────────────
+// ใช้ token จาก Admin Panel → 🔔 ตั้งค่าการแจ้งเตือน เหมือน sendLeaveNotify/sendAdvanceNotify/
+// sendProjectNotify — เรียกจากแอปหลัก (helpdesk.js) ที่โหลด window.NOTIFY_HELPDESK_TOKEN ไว้แล้วตอน boot
+window.sendHdUrgentNotify = async function (content) {
+  var token = window.NOTIFY_HELPDESK_TOKEN || '';
+  if (!token) return;
+  try {
+    var r = await _doNotifyFetch(token, content);
+    if (!r.ok) console.warn('Helpdesk urgent notify HTTP ' + r.status + ':', r.body);
+  } catch (e) { console.warn('Helpdesk urgent notify error:', e); }
 };
 
 // ── LEAVE NOTIFY (existing) ───────────────────────────────────────────────────
