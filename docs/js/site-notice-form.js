@@ -162,6 +162,10 @@ window.snlBuildHtml = function () {
       </div>
 
       <div class="f-grid">
+        <div class="f-group"><label class="f-label">วันที่ดำเนินงานที่บริษัท (เตรียมงานก่อนออกไซต์ — ไม่บังคับ)</label><input type="date" class="f-input" id="snl-office-work-start" onchange="window.snlRenderPreview()"></div>
+        <div class="f-group"><label class="f-label">ถึงวันที่</label><input type="date" class="f-input" id="snl-office-work-end" onchange="window.snlRenderPreview()"></div>
+      </div>
+      <div class="f-grid">
         <div class="f-group"><label class="f-label">วันที่ดำเนินงาน (เริ่ม)</label><input type="date" class="f-input" id="snl-work-start" onchange="window.snlRenderPreview()"></div>
         <div class="f-group"><label class="f-label">ถึงวันที่</label><input type="date" class="f-input" id="snl-work-end" onchange="window.snlRenderPreview()"></div>
       </div>
@@ -349,6 +353,7 @@ window.snlRenderPreview = function () {
       </div>
     </div>
 
+    ${(snlV('snl-office-work-start') || snlV('snl-office-work-end')) ? '<div class="snl-row">วันที่ดำเนินงาน <span class="snl-fill">' + (snlV('snl-office-work-start') ? fd(snlV('snl-office-work-start')) : '&nbsp;') + '</span> – <span class="snl-fill">' + (snlV('snl-office-work-end') ? fd(snlV('snl-office-work-end')) : '&nbsp;') + '</span> สถานที่ <span class="snl-fill snl-grow">บริษัท บางกอก เมดิคอล ซอฟต์แวร์ จำกัด</span></div>' : ''}
     <div class="snl-row">วันที่ดำเนินงาน <span class="snl-fill">${snlV('snl-work-start') ? fd(snlV('snl-work-start')) : '&nbsp;'}</span> – <span class="snl-fill">${snlV('snl-work-end') ? fd(snlV('snl-work-end')) : '&nbsp;'}</span> สถานที่ <span class="snl-fill snl-grow">${esc(snlV('snl-site-location')) || '&nbsp;'}</span></div>
 
     <div class="snl-box-section">
@@ -536,6 +541,8 @@ window.snlGatherData = function () {
     copydata_status: snlV('snl-copydata-status'),
     work_start: snlV('snl-work-start') || null,
     work_end: snlV('snl-work-end') || null,
+    office_work_start: snlV('snl-office-work-start') || null,
+    office_work_end: snlV('snl-office-work-end') || null,
     site_location: snlV('snl-site-location').trim(),
     attendees: attendees,
     addressee_key: addresseeEl ? addresseeEl.value : 'hospital_director',
@@ -571,7 +578,7 @@ window.snlNewForm = function () {
   ['snl-doc-no','snl-requester-name','snl-requester-position','snl-requester-dept',
    'snl-system-other-note','snl-revisit-no','snl-revisit-total',
    'snl-ma-no','snl-ma-total','snl-present-type','snl-task-other-note','snl-delivery-no','snl-delivery-total',
-   'snl-copydata-status','snl-work-start','snl-work-end','snl-site-location','snl-addressee-other-note',
+   'snl-copydata-status','snl-office-work-start','snl-office-work-end','snl-work-start','snl-work-end','snl-site-location','snl-addressee-other-note',
    'snl-contract-no','snl-contract-amount','snl-contract-date','snl-quote-no','snl-email-to','snl-email-cc'].forEach(function (id) {
     var el = document.getElementById(id); if (el) el.value = '';
   });
@@ -627,6 +634,8 @@ window.snlLoadForm = function (id) {
   set('snl-delivery-total', f.deliveryTotal);
   setChk('snl-task-copydata', f.taskCopydata);
   set('snl-copydata-status', f.copydataStatus);
+  set('snl-office-work-start', f.officeWorkStart);
+  set('snl-office-work-end', f.officeWorkEnd);
   set('snl-work-start', f.workStart);
   set('snl-work-end', f.workEnd);
   set('snl-site-location', f.siteLocation);

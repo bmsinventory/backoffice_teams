@@ -854,6 +854,8 @@ CREATE TABLE IF NOT EXISTS site_notice_forms (
   copydata_status       TEXT DEFAULT '',
   work_start            DATE,
   work_end              DATE,
+  office_work_start     DATE,
+  office_work_end       DATE,
   site_location          TEXT DEFAULT '',
   attendees             JSONB DEFAULT '[]',
   addressee_key         TEXT DEFAULT 'hospital_director',
@@ -876,6 +878,12 @@ CREATE INDEX IF NOT EXISTS idx_ecf_created_at  ON expense_clearing_forms (create
 CREATE INDEX IF NOT EXISTS idx_sdf_hospital_id ON site_deploy_forms (hospital_id);
 CREATE INDEX IF NOT EXISTS idx_sdf_created_at  ON site_deploy_forms (created_at);
 CREATE INDEX IF NOT EXISTS idx_snl_created_at  ON site_notice_forms (created_at);
+
+-- ── Migration: ช่วงวันที่ทำงานที่บริษัท (เตรียมงานก่อนออกไซต์) — แสดงเป็นบรรทัด "วันที่ดำเนินงาน ... สถานที่
+-- บริษัท บางกอก เมดิคอล ซอฟต์แวร์ จำกัด" แยกต่างหาก อยู่บนสุดเหนือบรรทัด work_start/work_end (สถานที่ปลายทาง)
+-- เดิมในเอกสารพิมพ์ — ไม่บังคับกรอก เว้นว่างได้ถ้าไม่มีช่วงเตรียมงานที่บริษัทก่อนออกไซต์ ──
+ALTER TABLE site_notice_forms ADD COLUMN IF NOT EXISTS office_work_start DATE;
+ALTER TABLE site_notice_forms ADD COLUMN IF NOT EXISTS office_work_end DATE;
 
 ALTER TABLE expense_clearing_forms ENABLE ROW LEVEL SECURITY;
 ALTER TABLE site_deploy_forms      ENABLE ROW LEVEL SECURITY;

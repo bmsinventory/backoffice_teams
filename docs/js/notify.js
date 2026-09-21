@@ -368,8 +368,9 @@ window.sendLeaveNotify=async function(eventType,lv){
     var lvId=lv.leave_id||lv.id||'';
     var _appBase=(window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1')
       ?(window.location.origin+window.location.pathname)
-      :'https://bmsinventory.github.io/backoffice_teams/';
-    var lvLink=lvId?(_appBase+'#leave='+lvId):'';
+      :'https://backoffice-teams.bmscloud.in.th/';
+    // ── ลิงก์แนบ &approve=1 เฉพาะตอนสถานะยังรออนุมัติ — กดลิงก์แล้วเด้งไปที่รายการพร้อมเปิดกล่องยืนยันอนุมัติทันที ──
+    var lvLink=lvId?(_appBase+'#leave='+lvId+(statusKey==='pending'?'&approve=1':'')):'';
     var baseInfo='👤 ชื่อ: **'+st.name+'**'
       +(st.role?'\n💼 ตำแหน่ง: '+st.role:'')
       +(st.dept?'\n🏢 แผนก: '+st.dept:'')

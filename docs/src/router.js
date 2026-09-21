@@ -143,22 +143,35 @@
   };
 
   // ── Handle Deep Links from URL hash ──
+  // รองรับ param ต่อท้ายด้วย & เช่น #leave=LV123&approve=1 (จากลิงก์แจ้งเตือน BMS Notify)
   window._handleDeepLink = function () {
     var hash = location.hash.replace('#', '');
     if (!hash) return;
     var eqIdx = hash.indexOf('=');
     if (eqIdx > -1) {
       var module = hash.slice(0, eqIdx);
-      var itemId = hash.slice(eqIdx + 1);
+      var rest = hash.slice(eqIdx + 1).split('&');
+      var itemId = rest[0];
+      var params = {};
+      rest.slice(1).forEach(function (p) {
+        var i = p.indexOf('=');
+        if (i > -1) params[p.slice(0, i)] = decodeURIComponent(p.slice(i + 1));
+      });
       if (module && window.ROUTE_MAP && window.ROUTE_MAP[module]) {
         window.goView(module);
         setTimeout(function () {
           var card = document.querySelector('[data-leave-id="' + itemId + '"]');
-          if (!card) return;
-          card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          card.style.outline = '2px solid var(--violet)';
-          card.style.boxShadow = '0 0 0 5px rgba(124,92,252,.25)';
-          setTimeout(function () { card.style.outline = ''; card.style.boxShadow = ''; }, 2500);
+          if (card) {
+            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            card.style.outline = '2px solid var(--violet)';
+            card.style.boxShadow = '0 0 0 5px rgba(124,92,252,.25)';
+            setTimeout(function () { card.style.outline = ''; card.style.boxShadow = ''; }, 2500);
+          }
+          // ── ลิงก์ "อนุมัติด่วน" จากแจ้งเตือน — เปิดกล่องยืนยันอนุมัติทันที (ยังต้องกดยืนยันอีกที กันกดพลาด) ──
+          if (module === 'leave' && params.approve === '1' && window.approveLeave) {
+            var lv = (window.LEAVES || []).find(function (x) { return x.id === itemId; });
+            if (lv && lv.status === 'pending') window.approveLeave(itemId);
+          }
         }, 350);
       }
     } else if (window.ROUTE_MAP && window.ROUTE_MAP[hash]) {

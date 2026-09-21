@@ -328,9 +328,9 @@
    (ฟอนต์ระบบ ไม่ใช่ web font ไม่ต้องโหลดจากเน็ต) ไม่มีก็ fallback ไปฟอนต์ไทยทั่วไปที่มักมีอยู่แล้ว ──
    font-family บน .imt-idoc สืบทอดลงลูกทุกตัว (หัวเรื่อง/ตาราง/ช่องเซ็นชื่อ) โดยไม่ต้องตั้งซ้ำ */
 .imt-idoc { font-family: 'TH SarabunPSK', 'TH Sarabun New', 'Sarabun', Tahoma, sans-serif; color: #000; font-size: 12px; background: #fff; padding: 6px; }
-.imt-idoc-head { border-bottom: 2.5px solid #1c4587; padding-bottom: 8px; margin-bottom: 0; }
-.imt-idoc-headerimg { display: block; width: 430px; max-width: 60%; height: auto; }
-.imt-idoc-title  { text-align: center; font-weight: 700; font-size: 16px; color: #000; border-bottom: 2px solid #000; padding: 8px 0; margin: 0 0 10px; }
+.imt-idoc-head { padding-bottom: 8px; margin-bottom: 0; }
+.imt-idoc-headerimg { display: block; width: 344px; max-width: 60%; height: auto; }
+.imt-idoc-title  { text-align: center; font-weight: 700; font-size: 20px; color: #000; padding: 8px 0; margin: 0 0 10px; }
 /* table-layout:fixed ใช้ความกว้างจาก <colgroup> ใน imtIssuePrintDocHtml() ตรง ๆ แทนการยืดตามเนื้อหา
    ยาว/สั้น — คู่กับ overflow-wrap ให้ข้อความยาว (ปัญหา/วิธีการแก้ไข) ตัดบรรทัดอยู่ในคอลัมน์ ไม่ดันตาราง
    กว้างล้นหน้ากระดาษ A4 แนวนอนออกไป — overflow:hidden กันเคสคอลัมน์แคบมาก (ลำดับ/วันที่) ที่ข้อความ

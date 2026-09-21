@@ -95,11 +95,20 @@
     }
   };
 
+  // ── ทุก onSnapshot ที่ยัง active อยู่ — ให้ visibilitychange listener ด้านล่างเรียก fetch ซ้ำได้ทั้งหมด
+  // (ใช้ตอนกลับมาที่แท็บหลังพักไว้นาน เผื่อ browser suspend WebSocket ตอนอยู่ background) ──
+  var _liveFetchers = [];
+
   // ── onSnapshot (realtime) ──
   window.onSnapshot = function (ref, callback, onError) {
     var isDoc   = ref._type === 'doc';
     var sbTable = ref._sb;
     var docId   = ref._id;
+    var _removed = false;
+    var _channel = null;
+    var _retryTimer = null;
+    var _retryDelay = 2000; // exponential backoff เริ่ม 2s, cap 30s
+    var _reconnectPending = false; // กันจอง retry ซ้อนกันหลายอันตอน event ยิงรัว ๆ
 
     async function _fetch() {
       try {
@@ -118,6 +127,7 @@
     }
 
     _fetch();
+    _liveFetchers.push(_fetch);
 
     var _debTimer = null;
     function _debouncedFetch() {
@@ -125,15 +135,59 @@
       _debTimer = setTimeout(_fetch, DEBOUNCE_MS);
     }
 
-    var channelName = 'snap-' + sbTable + (isDoc ? '-' + docId : '');
-    var channel = _sb.channel(channelName)
-      .on('postgres_changes', { event:'*', schema:'public', table:sbTable }, function () { _debouncedFetch(); })
-      .subscribe(function (status) {
-        if (status === 'CHANNEL_ERROR') console.warn('[db.service] Realtime subscribe error [' + sbTable + ']');
-      });
+    // ── ตั้ง subscribe ใหม่ทุกครั้งที่ channel หลุด (network blip / proxy ตัด connection ที่ค้างไว้นาน /
+    // browser suspend WebSocket ตอนแท็บอยู่ background ฯลฯ) — supabase-js "ไม่" join channel เดิมคืนให้
+    // อัตโนมัติเสมอไปในทุกกรณี ถ้าไม่ resubscribe เอง ตารางนี้จะหยุดอัปเดตแบบ realtime เงียบๆ
+    // (ต้องกด F5 ถึงจะเห็นข้อมูลใหม่) — เป็นจุดเดียวที่ทุก collection ในระบบใช้ร่วมกัน แก้ที่นี่ที่เดียวครอบคลุมทั้งหมด
+    //
+    // ระวัง: ตั้งใจ "ไม่" ตอบสนอง status 'CLOSED' — ทดสอบจริงพบว่า removeChannel() ของเราเอง (ตอน retry)
+    // ก็ทำให้ channel เดิมยิง 'CLOSED' กลับมาที่ callback นี้ด้วย ถ้าปฏิบัติกับมันเหมือน error จะกลาย
+    // เป็นวนซ้อน retry ไม่จบ (ตัวเองสร้าง CLOSED ให้ตัวเองอีกที) จนยิง reconnect รัวหลักพัน/วินาทีถล่ม
+    // Realtime server เอง (เจอจริงตอนทดสอบจำลอง disconnect) — CHANNEL_ERROR/TIMED_OUT ที่มาจาก
+    // การหลุดจริงจะจับได้ก่อน CLOSED เสมอ (state machine ของ Phoenix channel: errored → closed)
+    // จึงพอแล้วที่จะ react แค่ 2 status นี้ และมี guard _reconnectPending กันจองซ้อนตอน event รัว ──
+    function _subscribe() {
+      var myChannel;
+      var channelName = 'snap-' + sbTable + (isDoc ? '-' + docId : '') + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+      myChannel = _sb.channel(channelName)
+        .on('postgres_changes', { event:'*', schema:'public', table:sbTable }, function () { _debouncedFetch(); })
+        .subscribe(function (status) {
+          if (_removed || myChannel !== _channel) return; // channel เก่าที่ถูกแทนที่ไปแล้ว — เมิน event สาย
+          if (status === 'SUBSCRIBED') { _retryDelay = 2000; _reconnectPending = false; return; }
+          if ((status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') && !_reconnectPending) {
+            _reconnectPending = true;
+            var delay = _retryDelay;
+            _retryDelay = Math.min(_retryDelay * 2, 30000);
+            console.warn('[db.service] Realtime ' + status + ' [' + sbTable + '] — reconnect in ' + delay + 'ms');
+            clearTimeout(_retryTimer);
+            _retryTimer = setTimeout(function () {
+              _reconnectPending = false;
+              if (_removed) return;
+              _sb.removeChannel(myChannel);
+              _subscribe();
+              _fetch(); // เผื่อพลาด event ระหว่างหลุดการเชื่อมต่อ
+            }, delay);
+          }
+        });
+      _channel = myChannel;
+    }
+    _subscribe();
 
-    return function () { _sb.removeChannel(channel); };
+    return function () {
+      _removed = true;
+      clearTimeout(_retryTimer);
+      if (_channel) _sb.removeChannel(_channel);
+      var idx = _liveFetchers.indexOf(_fetch);
+      if (idx > -1) _liveFetchers.splice(idx, 1);
+    };
   };
+
+  // ── กลับมาที่แท็บหลังพักไว้ (สลับแท็บ/สลับแอพมือถือ) — บาง browser suspend WebSocket ตอน background
+  // ทำให้พลาด event ระหว่างนั้น รีเฟรชข้อมูลทุก collection ที่ subscribe อยู่ทันทีกันตกหล่น ──
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState !== 'visible') return;
+    _liveFetchers.slice().forEach(function (fn) { fn(); });
+  });
 
   // ── Own-Write Suppression: prevent realtime echo from re-rendering ──
   window._ownWrite      = window._ownWrite      || {};

@@ -101,12 +101,22 @@
     document.querySelectorAll('.view').forEach(function (v) { v.classList.remove('on'); });
     document.querySelectorAll('.nav-btn').forEach(function (n) { n.classList.remove('on'); });
     document.querySelectorAll('.bottom-nav-item').forEach(function (n) { n.classList.remove('active'); });
-    try { history.replaceState(null, '', location.pathname); } catch (e) {}
+
+    // ── รักษา deep link (เช่น #leave=LV123&approve=1 จากลิงก์แจ้งเตือน) ข้ามหน้า login ──
+    // ถ้า hash ตอนเปิดหน้าตรงกับ module ที่รู้จัก ให้เก็บ hash ไว้แล้วเปิดตรงนั้นแทน default view
+    var _dlHash = location.hash.replace('#', '');
+    var _dlEq = _dlHash.indexOf('=');
+    var _dlModule = _dlEq > -1 ? _dlHash.slice(0, _dlEq) : _dlHash;
+    var _hasDeepLink = !!(_dlModule && window.ROUTE_MAP && window.ROUTE_MAP[_dlModule]);
+    if (!_hasDeepLink) {
+      try { history.replaceState(null, '', location.pathname); } catch (e) {}
+    }
+    var _goAfterLoad = _hasDeepLink ? window._handleDeepLink : window._goDefaultView;
 
     if (window.isDbLoaded) {
       window.setupUser && window.setupUser();
       window.renderAll && window.renderAll();
-      window._goDefaultView && window._goDefaultView();
+      _goAfterLoad && _goAfterLoad();
     } else {
       window.showLoader && window.showLoader('กำลังโหลดข้อมูล...');
       window.setupUser && window.setupUser();
@@ -114,13 +124,13 @@
         if (window.isDbLoaded) {
           clearInterval(waitRender);
           window.renderAll && window.renderAll();
-          window._goDefaultView && window._goDefaultView();
+          _goAfterLoad && _goAfterLoad();
         }
       }, 300);
       setTimeout(function () {
         clearInterval(waitRender);
         window.renderAll && window.renderAll();
-        window._goDefaultView && window._goDefaultView();
+        _goAfterLoad && _goAfterLoad();
       }, 15000);
     }
   }

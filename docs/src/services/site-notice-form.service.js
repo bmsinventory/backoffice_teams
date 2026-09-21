@@ -39,6 +39,8 @@
       copydataStatus: d.copydata_status || '',
       workStart: d.work_start || '',
       workEnd: d.work_end || '',
+      officeWorkStart: d.office_work_start || '',
+      officeWorkEnd: d.office_work_end || '',
       siteLocation: d.site_location || '',
       attendees: Array.isArray(d.attendees) ? d.attendees : [],
       addresseeKey: d.addressee_key || 'hospital_director',
