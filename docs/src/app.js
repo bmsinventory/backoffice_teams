@@ -115,6 +115,18 @@
     } else {
       if (td) td.style.display = 'none';
     }
+
+    // Sync pending-leave badge (นับคำขอลาที่ยังไม่อนุมัติ)
+    var pend = (window.LEAVES || []).filter(function (l) { return l.status === 'pending'; }).length;
+    var lvNb = document.getElementById('leave-nb');
+    if (lvNb) { lvNb.textContent = pend; lvNb.style.display = pend ? '' : 'none'; }
+    var bLvNb = document.getElementById('bnav-leave-badge');
+    if (bLvNb) { bLvNb.textContent = pend; bLvNb.style.display = pend ? '' : 'none'; }
+
+    // Sync new-helpdesk-ticket badge (นับ ticket ที่ยังไม่ได้ triage/assign)
+    var hdNew = (window.HELPDESK_TICKETS || []).filter(function (t) { return t.status === 'new'; }).length;
+    var hdNb = document.getElementById('hd-nb');
+    if (hdNb) { hdNb.textContent = hdNew; hdNb.style.display = hdNew ? '' : 'none'; }
   };
 
   // ── Render All Active Views ──
@@ -148,6 +160,7 @@
       'view-worklog':      'renderWorkLog',
       'view-impl-tracker': 'renderImplTracker',
       'view-helpdesk':     'renderHelpdesk',
+      'view-all-issues':   'renderAllIssuesOverview',
     };
 
     Object.keys(renders).forEach(function (viewId) {

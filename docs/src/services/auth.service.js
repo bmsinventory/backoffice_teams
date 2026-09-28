@@ -103,11 +103,14 @@
     document.querySelectorAll('.bottom-nav-item').forEach(function (n) { n.classList.remove('active'); });
 
     // ── รักษา deep link (เช่น #leave=LV123&approve=1 จากลิงก์แจ้งเตือน) ข้ามหน้า login ──
-    // ถ้า hash ตอนเปิดหน้าตรงกับ module ที่รู้จัก ให้เก็บ hash ไว้แล้วเปิดตรงนั้นแทน default view
+    // ต้องเป็น hash แบบ "module=itemId&params" (มี "=") เท่านั้นถึงถือว่าเป็นลิงก์แจ้งเตือนจริง — hash
+    // เปล่า ๆ แค่ชื่อ module (เช่น #kanban, #all_issues) เป็นแค่ร่องรอยจาก history.replaceState ตอนสลับ
+    // view ปกติ (ดู goTo ใน router.js) ไม่ใช่ deep link ที่ตั้งใจ ถ้านับรวมด้วยจะทำให้ผู้ใช้ล็อกอินใหม่แล้ว
+    // ถูกพากลับไป view เดิมที่ค้างอยู่ในแถบ URL เสมอ แทนที่จะเข้า default view ตามสิทธิ์ตามปกติ ──
     var _dlHash = location.hash.replace('#', '');
     var _dlEq = _dlHash.indexOf('=');
-    var _dlModule = _dlEq > -1 ? _dlHash.slice(0, _dlEq) : _dlHash;
-    var _hasDeepLink = !!(_dlModule && window.ROUTE_MAP && window.ROUTE_MAP[_dlModule]);
+    var _dlModule = _dlEq > -1 ? _dlHash.slice(0, _dlEq) : '';
+    var _hasDeepLink = !!(_dlEq > -1 && _dlModule && window.ROUTE_MAP && window.ROUTE_MAP[_dlModule]);
     if (!_hasDeepLink) {
       try { history.replaceState(null, '', location.pathname); } catch (e) {}
     }

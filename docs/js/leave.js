@@ -420,6 +420,7 @@ window.saveLeave=async function(){
     window._applyLocalDoc('LEAVES',id,rec);
     window.renderLeave&&window.renderLeave();
     window.renderCalendar&&window.renderCalendar();
+    window.updateBadge&&window.updateBadge();
     window.closeM('m-leave');
     var notifyType=eid?'edit':'new';
     if(statusVal==='rejected') notifyType='rejected';
@@ -438,6 +439,7 @@ window.deleteLeave=function(id){
     window._removeLocalDoc('LEAVES',id);
     window.renderLeave&&window.renderLeave();
     window.renderCalendar&&window.renderCalendar();
+    window.updateBadge&&window.updateBadge();
     deleteDoc(getDocRef('LEAVES',id)).catch(function(e){window.showDbError(e);});
   },{icon:'🗑',title:'ยืนยันการลบ',okColor:'var(--coral)',okText:'ลบ'});
 };

@@ -368,6 +368,7 @@ window._WL_NOTIFY_DATA = {};      // sid -> { staff, projs:[{p,periods}] }
 window._WL_NOTIFY_ROWS = [];      // มุมมองรายคน เรียงตามวันที่เข้าไซต์เร็วสุดก่อน
 window._WL_NOTIFY_TEAM_ROWS = []; // มุมมองรายทีม/โครงการ: [{p, entries:[{label,s,e,staff:[...]}]}]
 window._wlNotifyView = 'staff';
+window._wlNotifyFilter = { staffName: '', teamName: '', type: '' }; // ตัวกรอง — แยกค่าค้นหาต่อมุมมอง ไม่ทับกัน
 var WL_NOTIFY_COLLAPSE_AT = 4; // คนที่มีงานเกินจำนวนนี้ จะพับซ่อนส่วนเกินไว้ ให้การ์ดไม่ยาวเกินไป
 
 window.openWlNotifyReport = function() {
@@ -428,6 +429,16 @@ window.openWlNotifyReport = function() {
   window._WL_NOTIFY_ROWS = rows;
   window._WL_NOTIFY_TEAM_ROWS = teamRows;
 
+  window._wlNotifyFilter = { staffName: '', teamName: '', type: '' };
+  var nameInput = document.getElementById('wl-notify-filter-name');
+  if (nameInput) nameInput.value = '';
+  var typeSel = document.getElementById('wl-notify-filter-type');
+  if (typeSel) {
+    typeSel.innerHTML = '<option value="">ทุกประเภทโครงการ</option>' +
+      (window.PTYPES || []).map(function(t) { return '<option value="' + esc(t.id) + '">' + esc(t.label) + '</option>'; }).join('');
+    typeSel.value = '';
+  }
+
   window.wlNotifySetView(window._wlNotifyView || 'staff');
   window.openM('m-wl-notify');
 };
@@ -443,16 +454,70 @@ window.wlNotifySetView = function(mode) {
     el.style.color = on ? '#fff' : 'var(--txt2)';
     el.style.border = '1px solid ' + (on ? 'var(--violet)' : 'var(--border)');
   });
+  var nameInput = document.getElementById('wl-notify-filter-name');
+  if (nameInput) {
+    nameInput.placeholder = mode === 'team' ? 'ค้นหาชื่อโครงการ...' : 'ค้นหาชื่อพนักงาน...';
+    nameInput.value = mode === 'team' ? window._wlNotifyFilter.teamName : window._wlNotifyFilter.staffName;
+  }
+  var typeSel = document.getElementById('wl-notify-filter-type');
+  if (typeSel) { typeSel.style.display = mode === 'team' ? '' : 'none'; typeSel.value = window._wlNotifyFilter.type; }
+  window.wlNotifyRenderBody();
+};
+
+// ── รับค่าจากช่องค้นหา/ตัวกรองประเภท แล้วเรนเดอร์ใหม่ (เก็บค่าแยกต่อมุมมอง ไม่ให้สลับแท็บแล้วค่าหาย) ──
+window.wlNotifyApplyFilter = function() {
+  var nameInput = document.getElementById('wl-notify-filter-name');
+  var typeSel = document.getElementById('wl-notify-filter-type');
+  var v = nameInput ? nameInput.value.trim() : '';
+  if (window._wlNotifyView === 'team') {
+    window._wlNotifyFilter.teamName = v;
+    window._wlNotifyFilter.type = typeSel ? typeSel.value : '';
+  } else {
+    window._wlNotifyFilter.staffName = v;
+  }
+  window.wlNotifyRenderBody();
+};
+
+window.wlNotifyRenderBody = function() {
   var body = document.getElementById('m-wl-notify-body');
   if (!body) return;
-  if (mode === 'team') {
-    body.innerHTML = window._WL_NOTIFY_TEAM_ROWS.length
-      ? '<div style="display:flex;flex-direction:column;gap:14px;">' + window._WL_NOTIFY_TEAM_ROWS.map(_wlNotifyTeamCardHtml).join('') + '</div>'
-      : '<div style="padding:40px;text-align:center;color:var(--txt3);">✅ ไม่มีโครงการที่ยังไม่ถึงวันเข้าไซต์</div>';
+  if (window._wlNotifyView === 'team') {
+    var q = (window._wlNotifyFilter.teamName || '').toLowerCase();
+    var ty = window._wlNotifyFilter.type || '';
+    var filtered = window._WL_NOTIFY_TEAM_ROWS.filter(function(t) {
+      return (!q || t.p.name.toLowerCase().indexOf(q) > -1) && (!ty || t.p.typeId === ty);
+    });
+    if (!filtered.length) {
+      body.innerHTML = '<div style="padding:40px;text-align:center;color:var(--txt3);">' +
+        (window._WL_NOTIFY_TEAM_ROWS.length ? '🔍 ไม่พบโครงการที่ตรงกับตัวกรอง' : '✅ ไม่มีโครงการที่ยังไม่ถึงวันเข้าไซต์') + '</div>';
+      return;
+    }
+    // จัดกลุ่มตามประเภทโครงการ เรียงกลุ่มตามชื่อประเภท (ก-ฮ)
+    var groups = {}, order = [];
+    filtered.forEach(function(t) {
+      var tid = t.p.typeId || '';
+      if (!groups[tid]) { groups[tid] = []; order.push(tid); }
+      groups[tid].push(t);
+    });
+    order.sort(function(a, b) { return (gT(a).label || '').localeCompare(gT(b).label || '', 'th'); });
+    body.innerHTML = order.map(function(tid) {
+      var t0 = gT(tid);
+      var list = groups[tid];
+      var headerHtml = '<div style="display:flex;align-items:center;gap:8px;margin:4px 0 2px;">' +
+        '<div style="width:4px;height:14px;border-radius:2px;background:' + (t0.color || '#9ba3b8') + ';flex-shrink:0;"></div>' +
+        '<span style="font-size:12px;font-weight:700;color:var(--txt);">🏷 ' + esc(t0.label || '(ไม่ระบุประเภท)') + '</span>' +
+        '<span style="font-size:10px;background:var(--surface);border:1px solid var(--border);color:var(--txt3);padding:1px 8px;border-radius:10px;">' + list.length + ' โครงการ</span>' +
+      '</div>';
+      return headerHtml + '<div style="display:flex;flex-direction:column;gap:14px;margin-bottom:14px;">' + list.map(_wlNotifyTeamCardHtml).join('') + '</div>';
+    }).join('');
   } else {
-    body.innerHTML = window._WL_NOTIFY_ROWS.length
-      ? '<div style="display:flex;flex-direction:column;gap:14px;">' + window._WL_NOTIFY_ROWS.map(_wlNotifyCardHtml).join('') + '</div>'
-      : '<div style="padding:40px;text-align:center;color:var(--txt3);">✅ ไม่มีวันเข้าไซต์ที่ยังไม่ถึง ที่มีทีมงานมอบหมายแล้ว</div>';
+    var q2 = (window._wlNotifyFilter.staffName || '').toLowerCase();
+    var filtered2 = window._WL_NOTIFY_ROWS.filter(function(r) {
+      return !q2 || r.staff.name.toLowerCase().indexOf(q2) > -1 || (r.staff.nickname || '').toLowerCase().indexOf(q2) > -1;
+    });
+    body.innerHTML = filtered2.length
+      ? '<div style="display:flex;flex-direction:column;gap:14px;">' + filtered2.map(_wlNotifyCardHtml).join('') + '</div>'
+      : '<div style="padding:40px;text-align:center;color:var(--txt3);">' + (window._WL_NOTIFY_ROWS.length ? '🔍 ไม่พบพนักงานที่ตรงกับตัวกรอง' : '✅ ไม่มีวันเข้าไซต์ที่ยังไม่ถึง ที่มีทีมงานมอบหมายแล้ว') + '</div>';
   }
 };
 

@@ -237,13 +237,22 @@
   };
 
   // ── AI ช่วยวิเคราะห์ (เรียกผ่าน nginx proxy /helpdesk-ai/ เท่านั้น) ─────────
+  // หมายเหตุ: ถ้า nginx ยังไม่ได้ตั้ง VLLM_UPSTREAM ตอน container start location /helpdesk-ai/
+  // จะไม่ถูกสร้างขึ้นเลย ทำให้ request หลุดไปเข้า SPA fallback แล้วได้ index.html (สถานะ 200) กลับมา
+  // แทน JSON — เช็ค content-type ก่อน parse เสมอ กันข้อความ error ดิบ "Unexpected token '<'" หลุดถึงผู้ใช้
+  async function _hdJsonOrThrow(res) {
+    var ct = res.headers.get('content-type') || '';
+    if (ct.indexOf('json') < 0) throw new Error('ระบบ AI ยังไม่พร้อมใช้งาน (proxy บนเซิร์ฟเวอร์ยังไม่ได้ตั้งค่า) — ติดต่อผู้ดูแลระบบ');
+    return res.json();
+  }
+
   var _hdAiModel = null;
   window.hdAiModel = async function () {
     if (_hdAiModel) return _hdAiModel;
     var res = await fetch(window.HD_AI_BASE + '/v1/models', { headers: { 'Accept': 'application/json' } });
     if (res.status === 404 || res.status === 502 || res.status === 503) throw new Error('ระบบยังไม่เปิดใช้งาน AI — ติดต่อผู้ดูแลระบบ');
     if (!res.ok) throw new Error('เรียก AI ไม่สำเร็จ (HTTP ' + res.status + ')');
-    var d = await res.json();
+    var d = await _hdJsonOrThrow(res);
     _hdAiModel = (d.data && d.data[0] && d.data[0].id) || (d.data && d.data[0]) || 'medgemma';
     return _hdAiModel;
   };
@@ -316,7 +325,7 @@
       }),
     });
     if (!res.ok) throw new Error('AI วิเคราะห์ไม่สำเร็จ (HTTP ' + res.status + ')');
-    var data = await res.json();
+    var data = await _hdJsonOrThrow(res);
     var content = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
     var out = _hdParseJson(content);
     var catOk = (window.HELPDESK_CATEGORIES || []).some(function (c) { return c.id === out.category_id; });
@@ -373,6 +382,7 @@
   window.onSnapshot(window.getColRef('HELPDESK_TICKETS'), function (s) {
     window.HELPDESK_TICKETS = s.docs.map(function (doc) { return tTicket(doc.data()); })
       .sort(function (a, b) { return (b.createdAt || '').localeCompare(a.createdAt || ''); });
+    window.updateBadge && window.updateBadge();
     if (window._ownWrite && window._ownWrite.HELPDESK_TICKETS) return;
     _rerenderIfOpen();
   }, function (e) { window.showDbErrorSoft && window.showDbErrorSoft(e, 'ศูนย์ช่วยเหลือ'); });

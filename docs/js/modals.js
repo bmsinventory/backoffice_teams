@@ -88,6 +88,24 @@ window.execDelete=async function(){
 }
 
 // ── IMPORT ──
+// เติมช่องเลือกโครงการปลายทางของ IMPL_ISSUES — ค่าเริ่มต้นซ่อนโครงการที่ "สิ้นสุดแล้วจริง" (เทียบวันที่
+// end กับวันนี้ตรง ๆ ไม่ใช่แค่เทียบปี พ.ศ. — โครงการที่จบไปแล้วตั้งแต่ต้นปีเดียวกันก็ต้องถูกซ่อนด้วย)
+// กันลิสต์ยาวเกินไปเมื่อสะสมโครงการเก่ามาหลายปี — ติ๊ก "แสดงโครงการในปีที่สิ้นสุดแล้วด้วย" เพื่อดึง
+// โครงการที่จบไปแล้วกลับมาแสดงด้วย ตอนต้องนำเข้าข้อมูลของโครงการเก่าจริง ๆ ──
+window.imtRefreshProjectImportOptions=function(){
+  const projSel=document.getElementById('import-imt-project');
+  if(!projSel)return;
+  const showEnded=(document.getElementById('import-imt-show-past-years')||{}).checked;
+  const today=new Date();today.setHours(0,0,0,0);
+  const prevSelected=projSel.value;
+  let list=(window.IMPL_PROJECTS||[]).slice();
+  if(!showEnded){
+    list=list.filter(p=>!p.end||pd(p.end)>=today);
+  }
+  list.sort((a,b)=>a.name.localeCompare(b.name,'th'));
+  projSel.innerHTML='<option value="">-- เลือกโครงการ --</option>'+list.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
+  if(prevSelected&&list.some(p=>p.id===prevSelected))projSel.value=prevSelected;
+};
 window.updateImportPreview=function(){
   const type=document.getElementById('import-type').value;
   const fileInput=document.getElementById('import-file');
@@ -96,6 +114,15 @@ window.updateImportPreview=function(){
   const formatBox=document.getElementById('import-format-preview');
   const templateBtn=document.getElementById('import-template-btn');
   const titleEl=document.getElementById('import-modal-title');
+  const imtProjectWrap=document.getElementById('import-imt-project-wrap');
+  const clearFirstLabel=document.getElementById('import-clear-first-label');
+  const clearFirstCb=document.getElementById('import-clear-first');
+  // ── ช่องเลือกโครงการปลายทาง (เฉพาะ IMPL_ISSUES) — ซ่อน/รีเซ็ตทุกครั้งที่สลับประเภทออกไปเป็นอย่างอื่น
+  // กันค่าที่เลือกไว้ค้างข้ามประเภท ── */
+  if(type!=='IMPL_ISSUES'){
+    if(imtProjectWrap)imtProjectWrap.style.display='none';
+    if(clearFirstLabel)clearFirstLabel.textContent='⚠ ลบข้อมูลเดิมก่อนนำเข้า';
+  }
   if(type==='CONTRACTS'){
     if(fileInput)fileInput.accept='.csv';
     if(fileLabel)fileLabel.textContent='2. เลือกไฟล์ CSV';
@@ -121,6 +148,23 @@ window.updateImportPreview=function(){
     if(formatBox)formatBox.textContent='hospital, reporter_name, phone, line_group, source_system, category, subject, description, priority, status, assignee, resolution, resolved_by, created_at, resolved_at (ดูคำอธิบายในไฟล์ Template)';
     if(templateBtn)templateBtn.textContent='📄 โหลดไฟล์ Template (.xlsx)';
     if(titleEl)titleEl.textContent='นำเข้าปัญหาเก่า HelpDesk (Excel)';
+    return;
+  }
+  if(type==='IMPL_ISSUES'){
+    if(fileInput)fileInput.accept='.xlsx,.xls,.csv';
+    if(fileLabel)fileLabel.textContent='2. เลือกไฟล์ Excel (.xlsx / .xls / .csv)';
+    if(msgEl)msgEl.innerHTML='1 แถว = 1 ปัญหาเก่า · 1 ไฟล์ = 1 โครงการ — เลือกโครงการปลายทางด้านบนก่อนกด "นำเข้า"';
+    if(formatBox)formatBox.textContent='created_at, department, reported_by, problem, category, severity, status, solution, received_by, fixed_by, fixed_date (ดูคำอธิบายในไฟล์ Template)';
+    if(templateBtn)templateBtn.textContent='📄 โหลดไฟล์ Template (.xlsx)';
+    if(titleEl)titleEl.textContent='นำเข้าปัญหาการใช้งานเก่า (Impl Tracker, Excel)';
+    if(imtProjectWrap){
+      imtProjectWrap.style.display='';
+      const pastYearsCb=document.getElementById('import-imt-show-past-years');
+      if(pastYearsCb)pastYearsCb.checked=false;
+      window.imtRefreshProjectImportOptions();
+    }
+    if(clearFirstLabel)clearFirstLabel.textContent='⚠ ลบปัญหาเดิมของโครงการนี้ทั้งหมดก่อนนำเข้า (กรณีนำเข้าซ้ำ — ลบเฉพาะปัญหาของโครงการที่เลือกไว้ด้านบนเท่านั้น ไม่กระทบโครงการอื่น)';
+    if(clearFirstCb)clearFirstCb.checked=false;
     return;
   }
   if(type==='HOSPITAL_CONTACTS'){
@@ -155,6 +199,7 @@ window.downloadTemplate=function(){
   if(type==='HOSPITAL_CONTACTS'){window.downloadHospitalContactsTemplate();return;}
   if(type==='HOSPITAL_PRODUCTS'){window.downloadHospitalProductsTemplate();return;}
   if(type==='HELPDESK'){window.hdDownloadImportTemplate&&window.hdDownloadImportTemplate();return;}
+  if(type==='IMPL_ISSUES'){window.imtDownloadIssueImportTemplate&&window.imtDownloadIssueImportTemplate();return;}
   const schema=window.IMPORT_SCHEMAS[type];if(!schema)return;const csvContent="data:text/csv;charset=utf-8,\uFEFF"+schema.headers.join(",")+"\n"+schema.example.join(",");const link=document.createElement("a");link.setAttribute("href",encodeURI(csvContent));link.setAttribute("download",`Template_${type}.csv`);document.body.appendChild(link);link.click();document.body.removeChild(link);
 }
 window.execImport=async function(){
@@ -199,6 +244,12 @@ window.execImport=async function(){
     };reader.readAsText(file);return;
   }
   if(selType==='HELPDESK'){window.closeM('m-import');window.hdImportFromFile&&window.hdImportFromFile(fileInput.files[0]);return;}
+  if(selType==='IMPL_ISSUES'){
+    const pid=(document.getElementById('import-imt-project')||{}).value||'';
+    if(!pid){document.getElementById('import-msg').innerHTML='<span style="color:var(--coral)">⚠ กรุณาเลือกโครงการปลายทางก่อน</span>';return;}
+    window.imtRunIssueImportInline&&await window.imtRunIssueImportInline(fileInput.files[0],pid,isClearFirst);
+    return;
+  }
   if(selType==='HOSPITALS'){window.closeM('m-import');await window.importHospitalsFromFile(fileInput.files[0]);return;}
   if(selType==='HOSPITAL_CONTACTS'){window.closeM('m-import');await window.importHospitalContactsFromFile(fileInput.files[0]);return;}
   if(selType==='HOSPITAL_PRODUCTS'){window.closeM('m-import');await window.importHospitalProductsFromFile(fileInput.files[0]);return;}

@@ -481,6 +481,7 @@ CREATE TABLE IF NOT EXISTS impl_projects (
   progress_percent NUMERIC DEFAULT 0,
   template_id      TEXT DEFAULT '',
   source_project_id TEXT DEFAULT '',
+  dashboard_token  TEXT UNIQUE,              -- กุญแจลิงก์ Public Dashboard (impl-dashboard.html?t=<token>)
   created_at       TIMESTAMPTZ DEFAULT NOW(),
   updated_at       TIMESTAMPTZ DEFAULT NOW()
 );
@@ -588,6 +589,13 @@ CREATE INDEX IF NOT EXISTS idx_impl_attachments_task_id ON impl_attachments (tas
 CREATE INDEX IF NOT EXISTS idx_impl_activity_project_id ON impl_activity_log (project_id);
 CREATE INDEX IF NOT EXISTS idx_impl_issues_project_id  ON impl_issues (project_id);
 CREATE INDEX IF NOT EXISTS idx_impl_issues_status      ON impl_issues (status);
+
+-- ── Migration: ลิงก์ Public Dashboard รายโครงการ (impl-dashboard.html?t=<token>) — กด "🖼️ Dashboard"
+-- ในแท็บ "ปัญหา" ของ Impl Tracker ครั้งแรกจะ generate token แบบสุ่มแล้วเก็บไว้ที่นี่ ให้เปิดดู/คัดลอกลิงก์
+-- ไปนำเสนอนอกระบบได้โดยไม่ต้อง login (RLS ของ impl_projects เปิด anon อยู่แล้ว — token คือ "กุญแจ" ที่ทำให้
+-- หน้า public เจาะจงได้แค่โครงการเดียว ไม่ใช่ตัว RLS เอง เหมือน helpdesk_tickets.access_token) ──
+ALTER TABLE impl_projects ADD COLUMN IF NOT EXISTS dashboard_token TEXT UNIQUE;
+CREATE INDEX IF NOT EXISTS idx_impl_projects_dash_token ON impl_projects (dashboard_token);
 
 ALTER TABLE impl_templates       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE impl_projects        ENABLE ROW LEVEL SECURITY;

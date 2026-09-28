@@ -78,7 +78,12 @@
       "Bash(node --check \"C:/Users/BMS/AppData/Local/Temp/claude/d-----------------------backoffice-teams---supabase/583c1637-5ae4-44cb-800a-c109f772a993/scratchpad/hd-import.js\")",
       "Bash(node -e \"const h=require\\('fs'\\).readFileSync\\('docs/index.html','utf8'\\);const o=\\(h.match\\(/<div\\\\b/g\\)||[]\\).length,c=\\(h.match\\(/<\\\\/div>/g\\)||[]\\).length;console.log\\('index.html div',o,c,o===c?'BALANCED':'DIFF'\\);console.log\\('m-hd-import present:',h.includes\\('id=\\\\\"m-hd-import\\\\\"'\\),h.includes\\('m-hd-import-run'\\)\\)\")",
       "Bash(node --check docs/js/modals.js)",
-      "Bash(node -e \"const h=require\\('fs'\\).readFileSync\\('docs/index.html','utf8'\\);const o=\\(h.match\\(/<div\\\\b/g\\)||[]\\).length,c=\\(h.match\\(/<\\\\/div>/g\\)||[]\\).length;console.log\\('div',o,c,o===c?'OK':'DIFF'\\);console.log\\('HELPDESK option:',h.includes\\('value=\\\\\"HELPDESK\\\\\"'\\)\\);console.log\\('still has hdOpenImport btn:',h.includes\\('hdOpenImport'\\)\\)\")"
+      "Bash(node -e \"const h=require\\('fs'\\).readFileSync\\('docs/index.html','utf8'\\);const o=\\(h.match\\(/<div\\\\b/g\\)||[]\\).length,c=\\(h.match\\(/<\\\\/div>/g\\)||[]\\).length;console.log\\('div',o,c,o===c?'OK':'DIFF'\\);console.log\\('HELPDESK option:',h.includes\\('value=\\\\\"HELPDESK\\\\\"'\\)\\);console.log\\('still has hdOpenImport btn:',h.includes\\('hdOpenImport'\\)\\)\")",
+      "Bash(node --check /tmp/help_inline.js)",
+      "Bash(node --check help_inline_check.js)",
+      "Bash(rm help_inline_check.js)",
+      "Bash(node --check docs/js/notify.js)",
+      "Read(//c/Program Files/Docker/Docker/**)"
     ],
     "additionalDirectories": [
       "C:\\Users\\BMS\\Desktop\\backoffice-teams\\public"

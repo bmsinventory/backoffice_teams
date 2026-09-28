@@ -162,11 +162,11 @@ window.snlBuildHtml = function () {
       </div>
 
       <div class="f-grid">
-        <div class="f-group"><label class="f-label">วันที่ดำเนินงานที่บริษัท (เตรียมงานก่อนออกไซต์ — ไม่บังคับ)</label><input type="date" class="f-input" id="snl-office-work-start" onchange="window.snlRenderPreview()"></div>
+        <div class="f-group"><label class="f-label">วันที่ดำเนินงานที่บริษัท (เตรียมงานก่อนออกไซต์ — คำนวณอัตโนมัติเป็น จ.-ศ. ของสัปดาห์ก่อนวันเริ่มงาน 1 สัปดาห์, ไม่บังคับ ลบได้ถ้าไม่ต้องการ)</label><input type="date" class="f-input" id="snl-office-work-start" onchange="window.snlRenderPreview()"></div>
         <div class="f-group"><label class="f-label">ถึงวันที่</label><input type="date" class="f-input" id="snl-office-work-end" onchange="window.snlRenderPreview()"></div>
       </div>
       <div class="f-grid">
-        <div class="f-group"><label class="f-label">วันที่ดำเนินงาน (เริ่ม)</label><input type="date" class="f-input" id="snl-work-start" onchange="window.snlRenderPreview()"></div>
+        <div class="f-group"><label class="f-label">วันที่ดำเนินงาน (เริ่ม)</label><input type="date" class="f-input" id="snl-work-start" onchange="window.snlOnWorkStartChange()"></div>
         <div class="f-group"><label class="f-label">ถึงวันที่</label><input type="date" class="f-input" id="snl-work-end" onchange="window.snlRenderPreview()"></div>
       </div>
       <div class="f-group">
@@ -408,6 +408,30 @@ window.snlOnSiteLocationChange = function () {
   window.snlRenderPreview();
 };
 
+// ── ช่วงวันเตรียมงานที่บริษัท: คำนวณอัตโนมัติเป็น จ.-ศ. ของสัปดาห์ก่อนหน้า "วันที่ดำเนินงาน (เริ่ม)" 1 สัปดาห์
+// ทุกครั้งที่วันเริ่มงานหน้างานเปลี่ยน (ผู้ใช้ยังลบ/แก้เองทีหลังได้ ถ้าไม่ต้องการช่วงเตรียมงานนี้) ──
+function snlToIso(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+window.snlComputeOfficeWorkDates = function () {
+  var ws = snlV('snl-work-start');
+  var startEl = document.getElementById('snl-office-work-start');
+  var endEl = document.getElementById('snl-office-work-end');
+  if (!ws) { if (startEl) startEl.value = ''; if (endEl) endEl.value = ''; return; }
+  var d = window.pd(ws);
+  d.setDate(d.getDate() - 7);
+  var mon = new Date(d);
+  mon.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // ถอยไปวันจันทร์ของสัปดาห์นั้น (0=อา..6=ส -> จ.=0)
+  var fri = new Date(mon);
+  fri.setDate(mon.getDate() + 4);
+  if (startEl) startEl.value = snlToIso(mon);
+  if (endEl) endEl.value = snlToIso(fri);
+};
+window.snlOnWorkStartChange = function () {
+  window.snlComputeOfficeWorkDates();
+  window.snlRenderPreview();
+};
+
 // ── Project Pick: ดึงข้อมูลจากโครงการติดตั้งระบบที่ยังไม่ถึงวันเริ่ม มาเติมฟอร์มอัตโนมัติ ──
 window.snlOnProjectPick = function () {
   var pid = snlV('snl-project-pick');
@@ -438,6 +462,7 @@ window.snlOnProjectPick = function () {
   // 3) วันที่ดำเนินงาน (เริ่ม) – ถึงวันที่
   var startEl = document.getElementById('snl-work-start'); if (startEl) startEl.value = p.start || '';
   var endEl = document.getElementById('snl-work-end'); if (endEl) endEl.value = p.end || '';
+  window.snlComputeOfficeWorkDates();
 
   // 4) รายชื่อผู้เข้าปฏิบัติงาน ← ทีมในโครงการ พร้อมตำแหน่ง
   var sids = (p.members && p.members.length ? p.members : (p.team || []).map(function (id) { return { sid: id }; }))

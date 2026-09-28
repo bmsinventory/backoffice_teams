@@ -32,6 +32,7 @@
 @import './modules/impl-tracker.css';
 @import './modules/form-tracker.css';
 @import './modules/helpdesk.css';
+@import './modules/all-issues.css';
 
 /* ── Utilities (last to allow overrides) ── */
 @import './utilities.css';

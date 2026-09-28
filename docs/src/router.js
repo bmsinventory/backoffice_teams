@@ -9,8 +9,10 @@
     opts = opts || {};
     var viewId = (window.ROUTE_MAP && window.ROUTE_MAP[moduleId]) || ('view-' + moduleId);
 
-    // Permission check
-    if (window.canView && !window.canView(moduleId)) {
+    // Permission check — 'all_issues' ไม่ได้ขึ้นกับระบบ can()/ROLE_PERMISSIONS (ไม่ได้ลงทะเบียนใน
+    // PERM_MODULES โดยตั้งใจ) จำกัดสิทธิ์แบบตายตัวด้วย window.ce() (PM/Admin) แทน
+    var _canSeeModule = moduleId === 'all_issues' ? (window.ce && window.ce()) : (!window.canView || window.canView(moduleId));
+    if (!_canSeeModule) {
       console.warn('[router] No permission to view:', moduleId);
       return;
     }
@@ -34,10 +36,10 @@
     var bottomBtn = document.querySelector('.bottom-nav-item[data-view="' + moduleId + '"]');
     if (bottomBtn) bottomBtn.classList.add('active');
 
-    // Update topbar title
+    // Update topbar title ('all_issues' ไม่ได้อยู่ใน PERM_MODULES โดยตั้งใจ — ดูเหตุผลด้านบน)
     var mod = window.PERM_MODULES && window.PERM_MODULES.find(function (m) { return m.id === moduleId; });
     var titleEl = document.getElementById('tp-title');
-    if (titleEl) titleEl.textContent = mod ? mod.label : moduleId;
+    if (titleEl) titleEl.textContent = mod ? mod.label : (moduleId === 'all_issues' ? 'ปัญหาทุกโครงการ' : moduleId);
 
     // Update URL hash (deep link)
     if (!opts.silent) {
@@ -51,8 +53,10 @@
   // ── goView: main navigation called by HTML nav buttons ──
   // Wraps goTo + triggers the render function for the target view
   window.goView = function (id, el) {
-    // Permission check with user-visible alert
-    if (window.canView && !window.canView(id)) {
+    // Permission check with user-visible alert — 'all_issues' จำกัดสิทธิ์ด้วย window.ce() แบบตายตัว
+    // (ดูหมายเหตุใน goTo ด้านบน) แทนระบบ can()/ROLE_PERMISSIONS ปกติ
+    var _canSee = id === 'all_issues' ? (window.ce && window.ce()) : (!window.canView || window.canView(id));
+    if (!_canSee) {
       window.showAlert && window.showAlert('คุณไม่มีสิทธิ์เข้าถึง Module นี้', 'warn');
       return;
     }
@@ -92,6 +96,7 @@
         worklog:    'renderWorkLog',
         impl_tracker: 'renderImplTracker',
         helpdesk:   'renderHelpdesk',
+        all_issues: 'renderAllIssuesOverview',
       };
       if (id === 'overview' || id === 'kanban' || id === 'projects') {
         window.runAutoStage && window.runAutoStage(true);
@@ -143,7 +148,11 @@
   };
 
   // ── Handle Deep Links from URL hash ──
-  // รองรับ param ต่อท้ายด้วย & เช่น #leave=LV123&approve=1 (จากลิงก์แจ้งเตือน BMS Notify)
+  // รองรับ param ต่อท้ายด้วย & เช่น #leave=LV123&approve=1 (จากลิงก์แจ้งเตือน BMS Notify) เท่านั้น —
+  // ต้องมี "=" จริง ๆ ถึงถือเป็น deep link ที่ตั้งใจ hash เปล่า ๆ แค่ชื่อ module (เช่น #kanban ที่ค้างอยู่
+  // ใน URL จาก history.replaceState ตอนสลับ view ปกติ — ดู goTo ด้านล่าง) ไม่ทำอะไร ปล่อยให้ view เริ่มต้น
+  // ("Overview" ที่ฝัง class="view on" ไว้ใน index.html อยู่แล้ว) แสดงตามปกติ กันผู้ใช้ล็อกอิน/รีเฟรชใหม่
+  // แล้วถูกพากลับไป view เดิมที่ค้างอยู่ในแถบ URL ทุกครั้งโดยไม่ตั้งใจ ──
   window._handleDeepLink = function () {
     var hash = location.hash.replace('#', '');
     if (!hash) return;
@@ -174,9 +183,8 @@
           }
         }, 350);
       }
-    } else if (window.ROUTE_MAP && window.ROUTE_MAP[hash]) {
-      window.goView(hash);
     }
+    // hash เปล่า ๆ ไม่มี "=" (เช่น #kanban, #all_issues ค้างจาก history.replaceState) — ไม่ทำอะไร
   };
 
   // ── Navigate to first accessible view after login ──

@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Dashboard สรุปปัญหา</title>
+<meta name="theme-color" content="#1a1a19">
+<link rel="icon" type="image/png" href="img/icon_app.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    color-scheme: light;
+    --surface:  #fcfcfb;  --page: #f9f9f7;
+    --ink:      #0b0b0b;  --ink2: #52514e;  --ink3: #898781;
+    --line:     #e1e0d9;  --border: rgba(11,11,11,.10);
+    --blue:     #2a78d6;  --blue-soft: rgba(42,120,214,.12);
+    --good:     #0ca30c;  --good-soft: rgba(12,163,12,.12);
+    --warning:  #fab219;  --warning-soft: rgba(250,178,25,.16);
+    --serious:  #ec835a;  --serious-soft: rgba(236,131,90,.14);
+    --critical: #d03b3b;  --critical-soft: rgba(208,59,59,.12);
+    --accent:   #4a3aa7;  --accent-soft: rgba(74,58,167,.10);
+    --cat-1:#2a78d6; --cat-2:#eb6834; --cat-3:#1baf7a; --cat-4:#eda100; --cat-5:#e87ba4; --cat-6:#008300;
+    --shadow: 0 1px 2px rgba(11,11,11,.05), 0 10px 28px rgba(11,11,11,.05);
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      color-scheme: dark;
+      --surface:  #1a1a19;  --page: #0d0d0d;
+      --ink:      #ffffff;  --ink2: #c3c2b7;  --ink3: #898781;
+      --line:     #2c2c2a;  --border: rgba(255,255,255,.10);
+      --blue:     #3987e5;  --blue-soft: rgba(57,135,229,.16);
+      --good:     #0ca30c;  --good-soft: rgba(12,163,12,.18);
+      --warning:  #fab219;  --warning-soft: rgba(250,178,25,.18);
+      --serious:  #ec835a;  --serious-soft: rgba(236,131,90,.18);
+      --critical: #d03b3b;  --critical-soft: rgba(208,59,59,.20);
+      --accent:   #9085e9;  --accent-soft: rgba(144,133,233,.16);
+      --cat-1:#3987e5; --cat-2:#d95926; --cat-3:#199e70; --cat-4:#c98500; --cat-5:#d55181; --cat-6:#008300;
+      --shadow: 0 1px 2px rgba(0,0,0,.35), 0 10px 28px rgba(0,0,0,.35);
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page);color:var(--ink);
+    font-family:'Noto Sans Thai',system-ui,-apple-system,'Segoe UI',sans-serif;font-size:15px;line-height:1.6;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:none;margin:0 auto;padding:0 28px 56px}
+  @media (max-width:640px){ .wrap{padding:0 14px 40px} }
+
+  /* ── Top bar: ไม่มี logo — บรรทัดเดียว บาง ๆ บอกบริบทว่ากำลังดูอะไรอยู่ ── */
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+    padding:18px 0;font-size:11.5px;font-weight:700;letter-spacing:.06em;color:var(--ink3);text-transform:uppercase}
+
+  .notice{padding:16px 18px;border-radius:12px;background:var(--blue-soft);color:var(--ink);font-size:14px}
+  .notice.err{background:var(--critical-soft);color:var(--critical)}
+
+  .dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+  .dash-grid .full{grid-column:1/-1}
+  @media (max-width:900px){ .dash-grid{grid-template-columns:1fr} }
+
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:22px 24px;
+    min-width:0;box-shadow:var(--shadow)}
+
+  /* ── Hero: ชื่อ รพ./โครงการ ใหญ่สุด สถานะเป็น chip แยกชัด ── */
+  .badge{display:inline-flex;align-items:center;gap:6px;padding:5px 13px;border-radius:999px;
+    font-size:12.5px;font-weight:700;white-space:nowrap}
+  .header-card{padding:16px 22px;border-top-width:3px;border-top-style:solid}
+  .header-card-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+  .proj-name{font-size:20px;font-weight:800;margin:8px 0 6px;letter-spacing:-.01em}
+  .proj-meta{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--ink3);font-weight:600}
+  .proj-meta b{color:var(--ink2);font-weight:700}
+
+  .sec-title{font-size:14px;font-weight:700;color:var(--ink);margin:0 0 16px;display:flex;align-items:center;gap:9px}
+  .sec-title::before{content:'';width:8px;height:8px;border-radius:2.5px;background:var(--accent);flex-shrink:0}
+  .sec-title .n{font-size:12px;font-weight:700;color:var(--ink3)}
+
+  /* ── ตัวกรอง — เปลี่ยนแล้วกรองทุกส่วนด้านล่างพร้อมกัน (stat/กราฟ/รายการ) — label กับ select อยู่แถว
+     เดียวกัน (ไม่ซ้อนบรรทัด) การ์ดกรอง padding แคบกว่าการ์ดทั่วไป กันกินพื้นที่แนวตั้งเกินจำเป็น ── */
+  .filter-card{padding:14px 20px}
+  .filter-bar{display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+  .filter-field{display:flex;align-items:center;gap:8px}
+  .filter-field label{font-size:12px;font-weight:700;color:var(--ink3);white-space:nowrap}
+  .filter-field select{font:inherit;font-size:13px;color:var(--ink);background:var(--page);
+    border:1px solid var(--border);border-radius:8px;padding:6px 26px 6px 10px;min-height:32px;cursor:pointer;
+    appearance:none;-webkit-appearance:none;min-width:100px;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%23898781'%3E%3Cpath fill-rule='evenodd' d='M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z' clip-rule='evenodd'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 7px center;background-size:14px}
+  .filter-clear-btn{flex-shrink:0;background:var(--page);border:1px solid var(--border);color:var(--ink2);
+    border-radius:8px;padding:6px 14px;font-size:12.5px;min-height:32px;margin-left:auto}
+  .filter-clear-btn:hover{background:var(--accent-soft);color:var(--accent)}
+
+  /* ── การ์ดสถิติ 5 ใบ ── */
+  .stat-row{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
+  @media (max-width:1100px){ .stat-row{grid-template-columns:repeat(3,1fr)} }
+  @media (max-width:640px){ .stat-row{grid-template-columns:repeat(2,1fr)} }
+  .stat-card{background:var(--surface);border:1px solid var(--border);border-top-width:3px;border-top-style:solid;
+    border-radius:16px;padding:16px 18px;box-shadow:var(--shadow)}
+  .stat-card-lbl{font-size:12.5px;font-weight:700;color:var(--ink2);margin-bottom:8px}
+  .stat-card-val{font-size:30px;font-weight:800;line-height:1;margin-bottom:6px;font-variant-numeric:tabular-nums}
+  .stat-card-sub{font-size:11.5px;color:var(--ink3);font-weight:600}
+  .stat-card-meter{height:6px;border-radius:99px;background:var(--line);overflow:hidden;margin-top:8px}
+  .stat-card-meter i{display:block;height:100%;border-radius:99px}
+
+  /* ── กราฟ 3 คอลัมน์: โดนัทหมวดหมู่ / โดนัทสถานะ / แนวโน้ม ── */
+  .chart-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  @media (max-width:1100px){ .chart-row{grid-template-columns:1fr} }
+  .donut-wrap{display:flex;flex-direction:column;align-items:center;gap:16px}
+  .donut-wrap svg{max-width:100%;height:auto}
+  .trend-svg{width:100%;height:auto;overflow:visible}
+  .trend-legend{display:flex;gap:18px;justify-content:center;margin-top:4px}
+
+  /* ── Meter: track = โทนอ่อนของสีเดียวกับ fill ── */
+  .bar-row{display:flex;align-items:center;gap:12px;margin-bottom:14px;font-size:13px}
+  .bar-row:last-child{margin-bottom:0}
+  .bar-lbl{flex:0 0 42%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink);font-weight:600}
+  .bar-wrap{flex:1;height:12px;border-radius:99px;overflow:hidden}
+  .bar-fill{height:100%;border-radius:99px}
+  .bar-val{flex:0 0 40px;text-align:right;font-weight:800;font-size:12.5px}
+
+  /* ── สรุปปัญหา: กราฟแท่งเรียงต่อกันแนวนอน (stacked bar — part-to-whole) แทนตัวเลขลอย
+     ช่องว่าง 2px สีพื้นการ์ดคั่นระหว่างส่วน ให้แยกส่วนชัดโดยไม่ต้องขีดเส้นขอบ ── */
+  .stackbar-track{display:flex;height:30px;border-radius:9px;overflow:hidden;background:var(--surface);gap:2px;margin-bottom:16px}
+  .stackbar-seg{height:100%}
+  .stackbar-legend{display:flex;gap:18px;flex-wrap:wrap}
+  .legend-item{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:var(--ink2)}
+  .legend-item i{width:10px;height:10px;border-radius:3px;display:inline-block;flex-shrink:0}
+  .legend-item b{color:var(--ink);font-weight:800;font-size:14px}
+
+  .empty{color:var(--ink3);font-size:13px;text-align:center;padding:18px 4px}
+
+  /* ── รายการปัญหาแบบละเอียด — เนื้อหาหลักของหน้านี้ (แทนที่ % ความคืบหน้าโครงการ ตามที่ต้องการดู
+     "ปัญหา" ไม่ใช่ "รายละเอียดโครงการ") เรียงใหม่สุดก่อน คั่นด้วยเส้นบางระหว่างรายการ ── */
+  .issue-item{padding:16px 0;border-top:1px solid var(--line)}
+  .issue-item:first-child{border-top:none;padding-top:0}
+  .issue-item-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+  .issue-num{font-size:12px;font-weight:800;color:var(--ink3);font-variant-numeric:tabular-nums;min-width:20px}
+  .tag{display:inline-flex;align-items:center;padding:3px 11px;border-radius:999px;font-size:11.5px;font-weight:700;white-space:nowrap}
+  .issue-cat{font-size:12px;color:var(--ink3);font-weight:600}
+  .issue-date{font-size:11.5px;color:var(--ink3);margin-left:auto;white-space:nowrap}
+  .issue-problem{font-size:14px;color:var(--ink);line-height:1.6;overflow-wrap:break-word;padding-left:28px}
+  .issue-solution{font-size:12.5px;color:var(--good);margin-top:8px;padding:9px 12px;background:var(--good-soft);border-radius:9px;line-height:1.55;overflow-wrap:break-word;margin-left:28px}
+
+  /* ── ตัวแบ่งหน้ารายการปัญหา (50 รายการ/หน้า) ── */
+  .issue-pager{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:18px}
+  .issue-pager-btn{background:var(--page);border:1px solid var(--border);border-radius:9px;
+    padding:9px 16px;font-size:13px;color:var(--ink2);min-height:auto}
+  .issue-pager-btn:hover:not(:disabled){background:var(--accent-soft);color:var(--accent)}
+  .issue-pager-btn:disabled{opacity:.4;cursor:default}
+  .issue-pager-info{font-size:12.5px;color:var(--ink3);font-weight:700;font-variant-numeric:tabular-nums}
+
+  .link-card{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  button{font:inherit;font-weight:700;cursor:pointer;border:none;border-radius:9px;padding:9px 14px;min-height:40px}
+  .link-copy-btn{flex-shrink:0;background:var(--surface);border:1px solid var(--border);
+    border-radius:9px;padding:9px 14px;font-size:13px;color:var(--ink2);text-transform:none;letter-spacing:normal;
+    transition:background .15s,color .15s,border-color .15s}
+  .link-copy-btn.copied{background:var(--good-soft);border-color:transparent;color:var(--good)}
+
+  .footnote{font-size:11.5px;color:var(--ink3);text-align:center;margin-top:20px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar"><span>Implementation Dashboard · สรุปปัญหา</span></div>
+  <div id="app"><div class="notice">กำลังโหลด...</div></div>
+</div>
+
+<script src="env-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+(function () {
+  var app = document.getElementById('app');
+  var db;
+  try {
+    db = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+  } catch (e) {
+    app.innerHTML = '<div class="notice err">เชื่อมต่อระบบไม่ได้ กรุณาลองใหม่ภายหลัง</div>';
+    return;
+  }
+
+  var qs = new URLSearchParams(location.search);
+  var token = qs.get('t') || '';
+
+  // ── สี: ยึด role-based palette จาก dataviz skill (good/warning/serious/critical เป็นค่าคงที่
+  // ข้ามโหมด, blue เป็น categorical slot 1 ใช้แทน "กำลังดำเนินการ/ข้อมูล" ที่ไม่ใช่สถานะเสีย/ดี) ──
+  var IMPL_STATUS = {
+    not_started: { l:'ยังไม่เริ่ม',        v:'--ink3' },
+    in_progress:  { l:'กำลังดำเนินการ',    v:'--blue' },
+    review:       { l:'รอตรวจสอบ',        v:'--warning' },
+    done:         { l:'เสร็จแล้ว',         v:'--good' },
+    delayed:      { l:'ล่าช้า',            v:'--serious' },
+    issue:        { l:'มีปัญหา',           v:'--critical' },
+    cancelled:    { l:'ยกเลิก',            v:'--ink3' },
+  };
+  var ISSUE_STATUS = {
+    open:        { l:'รอดำเนินการ',    v:'--warning' },
+    in_progress: { l:'กำลังดำเนินการ', v:'--blue' },
+    closed:      { l:'ดำเนินการแล้ว',  v:'--good' },
+  };
+  var SEVERITY = {
+    low:      { l:'น้อย',    v:'--ink3' },
+    medium:   { l:'ปานกลาง', v:'--warning' },
+    high:     { l:'สูง',     v:'--serious' },
+    critical: { l:'วิกฤต',   v:'--critical' },
+  };
+
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c] || c; }); }
+  function fd(s){ if(!s) return '-'; var d=new Date(s); if(isNaN(d)) return '-';
+    return d.getDate()+'/'+(d.getMonth()+1)+'/'+(d.getFullYear()+543); }
+
+  // ── โดนัท (SVG stroke-dasharray) — ไม่ใช้ไลบรารีภายนอก หน้าเบา โหลดไว ── */
+  function donutSvg(segments) {
+    var size = 176, thickness = 30;
+    var r = (size - thickness) / 2;
+    var c = 2 * Math.PI * r;
+    var total = segments.reduce(function (s, x) { return s + x.value; }, 0) || 1;
+    var offset = 0;
+    var circles = segments.filter(function (s) { return s.value > 0; }).map(function (s) {
+      var len = (s.value / total) * c;
+      var dash = len.toFixed(2) + ' ' + (c - len).toFixed(2);
+      var html = '<circle cx="' + (size / 2) + '" cy="' + (size / 2) + '" r="' + r + '" fill="none" style="stroke:' + s.color + '" stroke-width="' + thickness
+        + '" stroke-dasharray="' + dash + '" stroke-dashoffset="' + (-offset).toFixed(2) + '" transform="rotate(-90 ' + (size / 2) + ' ' + (size / 2) + ')"><title>' + esc(s.label) + ': ' + s.value + '</title></circle>';
+      offset += len;
+      return html;
+    }).join('');
+    return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 ' + size + ' ' + size + '" role="img">' + circles + '</svg>';
+  }
+
+  function catDonutBody(list) {
+    var counts = {};
+    list.forEach(function (i) { var c = i.category || 'ไม่ระบุ'; counts[c] = (counts[c] || 0) + 1; });
+    var keys = Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; });
+    if (!keys.length) return '<div class="empty">-</div>';
+    var CAP = 6;
+    var catColors = ['--cat-1', '--cat-2', '--cat-3', '--cat-4', '--cat-5', '--cat-6'];
+    var rows = keys.slice(0, CAP).map(function (k, idx) { return { label: k, value: counts[k], color: 'var(' + catColors[idx] + ')' }; });
+    var rest = keys.slice(CAP);
+    if (rest.length) {
+      var restTotal = rest.reduce(function (s, k) { return s + counts[k]; }, 0);
+      rows.push({ label: 'อื่นๆ (' + rest.length + ' หมวด)', value: restTotal, color: 'var(--ink3)' });
+    }
+    var legend = rows.map(function (r) { return '<span class="legend-item"><i style="background:' + r.color + '"></i>' + esc(r.label) + ' <b>' + r.value + '</b></span>'; }).join('');
+    return '<div class="donut-wrap">' + donutSvg(rows) + '<div class="stackbar-legend">' + legend + '</div></div>';
+  }
+
+  function statusDonutBody(list) {
+    var counts = {};
+    list.forEach(function (i) { counts[i.status] = (counts[i.status] || 0) + 1; });
+    var rows = Object.keys(ISSUE_STATUS).map(function (k) { var s = ISSUE_STATUS[k]; return { label: s.l, value: counts[k] || 0, color: 'var(' + s.v + ')' }; });
+    if (!rows.some(function (r) { return r.value > 0; })) return '<div class="empty">-</div>';
+    var legend = Object.keys(ISSUE_STATUS).map(function (k) {
+      var s = ISSUE_STATUS[k];
+      return '<span class="legend-item"><i style="background:var(' + s.v + ')"></i>' + esc(s.l) + ' <b>' + (counts[k] || 0) + '</b></span>';
+    }).join('');
+    return '<div class="donut-wrap">' + donutSvg(rows) + '<div class="stackbar-legend">' + legend + '</div></div>';
+  }
+
+  // ── แนวโน้ม: จำนวนที่รับแจ้ง (created_at) vs แก้ไขแล้ว (fixed_date) ต่อวัน — เส้น SVG ธรรมดา
+  // ไม่ใช้ Chart.js กันหน้าหนัก/พึ่งพา CDN เพิ่ม ── */
+  function niceCeil(v) {
+    if (v <= 0) return 4;
+    var mag = Math.pow(10, Math.floor(Math.log10(v)));
+    var norm = v / mag;
+    var nice = norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10;
+    return nice * mag;
+  }
+  function lineChartSvg(data) {
+    var W = 520, H = 230, padL = 30, padR = 10, padT = 12, padB = 28;
+    var innerW = W - padL - padR, innerH = H - padT - padB;
+    var n = data.length;
+    var maxVal = 0;
+    data.forEach(function (d) { maxVal = Math.max(maxVal, d.received, d.resolved); });
+    var niceMax = niceCeil(maxVal);
+    function xPos(i) { return n <= 1 ? padL + innerW / 2 : padL + (i / (n - 1)) * innerW; }
+    function yPos(v) { return padT + innerH - (v / niceMax) * innerH; }
+
+    var gridN = 4, gridHtml = '', labelHtml = '';
+    for (var g = 0; g <= gridN; g++) {
+      var val = Math.round(niceMax * g / gridN);
+      var gy = yPos(val);
+      gridHtml += '<line x1="' + padL + '" y1="' + gy.toFixed(1) + '" x2="' + (W - padR) + '" y2="' + gy.toFixed(1) + '" style="stroke:var(--line)" stroke-width="1"/>';
+      labelHtml += '<text x="' + (padL - 8) + '" y="' + (gy + 3.5).toFixed(1) + '" text-anchor="end" font-size="10.5" style="fill:var(--ink3)">' + val + '</text>';
+    }
+    var xLabelStep = n > 8 ? Math.ceil(n / 8) : 1;
+    var xLabelHtml = data.map(function (d, i) {
+      if (i % xLabelStep !== 0 && i !== n - 1) return '';
+      var dt = new Date(d.date);
+      var lbl = isNaN(dt) ? d.date : (dt.getDate() + '/' + (dt.getMonth() + 1));
+      return '<text x="' + xPos(i).toFixed(1) + '" y="' + (H - 8) + '" text-anchor="middle" font-size="10.5" style="fill:var(--ink3)">' + esc(lbl) + '</text>';
+    }).join('');
+
+    function seriesPts(key) { return data.map(function (d, i) { return xPos(i).toFixed(1) + ',' + yPos(d[key]).toFixed(1); }).join(' '); }
+    var recvPts = seriesPts('received'), resvPts = seriesPts('resolved');
+    var areaPts = recvPts + ' ' + xPos(n - 1).toFixed(1) + ',' + (padT + innerH) + ' ' + xPos(0).toFixed(1) + ',' + (padT + innerH);
+    function dots(key, color) {
+      return data.map(function (d, i) {
+        return '<circle cx="' + xPos(i).toFixed(1) + '" cy="' + yPos(d[key]).toFixed(1) + '" r="4" style="fill:' + color + ';stroke:var(--surface)" stroke-width="2"><title>' + esc(d.date) + ': ' + d[key] + '</title></circle>';
+      }).join('');
+    }
+
+    return '<svg class="trend-svg" viewBox="0 0 ' + W + ' ' + H + '" role="img">'
+      + gridHtml + labelHtml
+      + '<polygon points="' + areaPts + '" style="fill:var(--blue)" opacity="0.10"/>'
+      + '<polyline points="' + recvPts + '" fill="none" style="stroke:var(--blue)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'
+      + '<polyline points="' + resvPts + '" fill="none" style="stroke:var(--good)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'
+      + dots('received', 'var(--blue)') + dots('resolved', 'var(--good)')
+      + xLabelHtml + '</svg>'
+      + '<div class="trend-legend"><span class="legend-item"><i style="background:var(--blue)"></i>รับแจ้ง</span><span class="legend-item"><i style="background:var(--good)"></i>แก้ไขแล้ว</span></div>';
+  }
+  function trendChartBody(list) {
+    var byDate = {};
+    list.forEach(function (i) {
+      var d = (i.created_at || '').slice(0, 10);
+      if (d) { byDate[d] = byDate[d] || { received: 0, resolved: 0 }; byDate[d].received++; }
+    });
+    list.forEach(function (i) {
+      if (i.status === 'closed' && i.fixed_date) {
+        var d = String(i.fixed_date).slice(0, 10);
+        byDate[d] = byDate[d] || { received: 0, resolved: 0 };
+        byDate[d].resolved++;
+      }
+    });
+    var dates = Object.keys(byDate).sort();
+    if (!dates.length) return '<div class="empty">-</div>';
+    return lineChartSvg(dates.map(function (d) { return { date: d, received: byDate[d].received, resolved: byDate[d].resolved }; }));
+  }
+
+  // ── สถิติเด่น 5 ใบ ── */
+  function avgFixDays(list) {
+    var durations = list.filter(function (i) { return i.status === 'closed' && i.fixed_date && i.created_at; })
+      .map(function (i) { return Math.max(0, (new Date(i.fixed_date) - new Date(i.created_at)) / 86400000); });
+    if (!durations.length) return null;
+    return durations.reduce(function (s, d) { return s + d; }, 0) / durations.length;
+  }
+  function statCard(v, lbl, val, sub, meterPct) {
+    return '<div class="stat-card" style="border-top-color:var(' + v + ')">'
+      + '<div class="stat-card-lbl">' + esc(lbl) + '</div>'
+      + '<div class="stat-card-val" style="color:var(' + v + ')">' + val + '</div>'
+      + (sub ? '<div class="stat-card-sub">' + esc(sub) + '</div>' : '')
+      + (meterPct != null ? '<div class="stat-card-meter"><i style="width:' + meterPct + '%;background:var(' + v + ')"></i></div>' : '')
+      + '</div>';
+  }
+  function statRowHtml(list) {
+    var total = list.length;
+    var resolved = list.filter(function (i) { return i.status === 'closed'; }).length;
+    var pending = total - resolved;
+    var rate = total ? Math.round((resolved / total) * 100) : 0;
+    var avgDays = avgFixDays(list);
+    var avgTxt = avgDays == null ? '-' : (avgDays < 1 ? '< 1 วัน' : avgDays.toFixed(1) + ' วัน');
+    return statCard('--blue', 'ปัญหาทั้งหมด', total, 'รายการที่พบทั้งหมด')
+      + statCard('--good', 'ดำเนินการแล้ว', resolved, 'แก้ไขเรียบร้อย')
+      + statCard('--warning', 'รอดำเนินการ', pending, 'ยังไม่ได้แก้ไข')
+      + statCard('--accent', 'อัตราแก้ไข', rate + '%', '', rate)
+      + statCard('--serious', 'เวลาแก้ไขเฉลี่ย', avgTxt, 'จาก ' + resolved + ' รายการ');
+  }
+
+  async function load() {
+    if (!token) { app.innerHTML = '<div class="notice err">ไม่พบลิงก์ที่ถูกต้อง</div>'; return; }
+    var proj;
+    try {
+      var pr = await db.from('impl_projects').select('*').eq('dashboard_token', token).limit(1);
+      if (pr.error) throw pr.error;
+      proj = (pr.data && pr.data[0]) || null;
+    } catch (e) { proj = null; }
+    if (!proj) { app.innerHTML = '<div class="notice err">ไม่พบ Dashboard นี้ ลิงก์อาจไม่ถูกต้อง</div>'; return; }
+
+    // ── หน้านี้เน้น "ปัญหา" ของ รพ. นี้ล้วนๆ ตามที่ต้องการดู ไม่ใช่รายละเอียดความคืบหน้าโครงการ
+    // (phase/task/checklist) จึงตัดการดึงข้อมูลกลุ่มนั้นออก เหลือแค่ impl_issues ──
+    var issues = [];
+    try {
+      var isr = await db.from('impl_issues').select('*').eq('project_id', proj.id).order('created_at', { ascending: false });
+      issues = isr.data || [];
+    } catch (e) {}
+
+    // ── impl_issues.fixed_by เก็บ "ชื่อเล่น" จริงในระบบ (เช่น "แบม","ฟลุ๊ค") ไม่ใช่ชื่อ-นามสกุล —
+    // ดึง staff มาแปลงชื่อเล่น -> ชื่อ-นามสกุลเฉพาะตอนแสดงในตัวกรอง "ผู้แก้ไข" (ค่าที่ใช้กรองจริงยังอิง
+    // ชื่อเล่นเดิม ไม่กระทบข้อมูล) — หาไม่เจอ (พิมพ์ผิด/ลาออกแล้ว) ก็ใช้ชื่อเล่นเดิมแสดงแทน ──
+    var nicknameToFullName = {};
+    try {
+      var str = await db.from('staff').select('full_name,nickname');
+      (str.data || []).forEach(function (s) { if (s.nickname && s.full_name) nicknameToFullName[s.nickname.trim()] = s.full_name; });
+    } catch (e) {}
+
+    render(proj, issues, nicknameToFullName);
+  }
+
+  function render(proj, issues, nicknameToFullName) {
+    var st = IMPL_STATUS[proj.status] || IMPL_STATUS.not_started;
+
+    // ── ชื่อโครงการ (project_name) คือชื่อที่ระบุ รพ./สถานที่จริงเสมอ (เช่น "ติดตั้ง Inventory
+    // โรงพยาบาลทุ่งช้าง จ.น่าน") — ใช้เป็นหัวเรื่องเด่นแทน hospital_name เพราะข้อมูลจริงในระบบพบว่า
+    // hospital_name เก็บชื่อคน ไม่ใช่ชื่อ รพ. เลยสักโครงการ (ตรวจสอบกับฐานข้อมูลจริงแล้ว) ──
+    // ── ชื่อคอลัมน์ 2 ตัวนี้สลับความหมายกับของจริงในทีม (ยืนยันจากผู้ใช้งานจริง): คอลัมน์ project_manager
+    // ในฐานข้อมูลจริงๆ เก็บชื่อ "ผู้ประสานงาน" ส่วนคอลัมน์ hospital_name เก็บชื่อ "PM" ตัวจริง — จึงต้องสลับ
+    // label ตอนแสดงผล (ไม่แตะชื่อคอลัมน์ในฐานข้อมูล เพราะที่อื่นในระบบยังอ้างอิงชื่อเดิมอยู่) ──
+    var headerCard = '<div class="card full header-card" style="border-top-color:var(' + st.v + ')">'
+      + '<div class="header-card-top">'
+      + '<span class="badge" style="background:var(' + st.v + '-soft,rgba(137,135,129,.14));color:var(' + st.v + ')">' + esc(st.l) + '</span>'
+      + '<button class="link-copy-btn" id="dash-copy-btn" type="button">🔗 แชร์ลิงก์สาธารณะ</button>'
+      + '</div>'
+      + '<div class="proj-name">' + esc(proj.project_name) + '</div>'
+      + '<div class="proj-meta">'
+      + (proj.hospital_name ? '<span>PM <b>' + esc(proj.hospital_name) + '</b></span>' : '')
+      + ((proj.start_date || proj.end_date) ? '<span>' + fd(proj.start_date) + ' – ' + fd(proj.end_date) + '</span>' : '')
+      + (proj.project_manager ? '<span>ผู้ประสานงาน <b>' + esc(proj.project_manager) + '</b></span>' : '')
+      + '</div></div>';
+
+    // ── ตัวกรอง: ตัวเลือกสร้างจากข้อมูลปัญหาทั้งหมดของโครงการนี้ (ไม่ขึ้นกับตัวกรองที่เลือกอยู่)
+    // เปลี่ยนตัวไหนก็ตาม กรองทุกส่วนด้านล่างพร้อมกันหมด (สถิติ/กราฟ/รายการ) ผ่าน applyFilters() ──
+    function distinctValues(field) {
+      var set = {};
+      issues.forEach(function (i) { var v = (i[field] || '').trim(); if (v) set[v] = true; });
+      return Object.keys(set).sort(function (a, b) { return a.localeCompare(b, 'th'); });
+    }
+    function plainOptionsHtml(opts) { return '<option value="">ทั้งหมด</option>' + opts.map(function (o) { return '<option value="' + esc(o) + '">' + esc(o) + '</option>'; }).join(''); }
+    var statusOptionsHtml = '<option value="">ทั้งหมด</option>' + Object.keys(ISSUE_STATUS).map(function (k) { return '<option value="' + k + '">' + esc(ISSUE_STATUS[k].l) + '</option>'; }).join('');
+    // ── impl_issues.fixed_by เก็บชื่อเล่น — option value ยังเป็นชื่อเล่นเดิม (ใช้กรองข้อมูลจริง)
+    // แต่ label ที่เห็นแปลงเป็นชื่อ-นามสกุลจาก staff แล้ว (หาไม่เจอก็โชว์ชื่อเล่นเดิม) ──
+    function fixedByOptionsHtml() {
+      var rows = distinctValues('fixed_by').map(function (n) { return { value: n, label: nicknameToFullName[n] || n }; });
+      rows.sort(function (a, b) { return a.label.localeCompare(b.label, 'th'); });
+      return '<option value="">ทั้งหมด</option>' + rows.map(function (r) { return '<option value="' + esc(r.value) + '">' + esc(r.label) + '</option>'; }).join('');
+    }
+
+    var filterBarCard = '<div class="card full filter-card">'
+      + '<div class="filter-bar">'
+      + '<div class="filter-field"><label>กลุ่มปัญหา</label><select id="filter-category">' + plainOptionsHtml(distinctValues('category')) + '</select></div>'
+      + '<div class="filter-field"><label>หน่วยงาน</label><select id="filter-department">' + plainOptionsHtml(distinctValues('department')) + '</select></div>'
+      + '<div class="filter-field"><label>สถานะ</label><select id="filter-status">' + statusOptionsHtml + '</select></div>'
+      + '<div class="filter-field"><label>ผู้แก้ไข</label><select id="filter-fixedby">' + fixedByOptionsHtml() + '</select></div>'
+      + '<button class="filter-clear-btn" id="filter-clear-btn" type="button">ล้างตัวกรองทั้งหมด</button>'
+      + '</div></div>';
+
+    var statRowShell = '<div class="stat-row full" id="stat-row-body"></div>';
+    var chartRowShell = '<div class="chart-row full">'
+      + '<div class="card"><div class="sec-title">กลุ่มปัญหา</div><div id="cat-donut-body"></div></div>'
+      + '<div class="card"><div class="sec-title">สถานะการแก้ไข</div><div id="status-donut-body"></div></div>'
+      + '<div class="card"><div class="sec-title">แนวโน้ม (รับแจ้ง vs แก้ไข)</div><div id="trend-body"></div></div>'
+      + '</div>';
+
+    function issueItemHtml(i, num) {
+      var s = ISSUE_STATUS[i.status] || { l: i.status || '-', v: '--ink3' };
+      var sv = SEVERITY[i.severity];
+      return '<div class="issue-item">'
+        + '<div class="issue-item-head">'
+        + '<span class="issue-num">' + num + '</span>'
+        + '<span class="tag" style="background:var(' + s.v + '-soft,rgba(137,135,129,.14));color:var(' + s.v + ')">' + esc(s.l) + '</span>'
+        + (sv ? '<span class="tag" style="background:var(' + sv.v + '-soft,rgba(137,135,129,.14));color:var(' + sv.v + ')">' + esc(sv.l) + '</span>' : '')
+        + (i.category ? '<span class="issue-cat">' + esc(i.category) + '</span>' : '')
+        + '<span class="issue-date">' + fd(i.created_at) + '</span>'
+        + '</div>'
+        + '<div class="issue-problem">' + esc(i.problem || '') + '</div>'
+        + (i.solution ? '<div class="issue-solution">✓ วิธีแก้ไข: ' + esc(i.solution) + '</div>' : '')
+        + '</div>';
+    }
+    // ── รายการปัญหา: เรียง "ยังไม่ปิด" (รอดำเนินการ/กำลังทำ) ขึ้นก่อนเสมอ แล้วค่อยเรียงใหม่สุดก่อนในกลุ่ม
+    // เดียวกัน — ให้ปัญหาที่ยังต้องตามงานอยู่เห็นก่อน แสดงทีละหน้า หน้าละ ISSUE_PAGE_SIZE รายการ พร้อม
+    // เลขลำดับต่อเนื่องข้ามหน้า (หน้า 2 เริ่มที่ 51 ไม่ใช่ 1 ใหม่) กันรายการยาวเกินไปเวลามีปัญหาสะสมเยอะ ──
+    var ISSUE_PAGE_SIZE = 50;
+    var sortedIssues = [], totalPages = 1, issuePage = 1;
+
+    function renderIssuePage() {
+      var body = document.getElementById('issue-list-body');
+      if (!body) return;
+      var start = (issuePage - 1) * ISSUE_PAGE_SIZE;
+      var pageItems = sortedIssues.slice(start, start + ISSUE_PAGE_SIZE);
+      var itemsHtml = pageItems.map(function (it, idx) { return issueItemHtml(it, start + idx + 1); }).join('');
+      var pagerHtml = totalPages > 1
+        ? '<div class="issue-pager">'
+          + '<button id="issue-prev-btn" class="issue-pager-btn"' + (issuePage <= 1 ? ' disabled' : '') + '>‹ ก่อนหน้า</button>'
+          + '<span class="issue-pager-info">หน้า ' + issuePage + ' / ' + totalPages + '</span>'
+          + '<button id="issue-next-btn" class="issue-pager-btn"' + (issuePage >= totalPages ? ' disabled' : '') + '>ถัดไป ›</button>'
+          + '</div>'
+        : '';
+      body.innerHTML = (pageItems.length ? itemsHtml : '<div class="empty">✅ ไม่มีปัญหาที่แจ้งเข้ามา</div>') + pagerHtml;
+
+      var prevBtn = document.getElementById('issue-prev-btn');
+      if (prevBtn) prevBtn.addEventListener('click', function () { if (issuePage > 1) { issuePage--; renderIssuePage(); body.scrollIntoView({ block: 'nearest' }); } });
+      var nextBtn = document.getElementById('issue-next-btn');
+      if (nextBtn) nextBtn.addEventListener('click', function () { if (issuePage < totalPages) { issuePage++; renderIssuePage(); body.scrollIntoView({ block: 'nearest' }); } });
+    }
+
+    // ── ตัวกรอง: ค่าที่เลือกอยู่ในแต่ละ dropdown -> กรอง issues -> อัปเดตทุกส่วน (สถิติ/โดนัท/แนวโน้ม/รายการ)
+    // พร้อมกันในจุดเดียว เรียกทุกครั้งที่เปลี่ยนตัวกรองหรือกดล้างตัวกรอง ──
+    function currentFilters() {
+      return {
+        category: (document.getElementById('filter-category') || {}).value || '',
+        department: (document.getElementById('filter-department') || {}).value || '',
+        status: (document.getElementById('filter-status') || {}).value || '',
+        fixedBy: (document.getElementById('filter-fixedby') || {}).value || '',
+      };
+    }
+    function passesFilters(i, f) {
+      if (f.category && (i.category || '') !== f.category) return false;
+      if (f.department && (i.department || '') !== f.department) return false;
+      if (f.status && i.status !== f.status) return false;
+      if (f.fixedBy && (i.fixed_by || '') !== f.fixedBy) return false;
+      return true;
+    }
+    function applyFilters() {
+      var f = currentFilters();
+      var list = issues.filter(function (i) { return passesFilters(i, f); });
+
+      var statBody = document.getElementById('stat-row-body'); if (statBody) statBody.innerHTML = statRowHtml(list);
+      var catBody = document.getElementById('cat-donut-body'); if (catBody) catBody.innerHTML = catDonutBody(list);
+      var stBody = document.getElementById('status-donut-body'); if (stBody) stBody.innerHTML = statusDonutBody(list);
+      var trBody = document.getElementById('trend-body'); if (trBody) trBody.innerHTML = trendChartBody(list);
+      var countEl = document.getElementById('issue-list-count'); if (countEl) countEl.textContent = '(' + list.length + ' รายการ)';
+
+      sortedIssues = list.slice().sort(function (a, b) {
+        var aOpen = a.status !== 'closed', bOpen = b.status !== 'closed';
+        if (aOpen !== bOpen) return aOpen ? -1 : 1;
+        return (b.created_at || '').localeCompare(a.created_at || '');
+      });
+      totalPages = Math.max(1, Math.ceil(sortedIssues.length / ISSUE_PAGE_SIZE));
+      issuePage = 1;
+      renderIssuePage();
+    }
+
+    var issueListCard = '<div class="card full"><div class="sec-title">🩹 รายการปัญหา <span class="n" id="issue-list-count">(0 รายการ)</span></div>'
+      + '<div id="issue-list-body"></div></div>';
+
+    app.innerHTML = '<div class="dash-grid">' + headerCard + filterBarCard + statRowShell + chartRowShell + issueListCard + '</div>'
+      + '<div class="footnote">ข้อมูล ณ ' + new Date().toLocaleString('th-TH') + ' · บริษัท บางกอก เมดิคอล ซอฟต์แวร์ จำกัด</div>';
+
+    // ── ปุ่มคัดลอกลิงก์อยู่ในการ์ดเดียวกับชื่อโครงการ มุมขวาบนของการ์ด ──
+    var copyBtn = document.getElementById('dash-copy-btn');
+    if (copyBtn) copyBtn.addEventListener('click', function () {
+      navigator.clipboard.writeText(location.href).then(function () {
+        copyBtn.textContent = '✓ คัดลอกแล้ว';
+        copyBtn.classList.add('copied');
+        setTimeout(function () { copyBtn.textContent = '🔗 แชร์ลิงก์สาธารณะ'; copyBtn.classList.remove('copied'); }, 2000);
+      });
+    });
+
+    ['filter-category', 'filter-department', 'filter-status', 'filter-fixedby'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.addEventListener('change', applyFilters);
+    });
+    var clearBtn = document.getElementById('filter-clear-btn');
+    if (clearBtn) clearBtn.addEventListener('click', function () {
+      ['filter-category', 'filter-department', 'filter-status', 'filter-fixedby'].forEach(function (id) {
+        var el = document.getElementById(id); if (el) el.value = '';
+      });
+      applyFilters();
+    });
+
+    applyFilters();
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>

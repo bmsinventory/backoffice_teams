@@ -12,7 +12,7 @@
       return { id:d.id, name:d.template_name||'', description:d.description||'', structure:d.structure||{} };
     },
     IMPL_PROJECTS: function (d) {
-      return { id:d.id, name:d.project_name||'', hospitalName:d.hospital_name||'', start:d.start_date||'', end:d.end_date||'', pm:d.project_manager||'', status:d.status||'not_started', progress:Number(d.progress_percent)||0, templateId:d.template_id||'', sourceProjectId:d.source_project_id||'', createdAt:d.created_at||'', updatedAt:d.updated_at||'' };
+      return { id:d.id, name:d.project_name||'', hospitalName:d.hospital_name||'', start:d.start_date||'', end:d.end_date||'', pm:d.project_manager||'', status:d.status||'not_started', progress:Number(d.progress_percent)||0, templateId:d.template_id||'', sourceProjectId:d.source_project_id||'', dashboardToken:d.dashboard_token||'', createdAt:d.created_at||'', updatedAt:d.updated_at||'' };
     },
     IMPL_PHASES: function (d) {
       return { id:d.id, projectId:d.project_id, name:d.phase_name||'', description:d.description||'', order:Number(d.sort_order)||99, status:d.status||'not_started', progress:Number(d.progress_percent)||0 };

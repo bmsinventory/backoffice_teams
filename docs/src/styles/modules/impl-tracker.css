@@ -368,7 +368,10 @@
     display: block !important; position: absolute; top: 0; left: 0; width: 100%;
     padding: 12mm;
   }
-  @page { size: A4 landscape; margin: 0; }
+  /* หมายเหตุ: @page ไม่ใช่ selector ที่ scope ด้วย body[data-view] ได้ — เป็น at-rule ระดับหน้าพิมพ์
+     ทั้งเอกสาร ถ้าประกาศ "size: A4 landscape" ไว้ตรงนี้แบบ static จะไปทับ @page ของทุก view อื่น
+     ที่โหลดคำสั่ง CSS มาก่อนหน้า (เช่น expense-form.css) ทำให้เอกสารประกอบ Adv. พิมพ์แนวนอนผิดไปด้วย
+     จึงย้ายไปฉีด/ถอด @page landscape ด้วย JS เฉพาะตอนสั่งพิมพ์จริงจาก printImtIssues() แทน (impl-tracker.js) */
 }
 
 /* ── Report Tab: Hero (ring ความคืบหน้ารวม + สถิติเด่น) ── */

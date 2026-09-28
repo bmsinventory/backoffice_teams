@@ -256,6 +256,7 @@
           _lvTimer = setTimeout(function () {
             if (_von('view-leave'))    window.renderLeave && window.renderLeave();
             if (_von('view-calendar')) window.renderCalendar && window.renderCalendar();
+            window.updateBadge && window.updateBadge();
           }, 300);
         }
       }, window.showDbError);

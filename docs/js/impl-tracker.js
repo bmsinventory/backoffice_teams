@@ -698,6 +698,34 @@
     };
   })();
 
+  // ── รายชื่อโครงการต้นทางให้เลือกตอน "เพิ่มโครงการใหม่" — ตัดโครงการที่ถูกเพิ่มเข้า Impl Tracker ไปแล้ว
+  // ออกเสมอไม่ว่าจะติ๊กหรือไม่ (มี IMPL_PROJECTS ผูก sourceProjectId อยู่แล้ว) กันสร้างโครงการซ้ำซ้อน —
+  // ไม่ติ๊ก (ค่าเริ่มต้น) = เฉพาะโครงการที่ยังไม่จบ (ไม่มีวันสิ้นสุด หรือวันสิ้นสุดยังมาไม่ถึง)
+  // ติ๊ก "แสดงโครงการทั้งหมดในปีนี้" (imtToggleProjComboShowYear) = กว้างขึ้นเป็นทุกโครงการที่วันสิ้นสุด
+  // อยู่ในปี ค.ศ. ปัจจุบัน (รวมโครงการที่จบไปแล้วในปีนี้ด้วย) — ใช้ตอนต้องย้อนไปหาโครงการที่เพิ่งจบไป ──
+  function imtSrcProjectsForNew(showYear) {
+    var linkedIds = {};
+    (window.IMPL_PROJECTS || []).forEach(function (p) { if (p.sourceProjectId) linkedIds[p.sourceProjectId] = true; });
+    var notAdded = (window.PROJECTS || []).filter(function (sp) { return !linkedIds[sp.id]; });
+    if (showYear) {
+      var curYear = new Date().getFullYear();
+      return notAdded.filter(function (sp) { return sp.end && pd(sp.end).getFullYear() === curYear; });
+    }
+    var today = new Date(); today.setHours(0, 0, 0, 0);
+    return notAdded.filter(function (sp) { return !sp.end || pd(sp.end) >= today; });
+  }
+  // ── สลับติ๊ก "แสดงโครงการทั้งหมดในปีนี้" — สร้าง markup combobox ใหม่ทั้งชุด (ไม่ใช่แค่เรียก
+  // _initImtProjCombobox ซ้ำบน element เดิม) เพราะฟังก์ชันนั้นผูก event listener ใหม่ทับของเดิมทุกครั้งที่
+  // เรียก โดยไม่ถอดตัวเก่าออกก่อน เรียกซ้ำบน element เดิมจะเกิด listener ซ้อนกันจนคลิก/พิมพ์ทำงานผิดปกติ ──
+  window.imtToggleProjComboShowYear = function (showYear) {
+    var container = document.getElementById('imt-p-cmb-container');
+    if (!container) return;
+    var curVal = (document.getElementById('imt-p-source') || {}).value || '';
+    container.innerHTML = imtProjComboMarkup('');
+    var projects = imtSrcProjectsForNew(showYear);
+    window._initImtProjCombobox && window._initImtProjCombobox(projects, curVal);
+  };
+
   // ── Markup ของ combobox เลือกโครงการ ใช้ร่วมกันทั้งฟอร์ม "เพิ่มโครงการใหม่" และ "แก้ไขโครงการ" —
   // ตำแหน่ง dropdown คำนวณเป็น position:fixed ใน JS (ดู positionDrop ด้านบน) ไม่ต้องกำหนด top/left ที่นี่ ──
   function imtProjComboMarkup(hiddenValue, onchangeAttr) {
@@ -718,12 +746,16 @@
     if (!id) {
       // ── สร้างใหม่: เลือกโครงการต้นทาง + Template เท่านั้น ข้อมูลอื่น (ชื่อ/PM/วันที่)
       // ดึงมาจากโครงการต้นทางให้อัตโนมัติตอนบันทึก ไม่ต้องโชว์ในฟอร์ม ──
-      // แสดงเฉพาะโครงการที่ยังไม่สิ้นสุด (มีวันสิ้นสุด และยังไม่เลยวันนี้) — โครงการที่จบไปแล้วไม่ควรถูกเลือกมาเริ่มติดตามใหม่
+      // แสดงเฉพาะโครงการที่ยังไม่ถูกเพิ่มเข้า Impl Tracker — กันสร้างโครงการซ้ำซ้อนกับที่มีอยู่แล้ว
       var tplOptions = '<option value="">— ไม่ใช้ Template —</option>' + window.IMPL_TEMPLATES.map(function (t) { return '<option value="'+t.id+'">'+esc(t.name)+'</option>'; }).join('');
-      var todayImtP = new Date(); todayImtP.setHours(0,0,0,0);
-      var availSrcProjects = (window.PROJECTS||[]).filter(function (sp) { return sp.end && pd(sp.end) >= todayImtP; });
+      var availSrcProjects = imtSrcProjectsForNew(false);
       body.innerHTML =
-        '<div class="f-group"><label class="f-label">เลือกโครงการ *</label>' + imtProjComboMarkup('') + '</div>'
+        '<div class="f-group"><label class="f-label">เลือกโครงการ *</label>'
+        +   '<div id="imt-p-cmb-container">' + imtProjComboMarkup('') + '</div>'
+        +   '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--txt2);margin-top:6px;cursor:pointer;">'
+        +     '<input type="checkbox" id="imt-p-show-year" onchange="window.imtToggleProjComboShowYear(this.checked)"> แสดงโครงการทั้งหมดในปีนี้'
+        +   '</label>'
+        + '</div>'
         + '<div class="f-group"><label class="f-label">ใช้ Template Checklist</label><select class="f-input" id="imt-p-template">'+tplOptions+'</select></div>';
       document.getElementById('m-imt-project-title').textContent = 'เพิ่มโครงการใหม่';
       document.getElementById('m-imt-project-foot').style.display = window.canAdd(window.IMPL_MODULE) ? '' : 'none';
@@ -1533,6 +1565,7 @@
       +   '<div class="imt-ws-actions">'
       +     '<button class="btn btn-xls btn-sm" onclick="window.exportImtIssuesExcel()" title="ส่งออก Excel">📥<span class="btn-label"> Excel</span></button>'
       +     '<button class="btn btn-ghost btn-sm" onclick="window.openImtIssuePrintModal()" title="พิมพ์รายงานสรุปให้ รพ. เซ็นรับทราบ">🖨️<span class="btn-label"> พิมพ์รายงาน</span></button>'
+      +     '<button class="btn btn-ghost btn-sm" onclick="window.imtOpenPublicDashboard()" title="เปิด/คัดลอกลิงก์ Dashboard สาธารณะของ รพ. นี้ ไม่ต้อง login — ใช้นำเสนอตอนสรุปงานได้">🖼️<span class="btn-label"> Dashboard</span></button>'
       +     (window.canAdd(window.IMPL_MODULE) ? '<button class="btn btn-pri btn-sm" onclick="window.openImtIssueModal(null)">+<span class="btn-label"> แจ้งปัญหาใหม่</span></button>' : '')
       +   '</div>'
       + '</div>';
@@ -1614,7 +1647,17 @@
     var curNick = curTeamMember ? (curTeamMember.nickname || curTeamMember.name) : '';
     // ยังไม่มีใครแก้จริง (fixedBy ว่าง) → เดาให้เป็นคน Login เอง (ถ้าอยู่ในทีมโครงการนี้) กดบันทึกได้เลยไม่ต้องเลือกเอง
     var defaultFixedBy = i.fixedBy || curNick;
-    var fixedByOpts = ['<option value="">— ไม่ระบุ —</option>'].concat(teamStaff.map(function (s) {
+    // ── ข้อมูลเก่า/นำเข้าจาก Excel อาจเก็บชื่อที่ไม่ตรงกับทีมงานปัจจุบันของโครงการนี้เป๊ะ ๆ (คนละชื่อเล่น/
+    // ไม่ได้อยู่ในทีมที่ตั้งค่าไว้ตอนนี้แล้ว) — ถ้าไม่แทรกตัวเลือกนี้เข้าไปเอง <select> จะไม่มี option ไหน
+    // ตรงกับค่าที่เก็บไว้เลย เบราว์เซอร์เลย fallback ไปเลือก "— ไม่ระบุ —" (option แรก) แทนโดยอัตโนมัติ
+    // ทำให้ดูเหมือนข้อมูล "หายไป" ทั้งที่ยังอยู่ใน DB ปกติ (แค่ dropdown แสดงผิด) ──
+    var extraFixedByOpt = '';
+    if (defaultFixedBy && !teamStaff.some(function (s) { return (s.nickname || s.name) === defaultFixedBy; })) {
+      var matchedStaff = (window.STAFF || []).find(function (s) { return (s.nickname || s.name) === defaultFixedBy; });
+      var extraLabel = matchedStaff ? matchedStaff.name + ' (' + defaultFixedBy + ')' : defaultFixedBy + ' (ไม่อยู่ในทีมโครงการนี้)';
+      extraFixedByOpt = '<option value="' + esc(defaultFixedBy) + '" selected>' + esc(extraLabel) + '</option>';
+    }
+    var fixedByOpts = ['<option value="">— ไม่ระบุ —</option>', extraFixedByOpt].concat(teamStaff.map(function (s) {
       var nick = s.nickname || s.name;
       return { n:nick, label:s.name+' ('+nick+')' };
     }).sort(function (a, b) { return a.label.localeCompare(b.label, 'th'); }).map(function (o) {
@@ -1991,6 +2034,38 @@
     window._initImtHospCombobox(defOrgHosp ? defOrgHosp.id : '', defOrgText);
   };
 
+  // ── Dashboard สาธารณะ (impl-dashboard.html) — ลิงก์ดูภาพรวมความคืบหน้า/ปัญหาของ รพ. นี้ ไม่ต้อง login
+  // ใช้ token แบบเดียวกับ help.html?t=<token> (help.html ใช้ helpdesk_tickets.access_token) — ครั้งแรกที่กด
+  // ยังไม่มี token จะ generate สุ่ม 40 ตัวอักษรแล้วบันทึกไว้ที่ project (ใช้ตลอดไป ไม่เปลี่ยนทุกครั้งที่กด)
+  // แล้วคัดลอกลิงก์ + เปิดแท็บใหม่ให้เลย ให้กดปุ่มเดียวจบทั้งดู/คัดลอกไปนำเสนอ ──
+  function imtToken40() {
+    var s = '', ch = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+    for (var i = 0; i < 40; i++) s += ch.charAt(Math.floor(Math.random() * ch.length));
+    return s;
+  }
+  window.imtOpenPublicDashboard = async function () {
+    var pid = window.imtCurrentProjectId;
+    var proj = imtProject(pid);
+    if (!proj) return;
+    var token = proj.dashboardToken;
+    if (!token) {
+      token = imtToken40();
+      var row = {
+        project_name: proj.name, hospital_name: proj.hospitalName, start_date: proj.start || null, end_date: proj.end || null,
+        project_manager: proj.pm, status: proj.status, progress_percent: proj.progress, template_id: proj.templateId,
+        source_project_id: proj.sourceProjectId, dashboard_token: token, created_at: proj.createdAt,
+      };
+      window.imtApplyLocal('IMPL_PROJECTS', pid, row);
+      try {
+        await window.setDoc(window.getDocRef('IMPL_PROJECTS', pid), { dashboard_token: token }, { merge: true });
+      } catch (e) { window.showDbError && window.showDbError(e); return; }
+    }
+    var url = new URL('impl-dashboard.html?t=' + encodeURIComponent(token), location.href).href;
+    try { await navigator.clipboard.writeText(url); window.showAlert && window.showAlert('คัดลอกลิงก์ Dashboard แล้ว', 'success'); }
+    catch (e) { window.showAlert && window.showAlert('เปิด Dashboard แล้ว (คัดลอกลิงก์อัตโนมัติไม่สำเร็จ)', 'info'); }
+    window.open(url, '_blank');
+  };
+
   // ── พิมพ์เอกสารสรุปปัญหาจริงผ่าน browser print dialog (window.print()) — ต่างจาก exportImtReportImage
   // เดิมของแท็บ Report ที่ตั้งใจให้เป็นรูปภาพเท่านั้น เอกสารนี้ต้องออกมาเป็นกระดาษให้ รพ. เซ็นรับทราบจริง ๆ
   // จึงต้องพิมพ์ตรง ไม่ใช่แนบไฟล์ภาพ — ซ่อน UI อื่นทั้งหมดด้วย @media print scoped ที่ impl-tracker.css
@@ -1999,6 +2074,20 @@
     if (!el) return;
     el.classList.toggle('invalid', !!bad);
     if (bad && !el._invb) { el._invb = 1; ['input', 'change'].forEach(function (ev) { el.addEventListener(ev, function () { el.classList.remove('invalid'); }); }); }
+  }
+
+  // ── @page เป็น at-rule ระดับเอกสารพิมพ์ทั้งหมด ใช้ scope ด้วย body[data-view] ไม่ได้ — ฉีด/ถอด
+  // "size: A4 landscape" เฉพาะตอนพิมพ์จริงจากหน้านี้ กันไปทับ @page (portrait) ของเอกสารประกอบ Adv./
+  // หนังสือแจ้งเข้าไซต์ ที่โหลดมาก่อนหน้าใน main.css ──
+  function imtSetPrintLandscape(on) {
+    var el = document.getElementById('imt-print-landscape');
+    if (!el) {
+      el = document.createElement('style');
+      el.id = 'imt-print-landscape';
+      el.textContent = '@page { size: A4 landscape; margin: 0; }';
+      document.head.appendChild(el);
+    }
+    el.disabled = !on;
   }
 
   window.printImtIssues = function () {
@@ -2035,7 +2124,15 @@
     var host = document.getElementById('imt-issue-print-doc');
     if (!host) { window.showAlert && window.showAlert('เปิดแท็บ "ปัญหา" ของโครงการนี้ค้างไว้ก่อนพิมพ์', 'error'); return; }
     host.innerHTML = imtIssuePrintDocHtml(pid, opts);
-    setTimeout(function () { window.print(); }, 50);
+    setTimeout(function () {
+      imtSetPrintLandscape(true);
+      window.addEventListener('afterprint', function _off() {
+        window.removeEventListener('afterprint', _off);
+        imtSetPrintLandscape(false);
+      });
+      window.print();
+      imtSetPrintLandscape(false);
+    }, 50);
   };
 
   function renderImtCalendar(mount) {
@@ -2829,6 +2926,207 @@
     window.imtApplyLocal('IMPL_TEMPLATES', id, row);
     await window.setDoc(window.getDocRef('IMPL_TEMPLATES', id), row);
     window.renderImplTracker();
+  };
+
+  // ══════════════════════════════════════════════════════════════════════
+  // นำเข้าปัญหาการใช้งานเก่าจากระบบเดิม (Excel) — เรียกจากปุ่ม "นำเข้า" กลาง (modals.js execImport)
+  // 1 ไฟล์ = 1 โครงการ (เลือกโครงการปลายทางในหน้าพรีวิวก่อนกดนำเข้าจริง) ใช้ pattern เดียวกับ
+  // hdImportFromFile ใน helpdesk.js (อ่าน Excel → จับคู่คอลัมน์ด้วย synonym → พรีวิว → ยืนยันแล้วค่อยเขียนจริง)
+  // ══════════════════════════════════════════════════════════════════════
+  // ── ทั้ง 2 ไฟล์นี้โหลดแบบ <script type="module"> คนละโมดูล ไม่แชร์ scope กัน (ต่างจาก classic
+  // script ที่ function ระดับบนสุดจะกลาย เป็น global อัตโนมัติ) — hdNorm/hdParseDate ใน helpdesk.js
+  // จึงเรียกจากที่นี่ไม่ได้ ต้องมีสำเนาของตัวเองแยกต่างหาก (เจอบั๊กนี้จริงตอนทดสอบ) ──
+  function imtNorm(s) { return String(s == null ? '' : s).toLowerCase().replace(/[\s._-]/g, '').trim(); }
+  function imtParseDate(v) {
+    if (v == null || v === '') return '';
+    if (typeof v === 'number' && v > 10000) {
+      var d0 = new Date(Math.round((v - 25569) * 86400 * 1000));
+      if (!isNaN(d0)) return d0.toISOString();
+    }
+    var s = String(v).trim();
+    var m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?$/);
+    if (m) {
+      var yy = Number(m[3]); if (yy >= 2500) yy -= 543;
+      var d1 = new Date(yy, Number(m[2]) - 1, Number(m[1]), Number(m[4] || 0), Number(m[5] || 0));
+      return isNaN(d1) ? '' : d1.toISOString();
+    }
+    var m2 = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{1,2}):(\d{2}))?/);
+    if (m2) {
+      var y2 = Number(m2[1]); if (y2 >= 2500) y2 -= 543;
+      var d2 = new Date(y2, Number(m2[2]) - 1, Number(m2[3]), Number(m2[4] || 0), Number(m2[5] || 0));
+      return isNaN(d2) ? '' : d2.toISOString();
+    }
+    var d3 = new Date(s);
+    return isNaN(d3) ? '' : d3.toISOString();
+  }
+
+  var IMT_ISSUE_IMPORT_COLS = [
+    { key: 'created_at',  syn: ['created_at', 'date', 'วันที่แจ้ง', 'วันที่', 'วันแจ้ง'] },
+    { key: 'department',  syn: ['department', 'dept', 'หน่วยงาน', 'แผนก'] },
+    { key: 'reported_by', syn: ['reported_by', 'reporter', 'ผู้แจ้ง', 'ชื่อผู้แจ้ง'] },
+    { key: 'problem',     syn: ['problem', 'description', 'detail', 'ปัญหา', 'รายละเอียด', 'รายละเอียดปัญหา'], req: true },
+    { key: 'category',    syn: ['category', 'หมวด', 'ประเภท', 'หมวดปัญหา', 'กลุ่มปัญหา'] },
+    { key: 'severity',    syn: ['severity', 'ความรุนแรง'] },
+    { key: 'status',      syn: ['status', 'สถานะ'] },
+    { key: 'solution',    syn: ['solution', 'fix', 'วิธีแก้ไข', 'วิธีแก้', 'การแก้ไข', 'แนวทางแก้ไข'] },
+    { key: 'received_by', syn: ['received_by', 'ผู้รับเรื่อง', 'ผู้รับแจ้ง'] },
+    { key: 'fixed_by',    syn: ['fixed_by', 'resolved_by', 'ผู้แก้ไข', 'คนแก้ไข', 'ผู้ดำเนินการ'] },
+    { key: 'fixed_date',  syn: ['fixed_date', 'resolved_at', 'closed_at', 'วันที่แก้ไข', 'วันที่ปิด', 'วันที่เสร็จ'] },
+  ];
+
+  function imtNormIssueStatus(v) {
+    var q = imtNorm(v);
+    var ids = (window.IMPL_ISSUE_STATUS || []).map(function (s) { return s.id; });
+    if (ids.indexOf(q) > -1) return q;
+    if (/เสร็จ|ปิด|done|resolve|แก้ไขแล้ว|ดำเนินการแล้ว/.test(q)) return 'closed';
+    if (/กำลัง|progress|ดำเนินการอยู่/.test(q)) return 'in_progress';
+    return 'open';
+  }
+  function imtNormSeverity(v) {
+    var q = imtNorm(v);
+    var ids = (window.IMPL_SEVERITY || []).map(function (s) { return s.id; });
+    if (ids.indexOf(q) > -1) return q;
+    if (/วิกฤต|critical/.test(q)) return 'critical';
+    if (/สูง|high/.test(q)) return 'high';
+    if (/น้อย|low/.test(q)) return 'low';
+    return 'medium';
+  }
+
+  // ── "ผู้แก้ไข" ในไฟล์นำเข้าจะพิมพ์เป็นชื่อเล่นหรือชื่อ-นามสกุลเต็มก็ได้ (เพื่อความง่าย ไม่ต้องเปิด
+  // รายชื่อพนักงานไปหาว่าใครชื่อเล่นอะไร) — หาตัวตรงในระบบให้อัตโนมัติแล้วแปลงเป็นชื่อเล่นเก็บไว้เสมอ
+  // (ตาม convention เดิมของ fixedBy ทั้งระบบ) หาไม่เจอเลยก็เก็บข้อความเดิมไว้ตามที่พิมพ์มา ──
+  function imtResolveStaffToNick(v) {
+    var s = String(v || '').trim();
+    if (!s) return '';
+    var staff = (window.STAFF || []).find(function (x) { return (x.nickname && x.nickname === s) || (x.name && x.name === s); });
+    return staff ? (staff.nickname || staff.name) : s;
+  }
+
+  function imtIssueImportParse(objs) {
+    return (objs || []).map(function (o, idx) {
+      var rec = {};
+      Object.keys(o).forEach(function (k) {
+        var nk = imtNorm(k);
+        var col = IMT_ISSUE_IMPORT_COLS.find(function (c) { return c.syn.some(function (s) { return imtNorm(s) === nk; }); });
+        if (col && rec[col.key] == null) rec[col.key] = o[k];
+      });
+      var errs = [];
+      var problem = String(rec.problem || '').trim();
+      if (!problem) errs.push('ไม่มีรายละเอียดปัญหา');
+      var createdIso = imtParseDate(rec.created_at) || new Date().toISOString();
+      var status = imtNormIssueStatus(rec.status);
+      var fixedIso = imtParseDate(rec.fixed_date) || (status === 'closed' ? createdIso : '');
+      return {
+        row: idx + 2,
+        ok: errs.length === 0,
+        errs: errs,
+        data: {
+          department: String(rec.department || '').trim(),
+          reportedBy: String(rec.reported_by || '').trim(),
+          problem: problem,
+          category: String(rec.category || '').trim(),
+          severity: imtNormSeverity(rec.severity),
+          status: status,
+          solution: String(rec.solution || '').trim(),
+          receivedBy: String(rec.received_by || '').trim(),
+          fixedBy: imtResolveStaffToNick(rec.fixed_by),
+          fixedDate: fixedIso ? fixedIso.slice(0, 10) : '',
+          createdAt: createdIso,
+        },
+      };
+    });
+  }
+
+  window.imtDownloadIssueImportTemplate = function () {
+    if (!window.XLSX) { window.showAlert && window.showAlert('ไลบรารี Excel ยังไม่พร้อม', 'warn'); return; }
+    var headers = ['created_at', 'department', 'reported_by', 'problem', 'category', 'severity', 'status', 'solution', 'received_by', 'fixed_by', 'fixed_date'];
+    var example = ['2025-11-20', 'แผนกผู้ป่วยใน', 'คุณสมชาย', 'พิมพ์ใบสั่งยาไม่ออก', 'รายงาน / พิมพ์เอกสาร', 'ปานกลาง', 'ดำเนินการแล้ว', 'ตั้งค่าเครื่องพิมพ์เริ่มต้นใหม่', 'สมหญิง', 'สมหญิง ใจดี', '2025-11-21'];
+    var guide = [
+      ['คำแนะนำการกรอก'],
+      ['problem', 'รายละเอียดปัญหา — จำเป็น'],
+      ['status', 'รอดำเนินการ / กำลังดำเนินการ / ดำเนินการแล้ว (เว้นว่าง = รอดำเนินการ)'],
+      ['severity', 'น้อย / ปานกลาง / สูง / วิกฤต (เว้นว่าง = ปานกลาง)'],
+      ['category', 'ชื่อหมวดปัญหา (ไม่บังคับ)'],
+      ['created_at', 'วันที่แจ้งปัญหา'],
+      ['fixed_date', 'วันที่แก้ไขเสร็จ (ถ้าสถานะ = ดำเนินการแล้ว แต่ไม่ระบุ จะใช้วันที่แจ้งแทน)'],
+      ['fixed_by', 'ชื่อผู้แก้ไข — พิมพ์ชื่อเล่นหรือชื่อ-นามสกุลเต็มก็ได้ ระบบจะจับคู่กับรายชื่อพนักงานให้อัตโนมัติ'],
+      ['รูปแบบวันที่', 'YYYY-MM-DD หรือ DD/MM/YYYY (รองรับปี พ.ศ.)'],
+      ['หมายเหตุ', '1 ไฟล์ = 1 โครงการ ต้องเลือกโครงการปลายทางก่อนนำเข้า'],
+    ];
+    var wb = window.XLSX.utils.book_new();
+    window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.aoa_to_sheet([headers, example]), 'issues');
+    window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.aoa_to_sheet(guide), 'คำแนะนำ');
+    window.XLSX.writeFile(wb, 'Template_IMPL_ISSUES_import.xlsx');
+  };
+
+  // ── เรียกตรงจาก modals.js execImport (หน้าแรกของ modal นำเข้ากลาง ไม่ต้องเปิดป๊อบอับซ้อนอีกชั้น) —
+  // ประมวลผลไฟล์ + (ถ้าติ๊กไว้) ลบปัญหาเดิมเฉพาะโครงการที่เลือก + เขียนแถวใหม่ ครบในคลิกเดียว แล้วสรุปผล
+  // เป็น toast (ไม่มีหน้าพรีวิวแยกต่างหากอีกต่อไป — เพื่อให้ใช้งานง่าย ไม่ต้องคลิกหลายรอบ) ──
+  window.imtRunIssueImportInline = async function (file, pid, clearFirst) {
+    var msgEl = document.getElementById('import-msg');
+    if (!(window.canAdd && window.canAdd(window.IMPL_MODULE))) {
+      if (msgEl) msgEl.innerHTML = '<span style="color:var(--coral)">⚠ ไม่มีสิทธิ์นำเข้าปัญหา Impl Tracker</span>';
+      return;
+    }
+    if (!pid) { if (msgEl) msgEl.innerHTML = '<span style="color:var(--coral)">⚠ กรุณาเลือกโครงการปลายทางก่อน</span>'; return; }
+    if (!file) { if (msgEl) msgEl.innerHTML = '<span style="color:var(--coral)">⚠ กรุณาเลือกไฟล์ก่อน</span>'; return; }
+    if (!window.XLSX) { if (msgEl) msgEl.innerHTML = '<span style="color:var(--coral)">ไลบรารี Excel ยังไม่พร้อม</span>'; return; }
+    var proj = imtProject(pid);
+
+    if (msgEl) msgEl.innerHTML = '<span style="color:var(--txt3)">⏳ กำลังอ่านไฟล์...</span>';
+    var objs;
+    try {
+      var buf = await file.arrayBuffer();
+      var wb = window.XLSX.read(new Uint8Array(buf), { type: 'array' });
+      var ws = wb.Sheets[wb.SheetNames[0]];
+      objs = window.XLSX.utils.sheet_to_json(ws, { defval: '' });
+    } catch (err) {
+      if (msgEl) msgEl.innerHTML = '<span style="color:var(--coral)">อ่านไฟล์ไม่ได้: ' + esc(String(err.message || err)) + '</span>';
+      return;
+    }
+    var parsed = imtIssueImportParse(objs);
+    var rows = parsed.filter(function (p) { return p.ok; });
+    var badRows = parsed.filter(function (p) { return !p.ok; });
+    if (!parsed.length) { if (msgEl) msgEl.innerHTML = '<span style="color:var(--coral)">⚠ ไม่พบข้อมูลในไฟล์</span>'; return; }
+    if (!rows.length) { if (msgEl) msgEl.innerHTML = '<span style="color:var(--coral)">⚠ ไม่มีแถวที่นำเข้าได้เลย (ทุกแถวไม่มีรายละเอียดปัญหา)</span>'; return; }
+
+    if (msgEl) msgEl.innerHTML = '<span style="color:var(--txt3)">⏳ กำลังนำเข้า...</span>';
+
+    // ── ลบปัญหาเดิม "เฉพาะของโครงการที่เลือกไว้" ก่อนนำเข้า (กรณีนำเข้าซ้ำ) — กรองด้วย projectId
+    // ทุกครั้งกันพลาดลบข้ามโครงการอื่นโดยไม่ตั้งใจ ──
+    if (clearFirst) {
+      var toDelete = (window.IMPL_ISSUES || []).filter(function (x) { return x.projectId === pid; });
+      for (var j = 0; j < toDelete.length; j++) {
+        try { await window.deleteDoc(window.getDocRef('IMPL_ISSUES', toDelete[j].id)); }
+        catch (e) { console.warn('[impl issue import] delete old row failed', toDelete[j].id, e); }
+      }
+      window.IMPL_ISSUES = (window.IMPL_ISSUES || []).filter(function (x) { return x.projectId !== pid; });
+    }
+
+    var done = 0, failed = 0;
+    for (var i = 0; i < rows.length; i++) {
+      var d = rows[i].data;
+      try {
+        var id = window.imtUid('ISSU');
+        var row = {
+          project_id: pid, task_id: '',
+          department: d.department, reported_by: d.reportedBy, problem: d.problem,
+          category: d.category, severity: d.severity, status: d.status, solution: d.solution,
+          received_by: d.receivedBy, fixed_by: d.fixedBy, fixed_date: d.fixedDate || null,
+          created_at: d.createdAt,
+        };
+        window.imtApplyLocal('IMPL_ISSUES', id, row);
+        await window.setDoc(window.getDocRef('IMPL_ISSUES', id), row);
+        done++;
+      } catch (e) { failed++; console.warn('[impl issue import] row', rows[i].row, e); }
+    }
+
+    window.closeM('m-import');
+    var summary = 'นำเข้าปัญหาเข้าโครงการ "' + (proj ? proj.name : pid) + '" สำเร็จ ' + done + ' รายการ'
+      + (badRows.length ? ' · ข้าม ' + badRows.length + ' รายการ (ไม่มีรายละเอียดปัญหา)' : '')
+      + (failed ? ' · ผิดพลาด ' + failed : '');
+    window.showAlert && window.showAlert(summary, failed ? 'warn' : 'success');
+    if (window._von && window._von('view-impl-tracker')) window.renderImplTracker && window.renderImplTracker();
   };
 
 })();

@@ -50,6 +50,9 @@
     budget:       'view-budget',
     impl_tracker: 'view-impl-tracker',
     helpdesk:     'view-helpdesk',
+    // ── all_issues: ไม่ใส่ใน PERM_MODULES โดยตั้งใจ — เมนูนี้จำกัดสิทธิ์ PM/Admin แบบตายตัว (window.ce())
+    // ไม่ต้องการให้ Admin ไปเปิดสิทธิ์ให้ role อื่นผ่านหน้า Admin Panel ได้ (ดู router.js goTo/goView) ──
+    all_issues:   'view-all-issues',
   };
 
   // ── Default Route ──

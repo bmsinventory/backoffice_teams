@@ -1,0 +1,91 @@
+/* ================================================================
+   ALL-ISSUES.CSS — เมนู "ปัญหาทุกโครงการ" (all_issues, PM/Admin เท่านั้น)
+   ใช้ token/component เดิมให้มากที่สุด (.stat-row/.stat-c, .dtable-inner, .sec-label, .pbar, .led)
+   เพิ่มเฉพาะส่วนการ์ดสรุปต่อ Product / กราฟแท่งแนวนอน stacked / ตารางเมทริกซ์ที่ยังไม่มี
+================================================================ */
+
+/* .view เริ่มต้น overflow:hidden (คาดว่ามี wrapper ย่อยจัดการ scroll เอง เช่น #imt-content ของ
+   impl_tracker) — หน้านี้ไม่มี wrapper ย่อย ต่อ HTML ตรงลง #view-all-issues เลย ต้องเปิด scroll เอง
+   ตาม pattern เดียวกับ view-overview/view-lodging/view-holidays/view-advance ── */
+.view#view-all-issues.on { display: block; overflow-y: auto; }
+
+.aio-empty { color: var(--txt3); font-size: 12.5px; text-align: center; padding: 18px 4px; }
+.aio-guard { padding: 64px 20px; text-align: center; color: var(--txt3); font-size: 14px; }
+
+/* ── 5 การ์ด KPI — .stat-row ทั่วไปถูกบังคับ 4 คอลัมน์ด้วย !important จาก responsive.css ทุก breakpoint
+   ต้อง override ด้วย selector ที่ specificity สูงกว่า (.stat-row.aio-stat-row) ไม่ใช่แค่เพิ่ม class เฉย ๆ ── */
+.stat-row.aio-stat-row { grid-template-columns: repeat(5,1fr) !important; padding: 20px 24px; }
+@media (max-width: 1100px) { .stat-row.aio-stat-row { grid-template-columns: repeat(3,1fr) !important; } }
+@media (max-width: 640px)  { .stat-row.aio-stat-row { grid-template-columns: repeat(2,1fr) !important; } }
+
+/* ── การ์ดสรุปต่อ Product ── */
+.aio-prod-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(190px,1fr));
+  gap: 14px; padding: 0 24px 24px;
+}
+.aio-prod-card {
+  background: var(--surface); border: 1px solid var(--border); border-top: 3px solid var(--violet);
+  border-radius: var(--r2); padding: 16px 18px; box-shadow: var(--sh-sm); transition: all .2s;
+}
+.aio-prod-card:hover { box-shadow: var(--sh-md); transform: translateY(-2px); border-color: var(--border2); }
+.aio-prod-name     { font-size: 12.5px; font-weight: 800; margin-bottom: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.aio-prod-total     { font-size: 28px; font-weight: 800; color: var(--txt); line-height: 1; }
+.aio-prod-total-sub { font-size: 11px; color: var(--txt3); margin-bottom: 12px; }
+.aio-prod-mini       { display: flex; gap: 16px; }
+.aio-prod-mini-item  { display: flex; flex-direction: column; align-items: center; font-size: 10.5px; color: var(--txt3); font-weight: 600; }
+.aio-prod-mini-item b { font-size: 15px; }
+.aio-prod-pct        { text-align: right; font-size: 11px; font-weight: 700; color: var(--txt3); margin-top: 4px; }
+
+/* ── กราฟ 2 คอลัมน์: สถานะต่อ Product / กลุ่มปัญหาต่อ Product ── */
+.aio-chart-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 0 24px 24px; }
+@media (max-width: 1000px) { .aio-chart-grid-2 { grid-template-columns: 1fr; } }
+
+.aio-legend { display: flex; gap: 14px; flex-wrap: wrap; }
+.aio-legend-item { display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; color: var(--txt2); }
+.aio-legend-item i { width: 9px; height: 9px; border-radius: 3px; display: inline-block; flex-shrink: 0; }
+
+/* ── กราฟแท่งแนวนอน stacked (div+flex ธรรมดา ไม่ใช้ไลบรารีภายนอก) ── */
+.aio-hbar-chart { display: flex; flex-direction: column; gap: 14px; }
+.aio-hbar-row   { display: flex; align-items: center; gap: 10px; }
+.aio-hbar-label { flex: 0 0 130px; font-size: 12px; font-weight: 600; color: var(--txt2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.aio-hbar-label[onclick]:hover { color: var(--violet); text-decoration: underline; }
+.aio-hbar-track { flex: 1; background: var(--surface3); border-radius: 6px; height: 22px; overflow: hidden; }
+.aio-hbar-fill  { display: flex; height: 100%; transition: width .4s ease; }
+.aio-hbar-seg   { height: 100%; transition: filter .15s; }
+.aio-hbar-seg[onclick]:hover { filter: brightness(1.15); }
+.aio-hbar-total { flex: 0 0 40px; text-align: right; font-size: 12px; font-weight: 800; color: var(--txt); }
+.aio-hbar-axis  { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+.aio-hbar-axis-spacer  { flex: 0 0 130px; }
+.aio-hbar-axis-spacer2 { flex: 0 0 40px; }
+.aio-hbar-axis-nums    { flex: 1; display: flex; font-size: 10.5px; color: var(--txt3); }
+
+/* ── กราฟแนวโน้มปัญหา (เส้นโค้ง SVG) ── */
+.aio-trend-svg { width: 100%; height: auto; overflow: visible; }
+.aio-trend-svg circle:hover { r: 5.5; }
+
+/* ── ตารางเมทริกซ์ โรงพยาบาล × Product ── */
+.aio-matrix-tbl { width: 100%; border-collapse: collapse; }
+.aio-matrix-tbl th { white-space: nowrap; }
+.aio-matrix-tbl td { vertical-align: middle; padding: 8px 10px; }
+.aio-matrix-dot   { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+.aio-matrix-hname { font-weight: 700; color: var(--txt); white-space: nowrap; }
+.aio-matrix-empty { color: var(--txt3); text-align: center; }
+.aio-matrix-cell     { padding: 6px 10px; border-radius: 8px; font-size: 12px; white-space: nowrap; transition: all .15s; border: 1.5px solid transparent; }
+.aio-matrix-cell.ok   { background: rgba(6,214,160,.08); }
+.aio-matrix-cell.warn { background: rgba(255,107,107,.08); }
+.aio-matrix-cell:hover { border-color: var(--violet); box-shadow: var(--sh-sm); }
+.aio-matrix-cell-top { display: flex; align-items: center; gap: 6px; font-weight: 700; color: var(--txt); }
+.aio-matrix-cell-sub { font-size: 10.5px; color: var(--txt3); margin-top: 2px; }
+
+@media (max-width: 640px) {
+  .aio-hbar-label, .aio-hbar-axis-spacer { flex-basis: 90px; }
+}
+
+/* ── หัวกลุ่มโครงการใน modal รายละเอียด (m-aio-detail) — คั่นกลุ่มปัญหาต่อโครงการ แทนคอลัมน์
+   "โครงการ" ที่ซ้ำทุกแถวเดิม (pattern เดียวกับ .imt-list-phasehead ของ Impl Tracker) ── */
+.aio-detail-grouphead td {
+  background: var(--surface2); font-weight: 700; font-size: 12.5px; color: var(--txt);
+  padding: 10px 14px; border-top: 1px solid var(--border); cursor: default;
+}
+.aio-detail-grouphead:hover td { background: var(--surface2); }
+.aio-detail-groupcount { font-weight: 600; color: var(--txt3); font-size: 11.5px; margin-left: 2px; }

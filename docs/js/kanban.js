@@ -17,6 +17,19 @@ window.renderKanban = function(){
     var totalBudget=items.reduce(function(s,p){return s+p.cost;},0);
     var cards=items.map(function(p){
       var pt=gT(p.typeId);var pg=gG(p.groupId);
+      var pAdvs=window.ADVANCES.filter(function(a){return a.pid===p.id;});
+      var adv=pAdvs.find(function(a){return a.status!=='cleared';})||pAdvs[pAdvs.length-1];
+      var advStat=adv?window.AFLW.find(function(x){return x.id===adv.status;}):null;
+      var advBadge=advStat?`<span class="kb-card-type" style="background:${advStat.color}18;color:${advStat.color};margin:0" title="มี Advance — สถานะ: ${esc(advStat.label)}">💰 ${esc(advStat.label)}</span>`:'';
+      // ── ที่พักรออนุมัติ — เกณฑ์เดียวกับตาราง "สถานะที่พัก" ใน projects.js (ไม่นับกลุ่มโครงการที่ไม่ต้องติดตามที่พัก) ──
+      var _exLd=['GRP17733355541905','GRP17733355541906'];
+      var ldBadge='';
+      if(!_exLd.includes(p.groupId)){
+        var _pLds=window.LODGINGS.filter(function(l){return l.pid===p.id;});
+        if(_pLds.length&&!_pLds.some(function(l){return l.approvedDaily==='yes'||l.approvedMonthly==='yes';})){
+          ldBadge=`<span class="kb-card-type" style="background:#ffa62b18;color:var(--amber);margin:0" title="มีคำขอจัดหาที่พัก ยังไม่อนุมัติ">🏨 ที่พักรออนุมัติ</span>`;
+        }
+      }
       var displayProg=p.progress;
       if((sg.id==='exec'||sg.label==='ดำเนินการ')&&p.start&&p.end){var sDate=pd(p.start);var eDate=pd(p.end);var totalMs=eDate-sDate;if(totalMs>0)displayProg=Math.min(100,Math.max(0,Math.round((now-sDate)/totalMs*100)));}
       var mems=(p.members&&p.members.length>0?p.members:p.team.map(function(id){return{sid:id};}));
@@ -33,6 +46,8 @@ window.renderKanban = function(){
           <div style="display:flex;flex-wrap:wrap;gap:3px;">
             <span class="kb-card-type" style="background:${pt.color}18;color:${pt.color};margin:0">${esc(pt.label)}</span>
             ${pg?`<span class="kb-card-type" style="background:${pg.color}18;color:${pg.color};margin:0">${esc(pg.label)}</span>`:''}
+            ${advBadge}
+            ${ldBadge}
           </div>
         </div>
         <div class="kb-card-name">${esc(p.name)}${p.siteOwner?`<div style="font-size:10px;color:var(--txt3);font-weight:400;margin-top:2px;">🏢 ${esc(p.siteOwner)}</div>`:''}</div>
