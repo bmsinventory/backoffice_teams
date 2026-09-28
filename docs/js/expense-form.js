@@ -57,22 +57,59 @@ window.ecfRefreshActiveSavedList = function () {
   if (window.ecfActiveType === 'ac02') window.sdfRefreshSavedList();
   else if (window.ecfActiveType === 'ac03') window.snlRefreshSavedList();
   else window.ecfRefreshSavedList();
+  window.ecfUpdateDelBtn();
 };
 
 window.ecfDispatchLoad = function (id) {
   if (window.ecfActiveType === 'ac02') window.sdfLoadForm(id);
   else if (window.ecfActiveType === 'ac03') window.snlLoadForm(id);
   else window.ecfLoadForm(id);
+  window.ecfUpdateDelBtn();
 };
 window.ecfDispatchNew = function () {
   if (window.ecfActiveType === 'ac02') window.sdfNewForm();
   else if (window.ecfActiveType === 'ac03') window.snlNewForm();
   else window.ecfNewForm();
+  window.ecfUpdateDelBtn();
 };
-window.ecfDispatchSave = function () {
-  if (window.ecfActiveType === 'ac02') window.sdfSave();
-  else if (window.ecfActiveType === 'ac03') window.snlSave();
-  else window.ecfSave();
+window.ecfDispatchSave = async function () {
+  if (window.ecfActiveType === 'ac02') await window.sdfSave();
+  else if (window.ecfActiveType === 'ac03') await window.snlSave();
+  else await window.ecfSave();
+  window.ecfUpdateDelBtn();
+};
+
+// ── ลบฟอร์มที่บันทึกไว้ (ใช้ร่วมทั้ง 3 ประเภท) — ลบตัวที่เลือกอยู่ใน #ecf-saved-select แล้วล้างหน้ากลับเป็นฟอร์มใหม่ ──
+var ECF_DEL_CFG = {
+  ac01: { col: 'EXPENSE_CLEARING_FORMS', editKey: 'ecfEditId', newFn: 'ecfNewForm', refreshFn: 'ecfRefreshSavedList' },
+  ac02: { col: 'SITE_DEPLOY_FORMS',      editKey: 'sdfEditId', newFn: 'sdfNewForm', refreshFn: 'sdfRefreshSavedList' },
+  ac03: { col: 'SITE_NOTICE_FORMS',      editKey: 'snlEditId', newFn: 'snlNewForm', refreshFn: 'snlRefreshSavedList' },
+};
+// ปุ่ม "ลบ" แสดงเฉพาะตอนเลือกฟอร์มที่บันทึกไว้แล้ว + มีสิทธิ์ลบ
+window.ecfUpdateDelBtn = function () {
+  var btn = document.getElementById('ecf-del-btn'), sel = document.getElementById('ecf-saved-select');
+  if (!btn) return;
+  btn.style.display = (sel && sel.value && window.canDel && window.canDel('expense_form')) ? '' : 'none';
+};
+window.ecfDispatchDelete = function () {
+  if (!window.canDel || !window.canDel('expense_form')) return;
+  var cfg = ECF_DEL_CFG[window.ecfActiveType] || ECF_DEL_CFG.ac01;
+  var sel = document.getElementById('ecf-saved-select');
+  var id = sel ? sel.value : '';
+  if (!id) return;
+  var label = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : id;
+  window.showConfirm('ลบฟอร์ม "' + label + '" ใช่หรือไม่? ลบแล้วกู้คืนไม่ได้', async function () {
+    try {
+      await window.deleteDoc(window.getDocRef(cfg.col, id));
+      window[cfg.col] = (window[cfg.col] || []).filter(function (x) { return x.id !== id; });
+      if (window[cfg.editKey] === id) window[cfg.editKey] = null;
+      window[cfg.newFn]();
+      window[cfg.refreshFn]();
+      if (sel) sel.value = '';
+      window.ecfUpdateDelBtn();
+      window.showAlert && window.showAlert('ลบฟอร์มแล้ว', 'success');
+    } catch (e) { window.showDbError ? window.showDbError(e) : console.error(e); }
+  }, { title: 'ยืนยันการลบฟอร์ม', okText: 'ลบ' });
 };
 
 // ── Build Static Shell (input panel + preview panel) ──
@@ -95,6 +132,7 @@ function ecfBuildHtml() {
     <select class="t-sel" id="ecf-saved-select" onchange="window.ecfDispatchLoad(this.value)" style="min-width:220px;"></select>
     <button class="btn btn-ghost btn-sm ecf-edit-btn" onclick="window.ecfDispatchNew()">+ ฟอร์มใหม่</button>
     <button class="btn btn-teal btn-sm ecf-edit-btn" onclick="window.ecfDispatchSave()">💾 บันทึก</button>
+    <button class="btn btn-red btn-sm ecf-del-btn" id="ecf-del-btn" onclick="window.ecfDispatchDelete()" style="display:none;" title="ลบฟอร์มที่เลือกอยู่">🗑 ลบ</button>
     <button class="btn btn-pri btn-sm" onclick="window.ecfPrint()">🖨️ พิมพ์</button>
   </div>
 

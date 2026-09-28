@@ -160,12 +160,13 @@
       set:    function (ref, data) { ops.push({ t:'set',    ref:ref, data:data }); },
       update: function (ref, data) { ops.push({ t:'update', ref:ref, data:data }); },
       delete: function (ref)       { ops.push({ t:'delete', ref:ref }); },
-      commit: async function () {
+      commit: async function (onOp) {   // onOp(): เรียกหลังเขียนแต่ละรายการเสร็จ (ใช้ทำหลอดความคืบหน้า)
         for (var i = 0; i < ops.length; i++) {
           var op = ops[i];
           if (op.t === 'set')    await window.setDoc(op.ref, op.data);
           if (op.t === 'update') await window.updateDoc(op.ref, op.data);
           if (op.t === 'delete') await window.deleteDoc(op.ref);
+          if (onOp) onOp();
         }
       },
     };

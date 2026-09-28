@@ -162,7 +162,7 @@ window.snlBuildHtml = function () {
       </div>
 
       <div class="f-grid">
-        <div class="f-group"><label class="f-label">วันที่ดำเนินงานที่บริษัท (เตรียมงานก่อนออกไซต์ — คำนวณอัตโนมัติเป็น จ.-ศ. ของสัปดาห์ก่อนวันเริ่มงาน 1 สัปดาห์, ไม่บังคับ ลบได้ถ้าไม่ต้องการ)</label><input type="date" class="f-input" id="snl-office-work-start" onchange="window.snlRenderPreview()"></div>
+        <div class="f-group"><label class="f-label">วันที่ดำเนินงานที่บริษัท</label><input type="date" class="f-input" id="snl-office-work-start" onchange="window.snlRenderPreview()"></div>
         <div class="f-group"><label class="f-label">ถึงวันที่</label><input type="date" class="f-input" id="snl-office-work-end" onchange="window.snlRenderPreview()"></div>
       </div>
       <div class="f-grid">

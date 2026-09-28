@@ -316,9 +316,10 @@ function _populateTsFilters() {
 
   // Projects that have timesheets
   const pids = [...new Set(window.TIMESHEETS.map(r => r.pid).filter(Boolean))];
-  const curProj = projSel.value;
-  projSel.innerHTML = '<option value="">ทุกโครงการ</option>' +
-    window.PROJECTS.filter(p => pids.includes(p.id)).map(p => `<option value="${p.id}"${p.id===curProj?' selected':''}>${esc(p.name)}</option>`).join('');
+  const tsProjList = window.PROJECTS.filter(p => pids.includes(p.id));
+  const curProj = tsProjList.some(p => p.id === projSel.value) ? projSel.value : '';
+  window.initProjectCombobox(window.projectComboIds('ts-proj-cmb', 'ts-proj'), tsProjList, curProj,
+    () => window.renderTimesheet(), { allLabel: 'ทุกโครงการ', minWidth: 360 });
 
   // Staff that have timesheets
   const sids = [...new Set(window.TIMESHEETS.map(r => r.staffId).filter(Boolean))];

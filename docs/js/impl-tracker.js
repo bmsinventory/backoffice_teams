@@ -206,7 +206,9 @@
     window.renderImplTracker();
   };
 
+  var _imtSwitcherPending = null;
   function renderProjectSwitcher() {
+    _imtSwitcherPending = null;
     if (TABS_NEED_PROJECT.indexOf(window.imtTab) === -1) return '';
     var pid = window.imtCurrentProjectId;
     var proj = pid ? imtProject(pid) : null;
@@ -218,14 +220,19 @@
     var switchableProjects = window.IMPL_PROJECTS.filter(function (p) {
       return !hideDoneProjects || p.id === pid || imtProjectHealth(p).level !== 'done';
     });
-    var opts = switchableProjects.map(function (p) { return '<option value="'+p.id+'"'+(p.id===pid?' selected':'')+'>'+esc(p.name)+'</option>'; }).join('');
+    // ── ตัวเลือกเป็น combobox ค้นหา + จัดกลุ่มตามประเภทงาน (typeId ยืมจากโครงการต้นทาง) — ผูก listener
+    // หลัง renderTabs ใส่ markup ลง DOM แล้ว (ดู _imtSwitcherPending ใน renderTabs) ──
+    _imtSwitcherPending = {
+      pid: pid,
+      items: switchableProjects.map(function (p) { var sp = imtResolveSourceProject(p); return { id: p.id, name: p.name, typeId: sp ? sp.typeId : '' }; })
+    };
     var hideDoneChk = '<label class="imt-hidedone-chk" style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--txt2);white-space:nowrap;cursor:pointer;margin-left:auto;">'
       + '<input type="checkbox" '+(hideDoneProjects?'checked':'')+' onchange="window.imtToggleHideDoneProjects(this.checked)"> แสดงเฉพาะโครงการที่ยังไม่เสร็จ'
       + '</label>';
     return '<div class="imt-switcher">'
       + '<span class="imt-switcher-back" onclick="window.imtGoTab(\'dashboard\')">◀ ทุกโครงการ</span>'
       + '<span class="imt-switcher-lbl">กำลังดู:</span>'
-      + '<select class="f-input imt-switcher-sel" onchange="window.imtSwitchProject(this.value)">' + opts + '</select>'
+      + window.projectComboHtml('imt-sw-cmb', 'imt-sw-pid', 'ค้นหาหรือเลือกโครงการ...', 'width:300px;max-width:100%;flex:0 1 300px;min-width:0;')
       + '<div class="imt-switcher-progress"><div class="imt-switcher-pbar">'+pbarHtml(window.calcProjectProgress(proj))+'</div><span style="font-size:11.5px;font-weight:700;">'+window.calcProjectProgress(proj)+'%</span></div>'
       + hideDoneChk
       + '</div>';
@@ -242,6 +249,11 @@
       ? '<button class="btn btn-pri btn-sm imt-tabs-addbtn" onclick="window.openImtProjectModal(null)">+ เพิ่มโครงการ</button>' : '';
     var tabsRow = '<div class="imt-tabs-row"><div class="imt-tabs-scroll">'+tabsHtml+'</div>'+addBtn+'</div>';
     el.innerHTML = tabsRow + renderProjectSwitcher();
+    if (_imtSwitcherPending) {
+      var sw = _imtSwitcherPending;
+      window.initProjectCombobox(window.projectComboIds('imt-sw-cmb', 'imt-sw-pid'), sw.items, sw.pid,
+        function (id) { if (id && id !== window.imtCurrentProjectId) window.imtSwitchProject(id); }, { fixed: true, minWidth: 340 });
+    }
   }
 
   // ── เลือกโครงการที่ยังไม่เสร็จ/ไม่ถูกยกเลิก และมีวันสิ้นสุดใกล้ที่สุด (เร่งด่วนที่สุด) ให้เป็นโครงการ "กำลังดู"

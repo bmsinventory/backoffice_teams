@@ -93,6 +93,10 @@ window.execDelete=async function(){
 // กันลิสต์ยาวเกินไปเมื่อสะสมโครงการเก่ามาหลายปี — ติ๊ก "แสดงโครงการในปีที่สิ้นสุดแล้วด้วย" เพื่อดึง
 // โครงการที่จบไปแล้วกลับมาแสดงด้วย ตอนต้องนำเข้าข้อมูลของโครงการเก่าจริง ๆ ──
 window.imtRefreshProjectImportOptions=function(){
+  // ── ช่องเลือกเป็น combobox ค้นหา + จัดกลุ่มตามประเภทงาน (แบบเดียวกับ "เพิ่มโครงการใหม่") —
+  // hidden input id="import-imt-project" เก็บ id โครงการ Impl Tracker ที่เลือก ──
+  const host=document.getElementById('import-imt-project-host');
+  if(host&&!document.getElementById('import-imt-project'))host.innerHTML=window.projectComboHtml('import-imt-cmb','import-imt-project');
   const projSel=document.getElementById('import-imt-project');
   if(!projSel)return;
   const showEnded=(document.getElementById('import-imt-show-past-years')||{}).checked;
@@ -103,8 +107,11 @@ window.imtRefreshProjectImportOptions=function(){
     list=list.filter(p=>!p.end||pd(p.end)>=today);
   }
   list.sort((a,b)=>a.name.localeCompare(b.name,'th'));
-  projSel.innerHTML='<option value="">-- เลือกโครงการ --</option>'+list.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
-  if(prevSelected&&list.some(p=>p.id===prevSelected))projSel.value=prevSelected;
+  // IMPL_PROJECTS ไม่มี typeId — ยืมจากโครงการต้นทาง (sourceProjectId หรือชื่อตรงกัน) เพื่อจัดกลุ่มตามประเภทงาน
+  const srcOf=p=>(window.PROJECTS||[]).find(sp=>sp.id===p.sourceProjectId)||(window.PROJECTS||[]).find(sp=>sp.name===p.name);
+  const items=list.map(p=>{const sp=srcOf(p);return{id:p.id,name:p.name,typeId:sp?sp.typeId:''};});
+  const cur=prevSelected&&items.some(p=>p.id===prevSelected)?prevSelected:'';
+  window.initProjectCombobox(window.projectComboIds('import-imt-cmb','import-imt-project'),items,cur,null,{fixed:true});
 };
 window.updateImportPreview=function(){
   const type=document.getElementById('import-type').value;
@@ -186,6 +193,7 @@ window.updateImportPreview=function(){
 }
 window.openImportModal=function(){
   document.getElementById('import-file').value='';
+  window._importProgress(null);
   var activeView=document.querySelector('.view.on');
   var viewId=activeView?activeView.id.replace('view-',''):'';
   var typeMap={hospital:'HOSPITALS',staff:'STAFF',advance:'ADVANCES',contract:'CONTRACTS',helpdesk:'HELPDESK'};
@@ -202,6 +210,17 @@ window.downloadTemplate=function(){
   if(type==='IMPL_ISSUES'){window.imtDownloadIssueImportTemplate&&window.imtDownloadIssueImportTemplate();return;}
   const schema=window.IMPORT_SCHEMAS[type];if(!schema)return;const csvContent="data:text/csv;charset=utf-8,\uFEFF"+schema.headers.join(",")+"\n"+schema.example.join(",");const link=document.createElement("a");link.setAttribute("href",encodeURI(csvContent));link.setAttribute("download",`Template_${type}.csv`);document.body.appendChild(link);link.click();document.body.removeChild(link);
 }
+// ── หลอดความคืบหน้าตอนนำเข้า CSV — total = จำนวนรายการที่ต้องเขียน (รวมรายการที่ลบก่อนนำเข้า) ──
+window._importProgress=function(done,total,label){
+  const wrap=document.getElementById('import-progress');if(!wrap)return;
+  const btn=document.getElementById('import-exec-btn');
+  if(done===null){wrap.style.display='none';if(btn)btn.disabled=false;return;}
+  wrap.style.display='';if(btn)btn.disabled=true;
+  const pct=total>0?Math.min(100,Math.round(done/total*100)):0;
+  document.getElementById('import-progress-bar').style.width=pct+'%';
+  document.getElementById('import-progress-pct').textContent=pct+'%';
+  document.getElementById('import-progress-text').textContent=(label||'กำลังนำเข้า')+' '+done.toLocaleString()+' / '+total.toLocaleString()+' รายการ';
+};
 window.execImport=async function(){
   const fileInput=document.getElementById('import-file');const selType=document.getElementById('import-type').value;const schema=window.IMPORT_SCHEMAS[selType];const isClearFirst=document.getElementById('import-clear-first').checked;
   if(!fileInput.files.length){document.getElementById('import-msg').innerHTML='<span style="color:var(--coral)">⚠ กรุณาเลือกไฟล์ก่อน</span>';return;}
@@ -218,10 +237,11 @@ window.execImport=async function(){
       const headers=lines[0].map(h=>h.trim());
       document.getElementById('import-msg').innerHTML='<span style="color:var(--teal)">⏳ กำลังประมวลผล...</span>';
       const ctSchema=window.IMPORT_SCHEMAS['CONTRACTS'];
+      let done=0,total=lines.length-1,label='กำลังนำเข้า';const tick=()=>{done++;window._importProgress(done,total,label);};window._importProgress(0,total,label);
       try{
         let batch=writeBatch();let opCount=0;
-        const commitBatchIfNeeded=async()=>{if(opCount>=400){await batch.commit();batch=writeBatch();opCount=0;}};
-        if(isClearFirst){const existingDocs=await getDocs(getColRef('CONTRACTS'));for(let docSnap of existingDocs.docs){batch.delete(docSnap.ref);opCount++;await commitBatchIfNeeded();}}
+        const commitBatchIfNeeded=async()=>{if(opCount>=400){await batch.commit(tick);batch=writeBatch();opCount=0;}};
+        if(isClearFirst){const existingDocs=await getDocs(getColRef('CONTRACTS'));total+=existingDocs.docs.length;label='กำลังลบ/นำเข้า';window._importProgress(done,total,label);for(let docSnap of existingDocs.docs){batch.delete(docSnap.ref);opCount++;await commitBatchIfNeeded();}}
         var curYear=new Date().getFullYear();var yrPrefix=curYear+'-';
         var autoNum=(window.CONTRACTS||[]).reduce(function(m,c){if(c.id&&c.id.startsWith(yrPrefix)){var n=parseInt(c.id.slice(yrPrefix.length));return isNaN(n)?m:Math.max(m,n);}return m;},0);
         for(let i=1;i<lines.length;i++){
@@ -238,9 +258,9 @@ window.execImport=async function(){
           if(!docId){autoNum++;docId=curYear+'-'+String(autoNum).padStart(4,'0');rowObj['contract_id']=docId;}
           batch.set(getDocRef('CONTRACTS',docId),rowObj);opCount++;await commitBatchIfNeeded();
         }
-        if(opCount>0)await batch.commit();
-        window.closeM('m-import');window.showAlert(`นำเข้าสัญญาสำเร็จ ${lines.length-1} รายการ`,'success');
-      }catch(err){document.getElementById('import-msg').innerHTML='<span style="color:var(--coral)">❌ เกิดข้อผิดพลาด: '+err.message+'</span>';}
+        if(opCount>0)await batch.commit(tick);
+        window._importProgress(null);window.closeM('m-import');window.showAlert(`นำเข้าสัญญาสำเร็จ ${lines.length-1} รายการ`,'success');
+      }catch(err){window._importProgress(null);document.getElementById('import-msg').innerHTML='<span style="color:var(--coral)">❌ เกิดข้อผิดพลาด: '+err.message+' (เขียนไปแล้ว '+done+' / '+total+' รายการ)</span>';}
     };reader.readAsText(file);return;
   }
   if(selType==='HELPDESK'){window.closeM('m-import');window.hdImportFromFile&&window.hdImportFromFile(fileInput.files[0]);return;}
@@ -260,15 +280,16 @@ window.execImport=async function(){
     function parseCSV(str){var arr=[];var quote=false;for(var row=0,col=0,c=0;c<str.length;c++){var cc=str[c],nc=str[c+1];arr[row]=arr[row]||[];arr[row][col]=arr[row][col]||'';if(cc=='"'&&quote&&nc=='"'){arr[row][col]+=cc;++c;continue;}if(cc=='"'){quote=!quote;continue;}if(cc==','&&!quote){++col;continue;}if(cc=='\r'&&nc=='\n'&&!quote){++row;col=0;++c;continue;}if(cc=='\n'&&!quote){++row;col=0;continue;}if(cc=='\r'&&!quote){++row;col=0;continue;}arr[row][col]+=cc;}return arr.filter(r=>r.join('').trim()!=='');}
     const lines=parseCSV(text);if(lines.length<=1){document.getElementById('import-msg').innerHTML='<span style="color:var(--coral)">⚠ ไม่พบข้อมูลในไฟล์</span>';return;}
     const headers=lines[0].map(h=>h.trim());document.getElementById('import-msg').innerHTML='<span style="color:var(--teal)">⏳ กำลังประมวลผล...</span>';
+    let done=0,total=lines.length-1,label='กำลังนำเข้า';const tick=()=>{done++;window._importProgress(done,total,label);};window._importProgress(0,total,label);
     try{
       let batch=writeBatch();let opCount=0;
-      const commitBatchIfNeeded=async()=>{if(opCount>=400){await batch.commit();batch=writeBatch();opCount=0;}};
-      if(isClearFirst){const existingDocs=await getDocs(getColRef(selType));for(let docSnap of existingDocs.docs){batch.delete(docSnap.ref);opCount++;await commitBatchIfNeeded();}}
+      const commitBatchIfNeeded=async()=>{if(opCount>=400){await batch.commit(tick);batch=writeBatch();opCount=0;}};
+      if(isClearFirst){const existingDocs=await getDocs(getColRef(selType));total+=existingDocs.docs.length;label='กำลังลบ/นำเข้า';window._importProgress(done,total,label);for(let docSnap of existingDocs.docs){batch.delete(docSnap.ref);opCount++;await commitBatchIfNeeded();}}
       for(let i=1;i<lines.length;i++){const values=lines[i].map(v=>v.trim());let rowObj={};const newId=schema.prefix+Date.now()+i;rowObj[schema.idField]=newId;if(selType==='PROJECTS'){rowObj.status='active';rowObj.team=[];rowObj.members=[];}headers.forEach((h,index)=>{if(values[index]!==undefined&&schema.headers.includes(h)){let val=values[index];if(['budget','progress_pct','amount_requested','amount_cleared'].includes(h))val=Number(val)||0;if(['is_active'].includes(h))val=(val.toUpperCase()==='TRUE');rowObj[h]=val;}});batch.set(getDocRef(selType,newId),rowObj);opCount++;await commitBatchIfNeeded();}
-      if(opCount>0)await batch.commit();
-      window.closeM('m-import');window.showAlert(`นำเข้าข้อมูล ${selType} สำเร็จ ${lines.length-1} รายการ`,'success');
+      if(opCount>0)await batch.commit(tick);
+      window._importProgress(null);window.closeM('m-import');window.showAlert(`นำเข้าข้อมูล ${selType} สำเร็จ ${lines.length-1} รายการ`,'success');
       var admEl=document.getElementById('m-admin');if(admEl&&admEl.classList.contains('on')&&window.admCur)setTimeout(function(){window.admTab(window.admCur);},600);
-    }catch(err){document.getElementById('import-msg').innerHTML='<span style="color:var(--coral)">❌ เกิดข้อผิดพลาด: '+err.message+'</span>';}
+    }catch(err){window._importProgress(null);document.getElementById('import-msg').innerHTML='<span style="color:var(--coral)">❌ เกิดข้อผิดพลาด: '+err.message+' (เขียนไปแล้ว '+done+' / '+total+' รายการ)</span>';}
   };reader.readAsText(file);
 }
 

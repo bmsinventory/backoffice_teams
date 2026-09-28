@@ -392,9 +392,10 @@ function _populateCostFilters() {
   }
 
   const pids = [...new Set(window.COSTS.map(r => r.pid).filter(Boolean))];
-  const curProj = projSel.value;
-  projSel.innerHTML = '<option value="">ทุกโครงการ</option>' +
-    window.PROJECTS.filter(p => pids.includes(p.id)).map(p => `<option value="${p.id}"${p.id===curProj?' selected':''}>${esc(p.name)}</option>`).join('');
+  const costProjList = window.PROJECTS.filter(p => pids.includes(p.id));
+  const curProj = costProjList.some(p => p.id === projSel.value) ? projSel.value : '';
+  window.initProjectCombobox(window.projectComboIds('cost-proj-cmb', 'cost-proj'), costProjList, curProj,
+    () => window.renderCost(), { allLabel: 'ทุกโครงการ', minWidth: 360 });
 }
 
 // ── MODAL ─────────────────────────────────────────────────────────────────────
@@ -404,9 +405,12 @@ window.openCostModal = function(id) {
   document.getElementById('m-cost-title').textContent = c ? 'แก้ไขค่าใช้จ่าย' : 'บันทึกค่าใช้จ่าย';
   document.getElementById('cost-edit-id').value = c ? c.id : '';
 
-  const projSel = document.getElementById('costf-proj');
-  projSel.innerHTML = '<option value="">-- เลือกโครงการ --</option>' +
-    window.PROJECTS.filter(p => p.status !== 'cancelled').map(p => `<option value="${p.id}"${c && c.pid===p.id?' selected':''}>${esc(p.name)}</option>`).join('');
+  // ── ช่องเลือกโครงการแบบค้นหา + จัดกลุ่มตามประเภทงาน (เหมือน "เพิ่มโครงการใหม่" ของ Impl Tracker) —
+  // hidden input id="costf-proj" เก็บค่าเดิม ตอนบันทึกอ่าน .value ได้เหมือนเดิม ──
+  const projHost = document.getElementById('costf-proj-host');
+  if (projHost && !document.getElementById('costf-proj')) projHost.innerHTML = window.projectComboHtml('costf-proj-cmb', 'costf-proj');
+  const costfList = window.PROJECTS.filter(p => p.status !== 'cancelled' || (c && c.pid === p.id));
+  window.initProjectCombobox(window.projectComboIds('costf-proj-cmb', 'costf-proj'), costfList, c ? c.pid : '', null, { fixed: true });
 
   document.getElementById('costf-cat').value = c ? c.category : 'travel';
   document.getElementById('costf-amount').value = c ? c.amount : '';

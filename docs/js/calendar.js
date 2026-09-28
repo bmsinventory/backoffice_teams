@@ -53,7 +53,11 @@ window.updateCalFilterOpts=function(){
   // Refresh individual filter list
   var isPtype=window.calView==='ptype';
   var cfMs=document.getElementById('cal-filter-ptype');
-  if(cf)cf.style.display=isPtype?'none':'';
+  // มุมมองโครงการ: ใช้ combobox ค้นหา + จัดกลุ่มตามประเภทงาน (#cal-filter-proj) แทน select ธรรมดา
+  var projWrap=document.getElementById('cal-proj-cmb-wrap');
+  if(cf)cf.style.display=(isPtype||isProject)?'none':'';
+  if(projWrap)projWrap.style.display=isProject?'':'none';
+  if(isProject)_calInitProjCombo((document.getElementById('cal-filter-proj')||{}).value||'');
   if(cfMs)cfMs.style.display=isPtype?'':'none';
   if(isPtype){
     if(cfMs)window.msFilter('cal-filter-ptype',window.PTYPES,{placeholder:'ทั้งหมด',onChange:window.renderCalendar});
@@ -93,11 +97,17 @@ function buildCalAgendaHtml(activeRowsData,tCols){
   }).join('')+'</div>';
 }
 
+function _calInitProjCombo(cur){
+  var list=window.PROJECTS||[];
+  if(cur&&!list.some(function(p){return p.id===cur;}))cur='';
+  window.initProjectCombobox(window.projectComboIds('cal-proj-cmb','cal-filter-proj'),list,cur,function(){window.renderCalendar();},{allLabel:'ทั้งหมด',minWidth:360});
+}
 window.renderCalendar=function(){
   var cf=document.getElementById('cal-filter');
   var isPtypeView=window.calView==='ptype';
   if(isPtypeView||(cf&&cf.options.length<=1))window.updateCalFilterOpts();
-  var filt=isPtypeView?window.msValues('cal-filter-ptype'):((cf&&cf.value)||'');
+  var cfProj=document.getElementById('cal-filter-proj');
+  var filt=isPtypeView?window.msValues('cal-filter-ptype'):window.calView==='project'?((cfProj&&cfProj.value)||''):((cf&&cf.value)||'');
   var tCols=[];var y=window.calY;
   if(window.calTime==='month'){var dim=new Date(y,window.calM+1,0).getDate();for(var d=1;d<=dim;d++){var dt=new Date(y,window.calM,d);var _ds=y+'-'+String(window.calM+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');var _hol=window.HOLIDAYS.find(function(h){return h.date===_ds;});tCols.push({label:d,sub:window.DNAMES[dt.getDay()],s:dt,e:new Date(y,window.calM,d,23,59,59),isWk:dt.getDay()===0||dt.getDay()===6,isHol:!!_hol,holName:_hol?_hol.name:''});}var _monLbl=(window.matchMedia&&window.matchMedia('(max-width:768px)').matches)?window.THMON_SHORT[window.calM]:window.THMON[window.calM];document.getElementById('cal-lbl').textContent=_monLbl+' '+(y+543);}
   else if(window.calTime==='year'){for(var m=0;m<12;m++){var dt=new Date(y,m,1);tCols.push({label:window.THMON[m].slice(0,3),sub:'',s:dt,e:new Date(y,m+1,0,23,59,59),isWk:false});}document.getElementById('cal-lbl').textContent='ปี '+(y+543);}
@@ -285,6 +295,7 @@ window.calDeptChange=function(){
     }
     cf.value='';
   }
+  if(window.calView==='project')_calInitProjCombo('');
   window.renderCalendar();
 };
 

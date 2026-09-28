@@ -114,12 +114,17 @@
   // (same search / grouping / keyboard-nav UX everywhere a project needs to be picked).
   // Safe to call repeatedly on the same DOM nodes: first call binds listeners,
   // later calls just refresh the project list + selection (via inp._cmbUpdate).
-  window.initProjectCombobox = function (elIds, projects, curPid, onSelect) {
+  // opts (ไม่บังคับ): allLabel = เพิ่มตัวเลือกบนสุด (ค่า '') เช่น "ทุกโครงการ" สำหรับช่องกรอง ·
+  // fixed = วาง dropdown แบบ position:fixed (ใช้ในโมดัล — .m-body มี overflow ทำให้ dropdown ถูกครอบตัด) ·
+  // minWidth = ความกว้างขั้นต่ำของ dropdown (px) เผื่อช่องแคบในแถบเครื่องมือ
+  window.initProjectCombobox = function (elIds, projects, curPid, onSelect, opts) {
+    opts = opts || {};
     var inp = document.getElementById(elIds.inputId), drop = document.getElementById(elIds.dropId),
         lst = document.getElementById(elIds.listId), hid = document.getElementById(elIds.hiddenId);
     if (!inp || !drop || !lst || !hid) return;
 
-    if (inp._cmbUpdate) { inp._cmbUpdate(projects, curPid); return; }
+    if (inp._cmbUpdate) { inp._cmbOnSelect = onSelect; inp._cmbUpdate(projects, curPid); return; }
+    inp._cmbOnSelect = onSelect;
 
     var IH = 36, HH = 30, BUF = 6;
     var curProjects = projects || [], tmap = {}, tord = [];
@@ -136,6 +141,7 @@
     }
     function bFlat(sq) {
       var f = [], lq = sq.toLowerCase();
+      if (opts.allLabel && !sq) f.push({ k: 'i', id: '', name: opts.allLabel });
       if (sq) { curProjects.forEach(function (p) { if (p.name.toLowerCase().includes(lq)) f.push({ k: 'i', id: p.id, name: p.name }); }); }
       else { tord.forEach(function (tid) { var g = tmap[tid]; if (!g || !g.items.length) return; f.push({ k: 'h', tid: tid, label: g.label, color: g.color, count: g.items.length }); if (!col.has(tid)) g.items.forEach(function (p) { f.push({ k: 'i', id: p.id, name: p.name }); }); }); }
       return f;
@@ -156,9 +162,19 @@
       html += '<div style="height:' + botH + 'px"></div>';
       lst.innerHTML = html;
     }
-    function openDrop() { if (isOpen) return; isOpen = true; q = ''; fi = -1; flat = bFlat(''); lst.scrollTop = 0; render(); drop.style.display = 'block'; }
-    function closeDrop() { if (!isOpen) return; isOpen = false; drop.style.display = 'none'; inp.value = selName; }
-    function selProj(id, name) { selId = id; selName = name; hid.value = id; closeDrop(); onSelect && onSelect(id, name); }
+    function positionDrop() {
+      if (!opts.fixed && !opts.minWidth) return;
+      var r = inp.getBoundingClientRect(), w = Math.max(r.width, opts.minWidth || 0);
+      if (opts.fixed) {
+        drop.style.position = 'fixed'; drop.style.top = (r.bottom + 4) + 'px'; drop.style.right = 'auto';
+        drop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + 'px';
+        lst.style.maxHeight = Math.max(160, Math.min(360, window.innerHeight - r.bottom - 16)) + 'px';
+      } else { drop.style.right = 'auto'; }
+      drop.style.width = w + 'px';
+    }
+    function openDrop() { if (isOpen) return; isOpen = true; q = ''; fi = -1; flat = bFlat(''); lst.scrollTop = 0; render(); positionDrop(); drop.style.display = 'block'; if (opts.fixed) window.addEventListener('resize', positionDrop); }
+    function closeDrop() { if (!isOpen) return; isOpen = false; drop.style.display = 'none'; inp.value = selName; if (opts.fixed) window.removeEventListener('resize', positionDrop); }
+    function selProj(id, name) { selId = id; selName = name; hid.value = id; closeDrop(); inp._cmbOnSelect && inp._cmbOnSelect(id, name); }
     function scFi() { if (fi < 0) return; var top = 0; for (var i = 0; i < fi; i++) top += flat[i] ? (flat[i].k === 'h' ? HH : IH) : 0; if (top < lst.scrollTop) lst.scrollTop = top; else if (top + IH > lst.scrollTop + lst.clientHeight) lst.scrollTop = top + IH - lst.clientHeight; }
 
     lst.addEventListener('click', function (e) {
@@ -179,7 +195,9 @@
       else if (e.key === 'ArrowUp') { e.preventDefault(); var ci2 = iis.indexOf(fi); fi = ci2 <= 0 ? iis[0] : iis[ci2 - 1]; render(); scFi(); }
       else if (e.key === 'Enter') { e.preventDefault(); var it = flat[fi]; if (it && it.k === 'i') selProj(it.id, it.name); }
     });
-    document.addEventListener('mousedown', function (e) {
+    document.addEventListener('mousedown', function onDocDown(e) {
+      // combobox ถูกลบออกจาก DOM แล้ว (หน้าที่ render markup ใหม่ทุกครั้ง) — ถอด listener ทิ้ง กันสะสม
+      if (!document.body.contains(inp)) { document.removeEventListener('mousedown', onDocDown); return; }
       var wrap = elIds.wrapId ? document.getElementById(elIds.wrapId) : inp.parentElement;
       if (wrap && !wrap.contains(e.target)) closeDrop();
     });
@@ -189,7 +207,7 @@
       rebuildGroups();
       selId = newCurPid || '';
       var _cp = curProjects.find(function (p) { return p.id === selId; });
-      selName = _cp ? _cp.name : '';
+      selName = _cp ? _cp.name : (opts.allLabel && !selId ? opts.allLabel : '');
       hid.value = selId;
       inp.value = selName;
       col = new Set(); q = ''; fi = -1;
@@ -198,6 +216,20 @@
       render();
     };
     inp._cmbUpdate(curProjects, selId);
+  };
+
+  // ── Markup ของ project combobox ตามรูปแบบ id ชุดเดียวกัน: <key>-wrap / -input / -drop / -list
+  // + hidden input (hiddenId) เก็บค่า project id — โค้ดเดิมที่อ่าน .value จาก hiddenId ใช้ต่อได้เลย ──
+  window.projectComboHtml = function (key, hiddenId, placeholder, wrapStyle) {
+    return '<div id="' + key + '-wrap" style="position:relative;' + (wrapStyle || '') + '">'
+      + '<input id="' + key + '-input" type="text" class="f-input" placeholder="' + window.esc(placeholder || 'ค้นหาหรือเลือกโครงการ...') + '" autocomplete="off" spellcheck="false" style="padding-right:28px;cursor:pointer;">'
+      + '<span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:11px;color:var(--txt3);">▼</span>'
+      + '<input type="hidden" id="' + hiddenId + '">'
+      + '<div id="' + key + '-drop" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:9500;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.15);overflow:hidden;">'
+      + '<div id="' + key + '-list" style="max-height:260px;overflow-y:auto;"></div></div></div>';
+  };
+  window.projectComboIds = function (key, hiddenId) {
+    return { wrapId: key + '-wrap', inputId: key + '-input', dropId: key + '-drop', listId: key + '-list', hiddenId: hiddenId };
   };
 
   // ── Generic Searchable Flat Suggest Combobox ──

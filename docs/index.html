@@ -585,6 +585,7 @@
           <select class="t-sel" id="cal-filter" onchange="window.renderCalendar()">
             <option value="">ทั้งหมด</option>
           </select>
+          <div id="cal-proj-cmb-wrap" style="position:relative;width:230px;display:none;"><input id="cal-proj-cmb-input" type="text" class="t-sel" placeholder="ทั้งหมด" autocomplete="off" spellcheck="false" style="width:100%;padding-right:26px;cursor:pointer;"><span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:10px;color:var(--txt3);">▼</span><input type="hidden" id="cal-filter-proj"><div id="cal-proj-cmb-drop" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:9500;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.15);overflow:hidden;"><div id="cal-proj-cmb-list" style="max-height:320px;overflow-y:auto;"></div></div></div>
           <div class="ms-filter" id="cal-filter-ptype" style="display:none"></div>
           <label id="cal-only-active-wrap" style="display:none;align-items:center;gap:5px;font-size:12px;color:var(--txt2);cursor:pointer;white-space:nowrap;">
             <input type="checkbox" id="cal-only-active" checked onchange="window.renderCalendar()"> แสดงเฉพาะคนที่มีงาน
@@ -713,7 +714,7 @@
             <option value="10">ต.ค.</option><option value="11">พ.ย.</option><option value="12">ธ.ค.</option>
           </select>
           <div class="ms-filter" id="ts-type"></div>
-          <select class="t-sel" id="ts-proj" onchange="window.renderTimesheet()"><option value="">ทุกโครงการ</option></select>
+          <div id="ts-proj-cmb-wrap" style="position:relative;width:230px;"><input id="ts-proj-cmb-input" type="text" class="t-sel" placeholder="ทุกโครงการ" autocomplete="off" spellcheck="false" style="width:100%;padding-right:26px;cursor:pointer;"><span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:10px;color:var(--txt3);">▼</span><input type="hidden" id="ts-proj"><div id="ts-proj-cmb-drop" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:9500;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.15);overflow:hidden;"><div id="ts-proj-cmb-list" style="max-height:320px;overflow-y:auto;"></div></div></div>
           <select class="t-sel" id="ts-staff" onchange="window.renderTimesheet()"><option value="">ทุกคน</option></select>
           <div style="flex:1"></div>
           <button class="btn btn-xls btn-sm" onclick="window.exportTimesheet()" title="Export Excel">📥 Excel</button>
@@ -737,7 +738,7 @@
             <option value="10">ต.ค.</option><option value="11">พ.ย.</option><option value="12">ธ.ค.</option>
           </select>
           <div class="ms-filter" id="cost-type"></div>
-          <select class="t-sel" id="cost-proj" onchange="window.renderCost()"><option value="">ทุกโครงการ</option></select>
+          <div id="cost-proj-cmb-wrap" style="position:relative;width:230px;"><input id="cost-proj-cmb-input" type="text" class="t-sel" placeholder="ทุกโครงการ" autocomplete="off" spellcheck="false" style="width:100%;padding-right:26px;cursor:pointer;"><span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:10px;color:var(--txt3);">▼</span><input type="hidden" id="cost-proj"><div id="cost-proj-cmb-drop" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:9500;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.15);overflow:hidden;"><div id="cost-proj-cmb-list" style="max-height:320px;overflow-y:auto;"></div></div></div>
           <select class="t-sel" id="cost-cat" onchange="window.renderCost()">
             <option value="">ทุกหมวด</option>
             <option value="phone">📱 ค่าโทรศัพท์</option>
@@ -1463,7 +1464,7 @@
       <div class="f-grid">
         <div class="f-group" style="grid-column:span 2">
           <label class="f-label">โครงการ *</label>
-          <select class="f-input" id="costf-proj"></select>
+          <div id="costf-proj-host"></div>
         </div>
         <div class="f-group">
           <label class="f-label">หมวดค่าใช้จ่าย *</label>
@@ -1956,7 +1957,7 @@
       </div>
       <div class="f-group" id="import-imt-project-wrap" style="display:none;">
         <label class="f-label">เลือกโครงการปลายทาง (1 ไฟล์ = 1 โครงการ — ปัญหาของโครงการอื่นจะไม่ถูกแตะต้องเลย)</label>
-        <select class="f-input" id="import-imt-project" style="margin-bottom:8px;"></select>
+        <div id="import-imt-project-host" style="margin-bottom:8px;"></div>
         <label class="f-cb">
           <input type="checkbox" id="import-imt-show-past-years" onchange="window.imtRefreshProjectImportOptions()">
           <span class="f-label" style="margin-bottom:0;">แสดงโครงการในปีที่สิ้นสุดแล้วด้วย</span>
@@ -1978,10 +1979,19 @@
         </label>
       </div>
       <div id="import-msg" style="font-size:12px; color:var(--txt3); margin-top:10px;">รองรับเฉพาะไฟล์ .csv เท่านั้น</div>
+      <div id="import-progress" style="display:none; margin-top:12px;">
+        <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--txt2); margin-bottom:6px;">
+          <span id="import-progress-text">กำลังนำเข้า...</span>
+          <span id="import-progress-pct" style="font-weight:700; color:var(--teal);">0%</span>
+        </div>
+        <div style="height:10px; background:var(--surface2); border-radius:6px; overflow:hidden; border:1px solid var(--border);">
+          <div id="import-progress-bar" style="height:100%; width:0%; background:linear-gradient(90deg,var(--teal),var(--violet)); transition:width .2s;"></div>
+        </div>
+      </div>
     </div>
     <div class="m-foot">
       <button class="btn btn-ghost" onclick="window.closeM('m-import')">ยกเลิก</button>
-      <button class="btn btn-pri" onclick="window.execImport()">🚀 นำเข้าข้อมูล</button>
+      <button class="btn btn-pri" id="import-exec-btn" onclick="window.execImport()">🚀 นำเข้าข้อมูล</button>
     </div>
   </div>
 </div>
