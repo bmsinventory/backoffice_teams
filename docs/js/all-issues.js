@@ -339,6 +339,76 @@
     window.renderAllIssuesOverview();
   };
 
+  // ── 🤖 สรุปบทวิเคราะห์ด้วย AI — ส่ง "ตัวเลขสรุป + ตัวอย่างปัญหา" (ไม่ส่งข้อมูลดิบทั้งหมด) ให้ AI เขียน
+  // บทสรุปสำหรับผู้บริหาร · เก็บผลไว้ต่อปีที่เลือก (render ซ้ำจาก realtime ไม่หาย) กดใหม่เพื่อสรุปใหม่ ──
+  var _aiSummary = null; // { year, text, loading, error }
+  function aioAiStatsText() {
+    var issues = aioYearFilteredIssues();
+    var st = function (arr) {
+      var o = arr.filter(function (i) { return i.status !== 'closed'; }).length;
+      return arr.length + ' ข้อ (ค้าง ' + o + ', แก้แล้ว ' + (arr.length ? Math.round((arr.length - o) / arr.length * 100) : 0) + '%)';
+    };
+    var byType = {};
+    issues.forEach(function (i) { var k = aioProjectTypeId(i.projectId) || '__none__'; (byType[k] = byType[k] || []).push(i); });
+    var lines = ['ปี: ' + (_selectedYear ? 'พ.ศ. ' + (Number(_selectedYear) + 543) : 'ทุกปี'), 'ภาพรวม: ' + st(issues)];
+    Object.keys(byType).sort(function (a, b) { return byType[b].length - byType[a].length; }).forEach(function (k) {
+      var arr = byType[k];
+      var projN = {}; arr.forEach(function (i) { projN[i.projectId] = (projN[i.projectId] || 0) + 1; });
+      lines.push('', '## ประเภท: ' + aioProductLabel(k) + ' — ' + Object.keys(projN).length + ' โครงการ, ' + st(arr));
+      var top = function (field, n, title) {
+        var c = {}; arr.forEach(function (i) { var v = i[field] || 'ไม่ระบุ'; (c[v] = c[v] || []).push(i); });
+        var ks = Object.keys(c).sort(function (a, b) { return c[b].length - c[a].length; }).slice(0, n);
+        lines.push(title + ': ' + ks.map(function (v) { return v + ' ' + st(c[v]); }).join(' · '));
+        return { map: c, keys: ks };
+      };
+      var cats = top('category', 5, 'กลุ่มปัญหาที่พบมาก');
+      top('department', 5, 'แผนกที่แจ้งมาก');
+      lines.push('โครงการที่มีปัญหามากสุด: ' + Object.keys(projN).sort(function (a, b) { return projN[b] - projN[a]; }).slice(0, 3)
+        .map(function (p) { return aioProjectLabel(p) + ' ' + projN[p] + ' ข้อ'; }).join(' · '));
+      cats.keys.slice(0, 3).forEach(function (c) {
+        lines.push('ตัวอย่างปัญหากลุ่ม "' + c + '": ' + cats.map[c].slice(0, 3).map(function (i) { return '"' + String(i.problem || '').slice(0, 90) + '"'; }).join(', '));
+      });
+    });
+    return lines.join('\n');
+  }
+  window.aioRunAiSummary = async function () {
+    if (_aiSummary && _aiSummary.loading) return;
+    if (!aioYearFilteredIssues().length) { window.showAlert && window.showAlert('ยังไม่มีข้อมูลปัญหาในปีที่เลือก', 'warn'); return; }
+    var year = _selectedYear;
+    _aiSummary = { year: year, loading: true };
+    window.renderAllIssuesOverview();
+    try {
+      var text = await window.aiChat(
+        'คุณเป็นนักวิเคราะห์คุณภาพงานติดตั้งระบบซอฟต์แวร์โรงพยาบาล เขียนบทสรุปภาษาไทยสำหรับผู้บริหาร/PM จากสถิติปัญหาการใช้งานที่ให้ '
+        + 'ใช้หัวข้อ "## ภาพรวม", "## ประเด็นสำคัญรายประเภทโครงการ", "## ข้อเสนอแนะ" · แต่ละหัวข้อเป็น bullet สั้น กระชับ อ้างตัวเลขจริง '
+        + '· ข้อเสนอแนะ 3–5 ข้อ ต้องเจาะจง นำไปทำได้จริง (เช่น ปรับขั้นตอนติดตั้ง/อบรม/template) · ห้ามแต่งตัวเลขที่ไม่มีในข้อมูล',
+        aioAiStatsText(), { maxTokens: 1200, temperature: 0.3 });
+      _aiSummary = { year: year, text: text };
+    } catch (e) {
+      _aiSummary = { year: year, error: String(e.message || e) };
+    }
+    window.renderAllIssuesOverview();
+  };
+  window.aioCopyAiSummary = function () {
+    if (!_aiSummary || !_aiSummary.text || !navigator.clipboard) return;
+    navigator.clipboard.writeText(_aiSummary.text).then(function () { window.showAlert && window.showAlert('คัดลอกบทสรุปแล้ว', 'success'); });
+  };
+  function aioAiSummaryHtml() {
+    if (!_aiSummary || _aiSummary.year !== _selectedYear) return '';
+    var body = _aiSummary.loading ? '<div style="color:var(--txt3);font-size:12.5px;">⏳ AI กำลังวิเคราะห์ข้อมูล… (อาจใช้เวลาสักครู่)</div>'
+      : _aiSummary.error ? '<div style="color:var(--coral);font-size:12.5px;">' + window.esc(_aiSummary.error) + '</div>'
+      : '<div class="ai-text">' + window.aiTextToHtml(_aiSummary.text) + '</div>';
+    return '<div style="padding:0 24px 24px;"><div class="ai-card">'
+      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">'
+      +   '<div class="sec-label" style="margin:0;">🤖 บทสรุปจาก AI</div><div style="flex:1"></div>'
+      +   (_aiSummary.text ? '<button class="btn btn-ghost btn-sm" onclick="window.aioCopyAiSummary()">📋 คัดลอก</button>' : '')
+      +   '<button class="btn btn-ghost btn-sm" onclick="window.aioCloseAiSummary()">✕</button>'
+      + '</div>' + body
+      + (_aiSummary.text ? '<div style="font-size:10.5px;color:var(--txt3);margin-top:8px;">* สรุปโดย AI จากสถิติในหน้านี้ — ตรวจสอบก่อนนำไปใช้</div>' : '')
+      + '</div></div>';
+  }
+  window.aioCloseAiSummary = function () { _aiSummary = null; window.renderAllIssuesOverview(); };
+
   // ── Render หลัก ── //
   window.renderAllIssuesOverview = function () {
     var mount = document.getElementById('view-all-issues');
@@ -365,6 +435,8 @@
     var yearBar = '<div class="toolbar">'
       + '<span style="font-size:12.5px;font-weight:700;color:var(--txt2);">ปี</span>'
       + '<select class="t-sel" id="aio-f-year" onchange="window.aioSetYear(this.value)">' + yearOptionsHtml + '</select>'
+      + '<div style="flex:1"></div>'
+      + '<button class="btn btn-pri btn-sm" onclick="window.aioRunAiSummary()"' + (_aiSummary && _aiSummary.loading ? ' disabled' : '') + '>🤖 สรุปด้วย AI</button>'
       + '</div>';
 
     // ── จัดกลุ่มปัญหาตาม Product (ประเภทโครงการ) ──
@@ -591,6 +663,7 @@
 
     mount.innerHTML = yearBar
       + kpiRow
+      + aioAiSummaryHtml()
       + productCardsHtml
       + '<div class="aio-chart-grid-2">'
       +   '<div class="dtable-inner" style="padding:18px;"><div class="sec-label" style="margin-bottom:14px;">📊 สถานะต่อ Product</div>' + statusChartHtml + '</div>'

@@ -236,31 +236,9 @@
     return /^image\//.test(mime || '') || /\.(jpe?g|png|gif|webp)$/i.test(name || '');
   };
 
-  // ── AI ช่วยวิเคราะห์ (เรียกผ่าน nginx proxy /helpdesk-ai/ เท่านั้น) ─────────
-  // หมายเหตุ: ถ้า nginx ยังไม่ได้ตั้ง VLLM_UPSTREAM ตอน container start location /helpdesk-ai/
-  // จะไม่ถูกสร้างขึ้นเลย ทำให้ request หลุดไปเข้า SPA fallback แล้วได้ index.html (สถานะ 200) กลับมา
-  // แทน JSON — เช็ค content-type ก่อน parse เสมอ กันข้อความ error ดิบ "Unexpected token '<'" หลุดถึงผู้ใช้
-  async function _hdJsonOrThrow(res) {
-    var ct = res.headers.get('content-type') || '';
-    if (ct.indexOf('json') < 0) throw new Error('ระบบ AI ยังไม่พร้อมใช้งาน (proxy บนเซิร์ฟเวอร์ยังไม่ได้ตั้งค่า) — ติดต่อผู้ดูแลระบบ');
-    return res.json();
-  }
+  // ── AI ช่วยวิเคราะห์ — ตัวเรียก AI กลางอยู่ที่ src/services/ai.service.js (aiChat / aiChatJson) ──
 
-  var _hdAiModel = null;
-  window.hdAiModel = async function () {
-    if (_hdAiModel) return _hdAiModel;
-    var res = await fetch(window.HD_AI_BASE + '/v1/models', { headers: { 'Accept': 'application/json' } });
-    if (res.status === 404 || res.status === 502 || res.status === 503) throw new Error('ระบบยังไม่เปิดใช้งาน AI — ติดต่อผู้ดูแลระบบ');
-    if (!res.ok) throw new Error('เรียก AI ไม่สำเร็จ (HTTP ' + res.status + ')');
-    var d = await _hdJsonOrThrow(res);
-    _hdAiModel = (d.data && d.data[0] && d.data[0].id) || (d.data && d.data[0]) || 'medgemma';
-    return _hdAiModel;
-  };
-
-  function _hdWords(s) {
-    return String(s || '').toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(function (w) { return w.length >= 3; });
-  }
-  // เลือก Ticket เก่าที่ปิดแล้ว + คล้ายข้อความ เพื่อเป็น context ให้ AI
+  // เลือก Ticket เก่าที่ปิดแล้ว + คล้ายข้อความ เพื่อเป็น context ให้ AI (ความคล้ายแบบ bigram — รองรับภาษาไทย)
   window.hdAiSimilar = async function (text, limit) {
     var db = window.getDb && window.getDb();
     if (!db) return [];
@@ -277,29 +255,18 @@
         if (/^วิธีแก้ไข\s*[:：]/.test(e.body || '')) evMap[e.ticket_id] = e.body;
       });
     }
-    var qw = _hdWords(text);
     return (res.data || []).map(function (r) {
-      var hay = _hdWords((r.subject || '') + ' ' + (r.description || ''));
-      var score = qw.reduce(function (n, w) { return n + (hay.indexOf(w) > -1 ? 1 : 0); }, 0);
+      var score = window.aiTextSim(text, (r.subject || '') + ' ' + (r.description || ''));
       return { score: score, subject: r.subject, description: r.description, fix: evMap[r.id] || '' };
-    }).filter(function (x) { return x.score > 0 && x.fix; })
+    }).filter(function (x) { return x.score >= 0.2 && x.fix; })
       .sort(function (a, b) { return b.score - a.score; })
       .slice(0, limit || 3);
   };
-
-  function _hdParseJson(txt) {
-    var m = String(txt || '').match(/```(?:json)?\s*([\s\S]*?)```/i);
-    var body = m ? m[1] : txt;
-    var s = body.indexOf('{'), e = body.lastIndexOf('}');
-    if (s < 0 || e < 0) throw new Error('AI ตอบไม่เป็น JSON');
-    return JSON.parse(body.slice(s, e + 1));
-  }
 
   window.hdAiAnalyze = async function (opt) {
     opt = opt || {};
     var desc = String(opt.description || '').trim();
     if (!desc) throw new Error('ยังไม่มีรายละเอียดปัญหาให้วิเคราะห์');
-    var model = await window.hdAiModel();
     var cats = (window.HELPDESK_CATEGORIES || []).map(function (c) { return c.id + ' — ' + c.name; }).join('\n');
     var sim = [];
     try { sim = await window.hdAiSimilar(desc, 3); } catch (e) {}
@@ -313,21 +280,7 @@
       + (opt.sourceSystem ? 'ระบบที่ใช้งาน: ' + opt.sourceSystem + '\n' : '')
       + 'รายละเอียด: ' + desc + simTxt;
 
-    var res = await fetch(window.HD_AI_BASE + '/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: model, temperature: 0.2, max_tokens: 500,
-        messages: [
-          { role: 'system', content: window.HD_AI_SYSTEM_PROMPT },
-          { role: 'user', content: user },
-        ],
-      }),
-    });
-    if (!res.ok) throw new Error('AI วิเคราะห์ไม่สำเร็จ (HTTP ' + res.status + ')');
-    var data = await _hdJsonOrThrow(res);
-    var content = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
-    var out = _hdParseJson(content);
+    var out = await window.aiChatJson(window.HD_AI_SYSTEM_PROMPT, user, { maxTokens: 500 });
     var catOk = (window.HELPDESK_CATEGORIES || []).some(function (c) { return c.id === out.category_id; });
     return {
       categoryId: catOk ? out.category_id : '',
@@ -337,6 +290,24 @@
       reason: String(out.reason || '').trim(),
       similarCount: sim.length,
     };
+  };
+
+  // ── ร่างข้อความตอบผู้แจ้ง (รพ.) จากรายละเอียด Ticket + บทสนทนาทั้งหมด (รวมโน้ตภายในเป็นข้อมูลประกอบ
+  // แต่สั่งห้ามเปิดเผยตรง ๆ) — คืนข้อความล้วน ให้เจ้าหน้าที่ตรวจ/แก้ก่อนกดส่งเองเสมอ ──
+  window.hdAiDraftReply = async function (t, events, hint) {
+    var who = function (e) { return e.actor_type === 'reporter' ? 'ผู้แจ้ง' : e.actor_type === 'system' ? 'ระบบ' : 'ทีมงาน'; };
+    var convo = (events || []).filter(function (e) { return e.type === 'comment' && e.body; }).slice(-12).map(function (e) {
+      return '[' + who(e) + (e.is_internal ? ' · โน้ตภายใน' : '') + '] ' + String(e.body).slice(0, 500);
+    }).join('\n');
+    var st = ((window.HD_STATUS || []).find(function (s) { return s.id === t.status; }) || {}).label || t.status;
+    var user = 'หัวข้อ: ' + (t.subject || '-') + '\n'
+      + 'ผู้แจ้ง: ' + (t.reporterName || '-') + '\n'
+      + 'สถานะปัจจุบัน: ' + st + '\n'
+      + 'รายละเอียดปัญหา: ' + String(t.description || '').slice(0, 1500) + '\n'
+      + (convo ? '\nบทสนทนาที่ผ่านมา (เก่า → ใหม่):\n' + convo + '\n' : '')
+      + (hint ? '\nแนวทางแก้ไขที่ทีมพิจารณาอยู่: ' + hint + '\n' : '')
+      + '\nร่างข้อความตอบกลับผู้แจ้งฉบับถัดไป';
+    return window.aiChat(window.HD_AI_REPLY_PROMPT, user, { maxTokens: 500, temperature: 0.4 });
   };
 
   // ── Realtime Subscriptions (background, ไม่ block loader หลัก) ──

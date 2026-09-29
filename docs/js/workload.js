@@ -684,3 +684,137 @@ window.wlNotifyExportExcel = function() {
 
   XLSX.writeFile(wb, 'สรุปแจ้งงานเข้าไซต์_' + new Date().toISOString().slice(0, 10) + '.xlsx');
 };
+
+// ── 🤖 AI วิเคราะห์ภาระงานทีม + แนะนำการวางคน ─────────────────────────────────
+// ข้อเท็จจริงทุกตัวคำนวณในโค้ด (เกณฑ์ช่วงงานเดียวกับ renderWorkload: ใช้ visits ถ้ามี ไม่งั้นใช้ members/team)
+// · ผู้สมัครสำหรับแต่ละโครงการ = คนที่ "ว่างจริง" ตลอดช่วงโครงการ (ไม่มีงานอื่น/ไม่ลา) — AI เลือกได้จากรายชื่อนี้เท่านั้น
+function _wlStaffPeriods(sid) {
+  var out = [];
+  (window.PROJECTS || []).forEach(function(p) {
+    if (p.status === 'cancelled' || p.status === 'completed') return;
+    var vp = [];
+    (p.visits || []).forEach(function(v) { var vm = window._vtMember(v.team, sid, v.start, v.end); if (vm && vm.s && vm.e) vp.push({ s: vm.s, e: vm.e }); });
+    var mems = (p.members && p.members.length) ? p.members : (p.team || []).map(function(id) { return { sid: id, s: p.start, e: p.end }; });
+    var mp = mems.filter(function(m) { return m.sid === sid && m.s && m.e; }).map(function(m) { return { s: m.s, e: m.e }; });
+    (vp.length ? vp : mp).forEach(function(r) {
+      var s = pd(r.s), e = pd(r.e); s.setHours(0,0,0,0); e.setHours(23,59,59,999);
+      out.push({ pid: p.id, name: p.name, s: s, e: e });
+    });
+  });
+  return out;
+}
+function _wlLeaves(sid) {
+  return (window.LEAVES || []).filter(function(l) { return l.staffId === sid && l.status !== 'rejected' && l.startDate && l.endDate; })
+    .map(function(l) { var s = pd(l.startDate), e = pd(l.endDate); e.setHours(23,59,59,999); return { s: s, e: e }; });
+}
+// นับวันทำงาน (จ.–ศ.) ในช่วง from–to ที่ถูกครอบโดย ranges อย่างน้อย 1 ช่วง / อย่างน้อย 2 ช่วง (ซ้อนทับ)
+function _wlCountCovered(ranges, from, to, minCover) {
+  var n = 0, d = new Date(from); d.setHours(12,0,0,0);
+  var end = new Date(to); end.setHours(23,59,59,999);
+  for (var i = 0; d <= end && i < 400; i++) {
+    if (d.getDay() !== 0 && d.getDay() !== 6) {
+      var c = ranges.filter(function(r) { return r.s <= d && r.e >= d; }).length;
+      if (c >= (minCover || 1)) n++;
+    }
+    d.setDate(d.getDate() + 1);
+  }
+  return n;
+}
+function _wlTypeExp(sid) {
+  var exp = {};
+  (window.PROJECTS || []).forEach(function(p) {
+    if (p.status === 'cancelled' || !p.typeId) return;
+    var on = (p.members || []).some(function(m) { return m.sid === sid; }) || (p.team || []).indexOf(sid) > -1;
+    if (on) exp[p.typeId] = (exp[p.typeId] || 0) + 1;
+  });
+  return exp;
+}
+function _wlAiFacts() {
+  var mStart = new Date(window.wlY, window.wlM, 1), mEnd = new Date(window.wlY, window.wlM + 1, 0, 23, 59, 59);
+  var today = new Date(); today.setHours(0,0,0,0);
+  var workdays = _wlCountCovered([{ s: mStart, e: mEnd }], mStart, mEnd, 1);
+  var deptFilt = (document.getElementById('wl-dept-filter') || {}).value || '';
+  var staff = (window.STAFF || []).filter(function(s) { return s.active !== false && (!deptFilt || s.dept === deptFilt); });
+  var info = {};
+  staff.forEach(function(s) {
+    var per = _wlStaffPeriods(s.id), lv = _wlLeaves(s.id);
+    var inMonth = per.filter(function(r) { return r.s <= mEnd && r.e >= mStart; });
+    var projNames = []; inMonth.forEach(function(r) { if (projNames.indexOf(r.name) < 0) projNames.push(r.name); });
+    info[s.id] = { s: s, per: per, lv: lv, exp: _wlTypeExp(s.id), projNames: projNames,
+      busy: _wlCountCovered(inMonth, mStart, mEnd, 1), overlap: _wlCountCovered(inMonth, mStart, mEnd, 2),
+      leave: _wlCountCovered(lv, mStart, mEnd, 1) };
+  });
+  var who = function(s) { return s.name + (s.nickname && s.nickname !== s.name ? ' (' + s.nickname + ')' : ''); };
+  var typeLbl = function(id) { return (gT(id) || {}).label || '-'; };
+  var lines = ['เดือนที่วิเคราะห์: ' + window.THMON[window.wlM] + ' ' + (window.wlY + 543) + ' · วันทำงาน ' + workdays + ' วัน' + (deptFilt ? ' · แผนก ' + deptFilt : ''),
+    'ทีมงาน ' + staff.length + ' คน', '', '## ภาระงานรายคน (วันทำงานที่มีงาน / ' + workdays + ')'];
+  staff.map(function(s) { return info[s.id]; }).sort(function(a, b) { return b.busy - a.busy; }).slice(0, 60).forEach(function(x) {
+    var exp = Object.keys(x.exp).map(function(t) { return typeLbl(t) + ' ' + x.exp[t]; }).join(', ');
+    lines.push('- ' + who(x.s) + (x.s.role ? ' · ' + x.s.role : '') + (x.s.dept ? ' · ' + x.s.dept : '')
+      + ' | มีงาน ' + x.busy + ' วัน (' + (workdays ? Math.round(x.busy / workdays * 100) : 0) + '%)'
+      + (x.overlap ? ' | งานซ้อนกัน ' + x.overlap + ' วัน' : '') + (x.leave ? ' | ลา ' + x.leave + ' วัน' : '')
+      + ' | โครงการ: ' + (x.projNames.length ? x.projNames.slice(0, 4).join(', ') + (x.projNames.length > 4 ? ' +' + (x.projNames.length - 4) : '') : 'ว่าง')
+      + (exp ? ' | ประสบการณ์: ' + exp : ''));
+  });
+  // ── โครงการที่ต้องวางคน: เริ่มตั้งแต่วันนี้ (หรือต้นเดือนที่ดู ถ้าเป็นเดือนอนาคต) ถึงสิ้นเดือน + 30 วัน, ทีม ≤ 1 คน ──
+  var winFrom = mStart > today ? mStart : today, winTo = new Date(mEnd); winTo.setDate(winTo.getDate() + 30);
+  var need = (window.PROJECTS || []).filter(function(p) {
+    if (p.status === 'cancelled' || p.status === 'completed' || !p.start || !p.end) return false;
+    var s = pd(p.start); if (s < winFrom || s > winTo) return false;
+    var mems = (p.members && p.members.length) ? p.members : (p.team || []);
+    return mems.length <= 1;
+  }).sort(function(a, b) { return a.start.localeCompare(b.start); }).slice(0, 15);
+  lines.push('', '## โครงการที่ต้องวางคน (ยังไม่มีคน หรือมีแค่ 1 คน)');
+  if (!need.length) lines.push('(ไม่มี)');
+  need.forEach(function(p, i) {
+    var ps = pd(p.start), pe = pd(p.end); pe.setHours(23,59,59,999);
+    var len = _wlCountCovered([{ s: ps, e: pe }], ps, pe, 1);
+    var mems = (p.members && p.members.length) ? p.members.map(function(m) { return m.sid; }) : (p.team || []);
+    var cur = mems.map(function(id) { var s = (window.STAFF || []).find(function(x) { return x.id === id; }); return s ? who(s) : ''; }).filter(Boolean);
+    var cands = staff.filter(function(s) { return mems.indexOf(s.id) < 0; }).map(function(s) {
+      var x = info[s.id];
+      return { x: x, conflict: _wlCountCovered(x.per, ps, pe, 1), leave: _wlCountCovered(x.lv, ps, pe, 1), exp: x.exp[p.typeId] || 0 };
+    }).sort(function(a, b) { return (a.conflict + a.leave) - (b.conflict + b.leave) || b.exp - a.exp || a.x.busy - b.x.busy; }).slice(0, 8);
+    lines.push('', (i + 1) + ') ' + p.name + ' [' + typeLbl(p.typeId) + ']' + (p.isBorder ? ' · ชายแดน' : ''),
+      '   ช่วงงาน ' + fd(p.start) + ' – ' + fd(p.end) + ' (' + len + ' วันทำงาน) · ทีมปัจจุบัน: ' + (cur.length ? cur.join(', ') : 'ยังไม่มี'),
+      '   ผู้สมัคร (เรียงจากเหมาะสุด): ' + (cands.length ? cands.map(function(c) {
+        return who(c.x.s) + ' [' + (c.conflict || c.leave ? 'ติดงาน ' + c.conflict + ' วัน' + (c.leave ? ', ลา ' + c.leave + ' วัน' : '') : 'ว่างตลอดช่วง')
+          + ', เคยทำประเภทนี้ ' + c.exp + ' ครั้ง, งานเดือนนี้ ' + c.x.busy + ' วัน]';
+      }).join('; ') : 'ไม่มี'));
+  });
+  return { text: lines.join('\n'), staff: staff.length, need: need.length };
+}
+window.wlAiAnalyze = async function() {
+  var body = document.getElementById('m-wl-ai-body'), foot = document.getElementById('m-wl-ai-foot');
+  if (!body || !foot) return;
+  var close = '<button class="btn btn-ghost" onclick="window.closeM(\'m-wl-ai\')">ปิด</button>';
+  var facts = _wlAiFacts();
+  document.getElementById('m-wl-ai-title').textContent = 'AI วิเคราะห์ภาระงานทีม — ' + window.THMON[window.wlM] + ' ' + (window.wlY + 543);
+  foot.innerHTML = '';
+  window.openM('m-wl-ai');
+  if (!facts.staff) { body.innerHTML = '<div style="color:var(--txt3);">ไม่มีทีมงานในแผนกที่เลือก</div>'; foot.innerHTML = close; return; }
+  body.innerHTML = '<div style="color:var(--txt3);font-size:12.5px;">⏳ AI กำลังวิเคราะห์ภาระงาน ' + facts.staff + ' คน' + (facts.need ? ' และวางคนให้ ' + facts.need + ' โครงการ' : '') + '... (อาจใช้เวลาสักครู่)</div>';
+  try {
+    var text = await window.aiChat(
+      'คุณเป็นผู้ช่วยหัวหน้าทีมติดตั้งระบบซอฟต์แวร์โรงพยาบาล วิเคราะห์ภาระงานทีมและแนะนำการวางคนจากข้อมูลที่ให้ เขียนภาษาไทย กระชับ ใช้หัวข้อ: '
+      + '"## ภาพรวมภาระงาน" (2–3 bullet), "## คนที่งานหนัก/งานซ้อน" (ชื่อ + ตัวเลข + ควรทำอะไร เช่น โยกงาน/เลื่อน), "## คนที่ยังว่าง/งานน้อย", '
+      + '"## แนะนำการวางคน" (ทีละโครงการ: **ชื่อโครงการ** → ชื่อคนที่แนะนำ + เหตุผลสั้น ๆ), "## ข้อควรระวัง" · '
+      + 'กติกา: แนะนำคนให้โครงการได้เฉพาะจาก "ผู้สมัคร" ของโครงการนั้นเท่านั้น ให้ความสำคัญ ว่างตลอดช่วง > เคยทำประเภทนี้ > งานเดือนนี้น้อย · '
+      + 'อย่าแนะนำคนเดียวกันให้หลายโครงการที่ช่วงเวลาทับกัน · ถ้าผู้สมัครติดงานทุกคน ให้บอกตรง ๆ ว่าต้องเลื่อนงานหรือหาคนเพิ่ม · '
+      + 'ใช้ชื่อและตัวเลขตามข้อมูลเท่านั้น ห้ามแต่งเพิ่ม · ถ้าไม่มีโครงการที่ต้องวางคน ให้เขียนสั้น ๆ ว่าไม่มี',
+      facts.text, { maxTokens: 1800, temperature: 0.3 });
+    body.innerHTML = '<div class="ai-text">' + window.aiTextToHtml(text) + '</div>'
+      + '<div class="ai-card-note">* AI ช่วยแนะนำจากข้อมูลในระบบ (ตารางงาน/การลา/ประวัติโครงการ) — หัวหน้าทีมตัดสินใจเอง</div>';
+    body.dataset.raw = text.replace(/\*\*/g, '');
+    foot.innerHTML = close + '<button class="btn btn-teal" onclick="window.wlAiCopy()">📋 คัดลอก</button>'
+      + '<button class="btn btn-pri" onclick="window.wlAiAnalyze()">🔁 วิเคราะห์ใหม่</button>';
+  } catch (e) {
+    body.innerHTML = '<div style="color:var(--coral);">' + esc(String(e.message || e)) + '</div>';
+    foot.innerHTML = close + '<button class="btn btn-pri" onclick="window.wlAiAnalyze()">🔁 ลองใหม่</button>';
+  }
+};
+window.wlAiCopy = function() {
+  var b = document.getElementById('m-wl-ai-body'), t = b && b.dataset ? b.dataset.raw : '';
+  if (!t || !navigator.clipboard) return;
+  navigator.clipboard.writeText(t).then(function() { window.showAlert && window.showAlert('คัดลอกแล้ว', 'success'); });
+};

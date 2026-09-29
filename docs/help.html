@@ -129,6 +129,41 @@
   .tl2 .who b{color:var(--ink2);font-weight:700}
   .tl2 .who.mine b{color:var(--accent)}
   .tl2 .body{white-space:pre-wrap;font-size:14px;background:var(--bg);padding:10px 13px;border-radius:10px}
+  /* ── AI แนะนำวิธีแก้เบื้องต้น (ฟอร์มแจ้งปัญหา) ── */
+  .ai-btn{display:inline-flex;align-items:center;gap:4px;margin-top:6px;padding:4px 12px;min-height:0;border:1px solid var(--accent);border-radius:999px;background:var(--accent-soft);color:var(--accent);font-size:12.5px;font-weight:600;line-height:1.5}
+  .ai-btn:disabled{opacity:.6;cursor:wait}
+  .ai-flag{font-size:11.5px;font-weight:600;color:var(--bad);margin-top:4px}
+  .ai-box{margin-top:8px;border-radius:10px;background:var(--accent-soft);border-left:4px solid var(--accent);font-size:13px;line-height:1.7;color:var(--ink)}
+  .ai-box>summary{display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;list-style:none;user-select:none}
+  .ai-box>summary::-webkit-details-marker{display:none}
+  .ai-box-s{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ai-box-more{flex-shrink:0;font-size:12px;color:var(--accent)}
+  .ai-box-more::after{content:"ดูเพิ่มเติม ▾"}
+  .ai-box[open] .ai-box-more::after{content:"ซ่อน ▴"}
+  .ai-box-body{padding:0 14px 12px}
+  .ai-box-h{font-weight:800;flex-shrink:0}
+  .ai-box ol{margin:0 0 6px;padding-left:22px}
+  .ai-box-note{margin-top:4px}
+  .ai-box-foot{margin-top:8px;font-size:11.5px;color:var(--bad)}
+  /* ── ช่องแนบไฟล์: คลิก/ลากวาง/Ctrl+V + รายการพรีวิว ── */
+  .att-drop{display:flex;flex-direction:column;align-items:center;gap:4px;padding:18px 14px;border:2px dashed var(--line);border-radius:12px;background:var(--bg);cursor:pointer;text-align:center;transition:border-color .15s,background .15s}
+  .att-drop:hover,.att-drop:focus,.att-drop.over{border-color:var(--accent);background:var(--accent-soft);outline:none}
+  .att-drop-ic{font-size:26px;line-height:1}
+  .att-drop-t{font-size:13.5px;color:var(--ink)}
+  .att-drop-t b{color:var(--accent)}
+  .att-drop-s{font-size:12px;color:var(--ink3)}
+  .att-err{font-size:12px;color:var(--bad);margin-top:4px}
+  .att-err:empty{display:none}
+  .att-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;margin-top:8px}
+  .att-list:empty{display:none}
+  .att-item{display:flex;align-items:center;gap:10px;padding:8px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+  .att-item img{width:44px;height:44px;object-fit:cover;border-radius:6px;flex-shrink:0}
+  .att-ic{width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:24px;background:var(--bg);border-radius:6px;flex-shrink:0}
+  .att-meta{flex:1;min-width:0}
+  .att-name{font-size:12.5px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .att-size{font-size:11px;color:var(--ink3)}
+  .att-x{flex-shrink:0;width:28px;height:28px;min-height:0;padding:0;border:none;border-radius:50%;background:var(--bg);color:var(--ink2);font-size:13px;cursor:pointer}
+  .att-x:hover{background:var(--bad);color:#fff}
 </style>
 </head>
 <body>
@@ -146,6 +181,8 @@
 <!-- ใช้แค่ default array ของความเร่งด่วน (HD_URGENCY_DEFAULTS) ให้ตรงกับหน้า "+ แจ้งแทน" ในแอปหลัก
      ไฟล์นี้เป็นแค่ constant ล้วน ไม่มี side-effect/dependency กับไฟล์อื่น จึงโหลดในหน้า public นี้ได้ปลอดภัย -->
 <script src="src/config/helpdesk.config.js"></script>
+<!-- ตัวเรียก AI กลาง (vLLM ไม่ใช้คีย์) — ใช้ aiChatJson/aiTextSim สำหรับ "AI แนะนำวิธีแก้เบื้องต้น" ในฟอร์มแจ้งปัญหา -->
+<script src="src/services/ai.service.js"></script>
 <script>
 (function () {
   var app = document.getElementById('app');
@@ -196,6 +233,73 @@
   var ATT_ACCEPT='.jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.txt', ATT_MAX=15*1024*1024;
   var ATT_HINT='รองรับ: รูปภาพ (jpg, jpeg, png, gif, webp) · PDF · Word (doc, docx) · Excel (xls, xlsx) · txt — ไม่เกิน 15MB/ไฟล์';
   function isImg(m,n){ return /^image\//.test(m||'') || /\.(jpe?g|png|gif|webp)$/i.test(n||''); }
+
+  // ══ ช่องแนบไฟล์แบบใช้ง่าย — คลิกเลือก / ลากวาง / วางภาพจากคลิปบอร์ด (Ctrl+V) + พรีวิว + ลบทีละไฟล์
+  // ตรวจชนิด/ขนาดไฟล์ทันทีตอนเลือก (เดิมไฟล์เกิน 15MB ถูกข้ามเงียบ ๆ ตอนอัปโหลด) · ไฟล์เก็บใน _attFiles[id] ══
+  var _attFiles = {};
+  var ATT_EXT = ATT_ACCEPT.split(',');
+  function fmtSize(n){ return n >= 1048576 ? (n/1048576).toFixed(1)+' MB' : Math.max(1, Math.round(n/1024))+' KB'; }
+  function fileIcon(n){ return /\.pdf$/i.test(n)?'📕':/\.docx?$/i.test(n)?'📘':/\.xlsx?$/i.test(n)?'📗':'📄'; }
+  function attPickerMarkup(id){
+    return '<div class="att-drop" id="'+id+'-drop" tabindex="0" role="button">'
+      + '<input type="file" id="'+id+'" multiple accept="'+ATT_ACCEPT+'" hidden>'
+      + '<div class="att-drop-ic">📎</div>'
+      + '<div class="att-drop-t"><b>คลิกเพื่อเลือกไฟล์</b> หรือลากไฟล์มาวางที่นี่</div>'
+      + '<div class="att-drop-s">📋 แคปหน้าจอแล้วกด Ctrl+V วางได้เลย</div>'
+      + '</div>'
+      + '<div class="muted" style="margin-top:4px">'+esc(ATT_HINT)+'</div>'
+      + '<div class="att-err" id="'+id+'-err"></div>'
+      + '<div class="att-list" id="'+id+'-list"></div>';
+  }
+  function initAttPicker(id){
+    _attFiles[id] = [];
+    var inp = document.getElementById(id), drop = document.getElementById(id+'-drop');
+    if (!inp || !drop) return;
+    drop.onclick = function(){ inp.click(); };
+    drop.onkeydown = function(e){ if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inp.click(); } };
+    inp.onchange = function(){ addAttFiles(id, inp.files); inp.value = ''; };
+    ['dragenter','dragover'].forEach(function(ev){ drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.add('over'); }); });
+    ['dragleave','drop'].forEach(function(ev){ drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.remove('over'); }); });
+    drop.addEventListener('drop', function(e){ addAttFiles(id, e.dataTransfer && e.dataTransfer.files); });
+    // วางภาพจากคลิปบอร์ด — ผูกที่ document ครั้งเดียว ใช้กับช่องแนบไฟล์ที่แสดงอยู่ตอนนั้น (หน้าละ 1 ช่อง)
+    if (!initAttPicker._paste) {
+      initAttPicker._paste = true;
+      document.addEventListener('paste', function(e){
+        var cur = Object.keys(_attFiles).filter(function(k){ return document.getElementById(k); })[0];
+        var items = (e.clipboardData && e.clipboardData.files) || [];
+        if (!cur || !items.length) return;
+        e.preventDefault();
+        addAttFiles(cur, Array.prototype.map.call(items, function(f, i){
+          // ภาพจากคลิปบอร์ดชื่อซ้ำกันหมด ("image.png") — ตั้งชื่อใหม่ตามเวลา
+          return /^image\.\w+$/i.test(f.name) ? new File([f], 'screenshot_'+Date.now()+'_'+i+'.'+f.name.split('.').pop(), { type: f.type }) : f;
+        }));
+      });
+    }
+  }
+  function addAttFiles(id, list){
+    var bad = [];
+    Array.prototype.forEach.call(list || [], function(f){
+      var ext = '.' + String(f.name).split('.').pop().toLowerCase();
+      if (ATT_EXT.indexOf(ext) < 0) bad.push(f.name + ' (ไม่รองรับไฟล์ชนิดนี้)');
+      else if (f.size > ATT_MAX) bad.push(f.name + ' (ใหญ่เกิน 15MB)');
+      else if (!_attFiles[id].some(function(x){ return x.name === f.name && x.size === f.size; })) _attFiles[id].push(f);
+    });
+    var err = document.getElementById(id+'-err');
+    if (err) err.textContent = bad.length ? '⚠ ไม่ได้แนบ: ' + bad.join(', ') : '';
+    renderAttList(id);
+  }
+  function renderAttList(id){
+    var box = document.getElementById(id+'-list'); if (!box) return;
+    box.innerHTML = _attFiles[id].map(function(f, i){
+      var thumb = isImg(f.type, f.name) ? '<img src="'+URL.createObjectURL(f)+'" alt="">' : '<span class="att-ic">'+fileIcon(f.name)+'</span>';
+      return '<div class="att-item">'+thumb
+        + '<div class="att-meta"><div class="att-name" title="'+esc(f.name)+'">'+esc(f.name)+'</div><div class="att-size">'+fmtSize(f.size)+'</div></div>'
+        + '<button type="button" class="att-x" data-i="'+i+'" title="ลบไฟล์นี้">✕</button></div>';
+    }).join('');
+    box.querySelectorAll('.att-x').forEach(function(b){
+      b.onclick = function(){ _attFiles[id].splice(+b.getAttribute('data-i'), 1); renderAttList(id); };
+    });
+  }
   async function uploadAtts(ticketId, eventId, fileList){
     for(var i=0;i<(fileList?fileList.length:0);i++){
       var f=fileList[i];
@@ -391,8 +495,9 @@
       + '<label>ความเร่งด่วน <span class="req">*</span></label><select id="f-urg">'
       + urg.map(function(u,i){ return '<option value="'+u.priority+'"'+(i===0?' selected':'')+'>'+esc(u.label)+'</option>'; }).join('') + '</select>'
       + '<label>รายละเอียดปัญหา <span class="req">*</span></label><textarea id="f-desc" rows="5" placeholder="เกิดตอนไหน เมนูใด ข้อความ error ที่พบ"></textarea>'
-      + '<label>แนบรูป / ไฟล์ (ไม่บังคับ · เลือกได้หลายไฟล์)</label><input type="file" id="f-files" multiple accept="'+ATT_ACCEPT+'">'
-      + '<div class="muted" style="margin-top:3px">'+esc(ATT_HINT)+'</div>'
+      + '<button type="button" class="ai-btn" id="f-ai" title="AI แนะนำวิธีแก้เบื้องต้นจากปัญหาเดิม และเลือกประเภทปัญหาให้">🤖 AI ช่วยแนะนำวิธีแก้</button>'
+      + '<div id="f-ai-out"></div>'
+      + '<label>แนบรูป / ไฟล์ <span class="muted" style="font-weight:400">(ไม่บังคับ · แนบได้หลายไฟล์)</span></label>' + attPickerMarkup('f-files')
       + '<div id="f-msg" class="hidden" style="margin-top:12px"></div>'
       + '<div style="margin-top:16px;text-align:center"><button class="btn-pri" id="f-send" style="padding:11px 32px;">ส่งเรื่อง</button></div>'
       + '</div>';
@@ -409,8 +514,84 @@
     document.getElementById('f-cat').onchange = function(){
       var o = this.options[this.selectedIndex]; var p = o && o.getAttribute('data-pri');
       if (p) document.getElementById('f-urg').value = p;
+      var fl = document.getElementById('f-cat-ai'); if (fl) fl.remove(); // ผู้แจ้งเลือกเองแล้ว → เอาป้าย AI ออก
     };
     document.getElementById('f-send').onclick = submitNew;
+    initAttPicker('f-files');
+    document.getElementById('f-ai').onclick = function () { aiSuggest(cats, this); };
+  }
+
+  // ══ AI แนะนำวิธีแก้เบื้องต้น (หน้า public — ผู้แจ้งภายนอกเห็นผลลัพธ์) ══
+  // อ้างอิงเฉพาะ "วิธีแก้ไข:" ที่ทีมตอบผู้แจ้งไปแล้ว (ไม่ใช่โน้ตภายใน) · ตัดเบอร์/อีเมล/ลิงก์ออกก่อนส่ง AI
+  // · สั่ง AI ห้ามเอ่ยชื่อ รพ./บุคคล · แสดงเฉพาะคำแนะนำที่ AI สรุป ไม่แสดงเนื้อหา Ticket อื่นตรง ๆ
+  function redact(s) {
+    return String(s || '').replace(/https?:\/\/\S+/g, '[ลิงก์]').replace(/[\w.+-]+@[\w-]+\.[\w.]+/g, '[อีเมล]')
+      .replace(/\+?\d[\d\s-]{7,}\d/g, '[เบอร์]');
+  }
+  async function aiSimilarFixes(text) {
+    var tr = await db.from('helpdesk_tickets').select('id,subject,description,category_id')
+      .in('status', ['resolved', 'closed']).order('resolved_at', { ascending: false }).limit(150);
+    var rows = tr.data || [];
+    if (!rows.length) return [];
+    var er = await db.from('helpdesk_ticket_events').select('ticket_id,body,created_at')
+      .in('ticket_id', rows.map(function (r) { return r.id; })).eq('type', 'comment').eq('is_internal', false)
+      .order('created_at', { ascending: true });
+    var fix = {};
+    (er.data || []).forEach(function (e) { if (/^วิธีแก้ไข\s*[:：]/.test(e.body || '')) fix[e.ticket_id] = e.body; });
+    return rows.filter(function (r) { return fix[r.id]; }).map(function (r) {
+      return { score: window.aiTextSim(text, (r.subject || '') + ' ' + (r.description || '')), cat: r.category_id,
+        problem: redact(r.description || r.subject).slice(0, 200), fix: redact(fix[r.id]).slice(0, 300) };
+    }).filter(function (x) { return x.score >= 0.2; }).sort(function (a, b) { return b.score - a.score; }).slice(0, 4);
+  }
+  async function aiSuggest(cats, btn) {
+    var out = document.getElementById('f-ai-out'), descEl = document.getElementById('f-desc');
+    var desc = (descEl.value || '').trim();
+    if (desc.length < 10) { out.innerHTML = '<div class="notice err" style="margin-top:8px">กรุณาพิมพ์รายละเอียดปัญหาให้มากขึ้นก่อน แล้วค่อยกดให้ AI แนะนำ</div>'; descEl.focus(); return; }
+    btn.disabled = true; var old = btn.textContent; btn.textContent = '⏳ AI กำลังวิเคราะห์...';
+    out.innerHTML = '';
+    try {
+      var sim = [];
+      try { sim = await aiSimilarFixes(desc); } catch (e) {}
+      var sysEl = document.getElementById('f-sys');
+      var user = 'หมวดปัญหาที่เลือกได้ (ตอบ id):\n' + cats.map(function (c) { return c.id + ' — ' + c.name; }).join('\n')
+        + '\n\nระบบที่ใช้งาน: ' + ((sysEl && sysEl.value) || '-')
+        + '\nปัญหาที่ผู้ใช้แจ้ง: ' + redact(desc).slice(0, 1500)
+        + (sim.length ? '\n\nกรณีเก่าที่คล้ายกันและวิธีแก้ที่ทีมเคยแนะนำ:\n' + sim.map(function (x, i) { return (i + 1) + ') ' + x.problem + '\n   ' + x.fix; }).join('\n') : '');
+      var r = await window.aiChatJson(
+        'คุณเป็นเจ้าหน้าที่ Helpdesk ของบริษัทซอฟต์แวร์โรงพยาบาล ช่วยผู้ใช้ที่กำลังแจ้งปัญหา ตอบ "เฉพาะ JSON" รูปแบบ: '
+        + '{"category_id":"<id หมวดที่ตรงที่สุด หรือ empty ถ้าไม่แน่ใจ>","steps":["<ขั้นตอนแก้เบื้องต้นที่ผู้ใช้ทำเองได้ สั้น ๆ>"],'
+        + '"note":"<ประโยคสั้น ๆ ถึงผู้ใช้ เช่น ถ้ายังไม่หายให้กดส่งเรื่อง>","confidence":"low|medium|high"} · '
+        + 'steps 1–4 ข้อ ภาษาไทยสุภาพ เข้าใจง่าย เฉพาะสิ่งที่ผู้ใช้ปลายทางทำเองได้อย่างปลอดภัย (ห้ามแนะนำแก้ฐานข้อมูล/ตั้งค่าเซิร์ฟเวอร์) · '
+        + 'อิงวิธีแก้จากกรณีเก่าถ้ามี · ห้ามเอ่ยชื่อโรงพยาบาล ชื่อบุคคล หรือข้อมูลจากกรณีอื่นตรง ๆ · ถ้าไม่แน่ใจให้ steps เป็น [] และแนะนำให้ส่งเรื่อง',
+        user, { maxTokens: 500 });
+      var cat = cats.find(function (c) { return c.id === r.category_id; });
+      var catEl = document.getElementById('f-cat');
+      if (cat && catEl) {
+        catEl.value = cat.id;
+        var p = catEl.options[catEl.selectedIndex].getAttribute('data-pri');
+        if (p) document.getElementById('f-urg').value = p;
+        catEl.classList.remove('invalid');
+        var fl = document.getElementById('f-cat-ai');
+        if (!fl) { fl = document.createElement('div'); fl.id = 'f-cat-ai'; fl.className = 'ai-flag'; catEl.parentNode.appendChild(fl); }
+        fl.textContent = '🤖 AI เลือกให้ — ตรวจสอบ/เปลี่ยนได้';
+      }
+      var steps = (r.steps || []).filter(Boolean);
+      // แบบย่อ 1 บรรทัด กด "ดูเพิ่มเติม" เพื่อดูขั้นตอนแก้เบื้องต้น
+      out.innerHTML = '<details class="ai-box" open><summary>' // กางไว้เลย — ขั้นตอนแก้เบื้องต้นคือสิ่งที่ผู้แจ้งต้องเห็น
+        + '<span class="ai-box-h">🤖 AI แนะนำ</span>'
+        + '<span class="ai-box-s">' + (steps.length ? 'วิธีแก้เบื้องต้น ' + steps.length + ' ขั้นตอน' : 'ยังไม่มีวิธีแก้เบื้องต้น') + (cat ? ' · ประเภท: ' + esc(cat.name) : '') + '</span>'
+        + '<span class="ai-box-more"></span></summary>'
+        + '<div class="ai-box-body">'
+        + (steps.length ? '<ol>' + steps.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ol>'
+          : '<div>ยังไม่มีวิธีแก้เบื้องต้นที่แนะนำได้สำหรับปัญหานี้ — กด "ส่งเรื่อง" ได้เลย ทีมงานจะติดต่อกลับ</div>')
+        + (r.note ? '<div class="ai-box-note">' + esc(r.note) + '</div>' : '')
+        + '<div class="ai-box-foot">* คำแนะนำจาก AI เป็นแนวทางเบื้องต้นเท่านั้น หากทำแล้วยังไม่หาย กรุณากด "ส่งเรื่อง" ให้ทีมงานดูแลต่อ</div>'
+        + '</div></details>';
+    } catch (e) {
+      out.innerHTML = '<div class="notice err" style="margin-top:8px">AI ไม่พร้อมใช้งานในขณะนี้ — กด "ส่งเรื่อง" ได้ตามปกติ</div>';
+    } finally {
+      btn.disabled = false; btn.textContent = old;
+    }
   }
 
   function markInv(el, bad){
@@ -486,7 +667,7 @@
         ticket_id: row.id, type: 'system', actor_type: 'system',
         body: 'รับเรื่องผ่านฟอร์มเว็บ', is_internal: false, created_at: now.toISOString()
       });
-      try { await uploadAtts(row.id, sysEvId, document.getElementById('f-files').files); } catch (ue) {}
+      try { await uploadAtts(row.id, sysEvId, _attFiles['f-files'] || []); } catch (ue) {}
       var url = new URL('help.html?t=' + encodeURIComponent(row.access_token), location.href).href;
       app.innerHTML =
         '<div class="card success-card">'
@@ -602,8 +783,7 @@
     var replyBox = inactive ? '' : (
       '<div class="card"><h2>ให้ข้อมูลเพิ่มเติม</h2>'
       + '<textarea id="rep-txt" rows="3" placeholder="พิมพ์ข้อความถึงทีมงาน..."></textarea>'
-      + '<label>แนบรูป / ไฟล์ (ไม่บังคับ)</label><input type="file" id="rep-files" multiple accept="'+ATT_ACCEPT+'">'
-      + '<div class="muted" style="margin-top:3px">'+esc(ATT_HINT)+'</div>'
+      + '<label>แนบรูป / ไฟล์ <span class="muted" style="font-weight:400">(ไม่บังคับ)</span></label>' + attPickerMarkup('rep-files')
       + '<div id="rep-msg" class="hidden" style="margin-top:10px"></div>'
       + '<div style="margin-top:12px"><button class="btn-pri" id="rep-send">ส่ง</button></div></div>'
     );
@@ -656,7 +836,7 @@
       + replyBox;
 
     if (canRate) bindRate();
-    if (!closedish) document.getElementById('rep-send').onclick = submitReply;
+    if (!closedish) { document.getElementById('rep-send').onclick = submitReply; initAttPicker('rep-files'); }
     var rb = document.getElementById('reopen-btn'); if (rb) rb.onclick = submitReopen;
     if (showCall) document.getElementById('call-start-btn').onclick = startHdCall;
   }
@@ -734,8 +914,7 @@
   async function submitReply() {
     var ta = document.getElementById('rep-txt');
     var msg = document.getElementById('rep-msg');
-    var filesEl = document.getElementById('rep-files');
-    var files = filesEl && filesEl.files ? filesEl.files : [];
+    var files = _attFiles['rep-files'] || [];
     var txt = (ta.value || '').trim();
     function show(t, cls){ msg.className = 'notice ' + (cls||''); msg.textContent = t; msg.classList.remove('hidden'); }
     if (!txt && !files.length) return show('พิมพ์ข้อความ หรือแนบไฟล์ก่อน', 'err');

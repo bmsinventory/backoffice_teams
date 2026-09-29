@@ -723,3 +723,110 @@ window.saveTargetsPage = function() {
     }).catch(function(e){window.showDbError(e);});
 };
 
+// ── 🤖 AI สรุปประจำวัน — รวมสิ่งที่ต้องทำวันนี้/สัปดาห์นี้จากทุกโมดูล (โครงการ/Adv./ที่พัก/Helpdesk/การลา/Impl Tracker)
+// ข้อเท็จจริงทุกตัวคำนวณในโค้ด AI แค่จัดลำดับความสำคัญและเรียบเรียง · ผลวางใน #ov-ai-wrap (ไม่ถูก renderOverview ทับ) ──
+var _ovAiText = '';
+function _ovIso(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function _ovNick(sid) { var s = (window.STAFF || []).find(function (x) { return x.id === sid; }); return s ? (s.nickname || s.name) : ''; }
+function _ovAiFacts() {
+  var today = new Date(); today.setHours(0, 0, 0, 0);
+  var tIso = _ovIso(today), d7 = new Date(today); d7.setDate(d7.getDate() + 7); var d7Iso = _ovIso(d7);
+  var d30 = new Date(today); d30.setDate(d30.getDate() + 30); var d30Iso = _ovIso(d30);
+  var days = function (iso) { return Math.round((pd(iso) - today) / 86400000); };
+  var active = (window.PROJECTS || []).filter(function (p) { return p.status !== 'cancelled' && p.status !== 'completed'; });
+  var advOf = function (pid) { return (window.ADVANCES || []).filter(function (a) { return a.pid === pid && a.status !== 'cleared'; }); };
+  var advLbl = function (st) { return ((window.AFLW || []).find(function (x) { return x.id === st; }) || { label: st }).label; };
+  var mems = function (p) { return (p.members && p.members.length ? p.members.map(function (m) { return m.sid; }) : (p.team || [])).map(_ovNick).filter(Boolean); };
+  var L = ['วันนี้: ' + fd(tIso)], n = 0;
+  var sec = function (title, rows) { if (!rows.length) return; n += rows.length; L.push('', '## ' + title + ' (' + rows.length + ')'); rows.slice(0, 12).forEach(function (r) { L.push('- ' + r); }); if (rows.length > 12) L.push('- และอีก ' + (rows.length - 12) + ' รายการ'); };
+
+  sec('โครงการเริ่มใน 7 วัน', active.filter(function (p) { return p.start && p.start >= tIso && p.start <= d7Iso; })
+    .sort(function (a, b) { return a.start.localeCompare(b.start); }).map(function (p) {
+      var t = mems(p), adv = advOf(p.id);
+      return p.name + ' — เริ่ม ' + fd(p.start) + ' (อีก ' + days(p.start) + ' วัน) · ทีม ' + (t.length ? t.join(', ') : 'ยังไม่มีคน')
+        + ' · Adv. ' + (adv.length ? advLbl(adv[0].status) : 'ยังไม่ได้ทำ');
+    }));
+  sec('โครงการจบใน 7 วัน', active.filter(function (p) { return p.end && p.end >= tIso && p.end <= d7Iso; })
+    .map(function (p) { return p.name + ' — จบ ' + fd(p.end) + ' · ความคืบหน้า ' + (p.progress || 0) + '%'; }));
+  sec('ถึงระยะจัดทำ Adv. แต่ยังไม่อนุมัติ', active.filter(function (p) {
+      if (p.stage !== 'plan') return false;
+      var a = advOf(p.id); return !a.length || a.every(function (x) { return x.status === 'draft' || x.status === 'pending'; });
+    }).map(function (p) { var a = advOf(p.id); return p.name + (p.start ? ' — เริ่ม ' + fd(p.start) + ' (อีก ' + days(p.start) + ' วัน)' : '') + ' · ' + (a.length ? advLbl(a[0].status) : 'ยังไม่ได้ทำ Adv.'); }));
+  sec('Adv. รออนุมัติ', (window.ADVANCES || []).filter(function (a) { return a.status === 'pending'; }).map(function (a) {
+    var p = (window.PROJECTS || []).find(function (x) { return x.id === a.pid; }) || {};
+    return (p.name || '-') + (a.amount ? ' · ' + fca(a.amount) + ' บาท' : '') + (a.rdate ? ' · ขอเมื่อ ' + fd(a.rdate) : '');
+  }));
+  sec('Adv. เลยกำหนดเคลียร์', (window.ADVANCES || []).filter(function (a) { return (a.status === 'disbursed' || a.status === 'clearing') && a.ddate && a.ddate < tIso; })
+    .map(function (a) { var p = (window.PROJECTS || []).find(function (x) { return x.id === a.pid; }) || {}; return (p.name || '-') + ' · ครบกำหนด ' + fd(a.ddate) + ' (เลยมา ' + (-days(a.ddate)) + ' วัน) · ' + advLbl(a.status); }));
+  sec('ที่พักยังไม่อนุมัติ (โครงการเริ่มใน 30 วัน)', active.filter(function (p) {
+      if (!p.start || p.start < tIso || p.start > d30Iso) return false;
+      var l = (window.LODGINGS || []).filter(function (x) { return x.pid === p.id; });
+      return l.length && !l.some(function (x) { return x.approvedDaily === 'yes' || x.approvedMonthly === 'yes'; });
+    }).map(function (p) { return p.name + ' — เริ่ม ' + fd(p.start) + ' (อีก ' + days(p.start) + ' วัน)'; }));
+
+  var openSt = {}; (window.HD_STATUS || []).forEach(function (s) { openSt[s.id] = s.open !== false; });
+  var tickets = (window.HELPDESK_TICKETS || []).filter(function (t) { return openSt[t.status]; });
+  var now = new Date();
+  var hospName = function (id) { var h = (window.HOSPITALS || []).find(function (x) { return x.id === id; }); return h ? h.name : ''; };
+  sec('Helpdesk ด่วน (P1/P2) ที่ยังเปิดอยู่', tickets.filter(function (t) { return t.priority === 'p1' || t.priority === 'p2'; }).map(function (t) {
+    var age = t.createdAt ? Math.round((now - new Date(t.createdAt)) / 3600000) : 0;
+    return t.ticketNo + ' ' + t.priority.toUpperCase() + ' · ' + (hospName(t.hospitalId) || '-') + ' · ' + String(t.subject || '').slice(0, 60)
+      + ' · เปิดมา ' + (age >= 24 ? Math.floor(age / 24) + ' วัน' : age + ' ชม.') + (t.assigneeId ? ' · ผู้ดูแล ' + _ovNick(t.assigneeId) : ' · ยังไม่มอบหมาย');
+  }));
+  var breached = tickets.filter(function (t) { return t.resolutionDue && new Date(t.resolutionDue) < now; });
+  if (tickets.length) { L.push('', 'Helpdesk เปิดอยู่ทั้งหมด ' + tickets.length + ' เรื่อง · เกิน SLA ' + breached.length + ' เรื่อง · ยังไม่มอบหมาย ' + tickets.filter(function (t) { return !t.assigneeId; }).length + ' เรื่อง'); n++; }
+
+  var LV = { sick: 'ลาป่วย', vacation: 'ลาพักร้อน', personal: 'ลากิจ', maternity: 'ลาคลอด', ordain: 'ลาบวช', other: 'ลา' };
+  sec('ลางาน 7 วันนี้', (window.LEAVES || []).filter(function (l) { return l.status === 'approved' && l.startDate <= d7Iso && l.endDate >= tIso; })
+    .map(function (l) { return _ovNick(l.staffId) + ' ' + (LV[l.leaveType] || 'ลา') + ' ' + fd(l.startDate) + (l.endDate !== l.startDate ? ' – ' + fd(l.endDate) : ''); }));
+  sec('ใบลารออนุมัติ', (window.LEAVES || []).filter(function (l) { return l.status === 'pending'; })
+    .map(function (l) { return _ovNick(l.staffId) + ' ' + (LV[l.leaveType] || 'ลา') + ' ' + fd(l.startDate); }));
+
+  if (window.imtIsOverdue) {
+    var od = {};
+    (window.IMPL_TASKS || []).forEach(function (t) { if (window.imtIsOverdue(t)) od[t.projectId] = (od[t.projectId] || 0) + 1; });
+    sec('ติดตามสถานะโครงการ: มีงานเกินกำหนด', Object.keys(od).sort(function (a, b) { return od[b] - od[a]; }).map(function (pid) {
+      var ip = (window.IMPL_PROJECTS || []).find(function (x) { return x.id === pid; }); return (ip ? ip.name : pid) + ' · เกินกำหนด ' + od[pid] + ' งาน';
+    }));
+  }
+  return { text: L.join('\n'), count: n };
+}
+function _ovAiRender(html, show) {
+  var w = document.getElementById('ov-ai-wrap'); if (!w) return;
+  w.style.display = show ? '' : 'none';
+  w.innerHTML = html;
+}
+window.ovAiDaily = async function () {
+  var btn = document.getElementById('ov-ai-btn');
+  var facts = _ovAiFacts();
+  var head = function (extra) {
+    return '<div class="ai-card-head"><div class="sec-label" style="margin:0;">🤖 AI สรุปประจำวัน — ' + fd(_ovIso(new Date())) + '</div><div style="flex:1"></div>'
+      + (extra || '') + '<button class="btn btn-ghost btn-sm" onclick="window.ovAiClose()">✕</button></div>';
+  };
+  if (!facts.count) { _ovAiRender('<div class="ai-card">' + head() + '<div style="font-size:13px;">✅ วันนี้ไม่มีเรื่องค้างที่ต้องติดตาม</div></div>', true); return; }
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ กำลังสรุป...'; }
+  _ovAiRender('<div class="ai-card">' + head() + '<div style="color:var(--txt3);font-size:12.5px;">⏳ AI กำลังรวบรวมสิ่งที่ต้องทำวันนี้... (อาจใช้เวลาสักครู่)</div></div>', true);
+  try {
+    var text = await window.aiChat(
+      'คุณเป็นผู้ช่วยหัวหน้าทีมติดตั้งระบบซอฟต์แวร์โรงพยาบาล สรุปสิ่งที่ทีมต้องทำจากข้อมูลที่ให้ เป็นภาษาไทย กระชับ อ่านจบใน 1 นาที ใช้หัวข้อ: '
+      + '"## ต้องทำวันนี้" (เรื่องเร่งด่วนที่สุด เช่น Ticket P1, Adv. เลยกำหนด, โครงการจะเริ่มเร็ว ๆ นี้แต่ยังไม่พร้อม), '
+      + '"## ภายในสัปดาห์นี้", "## เฝ้าระวัง" · แต่ละ bullet บอกเรื่อง + สิ่งที่ควรทำ (เช่น อนุมัติ/ติดตาม/จัดคน) · '
+      + 'ถ้าโครงการจะเริ่มแต่ยังไม่มีทีม/ไม่มี Adv./ที่พักไม่อนุมัติ ให้ชี้ให้ชัด · ใช้ชื่อ ตัวเลข วันที่ตามข้อมูลเท่านั้น ห้ามแต่งเพิ่ม · หัวข้อที่ไม่มีเรื่องให้ข้ามไป',
+      facts.text, { maxTokens: 1500, temperature: 0.3 });
+    _ovAiText = text;
+    _ovAiRender('<div class="ai-card">'
+      + head('<button class="btn btn-ghost btn-sm" onclick="window.ovAiDaily()">🔁 สรุปใหม่</button><button class="btn btn-ghost btn-sm" onclick="window.ovAiCopy()">📋 คัดลอก</button>')
+      + '<div class="ai-text">' + window.aiTextToHtml(text) + '</div>'
+      + '<div class="ai-card-note">* สรุปโดย AI จากข้อมูลในระบบ ณ ' + new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น. — ตรวจสอบก่อนนำไปใช้</div>'
+      + '</div>', true);
+  } catch (e) {
+    _ovAiRender('<div class="ai-card">' + head() + '<div style="color:var(--coral);font-size:12.5px;">' + esc(String(e.message || e)) + '</div></div>', true);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🤖 AI สรุปประจำวัน'; }
+  }
+};
+window.ovAiClose = function () { _ovAiText = ''; _ovAiRender('', false); };
+window.ovAiCopy = function () {
+  if (!_ovAiText || !navigator.clipboard) return;
+  navigator.clipboard.writeText(_ovAiText.replace(/\*\*/g, '')).then(function () { window.showAlert && window.showAlert('คัดลอกแล้ว', 'success'); });
+};

@@ -321,8 +321,10 @@
             <select class="t-sel" id="ov-yr" onchange="window.renderOverview()"><option value="">ทุกปี พ.ศ.</option></select>
             <div class="ms-filter" id="ov-grp"></div>
             <div class="ms-filter" id="ov-type"></div>
+            <button class="btn btn-pri btn-sm" id="ov-ai-btn" onclick="window.ovAiDaily()" title="ให้ AI สรุปสิ่งที่ต้องทำวันนี้/สัปดาห์นี้ จากทุกโมดูล">🤖 AI สรุปประจำวัน</button>
           </div>
         </div>
+        <div id="ov-ai-wrap" style="padding:14px 24px 0;display:none;"></div>
         <!-- KPI cards -->
         <div id="stat-row" style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;padding:16px 24px;"></div>
         <!-- Annual Target Tracker -->
@@ -411,6 +413,7 @@
           <div class="ms-filter" id="kb-type"></div>
           <div class="ms-filter" id="kb-grp"></div>
           <div style="flex:1"></div>
+          <button class="btn btn-pri btn-sm" onclick="window.kbAiAdvSummary()" title="สรุปไซต์ในคอลัมน์ วางแผนงาน/จัดทำ Adv. ที่ต้องขออนุมัติ Adv. เป็นข้อความส่ง LINE">🤖 AI สรุปขออนุมัติ Adv.</button>
           <button class="btn btn-sm ce-only" style="background:var(--violet)15;color:var(--violet);border:1px solid var(--violet)30;font-weight:700;" onclick="window.runAutoStage(false)">⚡ อัปเดต Stage อัตโนมัติ</button>
           <div id="kb-last-auto" style="font-size:10px;color:var(--txt3);padding:0 8px;"></div>
         </div>
@@ -524,6 +527,7 @@
               <span class="month-lbl" id="wl-lbl"></span>
               <button class="mnav-btn" onclick="window.wlNav(1)">›</button>
             </div>
+            <button class="btn btn-pri btn-sm" onclick="window.wlAiAnalyze()" title="ให้ AI วิเคราะห์ภาระงานทีมเดือนนี้ และแนะนำการวางคนให้โครงการที่ยังขาดคน">🤖 AI วิเคราะห์ภาระงาน</button>
             <button class="btn btn-pri btn-sm ce-only" onclick="window.openWlNotifyReport()" title="สรุปตารางงานที่ยังไม่เริ่ม แยกรายคน สำหรับคัดลอก/บันทึกภาพส่ง LINE">📤 สรุปแจ้งงาน</button>
           </div>
         </div>
@@ -1865,31 +1869,6 @@
   </div>
 </div>
 
-<div class="overlay" id="m-imt-ai-key">
-  <div class="modal md">
-    <div class="m-head">
-      <div class="m-icon" style="background:rgba(124,92,252,.12)">🔑</div>
-      <div class="m-title">ตั้งค่า AI API Key</div>
-      <button class="m-x" onclick="window.closeM('m-imt-ai-key')">✕</button>
-    </div>
-    <div class="m-body">
-      <div style="font-size:12.5px;color:var(--txt2);margin-bottom:12px;line-height:1.6;">
-        ใช้ Google Gemini (ฟรี) ในการสรุปงานด้วย AI — ขอ API Key ฟรีได้ที่
-        <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>
-        <br>Key จะถูกบันทึกไว้ส่วนกลาง เมื่อตั้งค่าแล้วทุกคนในระบบใช้ "สรุปด้วย AI" ได้ทันทีโดยไม่ต้องกรอกเอง — เฉพาะ Admin เท่านั้นที่ตั้งค่า/แก้ไขได้
-      </div>
-      <div class="f-group">
-        <label class="f-label">Gemini API Key</label>
-        <input class="f-input" id="imt-ai-key-input" type="password" placeholder="AIza...">
-      </div>
-    </div>
-    <div class="m-foot">
-      <button class="btn btn-ghost" onclick="window.closeM('m-imt-ai-key')">ยกเลิก</button>
-      <button class="btn btn-pri" onclick="window.imtSaveAiKey()">💾 บันทึก</button>
-    </div>
-  </div>
-</div>
-
 <div class="overlay" id="m-wl-notify">
   <div class="modal lg">
     <div class="m-head">
@@ -1923,6 +1902,30 @@
     </div>
     <div class="m-body" id="m-imt-ai-summary-body" style="font-size:13px;line-height:1.7;"></div>
     <div class="m-foot" id="m-imt-ai-summary-foot"></div>
+  </div>
+</div>
+
+<div class="overlay" id="m-wl-ai">
+  <div class="modal lg">
+    <div class="m-head">
+      <div class="m-icon" style="background:rgba(124,92,252,.12)">🤖</div>
+      <div class="m-title" id="m-wl-ai-title">AI วิเคราะห์ภาระงานทีม</div>
+      <button class="m-x" onclick="window.closeM('m-wl-ai')">✕</button>
+    </div>
+    <div class="m-body" id="m-wl-ai-body"></div>
+    <div class="m-foot" id="m-wl-ai-foot"></div>
+  </div>
+</div>
+
+<div class="overlay" id="m-kb-ai">
+  <div class="modal md">
+    <div class="m-head">
+      <div class="m-icon" style="background:rgba(124,92,252,.12)">🤖</div>
+      <div class="m-title">สรุปขออนุมัติ Adv. ด้วย AI</div>
+      <button class="m-x" onclick="window.closeM('m-kb-ai')">✕</button>
+    </div>
+    <div class="m-body" id="m-kb-ai-body" style="font-size:13px;line-height:1.7;"></div>
+    <div class="m-foot" id="m-kb-ai-foot"></div>
   </div>
 </div>
 
@@ -2464,6 +2467,7 @@
 <script src="src/services/expense-form.service.js"></script>
 <script src="src/services/site-deploy-form.service.js"></script>
 <script src="src/services/site-notice-form.service.js"></script>
+<script src="src/services/ai.service.js"></script>
 <script src="src/services/helpdesk.service.js"></script>
 
 <!-- 4. Router -->

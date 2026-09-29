@@ -13,10 +13,5 @@ services:
       # docker-entrypoint.sh เอาค่านี้ไปสร้าง env-config.js ใหม่ทุกครั้งที่ container start
       SUPABASE_URL: "https://backoffice-teams.bmscloud.in.th"
       SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzg2MDY5OTg0LCJleHAiOjE5NDM3NDk5ODR9.87h6yNOOf2UIVLygJp-hap-Y0n37xQ7OzPfv7HTlrbY"
-      # ── ปุ่ม "AI ช่วยวิเคราะห์" ใน HelpDesk (MedGemma / vLLM) ──
-      # nginx proxy /helpdesk-ai/ → VLLM_UPSTREAM · frontend เห็นแค่ path นี้ ไม่เห็น host/คีย์จริง
-      # เว้นว่าง VLLM_UPSTREAM = ปิดฟีเจอร์ · ใส่ VLLM_API_KEY จริงตอน deploy (อย่า commit ค่าจริง)
-      VLLM_UPSTREAM: "https://vllm-gemma.bmscloud.in.th"
-      VLLM_API_KEY: "CHANGEME_vllm_api_key"
     ports:
       - "8089:80"

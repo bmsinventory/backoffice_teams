@@ -170,6 +170,7 @@ window.renderLodging=function(){
       </div>
       <div style="padding:12px 14px;flex:1;">${optionList}</div>
       <div style="padding:8px 14px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:6px;">
+        ${lds.length?`<button class="btn btn-pri btn-sm" onclick="window.ldAiDecideOpen('${p.id}')" title="ให้ AI เปรียบเทียบตัวเลือกที่พักและแนะนำ">🤖 AI ช่วยตัดสินใจ</button>`:''}
         ${window.canEdit('lodging')?`<button class="btn btn-teal btn-sm" onclick="window.showLdForm('${p.id}',null)">+ เพิ่มตัวเลือก</button>`:''}
       </div>
     </div>`;
@@ -293,6 +294,7 @@ window.openLodgingGroupModal=function(pid){
     <div style="font-size:10px;color:var(--txt3);">📅 ${fd(p?p.start:'')} → ${fd(p?p.end:'')} · ${lds.length} ตัวเลือก</div></div>
     ${addBtn}
   </div>
+  <div id="ld-ai-out"></div>
   ${(appD||appM)?`<div style="display:grid;grid-template-columns:${appD&&appM?'1fr 1fr':'1fr'};gap:8px;margin-bottom:14px;">
     ${appD?`<div style="padding:10px 12px;background:#4361ee10;border:1px solid #4361ee30;border-radius:10px;">
       <div style="font-size:10px;font-weight:700;color:var(--indigo);margin-bottom:2px;">✅ อนุมัติรายวัน</div>
@@ -363,6 +365,108 @@ window.openLodgingGroupModal=function(pid){
   document.getElementById('m-ld-foot').style.display='none';
   window.openM('m-lodging');
 }
+
+// ── 🤖 AI ช่วยตัดสินใจเลือกที่พัก — ตัวเลขทุกตัว (คืน/เตียง/ราคาต่อคนต่อคืน/พอสำหรับทีมไหม) คำนวณในโค้ด
+// ส่งให้ AI เป็นข้อเท็จจริง AI แค่เปรียบเทียบและให้เหตุผล · ปุ่มอนุมัติเรียก approveLdType เดิม (คนกดเองเสมอ) ──
+var LD_AMENITY={Wifi:'WiFi',Ac:'แอร์',Tv:'ทีวี',Fridge:'ตู้เย็น',Washer:'เครื่องซักผ้า',Shower:'เครื่องทำน้ำอุ่น',Pillow:'หมอน',Blanket:'ผ้าห่ม',Bedsheet:'ผ้าปู',Towel:'ผ้าเช็ดตัว',App:'ปลั๊ก/เครื่องใช้ไฟฟ้า',Park:'ที่จอดรถ',Breakfast:'อาหารเช้า'};
+function ldAmenities(l,side){
+  return Object.keys(LD_AMENITY).filter(function(k){return l[side+k];}).map(function(k){return LD_AMENITY[k];})
+    .concat(String(l[side+'Custom']||'').split(',').map(function(x){return x.trim();}).filter(Boolean));
+}
+function ldNights(l,p){
+  var s=l.checkIn||(p&&p.start),e=l.checkOut||(p&&p.end);
+  if(!s||!e)return 0;
+  return Math.max(1,Math.ceil((pd(e)-pd(s))/86400000));
+}
+function ldAiFacts(p,lds){
+  var mems=p?(p.members&&p.members.length?p.members:(p.team||[]).map(function(id){return{sid:id};})):[];
+  var lines=['โครงการ: '+(p?p.name:'-'),
+    'ช่วงดำเนินงาน: '+(p&&p.start?fd(p.start):'-')+' – '+(p&&p.end?fd(p.end):'-'),
+    'ทีมงานที่ต้องพัก: '+mems.length+' คน'+(p&&p.isBorder?' · พื้นที่ชายแดน':'')];
+  lds.forEach(function(l,i){
+    var n=ldNights(l,p),months=Math.ceil(n/30);
+    lines.push('','ตัวเลือกที่ '+(i+1)+': '+(l.name||'ไม่มีชื่อ')
+      +(l.checkIn?' · เข้าพัก '+fd(l.checkIn)+' – '+fd(l.checkOut):'')+' · '+n+' คืน'
+      +(l.phone?' · มีเบอร์ติดต่อ':'')+(l.mapUrl?' · มีแผนที่':''));
+    if(l.dsQty||l.ddQty){
+      var bedsD=l.dsQty+2*l.ddQty,dTot=l.dTotal||(n*(l.dsQty*l.dsRate+l.ddQty*l.ddRate));
+      lines.push('  รายวัน: เดี่ยว '+l.dsQty+' ห้อง × '+fca(l.dsRate)+'/คืน, คู่ '+l.ddQty+' ห้อง × '+fca(l.ddRate)+'/คืน'
+        +' · รองรับ '+bedsD+' คน'+(mems.length?(bedsD>=mems.length?' (พอสำหรับทีม)':' (ไม่พอสำหรับทีม '+mems.length+' คน)'):'')
+        +' · รวม '+fca(dTot)+' บาท'+(bedsD&&n?' · เฉลี่ย '+fca(dTot/bedsD/n)+' บาท/คน/คืน':''));
+      var aD=ldAmenities(l,'d');if(aD.length)lines.push('  สิ่งอำนวยความสะดวก (รายวัน): '+aD.join(', '));
+    }
+    if(l.msQty||l.mdQty){
+      var bedsM=l.msQty+2*l.mdQty,mTot=l.mTotal||(months*(l.msQty*l.msRate+l.mdQty*l.mdRate));
+      lines.push('  รายเดือน: เดี่ยว '+l.msQty+' ห้อง × '+fca(l.msRate)+'/เดือน, คู่ '+l.mdQty+' ห้อง × '+fca(l.mdRate)+'/เดือน'
+        +' ('+months+' เดือน) · รองรับ '+bedsM+' คน'+(mems.length?(bedsM>=mems.length?' (พอสำหรับทีม)':' (ไม่พอสำหรับทีม '+mems.length+' คน)'):'')
+        +' · รวม '+fca(mTot)+' บาท'+(bedsM&&n?' · เฉลี่ย '+fca(mTot/bedsM/n)+' บาท/คน/คืน':''));
+      lines.push('  ค่าน้ำ/ไฟ: '+(l.mInclUtil?'รวมในค่าห้องแล้ว':('น้ำ '+(l.mWater||'-')+', ไฟ '+(l.mElectric||'-')))
+        +(l.mDeposit?' · เงินประกัน '+fca(l.mDeposit)+' บาท'+(l.mDepositNote?' ('+l.mDepositNote+')':''):'')
+        +(l.mExtras?' · ค่าใช้จ่ายอื่น: '+l.mExtras:''));
+      var aM=ldAmenities(l,'m');if(aM.length)lines.push('  สิ่งอำนวยความสะดวก (รายเดือน): '+aM.join(', '));
+    }
+    if(l.note)lines.push('  หมายเหตุ: '+String(l.note).slice(0,200));
+  });
+  return lines.join('\n');
+}
+window._ldAiLast=null;
+window.ldAiDecide=async function(pid,btn){
+  var out=document.getElementById('ld-ai-out');if(!out)return;
+  var p=window.PROJECTS.find(function(x){return x.id===pid;});
+  var lds=window.LODGINGS.filter(function(l){return l.pid===pid;});
+  if(!lds.length)return;
+  var old=btn?btn.textContent:'';
+  if(btn){btn.disabled=true;btn.textContent='⏳ กำลังวิเคราะห์...';}
+  out.innerHTML='<div class="ai-out" style="margin-bottom:14px;font-size:12px;color:var(--txt3);">⏳ AI กำลังเปรียบเทียบ '+lds.length+' ตัวเลือก...</div>';
+  try{
+    var r=await window.aiChatJson(
+      'คุณเป็นผู้ช่วยฝ่ายปฏิบัติการ ช่วยเลือกที่พักให้ทีมที่ไปติดตั้งระบบที่โรงพยาบาลต่างจังหวัด เปรียบเทียบตัวเลือกจากข้อมูลที่ให้ '
+      +'โดยพิจารณา: รองรับคนพอไหม, ราคารวมและราคาต่อคนต่อคืน, รายวันหรือรายเดือนคุ้มกว่าตามจำนวนคืน, ค่าน้ำไฟ/เงินประกัน/ค่าใช้จ่ายแฝง, สิ่งอำนวยความสะดวกที่จำเป็นต่อการทำงาน (WiFi แอร์ ที่จอดรถ) '
+      +'ตอบ "เฉพาะ JSON" รูปแบบ: {"recommend_option":<เลขตัวเลือก>,"recommend_type":"daily|monthly","summary":"<สรุปคำแนะนำ 1–2 ประโยค>",'
+      +'"reasons":["<เหตุผลสั้น ๆ>"],"options":[{"option":<เลข>,"pros":"<ข้อดีสั้น ๆ>","cons":"<ข้อเสีย/ข้อควรระวังสั้น ๆ>"}],"warnings":["<สิ่งที่ควรตรวจสอบก่อนอนุมัติ ถ้ามี>"]} '
+      +'· ภาษาไทย · ใช้ตัวเลขตามข้อมูลเท่านั้น ห้ามคำนวณใหม่หรือแต่งเพิ่ม · recommend_type ต้องเป็นแบบที่ตัวเลือกนั้นมีราคาจริง',
+      ldAiFacts(p,lds),{maxTokens:900});
+    var idx=(parseInt(r.recommend_option,10)||0)-1;
+    var rec=lds[idx]||null;
+    var type=r.recommend_type==='monthly'?'monthly':'daily';
+    if(rec&&type==='daily'&&!(rec.dsQty||rec.ddQty))type='monthly';
+    if(rec&&type==='monthly'&&!(rec.msQty||rec.mdQty))type='daily';
+    window._ldAiLast={pid:pid,ldId:rec?rec.id:'',type:type};
+    var isApproved=rec&&(type==='daily'?rec.approvedDaily==='yes':rec.approvedMonthly==='yes');
+    var li=function(arr){return(arr||[]).filter(Boolean).map(function(x){return'<li>'+esc(String(x))+'</li>';}).join('');};
+    // แบบย่อ 1 บรรทัด (ตัวเลือกที่แนะนำ + ปุ่มอนุมัติ) กด "ดูเพิ่มเติม" เพื่อดูเหตุผล/ข้อดีข้อเสีย/ข้อควรระวัง
+    out.innerHTML='<div style="margin-bottom:14px;">'+window.aiSuggestHtml({
+      title:'AI แนะนำ',
+      open:true, // ผู้ใช้กดขอคำแนะนำเอง — แสดงเหตุผล/ข้อดีข้อเสียเต็มทันที
+      summary:rec?'<b>'+esc(rec.name||('ตัวเลือกที่ '+(idx+1)))+'</b> · '+(type==='daily'?'รายวัน':'รายเดือน')
+        +(isApproved?' <span style="color:var(--teal);">(อนุมัติแล้ว)</span>':''):'<span style="color:var(--txt3);">ไม่มีตัวเลือกที่แนะนำ</span>',
+      actions:rec&&!isApproved&&window.canApprove('lodging')?'<button class="btn btn-teal btn-sm" style="padding:3px 10px;font-size:11px;" onclick="window.ldAiApprove()">✅ อนุมัติตามคำแนะนำ</button>':'',
+      body:(r.summary?'<div style="font-size:12px;margin:6px 0;">'+esc(r.summary)+'</div>':'')
+      +((r.reasons||[]).length?'<ul style="margin:0 0 6px;padding-left:18px;font-size:12px;">'+li(r.reasons)+'</ul>':'')
+      +((r.options||[]).length?'<details style="font-size:11.5px;margin-bottom:6px;"><summary style="cursor:pointer;color:var(--txt2);">ข้อดี/ข้อเสียแต่ละตัวเลือก</summary>'
+        +(r.options||[]).map(function(o){var l=lds[(parseInt(o.option,10)||0)-1];return'<div style="padding:4px 0;border-bottom:1px dashed var(--border);"><b>'+(l?esc(l.name||('ตัวเลือกที่ '+o.option)):'ตัวเลือกที่ '+esc(String(o.option)))+'</b>'
+          +(o.pros?'<div style="color:var(--teal);">✔ '+esc(o.pros)+'</div>':'')+(o.cons?'<div style="color:var(--coral);">✖ '+esc(o.cons)+'</div>':'')+'</div>';}).join('')+'</details>':'')
+      +((r.warnings||[]).filter(Boolean).length?'<div style="font-size:11.5px;color:var(--amber);">⚠ ควรตรวจสอบ:<ul style="margin:2px 0 0;padding-left:18px;">'+li(r.warnings)+'</ul></div>':'')
+      +'<div style="font-size:10.5px;color:var(--txt3);margin-top:6px;">* AI ช่วยแนะนำเท่านั้น ผู้อนุมัติตัดสินใจเอง</div>',
+    })+'</div>';
+  }catch(e){
+    out.innerHTML='<div class="ai-out" style="margin-bottom:14px;color:var(--coral);font-size:12px;">'+esc(String(e.message||e))+'</div>';
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent=old;}
+  }
+};
+// ปุ่มบนการ์ดโครงการ (หน้ารวมที่พัก) — เปิด popup ที่พักของโครงการนั้น แล้วแสดงผล AI ใน popup (#ld-ai-out)
+window.ldAiDecideOpen=function(pid){
+  window.openLodgingGroupModal(pid);
+  window.ldAiDecide(pid,null);
+};
+window.ldAiApprove=async function(){
+  var s=window._ldAiLast;if(!s||!s.ldId)return;
+  var l=window.LODGINGS.find(function(x){return x.id===s.ldId;});
+  if(!confirm('อนุมัติที่พัก "'+((l&&l.name)||'')+'" แบบ'+(s.type==='daily'?'รายวัน':'รายเดือน')+' ?'))return;
+  await window.approveLdType(s.pid,s.ldId,s.type);
+  window.openLodgingGroupModal(s.pid);
+};
 
 window.showLdForm=function(pid,ldId){
   window.editLdId=ldId;

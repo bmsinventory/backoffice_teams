@@ -119,6 +119,8 @@
 .imt-health-chip b { font-size: 13px; }
 .imt-health-chip:hover { border-color: var(--border2); color: var(--txt); }
 .imt-health-chip.on   { background: var(--surface); color: var(--violet); border-color: var(--violet); box-shadow: var(--sh-sm); }
+/* ปุ่ม 🤖 AI สรุปภาพรวม ในแถบเดียวกับชิป — ไม่ยืดตามความสูงแถว (flex stretch) ให้สูงเท่าชิป */
+.imt-health-strip .imt-ai-btn { align-self: center; padding: 6px 12px; font-size: 12px; line-height: 1.2; white-space: nowrap; flex: 0 0 auto; }
 
 /* ── Project Health Card (ต่อยอดจาก .imt-pcard เดิม) ── */
 .imt-hcard-top   { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }

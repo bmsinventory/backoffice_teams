@@ -55,3 +55,23 @@ select.f-input {
 }
 .be-date > .be-date-display.is-empty { color: var(--txt3); }
 .be-date > .be-date-input:disabled ~ .be-date-display { opacity: .45; }
+
+/* ── ช่องแนบไฟล์แบบใช้ง่าย (window.attPickerHtml) — คลิก/ลากวาง/Ctrl+V + รายการพรีวิว ── */
+.att-drop { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 14px 12px; border: 2px dashed var(--border); border-radius: 12px; background: var(--surface2); cursor: pointer; text-align: center; transition: border-color .15s, background .15s; }
+.att-drop:hover, .att-drop:focus, .att-drop.over { border-color: var(--violet); background: rgba(124,92,252,.06); outline: none; }
+.att-drop-ic { font-size: 22px; line-height: 1; }
+.att-drop-t { font-size: 13px; color: var(--txt); }
+.att-drop-t b { color: var(--violet); }
+.att-drop-s { font-size: 11.5px; color: var(--txt3); }
+.att-hint { font-size: 11px; color: var(--txt3); margin-top: 4px; }
+.att-err { font-size: 11.5px; color: var(--coral); margin-top: 4px; }
+.att-err:empty, .att-list:empty { display: none; }
+.att-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; margin-top: 8px; }
+.att-item { display: flex; align-items: center; gap: 10px; padding: 7px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.att-item img { width: 40px; height: 40px; object-fit: cover; border-radius: 6px; flex-shrink: 0; }
+.att-ic { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; font-size: 22px; background: var(--surface2); border-radius: 6px; flex-shrink: 0; }
+.att-meta { flex: 1; min-width: 0; }
+.att-name { font-size: 12px; font-weight: 600; color: var(--txt); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.att-size { font-size: 10.5px; color: var(--txt3); }
+.att-x { flex-shrink: 0; width: 26px; height: 26px; min-height: 0; padding: 0; border: none; border-radius: 50%; background: var(--surface2); color: var(--txt2); font-size: 12px; cursor: pointer; }
+.att-x:hover { background: var(--coral); color: #fff; }

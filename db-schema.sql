@@ -362,7 +362,6 @@ CREATE TABLE IF NOT EXISTS settings (
   allowance_holiday_normal   NUMERIC DEFAULT 650,
   allowance_weekday_border   NUMERIC DEFAULT 650,
   allowance_holiday_border   NUMERIC DEFAULT 1250,
-  imt_ai_key                 TEXT DEFAULT '',
   -- role permissions (each role stored as JSONB)
   admin                      JSONB,
   pm                         JSONB,
@@ -1125,3 +1124,6 @@ BEGIN
 EXCEPTION WHEN OTHERS THEN
   RAISE NOTICE 'ข้าม storage bucket/policy (%) — ให้สร้าง bucket helpdesk (public) + policy anon เองใน Studio', SQLERRM;
 END $$;
+
+-- ── ลบ Gemini API Key เดิม (สรุปด้วย AI ใน Impl Tracker เปลี่ยนไปใช้ vLLM ภายในที่ไม่ต้องใช้คีย์แล้ว) ──
+ALTER TABLE settings DROP COLUMN IF EXISTS imt_ai_key;

@@ -276,4 +276,76 @@
     });
   };
 
+  // ── ช่องแนบไฟล์แบบใช้ง่าย (แบบเดียวกับหน้า help.html ที่ลูกค้าแจ้งเอง) — คลิกเลือก / ลากวาง / Ctrl+V วางภาพ
+  // + พรีวิว + ลบทีละไฟล์ · ตรวจชนิด/ขนาดทันทีตอนเลือก · ไฟล์เก็บใน window.attPickerFiles(id)
+  // opts: { accept: '.jpg,.png,...', max: bytes, hint: 'ข้อความใต้ช่อง' } ──
+  var _att = {}, _attOrder = [];
+  function attFmtSize(n) { return n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; }
+  function attIcon(n) { return /\.pdf$/i.test(n) ? '📕' : /\.docx?$/i.test(n) ? '📘' : /\.xlsx?$/i.test(n) ? '📗' : '📄'; }
+  window.attPickerHtml = function (id, opts) {
+    opts = opts || {};
+    return '<div class="att-drop" id="' + id + '-drop" tabindex="0" role="button">'
+      + '<input type="file" id="' + id + '" multiple accept="' + window.esc(opts.accept || '') + '" hidden>'
+      + '<div class="att-drop-ic">📎</div>'
+      + '<div class="att-drop-t"><b>คลิกเพื่อเลือกไฟล์</b> หรือลากไฟล์มาวางที่นี่</div>'
+      + '<div class="att-drop-s">📋 แคปหน้าจอแล้วกด Ctrl+V วางได้เลย</div>'
+      + '</div>'
+      + (opts.hint ? '<div class="att-hint">' + window.esc(opts.hint) + '</div>' : '')
+      + '<div class="att-err" id="' + id + '-err"></div>'
+      + '<div class="att-list" id="' + id + '-list"></div>';
+  };
+  window.attPickerInit = function (id, opts) {
+    opts = opts || {};
+    _att[id] = { files: [], ext: String(opts.accept || '').toLowerCase().split(',').filter(Boolean), max: opts.max || 0 };
+    _attOrder = _attOrder.filter(function (k) { return k !== id; }).concat(id);
+    var inp = document.getElementById(id), drop = document.getElementById(id + '-drop');
+    if (!inp || !drop) return;
+    drop.onclick = function () { inp.click(); };
+    drop.onkeydown = function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inp.click(); } };
+    inp.onchange = function () { attAdd(id, inp.files); inp.value = ''; };
+    ['dragenter', 'dragover'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('over'); }); });
+    ['dragleave', 'drop'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('over'); }); });
+    drop.addEventListener('drop', function (e) { attAdd(id, e.dataTransfer && e.dataTransfer.files); });
+    renderAttList(id);
+  };
+  window.attPickerFiles = function (id) { return (_att[id] && _att[id].files) || []; };
+  function attAdd(id, list) {
+    var st = _att[id]; if (!st) return;
+    var bad = [];
+    Array.prototype.forEach.call(list || [], function (f) {
+      var ext = '.' + String(f.name).split('.').pop().toLowerCase();
+      if (st.ext.length && st.ext.indexOf(ext) < 0) bad.push(f.name + ' (ไม่รองรับไฟล์ชนิดนี้)');
+      else if (st.max && f.size > st.max) bad.push(f.name + ' (ใหญ่เกิน ' + Math.round(st.max / 1048576) + 'MB)');
+      else if (!st.files.some(function (x) { return x.name === f.name && x.size === f.size; })) st.files.push(f);
+    });
+    var err = document.getElementById(id + '-err');
+    if (err) err.textContent = bad.length ? '⚠ ไม่ได้แนบ: ' + bad.join(', ') : '';
+    renderAttList(id);
+  }
+  function renderAttList(id) {
+    var box = document.getElementById(id + '-list'); if (!box || !_att[id]) return;
+    box.innerHTML = _att[id].files.map(function (f, i) {
+      var isImg = /^image\//.test(f.type) || /\.(jpe?g|png|gif|webp)$/i.test(f.name);
+      var thumb = isImg ? '<img src="' + URL.createObjectURL(f) + '" alt="">' : '<span class="att-ic">' + attIcon(f.name) + '</span>';
+      return '<div class="att-item">' + thumb
+        + '<div class="att-meta"><div class="att-name" title="' + window.esc(f.name) + '">' + window.esc(f.name) + '</div><div class="att-size">' + attFmtSize(f.size) + '</div></div>'
+        + '<button type="button" class="att-x" data-i="' + i + '" title="ลบไฟล์นี้">✕</button></div>';
+    }).join('');
+    box.querySelectorAll('.att-x').forEach(function (b) {
+      b.onclick = function () { _att[id].files.splice(+b.getAttribute('data-i'), 1); renderAttList(id); };
+    });
+  }
+  // วางภาพจากคลิปบอร์ด → ช่องแนบไฟล์ที่ init ล่าสุดและยังแสดงอยู่บนจอ (เช่น modal ที่เปิดทับหน้ารายละเอียด)
+  document.addEventListener('paste', function (e) {
+    var files = e.clipboardData && e.clipboardData.files;
+    if (!files || !files.length) return;
+    var cur = _attOrder.slice().reverse().filter(function (k) { var d = document.getElementById(k + '-drop'); return d && d.offsetParent !== null; })[0];
+    if (!cur) return;
+    e.preventDefault();
+    attAdd(cur, Array.prototype.map.call(files, function (f, i) {
+      // ภาพจากคลิปบอร์ดชื่อซ้ำกันหมด ("image.png") — ตั้งชื่อใหม่ตามเวลา
+      return /^image\.\w+$/i.test(f.name) ? new File([f], 'screenshot_' + Date.now() + '_' + i + '.' + f.name.split('.').pop(), { type: f.type }) : f;
+    }));
+  });
+
 })();

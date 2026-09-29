@@ -16,6 +16,7 @@
 @import './components/table.css';
 @import './components/form.css';
 @import './components/buttons.css';
+@import './components/ai.css';
 
 /* ── Feature Modules ── */
 @import './modules/login.css';

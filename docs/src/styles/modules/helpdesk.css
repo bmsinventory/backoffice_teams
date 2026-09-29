@@ -35,19 +35,6 @@
   #view-helpdesk .hd-chart-grid  { grid-template-columns: 1fr !important; }
 }
 
-/* AI ช่วยวิเคราะห์ */
-.hd-ai-out {
-  margin-top: 8px; padding: 10px 12px;
-  border: 1px solid var(--border); border-left: 3px solid var(--violet);
-  border-radius: 8px; background: var(--surface2); font-size: 12.5px;
-}
-.hd-ai-row {
-  display: flex; align-items: center; gap: 8px;
-  padding: 3px 0; border-bottom: 1px dashed var(--border);
-}
-.hd-ai-row:last-of-type { border-bottom: none; }
-.hd-ai-row > span { flex: 1; }
-.hd-ai-use { flex-shrink: 0; white-space: nowrap; }
 
 /* เครื่องหมายฟิลด์จำเป็น + สถานะกรอกไม่ครบ */
 .hd-req { color: var(--coral); font-weight: 700; }

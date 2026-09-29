@@ -400,6 +400,86 @@
     window.openImtTaskModal(taskId);
   };
 
+  // ── 🤖 AI สรุปภาพรวม: โครงการไหนต้องติดตาม + ควรทำอะไรเพิ่ม — ข้อเท็จจริงทุกตัวคำนวณในโค้ด (สุขภาพโครงการ/
+  // งานเกินกำหนด/ปัญหา/ความเสี่ยง/ความเคลื่อนไหวล่าสุด) ส่งให้ AI วิเคราะห์ · เก็บผลไว้ข้ามการ render ซ้ำ ──
+  var _imtAiOverview = null; // { loading, text, error, at }
+  function imtAiOverviewFacts() {
+    var today = new Date(new Date().toDateString());
+    var dayDiff = function (d) { return Math.round((today - pd(String(d).slice(0,10))) / 86400000); };
+    var rows = window.IMPL_PROJECTS.map(function (p) { return { p:p, h:imtProjectHealth(p) }; })
+      .filter(function (x) { return x.h.level !== 'done' && x.h.level !== 'cancelled'; })
+      .sort(function (a,b) { return IMT_HEALTH_ORDER[a.h.level] - IMT_HEALTH_ORDER[b.h.level] || b.h.overdue - a.h.overdue; });
+    var n = { delayed:0, risk:0, ontrack:0 };
+    rows.forEach(function (x) { n[x.h.level]++; });
+    var lines = ['วันนี้: ' + fd(today.toISOString().slice(0,10)),
+      'โครงการที่ยังไม่เสร็จ ' + rows.length + ' โครงการ: ล่าช้า ' + n.delayed + ' · ต้องติดตามพิเศษ ' + n.risk + ' · ปกติ ' + n.ontrack];
+    rows.slice(0, 30).forEach(function (x, i) {
+      var p = x.p, h = x.h, pid = p.id;
+      var tasks = imtTasksOfProject(pid);
+      var overdueT = tasks.filter(function (t) { return window.imtIsOverdue(t); })
+        .sort(function (a,b) { return (a.due||'').localeCompare(b.due||''); });
+      var stuck = tasks.filter(function (t) { return t.status === 'issue' || t.status === 'review'; });
+      var openIss = (window.IMPL_ISSUES || []).filter(function (s) { return s.projectId === pid && s.status !== 'closed'; });
+      var risks = (window.IMPL_RISKS || []).filter(function (r) { return r.projectId === pid && r.status === 'open'; });
+      var impactLbl = function (id) { return ((window.IMPL_IMPACT || []).find(function (x) { return x.id === id; }) || { label:id }).label; };
+      var acts = (window.IMPL_ACTIVITY_LOG || []).filter(function (a) { return a.projectId === pid; })
+        .sort(function (a,b) { return (b.createdAt||'').localeCompare(a.createdAt||''); });
+      var endTxt = p.end ? (dayDiff(p.end) > 0 ? 'เลยกำหนดจบ ' + dayDiff(p.end) + ' วัน' : 'เหลือ ' + (-dayDiff(p.end)) + ' วันถึงกำหนดจบ') : 'ไม่มีกำหนดจบ';
+      lines.push('', (i + 1) + ') ' + p.name + ' [' + h.label + ']',
+        '   ความคืบหน้า ' + h.progress + '%' + (h.expected !== null ? ' (ตามแผนควรได้ ~' + h.expected + '%)' : '') + ' · ' + endTxt + (p.pm ? ' · ผู้ดูแล ' + p.pm : ''));
+      if (overdueT.length) lines.push('   งานเกินกำหนด ' + overdueT.length + ' งาน: ' + overdueT.slice(0, 3).map(function (t) {
+        return t.name + ' (เกิน ' + dayDiff(t.due) + ' วัน' + (t.owner ? ', ' + t.owner : '') + ')'; }).join('; '));
+      if (h.dueSoon) lines.push('   งานใกล้ครบกำหนดใน 3 วัน ' + h.dueSoon + ' งาน');
+      if (stuck.length) lines.push('   งานสถานะมีปัญหา/รอตรวจสอบ ' + stuck.length + ' งาน: ' + stuck.slice(0, 3).map(function (t) { return t.name + ' (' + imtStatus(t.status).label + ')'; }).join('; '));
+      if (openIss.length) {
+        var oldest = openIss.reduce(function (m, s) { return Math.max(m, dayDiff(s.createdAt || today.toISOString())); }, 0);
+        lines.push('   ปัญหาการใช้งานค้าง ' + openIss.length + ' เรื่อง (ค้างนานสุด ' + oldest + ' วัน)');
+      }
+      if (risks.length) lines.push('   ความเสี่ยงที่ยังเปิดอยู่: ' + risks.slice(0, 3).map(function (r) { return r.title + ' (ผลกระทบ' + impactLbl(r.impact) + ')'; }).join('; '));
+      lines.push('   อัปเดตล่าสุด: ' + (acts.length ? dayDiff(acts[0].createdAt) + ' วันก่อน' : 'ยังไม่มีการอัปเดต'));
+    });
+    if (rows.length > 30) lines.push('', '(และโครงการสถานะปกติอีก ' + (rows.length - 30) + ' โครงการ ไม่ได้แสดงรายละเอียด)');
+    return { text: lines.join('\n'), count: rows.length };
+  }
+  window.imtRunAiOverview = async function () {
+    if (_imtAiOverview && _imtAiOverview.loading) return;
+    var facts = imtAiOverviewFacts();
+    if (!facts.count) { window.showAlert && window.showAlert('ไม่มีโครงการที่ยังไม่เสร็จให้สรุป', 'warn'); return; }
+    _imtAiOverview = { loading:true };
+    window.renderImplTracker();
+    try {
+      var text = await window.aiChat(
+        'คุณเป็นที่ปรึกษา PM โครงการติดตั้งระบบซอฟต์แวร์โรงพยาบาล วิเคราะห์สถานะทุกโครงการจากข้อมูลที่ให้ แล้วเขียนสรุปภาษาไทยสำหรับหัวหน้าทีม '
+        + 'ใช้หัวข้อ "## ภาพรวม" (2–3 bullet), "## โครงการที่ต้องติดตาม" (เรียงจากเร่งด่วนสุด แต่ละ bullet: **ชื่อโครงการ** — ปัญหาหลักที่เห็นจากข้อมูล → สิ่งที่ควรทำทันที), '
+        + '"## คำแนะนำเพิ่มเติม" (3–5 ข้อ เชิงปฏิบัติ เช่น ปรับแผน/เพิ่มคน/นัดประชุมกับ รพ./ติดตามผู้รับผิดชอบ) · '
+        + 'ไม่ต้องใส่โครงการสถานะปกติที่ไม่มีประเด็น · อ้างตัวเลขตามข้อมูลเท่านั้น ห้ามแต่งเพิ่ม · กระชับ',
+        facts.text, { maxTokens: 1500, temperature: 0.3 });
+      _imtAiOverview = { text:text, at:new Date() };
+    } catch (e) {
+      _imtAiOverview = { error:String(e.message || e) };
+    }
+    window.renderImplTracker();
+  };
+  window.imtCloseAiOverview = function () { _imtAiOverview = null; window.renderImplTracker(); };
+  window.imtCopyAiOverview = function () {
+    if (!_imtAiOverview || !_imtAiOverview.text || !navigator.clipboard) return;
+    navigator.clipboard.writeText(_imtAiOverview.text.replace(/\*\*/g, '')).then(function () { window.showAlert && window.showAlert('คัดลอกบทสรุปแล้ว', 'success'); });
+  };
+  function imtAiOverviewHtml() {
+    var s = _imtAiOverview;
+    if (!s) return '';
+    var body = s.loading ? '<div style="color:var(--txt3);font-size:12.5px;">⏳ AI กำลังวิเคราะห์ทุกโครงการ… (อาจใช้เวลาสักครู่)</div>'
+      : s.error ? '<div style="color:var(--coral);font-size:12.5px;">' + esc(s.error) + '</div>'
+      : '<div class="ai-text">' + window.aiTextToHtml(s.text) + '</div>';
+    return '<div class="ai-card" style="margin-bottom:16px;">'
+      + '<div class="ai-card-head"><div class="sec-label" style="margin:0;">🤖 AI สรุปภาพรวม — โครงการที่ต้องติดตาม</div><div style="flex:1"></div>'
+      +   (s.text ? '<button class="btn btn-ghost btn-sm" onclick="window.imtRunAiOverview()">🔁 สรุปใหม่</button><button class="btn btn-ghost btn-sm" onclick="window.imtCopyAiOverview()">📋 คัดลอก</button>' : '')
+      +   '<button class="btn btn-ghost btn-sm" onclick="window.imtCloseAiOverview()">✕</button></div>'
+      + body
+      + (s.text ? '<div class="ai-card-note">* สรุปโดย AI จากข้อมูลในระบบ ณ ' + s.at.toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit' }) + ' น. — ตรวจสอบก่อนนำไปใช้</div>' : '')
+      + '</div>';
+  }
+
   // ================================================================
   // DASHBOARD — ภาพรวมทุกโครงการ (รวม Dashboard เดิม + รายการโครงการ เดิมเป็นหน้าเดียว
   // เป็นมุมมองข้ามโครงการเสมอ ไม่ผูกกับ imtCurrentProjectId)
@@ -479,8 +559,9 @@
     var healthGrid = shown.length ? shown.map(function (x) { return imtHealthCardHtml(x.p, x.h); }).join('')
       : '<div style="grid-column:1/-1;text-align:center;color:var(--txt3);font-size:12px;padding:24px;">ไม่มีโครงการในหมวดนี้</div>';
 
+    var aiBtn = '<button class="btn btn-pri btn-sm imt-ai-btn" onclick="window.imtRunAiOverview()"'+(_imtAiOverview && _imtAiOverview.loading ? ' disabled' : '')+' title="ให้ AI สรุปว่าโครงการไหนต้องติดตาม และควรทำอะไรเพิ่ม">🤖 AI สรุปภาพรวม</button>';
     var healthSection = window.IMPL_PROJECTS.length
-      ? '<div class="imt-health-strip">'+chipsHtml+hideDoneProjectsChk+'</div><div class="imt-pgrid">'+healthGrid+'</div>'
+      ? '<div class="imt-health-strip">'+chipsHtml+hideDoneProjectsChk+aiBtn+'</div>'+imtAiOverviewHtml()+'<div class="imt-pgrid">'+healthGrid+'</div>'
       : '';
 
     var healthById = {};
@@ -1642,6 +1723,102 @@
     if (fixedByEl.value.trim() && fixedDateEl.value) statusEl.value = 'closed';
   };
 
+  // ── AI แนะนำกลุ่มปัญหา + วิธีแก้ — อ้างอิงปัญหาเก่าที่คล้ายกัน (มีวิธีแก้บันทึกไว้แล้ว) จากทุกโครงการ
+  // ให้น้ำหนักโครงการประเภทเดียวกันมากกว่า · แสดงผลเป็นคำแนะนำ มีปุ่ม "ใช้ค่านี้" ให้คนตัดสินใจเองเสมอ ──
+  var _imtAiLast = null;
+  function imtProjectTypeId(pid) { var sp = imtResolveSourceProject(imtProject(pid)); return sp ? sp.typeId : ''; }
+  function imtAiSimilarIssues(text, pid, excludeId) {
+    var myType = imtProjectTypeId(pid), typeCache = {};
+    return (window.IMPL_ISSUES || []).filter(function (x) { return x.id !== excludeId && (x.solution || '').trim(); })
+      .map(function (x) {
+        if (!(x.projectId in typeCache)) typeCache[x.projectId] = imtProjectTypeId(x.projectId);
+        var score = window.aiTextSim(text, x.problem) + (myType && typeCache[x.projectId] === myType ? 0.08 : 0);
+        return { issue: x, score: score };
+      })
+      .filter(function (r) { return r.score >= 0.2; })
+      .sort(function (a, b) { return b.score - a.score; })
+      .slice(0, 5).map(function (r) { return r.issue; });
+  }
+  window.imtAiSuggestIssue = async function (btn) {
+    var out = document.getElementById('imt-is-ai-out');
+    var problem = ((document.getElementById('imt-is-problem') || {}).value || '').trim();
+    if (!out) return;
+    if (!problem) { window.showAlert && window.showAlert('กรอกรายละเอียดปัญหาก่อน', 'warn'); return; }
+    var oldTxt = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ กำลังวิเคราะห์...'; }
+    out.innerHTML = '<div style="font-size:12px;color:var(--txt3);padding:6px 0;">⏳ กำลังวิเคราะห์...</div>';
+    try {
+      var pid = window.imtCurrentProjectId;
+      var cats = imtIssueCategories();
+      var sim = imtAiSimilarIssues(problem, pid, window.imtEditIssueId);
+      var proj = imtProject(pid);
+      var user = 'กลุ่มปัญหาที่เลือกได้ (ตอบชื่อให้ตรงตัวอักษร):\n' + cats.map(function (c) { return '- ' + c; }).join('\n')
+        + '\n\nโครงการ: ' + ((proj && proj.name) || '-')
+        + '\nแผนกที่แจ้ง: ' + (((document.getElementById('imt-is-dept') || {}).value || '').trim() || '-')
+        + '\nรายละเอียดปัญหา: ' + problem.slice(0, 1500)
+        + (sim.length ? '\n\nปัญหาเก่าที่คล้ายกันและวิธีแก้ที่เคยใช้:\n' + sim.map(function (x, n) {
+            return (n + 1) + ') [' + (x.category || '-') + '] ' + String(x.problem).slice(0, 200) + '\n   วิธีแก้: ' + String(x.solution).slice(0, 300);
+          }).join('\n') : '');
+      var res = await window.aiChatJson(
+        'คุณเป็นผู้ช่วยทีมติดตั้งระบบซอฟต์แวร์โรงพยาบาล วิเคราะห์ปัญหาการใช้งานที่ รพ. แจ้ง แล้วตอบ "เฉพาะ JSON" รูปแบบ: '
+        + '{"category":"<ชื่อกลุ่มปัญหาจากรายการ หรือ empty ถ้าไม่แน่ใจ>","solution_hint":"<แนวทางแก้ไขภาษาไทย 1–4 ประโยค>",'
+        + '"confidence":"low|medium|high","reason":"<เหตุผลสั้น ๆ>"} · ถ้ามีปัญหาเก่าที่คล้ายกัน ให้อิงวิธีแก้เหล่านั้นเป็นหลัก',
+        user, { maxTokens: 500 });
+      _imtAiLast = {
+        category: cats.indexOf(res.category) > -1 ? res.category : '',
+        solution: String(res.solution_hint || '').trim(),
+        confidence: res.confidence || '', reason: String(res.reason || '').trim(), similar: sim,
+      };
+      imtAiAutoFill(_imtAiLast);
+      out.innerHTML = imtAiCardHtml(_imtAiLast);
+    } catch (e) {
+      out.innerHTML = '<div class="ai-out" style="color:var(--coral);font-size:12px;">' + esc(String(e.message || e)) + '</div>';
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = oldTxt; }
+    }
+  };
+  function imtAiCardHtml(s) {
+    var conf = { low: 'ต่ำ', medium: 'ปานกลาง', high: 'สูง' }[s.confidence] || s.confidence || '-';
+    var hasSolutionBox = !!document.getElementById('imt-is-solution');
+    var filled = '<span class="ai-use" style="color:var(--teal);font-size:11.5px;font-weight:700;">✓ เติมให้แล้ว</span>';
+    // แบบย่อ 1 บรรทัด (กลุ่มปัญหา) กด "ดูเพิ่มเติม" เพื่อดูแนวทางแก้/ปัญหาเก่าที่คล้ายกัน
+    var filledAny = s.category || (s.solution && hasSolutionBox);
+    return window.aiSuggestHtml({
+      title: 'AI',
+      summary: (s.category ? 'กลุ่ม: ' + esc(s.category) : '<span style="color:var(--txt3);">ไม่แน่ใจกลุ่มปัญหา</span>')
+        + (s.solution ? ' · มีแนวทางแก้' : '') + (filledAny ? ' <span style="color:var(--teal);">✓ เติมให้แล้ว</span>' : ''),
+      actions: s.solution && !hasSolutionBox ? '<button type="button" class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:11px;" onclick="window.imtAiCopyHint()">คัดลอกแนวทางแก้</button>' : '',
+      body: '<div style="color:var(--txt3);font-size:11px;margin:4px 0;">ความมั่นใจ ' + esc(conf) + (s.similar.length ? ' · อ้างอิงปัญหาเก่า ' + s.similar.length + ' รายการ' : '') + '</div>'
+      + '<div class="ai-row"><span>กลุ่มปัญหา: <b>' + esc(s.category || '— AI ไม่แน่ใจ —') + '</b></span>'
+      +   (s.category ? filled : '') + '</div>'
+      + (s.solution ? '<div class="ai-row" style="align-items:flex-start;"><span>แนวทางแก้ไข: ' + esc(s.solution) + '</span>'
+      // แจ้งปัญหาใหม่ยังไม่มีช่อง "วิธีการแก้ไข" → คงปุ่มคัดลอกไว้ให้
+      +   (hasSolutionBox ? filled : '<button type="button" class="btn btn-ghost btn-sm ai-use" onclick="window.imtAiCopyHint()">คัดลอก</button>') + '</div>' : '')
+      + (s.similar.length ? '<details style="font-size:11.5px;margin-top:4px;"><summary style="cursor:pointer;color:var(--txt2);">ปัญหาเก่าที่คล้ายกัน</summary>'
+      +   s.similar.map(function (x) {
+            return '<div style="padding:4px 0;border-bottom:1px dashed var(--border);"><b>' + esc(String(x.problem).slice(0, 120)) + '</b>'
+              + '<div style="color:var(--txt3);">' + esc((imtProject(x.projectId) || {}).name || '') + ' · วิธีแก้: ' + esc(String(x.solution).slice(0, 200)) + '</div></div>';
+          }).join('') + '</details>' : '')
+      + (s.reason ? '<div style="font-size:11px;color:var(--txt3);margin-top:4px;">เหตุผล: ' + esc(s.reason) + '</div>' : '')
+      + '<div style="font-size:10.5px;color:var(--txt3);margin-top:4px;">* AI ช่วยแนะนำเท่านั้น ตรวจสอบก่อนใช้เสมอ</div>',
+    });
+  }
+  // ── เติมกลุ่มปัญหา + วิธีแก้ไขจากผล AI ให้ทันที (ไม่ต้องกดเลือก) พร้อมป้ายสีแดงว่ามาจาก AI ──
+  // วิธีแก้ไข: ช่องว่าง = ใส่ให้เลย · มีข้อความอยู่แล้ว = ต่อท้าย (ไม่ซ้ำถ้ากด AI ซ้ำ) · แจ้งปัญหาใหม่ไม่มีช่องนี้
+  function imtAiAutoFill(s) {
+    var c = document.getElementById('imt-is-cat');
+    if (c && s.category) { c.value = s.category; imtMarkInvalid(c, false); window.aiFlagField(c, c.value === s.category); }
+    var ta = document.getElementById('imt-is-solution');
+    if (ta && s.solution && ta.value.indexOf(s.solution) < 0) {
+      ta.value = ta.value.trim() ? ta.value.trim() + '\n' + s.solution : s.solution;
+      window.aiFlagField(ta, true);
+    }
+  }
+  window.imtAiCopyHint = function () {
+    var s = _imtAiLast; if (!s || !s.solution || !navigator.clipboard) return;
+    navigator.clipboard.writeText(s.solution).then(function () { window.showAlert && window.showAlert('คัดลอกแนวทางแก้ไขแล้ว', 'success'); });
+  };
+
   // ── Add/Edit Modal ──
   window.openImtIssueModal = function (id) {
     window.imtEditIssueId = id;
@@ -1697,7 +1874,9 @@
       +   '<div class="f-group"><label class="f-label">ผู้แจ้งปัญหา <span class="imt-req">*</span></label><input class="f-input" id="imt-is-reported-by" value="'+esc(i.reportedBy)+'" placeholder="ชื่อผู้แจ้ง"></div>'
       +   '<div class="f-group"><label class="f-label">หน่วยงาน/แผนกที่แจ้ง <span class="imt-req">*</span></label><input class="f-input" id="imt-is-dept" value="'+esc(i.department)+'" placeholder="เช่น ห้องจ่ายยา IPD" list="imt-dept-datalist"><datalist id="imt-dept-datalist">'+deptOpts+'</datalist></div>'
       + '</div>'
-      + '<div class="f-group"><label class="f-label">รายละเอียดปัญหา <span class="imt-req">*</span></label><textarea class="f-input" id="imt-is-problem" rows="5">'+esc(i.problem)+'</textarea></div>'
+      + '<div class="f-group"><label class="f-label">รายละเอียดปัญหา <span class="imt-req">*</span></label><textarea class="f-input" id="imt-is-problem" rows="5">'+esc(i.problem)+'</textarea>'
+      +   '<button type="button" class="btn btn-ghost btn-sm" style="margin-top:6px;" onclick="window.imtAiSuggestIssue(this)">🤖 AI แนะนำกลุ่มปัญหา / วิธีแก้</button>'
+      +   '<div id="imt-is-ai-out"></div></div>'
       + '<div class="imt-issue-row3" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">'
       +   '<div class="f-group"><label class="f-label">กลุ่มปัญหา <span class="imt-req">*</span></label><select class="f-input" id="imt-is-cat">'+catOpts+'</select></div>'
       +   '<div class="f-group"><label class="f-label">สถานะ <span class="imt-req">*</span></label><select class="f-input" id="imt-is-status">'+stOpts+'</select></div>'
@@ -2249,9 +2428,6 @@
     var toolbar = '<div class="toolbar">'
       + '<input type="date" class="f-input" id="imt-ai-date" style="max-width:150px;" value="'+esc(aiDate)+'" oninput="window.imtAiSelectedDate=this.value">'
       + '<button class="btn btn-pri btn-sm" onclick="window.imtGenerateAiWeekSummary()">✨ สรุปด้วย AI</button>'
-      // ── ตั้งค่า API Key ให้เฉพาะ Admin เห็น/แก้ได้ — Key ใช้ร่วมกันทั้งระบบผ่านฐานข้อมูลส่วนกลาง (SETTINGS.app.imt_ai_key)
-      // คนอื่นไม่ต้องกรอก Key เองแล้ว จึงไม่มีเหตุผลให้เห็นปุ่มนี้ ──
-      + (window.isAdmin() ? '<button class="btn btn-ghost btn-sm" onclick="window.imtOpenAiKeyModal()" title="ตั้งค่า API Key (Admin เท่านั้น)">🔑 API Key</button>' : '')
       + '<div style="flex:1"></div>'
       + '<button class="btn btn-xls btn-sm" onclick="window.exportImtReport()">📥 Excel</button>'
       + '<button class="btn btn-pri btn-sm" onclick="window.exportImtReportImage()">📷 บันทึกเป็นรูปภาพ</button></div>';
@@ -2480,51 +2656,8 @@
   }
 
   // ================================================================
-  // AI WEEKLY SUMMARY — เลือกวัน → สรุป "ทำไปแล้ว" (วันนั้น) + "ยังไม่ได้ทำ" (สัปดาห์ปัจจุบัน) ด้วย Gemini (ฟรี)
-  // Key เก็บส่วนกลางในฐานข้อมูล (SETTINGS.app.imt_ai_key → window.IMT_AI_KEY ผ่าน realtime.service.js)
-  // เฉพาะ Admin เท่านั้นที่ตั้ง/แก้ Key ได้ (ปุ่ม "🔑 API Key" ซ่อนจาก role อื่นในหน้า Report) ผู้ใช้อื่นทุกคน
-  // ใช้ "สรุปด้วย AI" ได้ทันทีโดยไม่ต้องกรอก Key เอง — ไม่ commit ลง source code (repo นี้เป็น public repo
-  // จึงห้ามฝัง API key ไว้ในซอร์สโค้ดเด็ดขาด แต่เป็น runtime data ไม่ใช่ source code) ──
-  var IMT_AI_KEY_STORAGE = 'imt_gemini_key'; // เดิม (ก่อนย้ายมาเก็บส่วนกลาง) — เก็บไว้แค่ migrate ค่าเก่าครั้งเดียว
-  // ลองหลายโมเดลตามลำดับ เผื่อบางโมเดลโควตาเต็ม/ไม่เปิดให้ใช้กับ Key นี้ (ข้อผิดพลาด 404/429)
-  // — ถ้า Key ผิดหรือไม่มีสิทธิ์เลย (401/403) จะหยุดลองทันทีเพราะโมเดลอื่นก็จะพังเหมือนกัน
-  // "gemini-flash-latest" เป็น alias ที่ Google เปลี่ยนให้ชี้รุ่นล่าสุดเองเรื่อย ๆ ไว้ลองก่อนเป็นด่านแรก
-  // (gemini-1.5-flash ถูกตัดออกแล้ว — Google เลิกรองรับ ทำให้ error "not found for API version v1beta") ──
-  var IMT_AI_MODELS = ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.0-flash'];
-
-  async function imtCallGemini(apiKey, prompt, model) {
-    var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + encodeURIComponent(apiKey);
-    var res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-    });
-    var data = await res.json();
-    if (!res.ok) {
-      var err = new Error((data.error && data.error.message) || ('เรียก AI ไม่สำเร็จ (HTTP ' + res.status + ')'));
-      err.status = res.status;
-      throw err;
-    }
-    var parts = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts;
-    var text = (parts || []).map(function (p) { return p.text || ''; }).join('');
-    if (!text.trim()) throw new Error('ไม่ได้รับข้อความสรุปจาก AI');
-    return text;
-  }
-
-  // ── รายชื่อ IMT_AI_MODELS ข้างบนเป็นชื่อ hardcode — Google ปลดระวางโมเดลเก่าเป็นระยะ (เช่นที่เพิ่งเกิดกับ
-  // gemini-1.5-flash) ทำให้ลิสต์นี้ล้าสมัยได้โดยไม่รู้ตัว ฟังก์ชันนี้ถาม ListModels ตรง ๆ ว่า Key นี้ใช้โมเดล
-  // ไหนกับ generateContent ได้จริงตอนนี้ ใช้เป็นทางสำรองตอนลองทุกชื่อใน IMT_AI_MODELS แล้วไม่ผ่านสักตัว ──
-  async function imtListGeminiModels(apiKey) {
-    var url = 'https://generativelanguage.googleapis.com/v1beta/models?key=' + encodeURIComponent(apiKey);
-    var res = await fetch(url);
-    var data = await res.json();
-    if (!res.ok) throw new Error((data.error && data.error.message) || ('เรียกรายชื่อโมเดลไม่สำเร็จ (HTTP ' + res.status + ')'));
-    return (data.models || [])
-      .filter(function (m) { return (m.supportedGenerationMethods || []).indexOf('generateContent') !== -1; })
-      .map(function (m) { return (m.name || '').replace(/^models\//, ''); })
-      .filter(Boolean);
-  }
-
+  // AI WEEKLY SUMMARY — เลือกวัน → สรุป "ทำไปแล้ว" (วันนั้น) + "ยังไม่ได้ทำ" (สัปดาห์ปัจจุบัน)
+  // ใช้ตัวเรียก AI กลาง (src/services/ai.service.js — vLLM ภายใน ไม่ต้องใช้ API Key) ──
   function imtWeekRange(dateStr) {
     var d = pd(dateStr);
     var dow = d.getDay(); // 0=Sun..6=Sat
@@ -2541,31 +2674,6 @@
     return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
   }
 
-  window.imtOpenAiKeyModal = function () {
-    // ปุ่มเปิด modal นี้ซ่อนจาก non-admin อยู่แล้ว แต่กันเหนียวไว้เผื่อถูกเรียกทางอื่น (defense in depth)
-    if (!window.isAdmin()) { window.showAlert && window.showAlert('เฉพาะ Admin เท่านั้นที่ตั้งค่า API Key ได้', 'error'); return; }
-    var input = document.getElementById('imt-ai-key-input');
-    // เผื่อเครื่องนี้เคยตั้งค่าแบบเดิม (localStorage) ไว้ก่อนย้ายมาเก็บส่วนกลาง — โชว์ให้กรอกต่อได้เลยไม่ต้องหาใหม่
-    if (input) input.value = window.IMT_AI_KEY || localStorage.getItem(IMT_AI_KEY_STORAGE) || '';
-    window.openM('m-imt-ai-key');
-  };
-
-  window.imtSaveAiKey = async function () {
-    if (!window.isAdmin()) { window.showAlert && window.showAlert('เฉพาะ Admin เท่านั้นที่ตั้งค่า API Key ได้', 'error'); return; }
-    var val = (document.getElementById('imt-ai-key-input').value || '').trim();
-    if (!val) { window.showAlert && window.showAlert('กรุณากรอก API Key', 'error'); return; }
-    window.closeM('m-imt-ai-key');
-    window.IMT_AI_KEY = val; // อัปเดตทันทีในเครื่องนี้ ไม่ต้องรอ realtime echo กลับมาก่อนถึงจะใช้ได้
-    try {
-      await window.setDoc(window.getDocRef('SETTINGS', 'app'), { imt_ai_key: val }, { merge:true });
-      localStorage.removeItem(IMT_AI_KEY_STORAGE); // เลิกใช้ค่าเก่าเฉพาะเครื่อง ยึดฐานข้อมูลส่วนกลางเป็นแหล่งเดียวจากนี้ไป
-      window.showAlert && window.showAlert('บันทึก API Key แล้ว — ใช้งานได้ทุกคนในระบบทันที', 'success');
-      if (window.imtAiPendingGenerate) { window.imtAiPendingGenerate = false; window.imtGenerateAiWeekSummary(); }
-    } catch (e) {
-      window.showDbError && window.showDbError(e);
-    }
-  };
-
   window.imtGenerateAiWeekSummary = async function () {
     var pid = window.imtCurrentProjectId;
     var proj = pid ? imtProject(pid) : null;
@@ -2574,15 +2682,6 @@
     var dateInput = document.getElementById('imt-ai-date');
     var selDate = (dateInput && dateInput.value) || new Date().toISOString().slice(0,10);
     window.imtAiSelectedDate = selDate;
-
-    // ── Key ส่วนกลางจากฐานข้อมูล (window.IMT_AI_KEY) — ใช้ได้ทันทีทุก role ไม่ต้องกรอกเอง
-    // ถ้ายังไม่มีค่า: Admin เปิด modal ตั้งค่าได้เลย ส่วน role อื่นแค่แจ้งให้ไปขอ Admin (ไม่มีสิทธิ์ตั้งเอง) ──
-    var apiKey = window.IMT_AI_KEY || '';
-    if (!apiKey) {
-      if (window.isAdmin()) { window.imtAiPendingGenerate = true; window.imtOpenAiKeyModal(); }
-      else { window.showAlert && window.showAlert('ยังไม่ได้ตั้งค่า API Key — กรุณาแจ้ง Admin ให้ตั้งค่าก่อนใช้งานฟีเจอร์นี้', 'warn'); }
-      return;
-    }
 
     var wk = imtWeekRange(selDate);
     var tasks = imtTasksOfProject(pid);
@@ -2609,75 +2708,37 @@
         }).join('\n')
       : '(ไม่มีงานค้างในสัปดาห์นี้)';
 
-    var prompt = 'คุณเป็นผู้ช่วยสรุปความคืบหน้าโครงการ IT ให้ผู้บริหารอ่านทางแชท LINE ได้ทันที เขียนเป็นภาษาไทย กระชับ ทางการแบบเป็นกันเอง ห้ามทักทายหรือลงท้ายด้วยคำถาม\n'
+    var system = 'คุณเป็นผู้ช่วยสรุปความคืบหน้าโครงการ IT ให้ผู้บริหารอ่านทางแชท LINE ได้ทันที เขียนเป็นภาษาไทย กระชับ ทางการแบบเป็นกันเอง ห้ามทักทายหรือลงท้ายด้วยคำถาม\n'
       + 'ห้ามใช้สัญลักษณ์ Markdown เด็ดขาด (ห้ามมี **, ##, - นำหน้าบรรทัด) เพราะ LINE ไม่รองรับ ให้ใช้อีโมจินำหน้าแทนทุกจุด:\n'
       + '- หัวข้อ "สิ่งที่ทำไปแล้ว" ให้ขึ้นต้นด้วย 📌 สิ่งที่ทำไปแล้ว\n'
       + '- หัวข้อ "สิ่งที่ยังไม่ได้ทำ" ให้ขึ้นต้นด้วย ⏳ สิ่งที่ยังไม่ได้ทำ\n'
-      + '- แต่ละรายการย่อยขึ้นต้นด้วย ✅ (ถ้าทำแล้ว) หรือ ▪️ (ถ้ายังไม่ทำ) แทนเครื่องหมาย -\n\n'
-      + 'โครงการ: ' + proj.name + (proj.hospitalName ? ' (' + proj.hospitalName + ')' : '') + '\n'
+      + '- แต่ละรายการย่อยขึ้นต้นด้วย ✅ (ถ้าทำแล้ว) หรือ ▪️ (ถ้ายังไม่ทำ) แทนเครื่องหมาย -\n'
+      + 'เขียนสรุปเป็น 2 หัวข้อตามรูปแบบข้างต้น แบบอ่านง่าย ความยาวรวมไม่เกิน 200 คำ';
+    var user = 'โครงการ: ' + proj.name + (proj.hospitalName ? ' (' + proj.hospitalName + ')' : '') + '\n'
       + 'วันที่เลือกดู: ' + fd(selDate) + '\n'
       + 'สัปดาห์ปัจจุบัน: ' + fd(wk.startStr) + ' - ' + fd(wk.endStr) + '\n\n'
       + 'รายการที่ทำไปแล้วในวันที่ ' + fd(selDate) + ':\n' + doneLines + '\n\n'
-      + 'งานที่ยังไม่เสร็จซึ่งอยู่ในสัปดาห์นี้หรือเลยกำหนดมาแล้ว:\n' + pendingLines + '\n\n'
-      + 'เขียนสรุปเป็น 2 หัวข้อตามรูปแบบข้างต้น แบบอ่านง่าย ความยาวรวมไม่เกิน 200 คำ';
+      + 'งานที่ยังไม่เสร็จซึ่งอยู่ในสัปดาห์นี้หรือเลยกำหนดมาแล้ว:\n' + pendingLines;
 
-    // แสดงผลเป็น Popup แยก (m-imt-ai-summary) แทนกล่องขยายในหน้าเดิม — เปิด popup ทันทีพร้อมสถานะ
-    // กำลังโหลด แล้วค่อยเติมผลลัพธ์ทีหลัง ไม่บังเนื้อหาหลักของหน้า Report ระหว่างรอผล ──
+    // แสดงผลเป็น Popup แยก (m-imt-ai-summary) — เปิดทันทีพร้อมสถานะกำลังโหลด แล้วค่อยเติมผลลัพธ์ทีหลัง ──
     var out = document.getElementById('m-imt-ai-summary-body');
     var foot = document.getElementById('m-imt-ai-summary-foot');
     foot.innerHTML = '';
     out.innerHTML = '<div style="color:var(--txt3);">⏳ กำลังให้ AI สรุปให้...</div>';
     window.openM('m-imt-ai-summary');
 
-    var text = null, lastErr = null, lastModel = null, triedModels = [], rateLimited = false;
-    for (var mi = 0; mi < IMT_AI_MODELS.length; mi++) {
-      try {
-        text = await imtCallGemini(apiKey, prompt, IMT_AI_MODELS[mi]);
-        break;
-      } catch (e) {
-        lastErr = e; lastModel = IMT_AI_MODELS[mi]; triedModels.push(IMT_AI_MODELS[mi]);
-        // 401/403 = Key ผิดหรือไม่มีสิทธิ์ใช้ API นี้เลย — ลองโมเดลอื่นก็จะพังเหมือนกัน หยุดลองทันที
-        if (e.status === 401 || e.status === 403) break;
-        // 429 = rate limit/โควตาผูกกับ "Key นี้ทั้งโปรเจกต์" ไม่ใช่ปัญหาเฉพาะโมเดล — ยิงโมเดลอื่นต่อทันที
-        // จะโดน rate limit ซ้ำเท่านั้น (ยิ่งยิงถี่ยิ่งโดนบล็อกนานขึ้น) จึงหยุดทันทีเหมือน 401/403 ไม่ลองต่อ
-        if (e.status === 429) { rateLimited = true; break; }
-        // 404 (ไม่มีโมเดลนี้จริง ๆ) → ไม่เกี่ยวกับโควตา ลองโมเดลถัดไปในลิสต์ต่อได้
-      }
-    }
-    // ── ถามรายชื่อโมเดลสดจาก Google เฉพาะตอนพังเพราะ "หาโมเดลไม่เจอ" (404, ลิสต์ hardcode ล้าสมัย) เท่านั้น
-    // ถ้าเป็น rate limit (429) การยิง ListModels ซ้ำจะยิ่งโดน rate limit หนักขึ้นเปล่า ๆ ไม่ช่วยอะไรเลย ──
-    if (!text && lastErr && !rateLimited && lastErr.status !== 401 && lastErr.status !== 403) {
-      try {
-        var liveModels = await imtListGeminiModels(apiKey);
-        var candidate = liveModels.find(function (m) { return triedModels.indexOf(m) === -1 && /flash/i.test(m) && !/embedding|vision|tts|image/i.test(m); });
-        if (candidate) {
-          try { text = await imtCallGemini(apiKey, prompt, candidate); lastModel = candidate; }
-          catch (e2) { lastErr = e2; lastModel = candidate; if (e2.status === 429) rateLimited = true; }
-        }
-      } catch (e3) { /* ListModels เองก็พัง (เช่น Key ผิดรูปแบบ) — ปล่อยผ่าน ใช้ lastErr เดิมแสดงผล */ }
-    }
-    if (text) {
+    try {
+      var text = await window.aiChat(system, user, { maxTokens: 700, temperature: 0.3 });
       // กันเหนียว เผื่อโมเดลยังใส่ markdown มาแม้สั่งห้ามแล้ว (LINE แสดงเป็นดอกจัน/สัญลักษณ์ดิบ ไม่ใช่ตัวหนา)
       text = text.replace(/\*\*/g, '').replace(/^#+\s*/gm, '').replace(/^-\s+/gm, '▪️ ');
       out.innerHTML = '<div>' + esc(text).replace(/\n/g,'<br>') + '</div>';
       out.dataset.raw = text;
       foot.innerHTML = '<button class="btn btn-ghost" onclick="window.closeM(\'m-imt-ai-summary\')">ปิด</button>'
         + '<button class="btn btn-teal" onclick="window.imtCopyAiSummary()">📋 คัดลอกส่ง LINE</button>';
-    } else if (rateLimited) {
-      // ── Rate limit ชั่วคราว (429) — Key เดิมใช้ได้ปกติ แค่มีคนเพิ่งกดสรุปด้วย AI ถี่ ๆ ในไม่กี่วินาทีที่ผ่านมา
-      // (โควตาผูกกับ Key เดียวใช้ร่วมกันทั้งระบบแล้ว จึงชนกันง่ายขึ้นกว่าตอนที่ต่างคนต่างมี Key ของตัวเอง)
-      // ไม่ใช่ปัญหา Key ผิด/หมดสิทธิ์ถาวร แค่รอสักครู่แล้วลองใหม่ก็ใช้ได้ ──
-      out.innerHTML = '<div style="color:var(--amber);">⏳ Google จำกัดจำนวนคำขอชั่วคราว (rate limit)</div>'
-        + '<div style="color:var(--txt3);font-size:11.5px;margin-top:6px;">อาจเป็นเพราะมีคนเพิ่งใช้ "สรุปด้วย AI" ถี่ ๆ เมื่อครู่ (Key นี้ใช้ร่วมกันทั้งระบบ) ไม่ใช่ปัญหา Key เสียหรือหมดสิทธิ์ — รอประมาณ 30-60 วินาทีแล้วกด "สรุปด้วย AI" ใหม่อีกครั้ง</div>';
+    } catch (e) {
+      out.innerHTML = '<div style="color:var(--coral);">' + esc(String(e.message || e)) + '</div>';
       foot.innerHTML = '<button class="btn btn-ghost" onclick="window.closeM(\'m-imt-ai-summary\')">ปิด</button>'
         + '<button class="btn btn-pri" onclick="window.imtGenerateAiWeekSummary()">🔁 ลองใหม่</button>';
-    } else {
-      // ── บอกชื่อโมเดลที่พังจริง (lastModel) แทนที่จะบอกแค่ "ลองครบทุกโมเดลแล้ว" เฉย ๆ — ช่วยแยกได้ทันทีว่า
-      // เป็นปัญหา Key/โควตา (จะพังทุกโมเดลเหมือนกันหมด) หรือแค่ชื่อโมเดลตัวสุดท้ายที่ไม่มีอยู่จริงแล้ว ──
-      out.innerHTML = '<div style="color:var(--coral);">เกิดข้อผิดพลาด' + (lastModel ? ' (' + esc(lastModel) + ')' : '') + ': ' + esc((lastErr && lastErr.message) || 'ไม่ทราบสาเหตุ') + '</div>'
-        + '<div style="color:var(--txt3);font-size:11.5px;margin-top:6px;">ลองครบทุกโมเดลที่รองรับแล้วไม่สำเร็จ (รวมถามรายชื่อโมเดลล่าสุดจาก Google โดยตรงแล้วด้วย) — ถ้าเจอ "quota exceeded, limit: 0" แปลว่า API Key นี้ผูกกับโปรเจกต์ Google Cloud ที่ไม่มีสิทธิ์ใช้งานฟรี ลองสร้าง Key ใหม่ที่ '
-        +   '<a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> โดยเลือก "Create API key in new project" (โปรเจกต์ที่ยังไม่เคยผูก Billing มาก่อน)</div>';
-      foot.innerHTML = '<button class="btn btn-ghost" onclick="window.closeM(\'m-imt-ai-summary\')">ปิด</button>';
     }
   };
 

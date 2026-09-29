@@ -282,15 +282,16 @@ window.openProjModal=function(id){
   var memberRows=mems.map(function(m){var st=gSt(m.sid);var j=window.STAFF.findIndex(function(s){return s.id===m.sid;});var overlaps=getStaffOverlaps(m.sid,m.s,m.e,window.editPid);var warnText=overlaps.length>0?overlapWarnText(overlaps):'';return`<div class="m-row" id="mr-${m.id}" data-sid="${m.sid}" style="padding:7px 8px;border-radius:8px;margin-bottom:4px;background:var(--surface2);"><div style="display:flex;align-items:center;gap:7px;"><div style="width:26px;height:26px;border-radius:50%;background:${avC(Math.max(j,0))};color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${st.name.charAt(0)}</div><span style="flex:1;font-size:11px;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${esc(st.name)}${st.nickname?` <span style="color:var(--txt3);font-weight:400;">(${esc(st.nickname)})</span>`:''}</span>${window.canEdit('projects')?`<button class="btn btn-red btn-sm pku-x-btn" style="padding:2px 7px;font-size:11px;" onclick="window.pkuDeselect('${m.id}')">✕</button>`:''}</div>${window.canEdit('projects')?`<input type="hidden" id="msid-${m.id}" value="${m.sid}"><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:5px;padding-left:33px;">${window.beDateField('ms-'+m.id,m.s,{onchange:"window.checkMemOverlap('"+m.id+"')",dispStyle:'padding:4px 6px;font-size:10px;'})}${window.beDateField('me-'+m.id,m.e,{onchange:"window.checkMemOverlap('"+m.id+"')",dispStyle:'padding:4px 6px;font-size:10px;'})}</div><div id="mwarn-${m.id}" style="font-size:10px;color:var(--coral);margin-top:3px;padding-left:33px;display:${warnText?'block':'none'}">${warnText}</div>`:''}</div>`;}).join('');
   var ce=window.canEdit('projects'),ceA=ce?'':'disabled';
   var hasDates=!!(p&&p.start&&p.end)||mems.length>0;
+  // ปุ่มจัดงานอัจฉริยะ — ปุ่มเล็กชิดขวาในแถบแท็บ (เฉพาะตอนสร้างโครงการใหม่) แทนแถบใหญ่เต็มแถวเดิม
+  var smartBtn=(!p&&ce)?'<button type="button" onclick="window.openSmartSchedule()" title="ค้นหาช่วงเวลาว่างและทีมงานอัตโนมัติ" style="margin-left:auto;padding:6px 12px;background:linear-gradient(135deg,#7c5cfc,#4361ee);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;">🤖 จัดงานอัจฉริยะ</button>':'';
   var tabBar='<div id="pf-tabs" style="display:flex;gap:6px;align-items:center;padding:12px 24px;border-bottom:1px solid var(--border);margin:-24px -24px 20px;background:var(--surface);position:sticky;top:-24px;z-index:5;">'
     +'<button class="pf-tab-btn" data-tab="info" onclick="window.pfTab(\'info\')" style="background:var(--violet);color:#fff;border:1px solid var(--violet);border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;">📋 ข้อมูลโครงการ</button>'
     +'<button id="pf-tab-team-btn" class="pf-tab-btn" data-tab="team" onclick="window.pfTab(\'team\')" style="background:var(--surface2);color:var(--txt2);border:1px solid var(--border);border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;display:'+(hasDates?'':'none')+';">👥 ทีมงาน'+(mems.length>0?' ('+mems.length+')':'')+'</button>'
     +'<button class="pf-tab-btn" data-tab="visits" onclick="window.pfTab(\'visits\')" style="background:var(--surface2);color:var(--txt2);border:1px solid var(--border);border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;">📍 รอบเข้าไซต์หลายช่วง'+(p&&p.visits&&p.visits.length>0?' ('+p.visits.length+')':'')+'</button>'
+    +smartBtn
     +progTabHtml
     +'</div>';
-  var smartBtn=(!p&&ce)?'<div style="margin-bottom:16px;"><button type="button" onclick="window.openSmartSchedule()" style="width:100%;padding:11px 16px;background:linear-gradient(135deg,#7c5cfc,#4361ee);color:#fff;border:none;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 14px rgba(124,92,252,.35);"><span style="font-size:18px;">🤖</span><span>จัดงานอัจฉริยะ</span><span style="font-size:11px;font-weight:400;opacity:.85;">— ค้นหาช่วงเวลาว่างและทีมงานอัตโนมัติ</span></button></div>':'';
   var infoPane='<div id="pf-pane-info">'
-    +smartBtn
     +'<div class="f-group"><label class="f-label">ชื่อโครงการ *</label><input class="f-input" id="pf-name" value="'+esc(p?p.name:'')+'" placeholder="ชื่อโครงการ" '+ceA+'></div>'
     +'<input type="hidden" id="pf-stg" value="'+(p?p.stage:(window.STAGES.length?window.STAGES[0].id:''))+'">'
     +'<div class="f-grid">'
@@ -688,7 +689,10 @@ window.runSmartSchedule = function() {
   window._ssSlots=slots;
   var top=slots.slice(0,5);
   if(!top.length||top[0].freeStaff.length===0){resEl.innerHTML='<div style="color:var(--amber);font-size:12px;text-align:center;padding:16px;">⚠ ไม่พบช่วงเวลาที่พนักงานว่างพร้อมกัน ลองเพิ่มสัปดาห์ค้นหาหรือลดจำนวนแผนก</div>';return;}
-  var html='<div style="font-size:11px;font-weight:600;color:var(--txt3);margin-bottom:10px;">ผลลัพธ์ที่แนะนำ (เรียงตามความพร้อมของทีม)</div>';
+  var html='<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;">'
+    +'<div style="font-size:11px;font-weight:600;color:var(--txt3);">ผลลัพธ์ที่แนะนำ (เรียงตามความพร้อมของทีม)</div>'
+    +'<button class="btn btn-pri btn-sm" style="white-space:nowrap;" onclick="window.ssAiRecommend(this)" title="ให้ AI เลือกช่วงเวลาและคนที่เหมาะสม (ไม่ต้องใส่ทุกคนที่ว่าง)">🤖 ให้ AI ช่วยเลือก</button>'
+    +'</div><div id="ss-ai"></div>';
   top.forEach(function(r,i){
     var freeNm=r.freeStaff.map(function(s){return s.nickname||s.name.split(' ')[0];}).join(', ');
     var borderCol=i===0?'var(--teal)':i===1?'var(--violet)':'var(--border)';
@@ -708,7 +712,92 @@ window.runSmartSchedule = function() {
   resEl.innerHTML=html;
 };
 
-window.applySmartSlot = function(idx) {
+// ── 🤖 AI ช่วยเลือกช่วงเวลา + คนที่เหมาะสม จากผลค้นหา 5 ช่วงแรก — ข้อเท็จจริงคำนวณในโค้ด (คนว่างจริงต่อช่วง,
+// ประสบการณ์ประเภทงานนี้, งานก่อน/หลังช่วงนั้น 30 วัน, ขนาดทีมเฉลี่ยของประเภทนี้) · AI เลือกได้เฉพาะคนที่ "ว่าง"
+// ในช่วงที่เลือกเท่านั้น (ตรวจซ้ำในโค้ดอีกชั้น) · กดใช้ = ใส่วันที่ + เฉพาะคนที่ AI แนะนำ แทนการใส่ทุกคนที่ว่าง ──
+function ssStaffLabel(s){ return s.name+(s.nickname&&s.nickname!==s.name?' ('+s.nickname+')':''); }
+function ssProjDaysAround(sid, from, to){
+  // วันที่มีงานโครงการอื่น (นับวันปฏิทิน) ในช่วง from–to — ใช้ดูภาระก่อน/หลังช่วงที่จะไป
+  var n=0;
+  (window.PROJECTS||[]).forEach(function(p){
+    if(p.status==='cancelled'||p.id===window.editPid)return;
+    var mems=(p.members&&p.members.length)?p.members:(p.team||[]).map(function(id){return{sid:id,s:p.start,e:p.end};});
+    mems.filter(function(m){return m.sid===sid&&m.s&&m.e;}).forEach(function(m){
+      var s=pd(m.s),e=pd(m.e);if(s<from)s=new Date(from);if(e>to)e=new Date(to);
+      if(e>=s)n+=Math.round((e-s)/86400000)+1;
+    });
+  });
+  return n;
+}
+window.ssAiRecommend = async function(btn) {
+  var out=document.getElementById('ss-ai');if(!out)return;
+  var slots=(window._ssSlots||[]).slice(0,5).filter(function(r){return r.freeStaff.length;});
+  if(!slots.length)return;
+  var typeId=((document.getElementById('pf-type-modal')||document.getElementById('pf-type')||{}).value)||'';
+  var typeLbl=(gT(typeId)||{}).label||'';
+  // ขนาดทีมเฉลี่ยของโครงการประเภทเดียวกันในอดีต
+  var sameType=(window.PROJECTS||[]).filter(function(p){return p.typeId===typeId&&p.id!==window.editPid&&p.status!=='cancelled';});
+  var sizes=sameType.map(function(p){return(p.members&&p.members.length)?p.members.length:(p.team||[]).length;}).filter(function(n){return n>0;});
+  var avgTeam=sizes.length?Math.round(sizes.reduce(function(a,b){return a+b;},0)/sizes.length*10)/10:0;
+  var exp=function(sid){return sameType.filter(function(p){return(p.members||[]).some(function(m){return m.sid===sid;})||(p.team||[]).indexOf(sid)>-1;}).length;};
+  var lines=['โครงการ: '+(((document.getElementById('pf-name')||{}).value)||'(ยังไม่ตั้งชื่อ)')
+    +(typeLbl?' · ประเภท '+typeLbl:'')+(((document.getElementById('pf-owner')||{}).value)?' · สถานที่ '+document.getElementById('pf-owner').value:''),
+    'ขนาดทีมเฉลี่ยของโครงการประเภทนี้ในอดีต: '+(avgTeam?avgTeam+' คน (จาก '+sizes.length+' โครงการ)':'ไม่มีข้อมูล')];
+  slots.forEach(function(r,i){
+    var s=pd(r.start),e=pd(r.end);
+    var b0=new Date(s);b0.setDate(b0.getDate()-30);var b1=new Date(s);b1.setDate(b1.getDate()-1);
+    var a0=new Date(e);a0.setDate(a0.getDate()+1);var a1=new Date(e);a1.setDate(a1.getDate()+30);
+    lines.push('','ช่วงที่ '+(i+1)+': '+fd(r.start)+' – '+fd(r.end)+(r.holCnt?' · มีวันหยุด '+r.holCnt+' วัน':'')+' · ติดงานอื่น '+r.busyStaff.length+' คน',
+      '  คนที่ว่างตลอดช่วง ('+r.freeStaff.length+' คน):');
+    r.freeStaff.slice(0,25).forEach(function(st){
+      lines.push('  - '+ssStaffLabel(st)+(st.role?' · '+st.role:'')+(st.dept?' · '+st.dept:'')
+        +' | เคยทำประเภทนี้ '+exp(st.id)+' ครั้ง | งาน 30 วันก่อนช่วง '+ssProjDaysAround(st.id,b0,b1)+' วัน, 30 วันหลังช่วง '+ssProjDaysAround(st.id,a0,a1)+' วัน');
+    });
+  });
+  var old=btn?btn.textContent:'';
+  if(btn){btn.disabled=true;btn.textContent='⏳ AI กำลังวิเคราะห์...';}
+  out.innerHTML='<div class="ai-out" style="margin-bottom:10px;font-size:12px;color:var(--txt3);">⏳ AI กำลังเลือกช่วงเวลาและทีมที่เหมาะสม...</div>';
+  try{
+    var r=await window.aiChatJson(
+      'คุณเป็นผู้ช่วยหัวหน้าทีมติดตั้งระบบซอฟต์แวร์โรงพยาบาล เลือกช่วงเวลาและทีมที่เหมาะสมที่สุดสำหรับโครงการจากข้อมูลที่ให้ '
+      +'พิจารณา: จำนวนคนพอ (อิงขนาดทีมเฉลี่ย ถ้าไม่มีข้อมูลให้ 2 คน), มีคนเคยทำประเภทนี้อย่างน้อย 1 คน, กระจายงานให้คนที่งานก่อน/หลังช่วงน้อย ไม่ให้คนเดิมทำงานติดกันหนัก, วันหยุดในช่วง, เริ่มเร็วดีกว่าถ้าเงื่อนไขใกล้เคียงกัน '
+      +'ตอบ "เฉพาะ JSON": {"slot":<เลขช่วง>,"team":["<ชื่อตามที่ให้ทุกตัวอักษร>"],"lead":"<ชื่อหัวหน้าทีมจาก team>","summary":"<สรุป 1–2 ประโยค>",'
+      +'"reasons":["<เหตุผลสั้น ๆ>"],"warnings":["<ข้อควรระวัง ถ้ามี>"]} · ภาษาไทย · team ต้องเลือกจาก "คนที่ว่างตลอดช่วง" ของช่วงนั้นเท่านั้น ห้ามแต่งชื่อ',
+      lines.join('\n'),{maxTokens:700});
+    var idx=(parseInt(r.slot,10)||1)-1;var slot=slots[idx];
+    if(!slot)throw new Error('AI เลือกช่วงเวลาไม่ถูกต้อง — ลองใหม่อีกครั้ง');
+    // ตรวจซ้ำ: เก็บเฉพาะชื่อที่อยู่ในรายชื่อคนว่างของช่วงนั้นจริง
+    var byLabel={};slot.freeStaff.forEach(function(st){byLabel[ssStaffLabel(st)]=st;byLabel[st.name]=st;if(st.nickname)byLabel[st.nickname]=st;});
+    var team=[];(r.team||[]).forEach(function(n){var st=byLabel[String(n).trim()];if(st&&team.indexOf(st)<0)team.push(st);});
+    if(!team.length)throw new Error('AI ไม่ได้เลือกทีมจากรายชื่อที่ว่าง — ลองใหม่อีกครั้ง');
+    var lead=byLabel[String(r.lead||'').trim()];
+    if(lead&&team.indexOf(lead)>0){team.splice(team.indexOf(lead),1);team.unshift(lead);} // หัวหน้าทีมไว้ลำดับแรก
+    window._ssAi={slotIdx:window._ssSlots.indexOf(slot),team:team};
+    var li=function(a){return(a||[]).filter(Boolean).map(function(x){return'<li>'+esc(String(x))+'</li>';}).join('');};
+    // แบบย่อ 1 บรรทัด (ช่วงวัน · จำนวนคน + ปุ่มใช้) กด "ดูเพิ่มเติม" เพื่อดูรายชื่อ/เหตุผล/ข้อควรระวัง
+    out.innerHTML='<div style="margin-bottom:10px;">'+window.aiSuggestHtml({
+      title:'AI แนะนำ',
+      open:true, // ผู้ใช้กดขอคำแนะนำเอง — แสดงรายชื่อ/เหตุผลเต็มทันที
+      summary:'📅 '+fd(slot.start)+' → '+fd(slot.end)+' · 👥 '+team.length+' คน',
+      actions:'<button class="btn btn-teal btn-sm" style="padding:3px 10px;font-size:11px;" onclick="window.ssApplyAi()">✓ ใช้ตามนี้</button>',
+      body:'<div style="font-size:12.5px;margin:6px 0 4px;">👥 '+team.map(function(st,i){return esc(ssStaffLabel(st))+(i===0&&lead?' <span style="color:var(--violet);font-size:11px;">(หัวหน้าทีม)</span>':'');}).join(', ')+'</div>'
+        +(r.summary?'<div style="font-size:12px;margin-bottom:4px;">'+esc(r.summary)+'</div>':'')
+        +((r.reasons||[]).length?'<ul style="margin:0 0 4px;padding-left:18px;font-size:12px;">'+li(r.reasons)+'</ul>':'')
+        +((r.warnings||[]).filter(Boolean).length?'<div style="font-size:11.5px;color:var(--amber);">⚠ '+(r.warnings||[]).filter(Boolean).map(function(w){return esc(String(w));}).join(' · ')+'</div>':'')
+        +'<div style="font-size:10.5px;color:var(--txt3);margin-top:6px;">* AI ช่วยแนะนำเท่านั้น ปรับทีมต่อได้ในแท็บทีมงาน</div>',
+    })+'</div>';
+  }catch(e){
+    out.innerHTML='<div class="ai-out" style="margin-bottom:10px;color:var(--coral);font-size:12px;">'+esc(String(e.message||e))+'</div>';
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent=old;}
+  }
+};
+window.ssApplyAi = function() {
+  var a=window._ssAi;if(!a)return;
+  window.applySmartSlot(a.slotIdx,a.team);
+};
+
+window.applySmartSlot = function(idx, onlyStaff) {
   var r=window._ssSlots[idx];if(!r)return;
   var startEl=document.getElementById('pf-start');var endEl=document.getElementById('pf-end');
   if(startEl)startEl.value=r.start;
@@ -717,15 +806,16 @@ window.applySmartSlot = function(idx) {
   if(startEl)startEl.dispatchEvent(new Event('change'));
   if(endEl)endEl.dispatchEvent(new Event('change'));
   window.updateTeamTabVisibility();
-  // Add free staff to team (silent, no duplicate)
-  r.freeStaff.forEach(function(s){
+  // Add staff to team (silent, no duplicate) — onlyStaff = ทีมที่ AI เลือก, ไม่ส่งมา = ใส่ทุกคนที่ว่าง (แบบเดิม)
+  var team=onlyStaff||r.freeStaff;
+  team.forEach(function(s){
     var existing=document.querySelector('#mem-list .m-row[data-sid="'+s.id+'"]');
     if(!existing)window.pkuSelect(s.id);
   });
   // Switch to team tab
   setTimeout(function(){window.pfTab('team');},50);
   var ov=document.getElementById('ss-overlay');if(ov)ov.remove();
-  window.showAlert('กำหนดช่วง '+fd(r.start)+' → '+fd(r.end)+'\nทีมงาน '+r.freeStaff.length+' คนเรียบร้อย ✓','success');
+  window.showAlert('กำหนดช่วง '+fd(r.start)+' → '+fd(r.end)+'\nทีมงาน '+team.length+' คนเรียบร้อย ✓','success');
 };
 
 window.saveProject=async function(){
