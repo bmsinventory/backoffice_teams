@@ -4,7 +4,8 @@ COPY docs/ /usr/share/nginx/html/
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 
-RUN chmod +x /docker-entrypoint.sh
+# ตัด CR (CRLF จากการ checkout บน Windows) กัน container สตาร์ทไม่ขึ้น: "exec /docker-entrypoint.sh: no such file or directory"
+RUN sed -i 's/\r$//' /docker-entrypoint.sh && chmod +x /docker-entrypoint.sh
 
 ENV SUPABASE_URL=""
 ENV SUPABASE_ANON_KEY=""

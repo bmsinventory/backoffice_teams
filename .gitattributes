@@ -1,0 +1,2 @@
+# shell scripts ต้องเป็น LF เสมอ — CRLF ทำให้ container รัน /docker-entrypoint.sh ไม่ได้ ("no such file or directory")
+*.sh text eol=lf
