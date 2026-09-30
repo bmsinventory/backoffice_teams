@@ -1668,33 +1668,32 @@
       + '</div>';
 
     var rows = imtFilteredIssues(pid);
-    // ── "ลำดับ" เป็นคอลัมน์แรกตามปกติ (ธรรมเนียมตาราง) — บนมือถือที่ .m-card-table ใช้คอลัมน์แรกเป็น
-    // หัวการ์ดโดย default นั้นไม่เหมาะกับ "ลำดับ" (แค่ตัวเลข ไม่สื่อความหมาย) จึงจัดการแยกเฉพาะจุดผ่าน
-    // class "imt-issues-tbl"/"imt-card-title" แทนการสลับลำดับคอลัมน์จริง — ดู responsive override ใน
-    // impl-tracker.css ที่คืนคอลัมน์แรกเป็นช่องปกติ แล้วเลื่อนสิทธิ์ "หัวการ์ด" มาให้ td.imt-card-title
-    // (ปัญหา) แทน โดยไม่กระทบลำดับคอลัมน์ desktop หรือ .m-card-table ตารางอื่นในแอป ──
-    var rowsHtml = rows.map(function (i, idx) {
+    // ── รายการปัญหาแบบการ์ด (แทนตาราง 10 คอลัมน์ที่อ่านยากและไม่เห็นวิธีแก้) — ใช้เลย์เอาต์เดียวกันทั้งคอม/มือถือ
+    // หัวการ์ด: ลำดับ · สถานะ · กลุ่มปัญหา · วันที่รับ | เนื้อหา: ❓ ปัญหา คู่ 💡 วิธีการแก้ไข (จอกว้างวางข้างกัน
+    // มือถือเรียงบน-ล่าง) | ท้ายการ์ด: หน่วยงาน · ผู้แจ้ง · ผู้รับ · ผู้แก้ไข+วันที่ (ชื่อไม่มีคำนำหน้า ให้สั้น) ──
+    var nm = function (ref) { return window.nameKey(window.staffNameByRef(ref)); };
+    var cardsHtml = rows.map(function (i, idx) {
       var st = imtIssueStatus(i.status);
-      return '<tr onclick="window.openImtIssueModal(\''+i.id+'\')">'
-        + '<td style="text-align:center;">'+(idx + 1)+'</td>'
-        + '<td class="imt-card-title" style="min-width:220px;max-width:420px;white-space:normal;overflow-wrap:anywhere;">'+esc(i.problem)+'</td>'
-        + '<td>'+statusTag(st)+'</td>'
-        + '<td style="white-space:nowrap;">'+fd(i.createdAt)+'</td>'
-        + '<td><span class="tag">'+esc(i.category||'-')+'</span></td>'
-        + '<td>'+esc(i.reportedBy||'-')+'</td>'
-        + '<td>'+esc(i.department||'-')+'</td>'
-        + '<td>'+esc(i.receivedBy||'-')+'</td>'
-        + '<td>'+esc(i.fixedBy ? imtStaffNameByNick(i.fixedBy) : '-')+'</td>'
-        + '<td style="white-space:nowrap;">'+(i.fixedDate?fd(i.fixedDate):'-')+'</td>'
-        + '</tr>';
-    }).join('') || '<tr><td colspan="10" style="text-align:center;color:var(--txt3);padding:30px;">ยังไม่มีปัญหาที่บันทึกไว้ในโครงการนี้</td></tr>';
-
-    var table = '<div class="dtable-inner"><table class="imt-issues-tbl"><thead><tr>'
-      + '<th>ลำดับ</th><th>ปัญหา</th><th>สถานะ</th><th>วันที่รับ</th><th>กลุ่มปัญหา</th><th>ผู้แจ้ง</th><th>หน่วยงาน</th><th>ผู้รับปัญหา</th><th>ผู้แก้ไข</th><th>วันที่แก้ไข</th>'
-      + '</tr></thead><tbody>'+rowsHtml+'</tbody></table></div>';
+      var meta = [
+        i.department ? '🏥 ' + esc(i.department) : '',
+        i.reportedBy ? '👤 ผู้แจ้ง ' + esc(i.reportedBy) : '',
+        i.receivedById ? '📥 รับโดย ' + esc(nm(i.receivedById)) : '',
+        i.fixedById ? '🔧 แก้โดย ' + esc(nm(i.fixedById)) + (i.fixedDate ? ' · ' + fd(i.fixedDate) : '') : '',
+      ].filter(Boolean).map(function (x) { return '<span>' + x + '</span>'; }).join('');
+      return '<div class="imt-iss-card" onclick="window.openImtIssueModal(\''+i.id+'\')">'
+        + '<div class="imt-iss-head"><span class="imt-iss-no">#' + (idx + 1) + '</span>' + statusTag(st)
+        +   (i.category ? '<span class="imt-iss-cat">' + esc(i.category) + '</span>' : '')
+        +   '<span class="imt-iss-date">📅 ' + fd(i.createdAt) + '</span></div>'
+        + '<div class="imt-iss-body">'
+        +   '<div class="imt-iss-box prob"><div class="imt-iss-lbl">❓ ปัญหา</div><div class="imt-iss-txt">' + esc(i.problem || '-') + '</div></div>'
+        +   '<div class="imt-iss-box sol' + (i.solution ? '' : ' empty') + '"><div class="imt-iss-lbl">💡 วิธีการแก้ไข</div><div class="imt-iss-txt">' + (i.solution ? esc(i.solution) : 'ยังไม่ได้บันทึกวิธีแก้') + '</div></div>'
+        + '</div>'
+        + (meta ? '<div class="imt-iss-meta">' + meta + '</div>' : '')
+        + '</div>';
+    }).join('') || '<div class="imt-iss-empty">' + (all.length ? 'ไม่มีปัญหาที่ตรงตัวกรอง' : 'ยังไม่มีปัญหาที่บันทึกไว้ในโครงการนี้') + '</div>';
 
     mount.innerHTML = header + kpis + filterBar
-      + '<div class="imt-ws-scroll" style="padding:0 24px 24px;overflow-y:auto;flex:1;">'+table+'</div>'
+      + '<div class="imt-ws-scroll imt-iss-list" style="padding:0 24px 24px;overflow-y:auto;flex:1;">'+cardsHtml+'</div>'
       + '<div class="imt-print-only" id="imt-issue-print-doc"></div>';
   }
 
