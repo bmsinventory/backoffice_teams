@@ -2143,8 +2143,9 @@
         + '<td>'+esc(i.category||'-')+'</td>'
         + '<td>'+esc(st.label)+'</td>'
         + '<td>'+esc(i.solution||'—')+'</td>'
-        + '<td>'+esc(i.receivedBy||'—')+'</td>'
-        + '<td>'+esc(i.fixedBy ? imtStaffNameByNick(i.fixedBy) : '—')+'</td>'
+        // ผู้รับปัญหา/ผู้แก้ไข: ชื่อ-นามสกุลไม่มีคำนำหน้า (nameKey ตัด นาย/นาง/นางสาว/น.ส.)
+        + '<td>'+esc(window.nameKey(window.staffNameByRef(i.receivedById)) || '—')+'</td>'
+        + '<td>'+esc(window.nameKey(window.staffNameByRef(i.fixedById)) || '—')+'</td>'
         + '<td class="dt">'+(i.fixedDate?fd(i.fixedDate):'—')+'</td>'
         + '</tr>';
     }).join('') || '<tr><td colspan="10" style="text-align:center;color:#888;padding:16px;">ไม่มีข้อมูลในช่วงที่เลือก</td></tr>';
@@ -2159,10 +2160,13 @@
       +   '<colgroup><col style="width:4%"><col style="width:8%"><col style="width:9%"><col style="width:19%">'
       +   '<col style="width:8%"><col style="width:8%"><col style="width:19%"><col style="width:8%">'
       +   '<col style="width:8%"><col style="width:9%"></colgroup>'
-      +   '<thead><tr>'
+      // ── แถวเว้นระยะ (.sp) ใน thead/tfoot — browser พิมพ์ thead/tfoot ซ้ำทุกหน้า จึงได้ระยะขอบบน/ล่างทุกแผ่น
+      // (@page margin เป็น 0 กันหัว/ท้ายกระดาษของ browser · padding ของกล่องเอกสารมีผลแค่ต้นแผ่นแรก/ท้ายแผ่นสุดท้าย
+      // แผ่นที่ 2 เป็นต้นไปเลยชิดขอบกระดาษ) ──
+      +   '<thead><tr class="sp"><th colspan="10"></th></tr><tr>'
       +   '<th>ลำดับ</th><th>วันที่รับปัญหา</th><th>หน่วยงาน</th><th>ปัญหา</th><th>กลุ่มปัญหา</th><th>สถานะ</th>'
       +   '<th>วิธีการแก้ไข</th><th>ผู้รับปัญหา</th><th>ผู้แก้ไข</th><th>วันที่แก้ไขปัญหา</th>'
-      + '</tr></thead><tbody>'+trs+'</tbody></table>'
+      + '</tr></thead><tfoot><tr class="sp"><td colspan="10"></td></tr></tfoot><tbody>'+trs+'</tbody></table>'
       + '<div class="imt-idoc-sign">'
       +   '<div class="imt-idoc-sb"><div class="imt-idoc-line"></div><div class="imt-idoc-nm">('+esc(opts.signLName||'')+')</div><div>ตำแหน่ง '+esc(opts.signLPos||'')+'</div><div>'+esc(opts.signLOrg||'')+'</div></div>'
       +   '<div class="imt-idoc-sb"><div class="imt-idoc-line"></div><div class="imt-idoc-nm">('+esc(opts.signRName||'')+')</div><div>ตำแหน่ง '+esc(opts.signRPos||'')+'</div><div>'+esc(opts.signROrg||'')+'</div></div>'

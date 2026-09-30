@@ -337,7 +337,9 @@
    ยาว/สั้น — คู่กับ overflow-wrap ให้ข้อความยาว (ปัญหา/วิธีการแก้ไข) ตัดบรรทัดอยู่ในคอลัมน์ ไม่ดันตาราง
    กว้างล้นหน้ากระดาษ A4 แนวนอนออกไป — overflow:hidden กันเคสคอลัมน์แคบมาก (ลำดับ/วันที่) ที่ข้อความ
    ตัดบรรทัดแล้วยังกว้างเกิน cell อยู่ดี ไม่ให้ล้นทับตัวหนังสือคอลัมน์ข้าง ๆ ── */
-.imt-idoc-tbl { width: 100%; table-layout: fixed; font-size: 12px; border-collapse: collapse; border: 1px solid #333; color: #000; }
+.imt-idoc-tbl { width: 100%; table-layout: fixed; font-size: 12px; border-collapse: collapse; color: #000; } /* ไม่มีกรอบรอบตาราง — ทุกเซลล์มีกรอบเองแล้ว (กรอบนอกจะครอบแถวเว้นระยะ .sp ด้วย) */
+/* แถวเว้นระยะขอบบน/ล่างของทุกแผ่นตอนพิมพ์ (อยู่ใน thead/tfoot ที่พิมพ์ซ้ำทุกหน้า) — ไม่มีกรอบ/พื้นหลัง */
+.imt-idoc-tbl tr.sp th, .imt-idoc-tbl tr.sp td { height: 10mm; padding: 0; border: none; background: none; }
 .imt-idoc-tbl th, .imt-idoc-tbl td { border: 1px solid #333; padding: 5px 6px; text-align: left; vertical-align: top; overflow-wrap: break-word; word-break: break-word; overflow: hidden; }
 .imt-idoc-tbl th { background: #cfe2f3; font-weight: 700; text-align: center; font-size: 12px; color: #000; }
 .imt-idoc-tbl td.n  { text-align: center; }
