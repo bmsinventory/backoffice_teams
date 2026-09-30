@@ -329,7 +329,7 @@
 /* บังคับฟอนต์เอกสารราชการไทย TH SarabunPSK — ใช้ได้ต่อเมื่อเครื่องที่สั่งพิมพ์ลงฟอนต์นี้ไว้แล้ว
    (ฟอนต์ระบบ ไม่ใช่ web font ไม่ต้องโหลดจากเน็ต) ไม่มีก็ fallback ไปฟอนต์ไทยทั่วไปที่มักมีอยู่แล้ว ──
    font-family บน .imt-idoc สืบทอดลงลูกทุกตัว (หัวเรื่อง/ตาราง/ช่องเซ็นชื่อ) โดยไม่ต้องตั้งซ้ำ */
-.imt-idoc { font-family: 'TH SarabunPSK', 'TH Sarabun New', 'Sarabun', Tahoma, sans-serif; color: #000; font-size: 12px; background: #fff; padding: 6px; }
+.imt-idoc { font-family: 'TH SarabunPSK', 'TH Sarabun New', 'Sarabun', Tahoma, sans-serif; color: #000; font-size: 12px; background: #fff; padding: 6px 6px 0; } /* ไม่มี padding ล่าง — ต่อท้าย tfoot แล้วล้นเป็นหน้าเปล่า */
 .imt-idoc-head { padding-bottom: 8px; margin-bottom: 0; }
 .imt-idoc-headerimg { display: block; width: 344px; max-width: 60%; height: auto; }
 .imt-idoc-title  { text-align: center; font-weight: 700; font-size: 20px; color: #000; padding: 8px 0; margin: 0 0 10px; }
@@ -340,6 +340,9 @@
 .imt-idoc-tbl { width: 100%; table-layout: fixed; font-size: 12px; border-collapse: collapse; color: #000; } /* ไม่มีกรอบรอบตาราง — ทุกเซลล์มีกรอบเองแล้ว (กรอบนอกจะครอบแถวเว้นระยะ .sp ด้วย) */
 /* แถวเว้นระยะขอบบน/ล่างของทุกแผ่นตอนพิมพ์ (อยู่ใน thead/tfoot ที่พิมพ์ซ้ำทุกหน้า) — ไม่มีกรอบ/พื้นหลัง */
 .imt-idoc-tbl tr.sp th, .imt-idoc-tbl tr.sp td { height: 10mm; padding: 0; border: none; background: none; }
+/* แผ่นแรกไม่ต้องเว้นระยะ (มีหัวเอกสารอยู่แล้ว) — ดึงตารางขึ้นเท่าความสูงแถวเว้นระยะ ให้หัวตารางต่อจากชื่อรายงานพอดี
+   margin ติดลบมีผลแค่ช่วงแรกของตาราง แผ่นที่ 2 เป็นต้นไปยังเว้นขอบบน 10mm ตามเดิม */
+.imt-idoc-tbl { margin-top: -10mm; }
 /* แถวสุดท้าย + ช่องลงนาม ห้ามแยกหน้า (ดู imtIssuePrintDocHtml) · แถวช่องลงนามไม่มีกรอบ */
 .imt-idoc-tbl tbody.keep { break-inside: avoid; page-break-inside: avoid; }
 .imt-idoc-tbl tr.sign > td { border: none; padding: 0; }

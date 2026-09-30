@@ -2124,6 +2124,17 @@
   // ── Export: รูปภาพเอกสารสรุป (letterhead + ตาราง + ช่องเซ็นชื่อ) — ให้พิมพ์/แนบส่งให้ รพ. เซ็นรับทราบ
   // ทำแบบเดียวกับ exportImtReportImage เดิม (html2canvas ของ .imt-print-only ที่ซ่อนไว้) ไม่เปิด browser
   // print dialog เพราะโมดูลนี้เคยตัดฟีเจอร์ Print/PDF ออกไปแล้ว (ดูคอมเมนต์หัว impl-tracker.css) ──
+  // ── หัวข้อรายงานสรุปปัญหา (เลือกในหน้าต่างพิมพ์) · ค่าเริ่มต้นเดาจากชื่อโครงการ ──
+  var IMT_ISSUE_PRINT_TITLES = [
+    'ไฟล์สรุปปัญหาการใช้งานโปรแกรม BMS-INVENTORY',
+    'ไฟล์สรุปปัญหาการใช้งานโปรแกรม BMS-HOSxP XE ระบบงานครุภัณฑ์',
+    'ไฟล์สรุปปัญหาการใช้งานโปรแกรม BMS-HOSxP XE',
+  ];
+  function imtIssuePrintTitleDefault(proj) {
+    var n = String((proj && proj.name) || '');
+    return IMT_ISSUE_PRINT_TITLES[/inventory/i.test(n) ? 0 : /ครุภัณฑ์/.test(n) ? 1 : 2];
+  }
+
   function imtIssuePrintDocHtml(pid, opts) {
     var proj = imtProject(pid);
     var rows = imtIssuesOfProject(pid).filter(function (i) {
@@ -2163,7 +2174,7 @@
 
     return '<div class="imt-idoc">'
       + '<div class="imt-idoc-head"><img class="imt-idoc-headerimg" src="img/BMS-Header.jpg" alt="บริษัท บางกอก เมดิคอล ซอฟต์แวร์ จำกัด"></div>'
-      + '<div class="imt-idoc-title">ไฟล์สรุปปัญหาการใช้งานโปรแกรม '+esc(proj.name)+'</div>'
+      + '<div class="imt-idoc-title">'+esc(opts.title || imtIssuePrintTitleDefault(proj))+'</div>'
       // ── กำหนดความกว้างคอลัมน์ตายตัวด้วย <colgroup> (คู่กับ table-layout:fixed ใน CSS) กัน 10 คอลัมน์
       // รวมกันกว้างเกินหน้ากระดาษ A4 แนวนอน — ไม่งั้นตัวอักษรใหญ่ขึ้น (14px) + ข้อความยาว (ปัญหา/วิธีแก้)
       // จะดันตารางกว้างล้นออกไปทางขวาจนถูกตัดตอนพิมพ์ ──
@@ -2357,8 +2368,12 @@
     var defOrgText = o.signROrg != null ? o.signROrg : '';
     var defOrgHosp = (window.HOSPITALS || []).find(function (h) { return imtHospDisplayText(h) === defOrgText; });
     var body = document.getElementById('m-imt-issue-print-body');
+    var curTitle = IMT_ISSUE_PRINT_TITLES.indexOf(o.title) > -1 ? o.title : imtIssuePrintTitleDefault(proj);
     body.innerHTML =
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'
+      '<div class="f-group"><label class="f-label">หัวข้อรายงาน <span class="imt-req">*</span></label><select class="f-input" id="iip-title">'
+      +   IMT_ISSUE_PRINT_TITLES.map(function (t) { return '<option'+(t === curTitle ? ' selected' : '')+'>'+esc(t)+'</option>'; }).join('')
+      + '</select></div>'
+      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'
       +   '<div class="f-group"><label class="f-label">จากวันที่ <span class="imt-req">*</span></label><input type="date" class="f-input" id="iip-from" value="'+esc(o.from != null ? o.from : (proj.start||''))+'"></div>'
       +   '<div class="f-group"><label class="f-label">ถึงวันที่ <span class="imt-req">*</span></label><input type="date" class="f-input" id="iip-to" value="'+esc(o.to != null ? o.to : (proj.end||''))+'"></div>'
       + '</div>'
@@ -2462,6 +2477,7 @@
     }
 
     var opts = window.imtIssuePrintOpts = {
+      title: (document.getElementById('iip-title') || {}).value || imtIssuePrintTitleDefault(proj),
       from: fromEl.value, to: toEl.value,
       signLName: lnameEl.value.trim(), signLPos: lposEl.value.trim(), signLOrg: lorgEl.value.trim(),
       signRName: rnameEl.value.trim(), signRPos: rposEl.value.trim(), signROrg: rHosp ? imtHospDisplayText(rHosp) : rOrgTyped,
