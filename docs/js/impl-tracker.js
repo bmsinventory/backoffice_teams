@@ -2356,7 +2356,9 @@
     var pid = window.imtCurrentProjectId;
     var proj = imtProject(pid);
     if (!proj) return;
-    var o = window.imtIssuePrintOpts || {};
+    // ค่าที่กรอกล่าสุด (ช่วงวันที่/ผู้ลงนาม/หัวข้อ) จำแยกรายโครงการ — เปลี่ยนโครงการแล้วต้องได้วันเริ่ม-สิ้นสุดของโครงการใหม่
+    // (เดิมจำค่าเดียวร่วมกันทุกโครงการ เปลี่ยนโครงการแล้วช่วงวันที่ยังค้างของโครงการก่อน)
+    var o = (window.imtIssuePrintOpts || {})[pid] || {};
     // ── ผู้ลงนามฝั่งบริษัท: ดึงชื่อจาก "เจ้าของไซต์" ของโครงการต้นทาง (window.PROJECTS.siteOwner —
     // ฟิลด์เดียวกับที่ใช้ทั่วทั้งแอป ดู projects.js) + ตำแหน่งจากข้อมูลพนักงานตามชื่อนั้น ──
     var sp = imtResolveSourceProject(proj);
@@ -2476,7 +2478,8 @@
       return;
     }
 
-    var opts = window.imtIssuePrintOpts = {
+    window.imtIssuePrintOpts = window.imtIssuePrintOpts || {};
+    var opts = window.imtIssuePrintOpts[pid] = {
       title: (document.getElementById('iip-title') || {}).value || imtIssuePrintTitleDefault(proj),
       from: fromEl.value, to: toEl.value,
       signLName: lnameEl.value.trim(), signLPos: lposEl.value.trim(), signLOrg: lorgEl.value.trim(),
