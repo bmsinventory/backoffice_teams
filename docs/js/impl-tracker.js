@@ -1073,11 +1073,23 @@
     return '<div style="max-width:1000px;margin:0 auto;padding-top:20px;">'+hideDoneProjectsChk+'<div class="imt-pgrid">'+cards+'</div></div>';
   }
 
+  // ── สถานะ Phase: คำนวณจากงานข้างในเอง (เดิมใช้ค่าที่ตั้งมือในฟอร์ม Phase ซึ่งมักค้าง "ยังไม่เริ่ม" แม้งานเสร็จ 100%)
+  // ยกเว้นสถานะพิเศษที่คำนวณจากงานไม่ได้ (ล่าช้า/มีปัญหา/รอตรวจสอบ/ยกเลิก) — ตั้งไว้ในฟอร์มก็ยังใช้ค่านั้น ──
+  var IMT_PHASE_MANUAL_STATUS = ['delayed', 'issue', 'review', 'cancelled'];
+  function imtPhaseStatus(ph) {
+    if (IMT_PHASE_MANUAL_STATUS.indexOf(ph.status) > -1) return imtStatus(ph.status);
+    var tasks = imtTasksOfPhase(ph.id).filter(function (t) { return t.status !== 'cancelled'; });
+    var id = window.calcPhaseProgress(ph) >= 100 && tasks.length ? 'done'
+      : tasks.some(function (t) { return t.status !== 'not_started' || window.calcTaskProgress(t) > 0; }) ? 'in_progress'
+      : 'not_started';
+    return imtStatus(id);
+  }
+
   function renderPhaseAccordion(ph, idx, total) {
     var allTasks = imtTasksOfPhase(ph.id);
     var tasks = imtFilteredTasks(allTasks);
     var pct = window.calcPhaseProgress(ph);
-    var st = imtStatus(ph.status);
+    var st = imtPhaseStatus(ph);
     var open = window['_imtOpenPhase_'+ph.id] !== false; // เปิดโดย default
     var canEdit = window.canEdit(window.IMPL_MODULE);
     // ── idx/total อ้างอิงตำแหน่งจริงใน allTasks (ไม่ใช่ tasks ที่ถูกกรอง) กันเลขลำดับ/ลากสลับตำแหน่งพัง
@@ -1283,7 +1295,11 @@
     body.innerHTML =
       '<div class="f-group"><label class="f-label">ชื่อ Phase / หมวดงาน *</label><input class="f-input" id="imt-ph-name" value="'+esc(ph.name)+'"></div>'
       + '<div class="f-group"><label class="f-label">รายละเอียด</label><textarea class="f-input" id="imt-ph-desc">'+esc(ph.description)+'</textarea></div>'
-      + '<div class="f-group"><label class="f-label">สถานะ</label><select class="f-input" id="imt-ph-status">'+window.IMPL_STATUS.map(function (s) { return '<option value="'+s.id+'"'+(ph.status===s.id?' selected':'')+'>'+s.icon+' '+s.label+'</option>'; }).join('')+'</select></div>';
+      // สถานะ: ปกติ "อัตโนมัติ" (คำนวณจากงาน — ดู imtPhaseStatus) · ตั้งเองได้เฉพาะสถานะที่คำนวณจากงานไม่ได้
+      + '<div class="f-group"><label class="f-label">สถานะ</label><select class="f-input" id="imt-ph-status">'
+      +   '<option value="not_started">🔄 อัตโนมัติตามงาน (ยังไม่เริ่ม / กำลังดำเนินการ / เสร็จแล้ว)</option>'
+      +   window.IMPL_STATUS.filter(function (s) { return IMT_PHASE_MANUAL_STATUS.indexOf(s.id) > -1; }).map(function (s) { return '<option value="'+s.id+'"'+(ph.status===s.id?' selected':'')+'>'+s.icon+' '+s.label+'</option>'; }).join('')
+      + '</select></div>';
     document.getElementById('m-imt-phase-title').textContent = id ? 'แก้ไข Phase' : 'เพิ่ม Phase ใหม่';
     window.openM('m-imt-phase');
   };
@@ -2717,7 +2733,7 @@
             + '</div>');
         });
       });
-      return { name:ph.name, num:phIdx+1, color:imtStatus(ph.status).color, pct:window.calcPhaseProgress(ph), rows:itemRows };
+      return { name:ph.name, num:phIdx+1, color:imtPhaseStatus(ph).color, pct:window.calcPhaseProgress(ph), rows:itemRows };
     }).filter(function (g) { return g.rows.length; });
 
     function ppcGroupHtml(g) {
