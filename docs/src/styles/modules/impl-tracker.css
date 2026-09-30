@@ -355,11 +355,11 @@
 .imt-idoc-tbl thead { display: table-header-group; }
 .imt-idoc-tbl tr { page-break-inside: avoid; break-inside: avoid; }
 .imt-idoc-sign { display: flex; justify-content: space-between; gap: 30px; margin-top: 46px; }
-.imt-idoc-sb   { width: 47%; text-align: center; font-size: 12px; color: #000; }
+.imt-idoc-sb   { width: 47%; text-align: center; font-size: 14px; line-height: 1.5; color: #000; } /* ใหญ่กว่าตัวตาราง (12px) ให้อ่านชื่อ/ตำแหน่งผู้ลงนามง่าย */
 /* เดิมเส้นประยาวเต็มความกว้างคอลัมน์ (47% ของหน้ากระดาษ) ยาวเว่อร์ไปสำหรับที่เซ็นชื่อ — จำกัดความกว้าง
    ไว้พอดี ๆ แล้ว margin:auto จัดกึ่งกลางแทน (พ่อ .imt-idoc-sb ตั้ง text-align:center ไว้แล้วแต่ไม่มีผล
    กับ div block ที่กว้างเต็มพ่ออยู่แล้วโดยไม่กำหนด width เอง) ── */
-.imt-idoc-line { width: 220px; max-width: 100%; margin: 0 auto 6px; border-bottom: 1px dotted #333; height: 26px; }
+.imt-idoc-line { width: 160px; max-width: 100%; margin: 0 auto 6px; border-bottom: 1px dotted #333; height: 26px; }
 .imt-idoc-nm   { font-weight: 600; margin-bottom: 2px; }
 
 /* ════ PRINT: แสดงเฉพาะ #imt-issue-print-doc ตอนสั่งพิมพ์จริง ไม่มี UI แอปติดมาด้วย ════
