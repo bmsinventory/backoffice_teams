@@ -2148,7 +2148,18 @@
         + '<td>'+esc(window.nameKey(window.staffNameByRef(i.fixedById)) || '—')+'</td>'
         + '<td class="dt">'+(i.fixedDate?fd(i.fixedDate):'—')+'</td>'
         + '</tr>';
-    }).join('') || '<tr><td colspan="10" style="text-align:center;color:#888;padding:16px;">ไม่มีข้อมูลในช่วงที่เลือก</td></tr>';
+    });
+    if (!trs.length) trs = ['<tr><td colspan="10" style="text-align:center;color:#888;padding:16px;">ไม่มีข้อมูลในช่วงที่เลือก</td></tr>'];
+
+    // ── ช่องลงนามเป็นแถวสุดท้ายของตาราง รวมกลุ่มกับแถวข้อมูลแถวสุดท้าย (tbody.keep = ห้ามตัดหน้ากลางกลุ่ม)
+    // → ไม่พอที่หน้าเดิม browser จะยกแถวสุดท้าย "พร้อม" ช่องลงนามไปหน้าใหม่ด้วยกัน ช่องลงนามไม่ตกไปอยู่หน้าเปล่าลำพัง
+    // (เดิมอยู่นอกตาราง ตัดหน้าก่อนช่องลงนามได้อิสระ) ──
+    var signRow = '<tr class="sign"><td colspan="10"><div class="imt-idoc-sign">'
+      +   '<div class="imt-idoc-sb"><div class="imt-idoc-line"></div><div class="imt-idoc-nm">('+esc(opts.signLName||'')+')</div><div>ตำแหน่ง '+esc(opts.signLPos||'')+'</div><div>'+esc(opts.signLOrg||'')+'</div></div>'
+      +   '<div class="imt-idoc-sb"><div class="imt-idoc-line"></div><div class="imt-idoc-nm">('+esc(opts.signRName||'')+')</div><div>ตำแหน่ง '+esc(opts.signRPos||'')+'</div><div>'+esc(opts.signROrg||'')+'</div></div>'
+      + '</div></td></tr>';
+    var bodyHtml = (trs.length > 1 ? '<tbody>' + trs.slice(0, -1).join('') + '</tbody>' : '')
+      + '<tbody class="keep">' + trs[trs.length - 1] + signRow + '</tbody>';
 
     return '<div class="imt-idoc">'
       + '<div class="imt-idoc-head"><img class="imt-idoc-headerimg" src="img/BMS-Header.jpg" alt="บริษัท บางกอก เมดิคอล ซอฟต์แวร์ จำกัด"></div>'
@@ -2166,11 +2177,7 @@
       +   '<thead><tr class="sp"><th colspan="10"></th></tr><tr>'
       +   '<th>ลำดับ</th><th>วันที่รับปัญหา</th><th>หน่วยงาน</th><th>ปัญหา</th><th>กลุ่มปัญหา</th><th>สถานะ</th>'
       +   '<th>วิธีการแก้ไข</th><th>ผู้รับปัญหา</th><th>ผู้แก้ไข</th><th>วันที่แก้ไขปัญหา</th>'
-      + '</tr></thead><tfoot><tr class="sp"><td colspan="10"></td></tr></tfoot><tbody>'+trs+'</tbody></table>'
-      + '<div class="imt-idoc-sign">'
-      +   '<div class="imt-idoc-sb"><div class="imt-idoc-line"></div><div class="imt-idoc-nm">('+esc(opts.signLName||'')+')</div><div>ตำแหน่ง '+esc(opts.signLPos||'')+'</div><div>'+esc(opts.signLOrg||'')+'</div></div>'
-      +   '<div class="imt-idoc-sb"><div class="imt-idoc-line"></div><div class="imt-idoc-nm">('+esc(opts.signRName||'')+')</div><div>ตำแหน่ง '+esc(opts.signRPos||'')+'</div><div>'+esc(opts.signROrg||'')+'</div></div>'
-      + '</div>'
+      + '</tr></thead><tfoot><tr class="sp"><td colspan="10"></td></tr></tfoot>' + bodyHtml + '</table>'
       + '</div>';
   }
 

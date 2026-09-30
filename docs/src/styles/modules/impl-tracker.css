@@ -340,6 +340,9 @@
 .imt-idoc-tbl { width: 100%; table-layout: fixed; font-size: 12px; border-collapse: collapse; color: #000; } /* ไม่มีกรอบรอบตาราง — ทุกเซลล์มีกรอบเองแล้ว (กรอบนอกจะครอบแถวเว้นระยะ .sp ด้วย) */
 /* แถวเว้นระยะขอบบน/ล่างของทุกแผ่นตอนพิมพ์ (อยู่ใน thead/tfoot ที่พิมพ์ซ้ำทุกหน้า) — ไม่มีกรอบ/พื้นหลัง */
 .imt-idoc-tbl tr.sp th, .imt-idoc-tbl tr.sp td { height: 10mm; padding: 0; border: none; background: none; }
+/* แถวสุดท้าย + ช่องลงนาม ห้ามแยกหน้า (ดู imtIssuePrintDocHtml) · แถวช่องลงนามไม่มีกรอบ */
+.imt-idoc-tbl tbody.keep { break-inside: avoid; page-break-inside: avoid; }
+.imt-idoc-tbl tr.sign > td { border: none; padding: 0; }
 .imt-idoc-tbl th, .imt-idoc-tbl td { border: 1px solid #333; padding: 5px 6px; text-align: left; vertical-align: top; overflow-wrap: break-word; word-break: break-word; overflow: hidden; }
 .imt-idoc-tbl th { background: #cfe2f3; font-weight: 700; text-align: center; font-size: 12px; color: #000; }
 .imt-idoc-tbl td.n  { text-align: center; }
@@ -370,7 +373,9 @@
   body[data-view="impl_tracker"] #imt-issue-print-doc * { visibility: visible; }
   body[data-view="impl_tracker"] #imt-issue-print-doc {
     display: block !important; position: absolute; top: 0; left: 0; width: 100%;
-    padding: 12mm;
+    /* ไม่มี padding ล่าง — ขอบล่างทุกแผ่นได้จากแถวเว้นระยะใน tfoot แล้ว · padding ล่างซ้อนเข้าไปอีกทำให้
+       หน้าสุดท้ายที่เหลือที่ว่างน้อยล้นไปเป็นหน้าเปล่า (มีแค่หัวตาราง) */
+    padding: 12mm 12mm 0;
   }
   /* หมายเหตุ: @page ไม่ใช่ selector ที่ scope ด้วย body[data-view] ได้ — เป็น at-rule ระดับหน้าพิมพ์
      ทั้งเอกสาร ถ้าประกาศ "size: A4 landscape" ไว้ตรงนี้แบบ static จะไปทับ @page ของทุก view อื่น
