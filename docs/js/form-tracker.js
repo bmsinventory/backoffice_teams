@@ -90,10 +90,10 @@
     if (!item) return;
     var row = {
       project_id: item.projectId, group_id: item.groupId, form_name: item.name, form_type: item.formType,
-      status: item.status, owner: item.owner, description: item.description, sort_order: item.order,
+      status: item.status, owner: window.staffIdByRef(item.ownerId), description: item.description, sort_order: item.order,
       received_date: item.receivedDate || null,
     };
-    var overrides = {}; overrides[field] = value; overrides.updated_at = new Date().toISOString();
+    var overrides = {}; overrides[field] = field === 'owner' ? window.staffIdByRef(value) : value; overrides.updated_at = new Date().toISOString(); // ผู้จัดทำ: ช่องเลือกให้ชื่อเล่น → เก็บเป็นรหัส
     Object.assign(row, overrides);
     window.ftkApplyLocal('FORM_ITEMS', itemId, row);
     window.renderImplTracker();

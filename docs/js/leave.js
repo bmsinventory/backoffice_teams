@@ -538,7 +538,7 @@ window._holShowStatus=function(rows,filename){
     +(byType.custom?'<span style="background:rgba(255,166,43,.1);color:var(--amber);padding:2px 8px;border-radius:10px;font-weight:600;">⭐ อื่นๆ '+byType.custom+'</span>':'')
     +'</div>'
     +'<div style="font-size:11px;color:var(--txt3);margin-bottom:6px;">ตัวอย่าง'+(rows.length>5?' (5 รายการแรก)':'')+':</div>'
-    +'<table style="width:100%;border-collapse:collapse;font-size:11px;"><thead><tr style="background:var(--surface2)"><th style="padding:3px 8px;text-align:left;font-weight:600;font-size:10px;color:var(--txt3);">ชื่อวันหยุด</th><th style="padding:3px 8px;text-align:left;font-weight:600;font-size:10px;color:var(--txt3);">วันที่</th><th style="padding:3px 8px;text-align:left;font-weight:600;font-size:10px;color:var(--txt3);">ประเภท</th></tr></thead><tbody>'+preview+'</tbody></table>'
+    +'<table class="m-scroll-tbl" style="width:100%;border-collapse:collapse;font-size:11px;"><thead><tr style="background:var(--surface2)"><th style="padding:3px 8px;text-align:left;font-weight:600;font-size:10px;color:var(--txt3);">ชื่อวันหยุด</th><th style="padding:3px 8px;text-align:left;font-weight:600;font-size:10px;color:var(--txt3);">วันที่</th><th style="padding:3px 8px;text-align:left;font-weight:600;font-size:10px;color:var(--txt3);">ประเภท</th></tr></thead><tbody>'+preview+'</tbody></table>'
     +(rows.length>5?'<div style="font-size:10px;color:var(--txt3);margin-top:4px;">... และอีก '+(rows.length-5)+' รายการ</div>':'')
     +'</div>';
 };

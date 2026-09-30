@@ -40,3 +40,9 @@
 
 .kb-empty { height: 60px; border: 2px dashed var(--border); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--txt3); font-weight: 500; }
 .kb-drop  { background: rgba(124,92,252,.05) !important; border-color: rgba(124,92,252,.3) !important; }
+
+/* ── เมนูย้าย Stage บนการ์ด — แสดงเฉพาะมือถือ (จอสัมผัสลากการ์ดไม่ได้) ── */
+.kb-stage-sel { display: none; }
+@media (max-width: 768px) {
+  .kb-stage-sel { display: block; width: 100%; margin-top: 8px; min-height: 36px !important; padding: 6px 8px; font-size: 12px; font-family: inherit; color: var(--txt2); background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; }
+}

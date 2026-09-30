@@ -291,6 +291,7 @@ window.advAddExpRow = function(item) {
   var catOpts = `<option value="">-- ระบุหมวด --</option>`+_EXP_CATS.map(function(c){return`<option value="${c.k}"${item&&item.category===c.k?' selected':''}>${c.l}</option>`;}).join('');
   var row = document.createElement('div');
   row.id = rowId;
+  row.className = 'adv-exp-row';
   row.style.cssText = 'display:grid;grid-template-columns:1.4fr 1.8fr 1fr auto;gap:6px;align-items:center;margin-bottom:6px;';
   var amtVal = (item&&item.amount) ? Number(item.amount).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '';
   row.innerHTML = `<select class="f-input" id="${rowId}-cat" style="font-size:12px;padding:6px 8px;">${catOpts}</select>
@@ -544,7 +545,7 @@ window.advBuildClearedSection = function(a, pid) {
   <!-- EXPENSE ITEMS -->
   <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px;">
     <div style="font-size:13px;font-weight:700;color:var(--indigo);margin-bottom:10px;">🧾 รายการค่าใช้จ่าย</div>
-    <div style="display:grid;grid-template-columns:1.4fr 1.8fr 1fr auto;gap:6px;margin-bottom:6px;">
+    <div class="adv-exp-head" style="display:grid;grid-template-columns:1.4fr 1.8fr 1fr auto;gap:6px;margin-bottom:6px;">
       <span style="font-size:10px;color:var(--txt3);font-weight:600;">หมวด</span>
       <span style="font-size:10px;color:var(--txt3);font-weight:600;">รายละเอียด</span>
       <span style="font-size:10px;color:var(--txt3);font-weight:600;text-align:right;">จำนวนเงิน</span>

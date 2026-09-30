@@ -94,7 +94,7 @@ window.snlBuildHtml = function () {
 
       <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px;">
         <div style="font-size:13px;font-weight:700;color:var(--txt);margin-bottom:10px;">📋 เรื่องที่ให้ดำเนินการ</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;align-items:center;">
+        <div class="m-stack" style="display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;align-items:center;">
           <label style="display:flex;align-items:center;gap:6px;font-size:12px;">
             <input type="checkbox" id="snl-task-install" onchange="window.snlRenderPreview()"> เข้าปฏิบัติงานติดตั้ง
           </label>

@@ -164,7 +164,7 @@ window.showConfirm=function(msg,onOk,opts){
   ov.innerHTML='<div style="background:var(--surface);border-radius:16px;padding:28px 32px;max-width:360px;width:90%;box-shadow:0 12px 48px rgba(0,0,0,.3);border:1px solid var(--border);text-align:center;">'
     +'<div style="font-size:36px;margin-bottom:12px;">'+icon+'</div>'
     +'<div style="font-size:15px;font-weight:700;color:var(--txt);margin-bottom:8px;">'+title+'</div>'
-    +'<div style="font-size:13px;color:var(--txt2);line-height:1.7;margin-bottom:22px;">'+esc(msg)+'</div>'
+    +'<div style="font-size:13px;color:var(--txt2);line-height:1.7;margin-bottom:22px;white-space:pre-line;">'+esc(msg)+'</div>'
     +'<div style="display:flex;gap:10px;justify-content:center;">'
     +'<button id="sc-cancel" style="flex:1;padding:9px;background:var(--surface2);color:var(--txt2);border:1px solid var(--border);border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">ยกเลิก</button>'
     +'<button id="sc-ok" style="flex:1;padding:9px;background:'+okColor+';color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">'+okText+'</button>'
@@ -237,10 +237,13 @@ window.openProjModal=function(id){
   var staffSorted=window.STAFF.filter(function(s){return s.active!==false;}).slice().sort(function(a,b){var da=a.dept||'zzz',db=b.dept||'zzz';if(da!==db)return da.localeCompare(db,'th');return(a.role||'').localeCompare(b.role||'','th');});
   function _ownerPri(r){if(!r)return 99;if(r.includes('ผู้จัดการ'))return 1;if(r.includes('หัวหน้า'))return 2;return 3;}
   var ownerStaff=window.STAFF.filter(function(s){return s.active!==false&&s.role&&(s.role.includes('ผู้จัดการ')||s.role.includes('หัวหน้า'));}).slice().sort(function(a,b){var pa=_ownerPri(a.role),pb=_ownerPri(b.role);if(pa!==pb)return pa-pb;return(a.name||'').localeCompare(b.name||'','th');});
-  var ownerOpts='<option value="">-- เลือกเจ้าของไซต์ --</option>'+ownerStaff.map(function(s){return`<option value="${esc(s.name)}"${p&&p.siteOwner===s.name?' selected':''}>${esc(s.name)}${s.nickname?' ('+esc(s.nickname)+')':''}`;}).join('');
+  // เก็บเป็นรหัสพนักงาน · คนที่บันทึกไว้เดิมแต่ตอนนี้ไม่อยู่ในรายการ (ลาออก/เปลี่ยนตำแหน่ง) ยังต้องแสดงให้เห็น ไม่ใช่ช่องว่าง
+  var _curOwner=p&&window.staffByRef(p.siteOwnerId);if(_curOwner&&ownerStaff.indexOf(_curOwner)<0)ownerStaff.push(_curOwner);
+  var ownerOpts='<option value="">-- เลือกเจ้าของไซต์ --</option>'+ownerStaff.map(function(s){return`<option value="${esc(s.id)}"${p&&window.staffByRef(p.siteOwnerId)===s?' selected':''}>${esc(s.name)}${s.nickname?' ('+esc(s.nickname)+')':''}`;}).join('');
   var _instPosIds=['POS17733356564931','POS17733356564934','POS17733356564935','POS17733356564937','POS17733356564936'];
   var _instPosLabels=window.POSITIONS.filter(function(pos){return _instPosIds.includes(pos.id);}).map(function(pos){return pos.label;});
-  var installerOpts='<option value="">-- เลือกผู้ติดตั้ง --</option>'+window.STAFF.filter(function(s){return s.active!==false&&_instPosLabels.includes(s.role);}).slice().sort(function(a,b){return(a.name||'').localeCompare(b.name||'','th');}).map(function(s){return`<option value="${esc(s.name)}"${p&&p.installer===s.name?' selected':''}>${esc(s.name)}${s.nickname?' ('+esc(s.nickname)+')':''}`;}).join('');
+  var _curInst=p&&window.staffByRef(p.installerId);
+  var installerOpts='<option value="">-- เลือกผู้ติดตั้ง --</option>'+window.STAFF.filter(function(s){return s===_curInst||(s.active!==false&&_instPosLabels.includes(s.role));}).slice().sort(function(a,b){return(a.name||'').localeCompare(b.name||'','th');}).map(function(s){return`<option value="${esc(s.id)}"${p&&window.staffByRef(p.installerId)===s?' selected':''}>${esc(s.name)}${s.nickname?' ('+esc(s.nickname)+')':''}`;}).join('');
   var currentSids=mems.map(function(m){return m.sid;});
   var pickerHtml=(function(){
     var depts=[...new Set(staffSorted.map(function(s){return s.dept||'ไม่ระบุทีม';}))];
@@ -629,7 +632,7 @@ window.openSmartSchedule = function() {
     +'<div><div style="font-size:17px;font-weight:700;color:var(--txt);">จัดงานอัจฉริยะ</div><div style="font-size:11px;color:var(--txt3);margin-top:2px;">ค้นหาช่วงเวลาที่พนักงานว่าง ไม่มีงานซ้อน</div></div>'
     +'<button onclick="document.getElementById(\'ss-overlay\').remove()" style="margin-left:auto;background:none;border:none;font-size:20px;cursor:pointer;color:var(--txt3);line-height:1;">✕</button>'
     +'</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">'
+    +'<div class="m-stack" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">'
     +'<div class="f-group"><label class="f-label">ระยะเวลาโครงการ (สัปดาห์) *</label><input type="number" id="ss-weeks" class="f-input" value="2" min="1" max="52"></div>'
     +'<div class="f-group"><label class="f-label">ค้นหาล่วงหน้าสูงสุด (สัปดาห์)</label><input type="number" id="ss-lookahead" class="f-input" value="16" min="4" max="52"></div>'
     +'</div>'
@@ -741,7 +744,7 @@ window.ssAiRecommend = async function(btn) {
   var avgTeam=sizes.length?Math.round(sizes.reduce(function(a,b){return a+b;},0)/sizes.length*10)/10:0;
   var exp=function(sid){return sameType.filter(function(p){return(p.members||[]).some(function(m){return m.sid===sid;})||(p.team||[]).indexOf(sid)>-1;}).length;};
   var lines=['โครงการ: '+(((document.getElementById('pf-name')||{}).value)||'(ยังไม่ตั้งชื่อ)')
-    +(typeLbl?' · ประเภท '+typeLbl:'')+(((document.getElementById('pf-owner')||{}).value)?' · สถานที่ '+document.getElementById('pf-owner').value:''),
+    +(typeLbl?' · ประเภท '+typeLbl:'')+(((document.getElementById('pf-owner')||{}).value)?' · สถานที่ '+window.staffNameByRef(document.getElementById('pf-owner').value):''),
     'ขนาดทีมเฉลี่ยของโครงการประเภทนี้ในอดีต: '+(avgTeam?avgTeam+' คน (จาก '+sizes.length+' โครงการ)':'ไม่มีข้อมูล')];
   slots.forEach(function(r,i){
     var s=pd(r.start),e=pd(r.end);

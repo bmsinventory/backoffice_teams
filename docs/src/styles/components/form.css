@@ -75,3 +75,16 @@ select.f-input {
 .att-size { font-size: 10.5px; color: var(--txt3); }
 .att-x { flex-shrink: 0; width: 26px; height: 26px; min-height: 0; padding: 0; border: none; border-radius: 50%; background: var(--surface2); color: var(--txt2); font-size: 12px; cursor: pointer; }
 .att-x:hover { background: var(--coral); color: #fff; }
+/* ปุ่มแนบไฟล์แบบเล็ก (attPickerHtml compact) — ใช้ในกล่องพิมพ์แบบแชท */
+.att-btn { width: 32px; height: 32px; min-height: 0; padding: 0; border: none; border-radius: 8px; background: transparent; font-size: 17px; line-height: 1; cursor: pointer; }
+.att-btn:hover, .att-btn:focus-visible { background: var(--surface2); outline: none; }
+
+/* ── รายการตัวเลือก dropdown บนมือถือ (mobile.js initMobileSelect) — แทน popup ของ browser ที่ตกแต่งไม่ได้
+   ขนาดตัวอักษร/ระยะเท่ากับส่วนอื่นของระบบ ── */
+.m-select-panel { position: fixed; z-index: 10060; overflow-y: auto; -webkit-overflow-scrolling: touch; background: var(--surface); border: 1.5px solid var(--border); border-radius: 12px; box-shadow: 0 12px 32px rgba(0,0,0,.18); padding: 4px; }
+.m-select-opt { padding: 10px 12px; font-size: 13px; color: var(--txt); border-radius: 8px; cursor: pointer; line-height: 1.35; }
+.m-select-opt:active { background: var(--surface2); }
+.m-select-opt.on { background: rgba(124,92,252,.1); color: var(--violet); font-weight: 700; }
+.m-select-opt.on::before { content: '✓ '; }
+.m-select-opt.off { color: var(--txt3); cursor: default; }
+.m-select-group { padding: 8px 12px 4px; font-size: 10.5px; font-weight: 700; color: var(--txt3); text-transform: uppercase; letter-spacing: .4px; }

@@ -375,8 +375,12 @@
     // ชื่อเล่นเดิม ไม่กระทบข้อมูล) — หาไม่เจอ (พิมพ์ผิด/ลาออกแล้ว) ก็ใช้ชื่อเล่นเดิมแสดงแทน ──
     var nicknameToFullName = {};
     try {
-      var str = await db.from('staff').select('full_name,nickname');
-      (str.data || []).forEach(function (s) { if (s.nickname && s.full_name) nicknameToFullName[s.nickname.trim()] = s.full_name; });
+      var str = await db.from('staff').select('staff_id,full_name,nickname');
+      (str.data || []).forEach(function (s) {
+        if (!s.full_name) return;
+        if (s.nickname) nicknameToFullName[s.nickname.trim()] = s.full_name;
+        if (s.staff_id) nicknameToFullName[s.staff_id] = s.full_name; // ข้อมูลใหม่เก็บเป็นรหัสพนักงาน
+      });
     } catch (e) {}
 
     render(proj, issues, nicknameToFullName);

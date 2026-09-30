@@ -261,7 +261,7 @@ window.renderWorkload = function() {
   if (headEl) {
     headEl.innerHTML =
       '<div style="display:flex;min-width:fit-content;">' +
-      '<div style="width:'+NAME_W+'px;flex-shrink:0;padding:5px 14px;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;border-right:1px solid var(--border);">พนักงาน / แผนก</div>' +
+      '<div class="wl-name" style="width:'+NAME_W+'px;flex-shrink:0;padding:5px 14px;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;border-right:1px solid var(--border);">พนักงาน / แผนก</div>' +
       '<div style="display:flex;">' +
         days.map(function(day) {
           var isT = day.d === todayD;
@@ -273,7 +273,7 @@ window.renderWorkload = function() {
           '</div>';
         }).join('') +
       '</div>' +
-      '<div style="width:'+SUM_W+'px;flex-shrink:0;padding:5px 14px;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;justify-content:flex-end;border-left:1px solid var(--border);">ภาระงาน</div>' +
+      '<div class="wl-sum" style="width:'+SUM_W+'px;flex-shrink:0;padding:5px 14px;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;justify-content:flex-end;border-left:1px solid var(--border);">ภาระงาน</div>' +
       '</div>';
   }
 
@@ -313,15 +313,17 @@ window.renderWorkload = function() {
     var olBadge   = r.hasOverlap ? '<span style="font-size:8px;font-weight:700;color:#fff;background:#ff6b6b;padding:1px 5px;border-radius:4px;margin-left:4px;">⚠ซ้อน</span>' : '';
 
     return '<div style="display:flex;align-items:stretch;border-bottom:1px solid var(--border);transition:background .15s;min-width:fit-content;" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">' +
-      '<div style="width:'+NAME_W+'px;flex-shrink:0;padding:6px 14px;display:flex;align-items:center;gap:10px;border-right:1px solid var(--border);cursor:pointer;" onclick="window.wlStaffClick(event,\''+esc(s.id)+'\')">' +
-        '<div style="width:30px;height:30px;border-radius:9px;background:'+avC(r.gi)+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">'+initials+'</div>' +
+      '<div class="wl-name" style="width:'+NAME_W+'px;flex-shrink:0;padding:6px 14px;display:flex;align-items:center;gap:10px;border-right:1px solid var(--border);cursor:pointer;" onclick="window.wlStaffClick(event,\''+esc(s.id)+'\')">' +
+        '<div class="wl-av" style="width:30px;height:30px;border-radius:9px;background:'+avC(r.gi)+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">'+initials+'</div>' +
         '<div style="min-width:0;">' +
-          '<div style="font-size:12px;font-weight:700;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="'+esc(s.name+(s.nickname?' ('+s.nickname+')':''))+'">'+displayName+'</div>' +
-          '<div style="font-size:10px;color:var(--txt3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(s.role||'—')+'</div>' +
+          '<div style="font-size:12px;font-weight:700;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="'+esc(s.name+(s.nickname?' ('+s.nickname+')':''))+'"><span class="wl-fullname">'+displayName+'</span><span class="wl-mname">'+esc(s.nickname||s.name)+'</span></div>' +
+          '<div class="wl-role" style="font-size:10px;color:var(--txt3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(s.role||'—')+'</div>' +
+          // มือถือ: ซ่อนคอลัมน์ภาระงานด้านขวา แสดงสถานะย่อใต้ชื่อแทน
+          '<div class="wl-mstat" style="font-size:10px;font-weight:700;color:'+statusClr+';">'+statusTxt+(r.hasOverlap?' ⚠':'')+'</div>' +
         '</div>' +
       '</div>' +
       '<div style="display:flex;align-items:stretch;">'+cells+'</div>' +
-      '<div style="width:'+SUM_W+'px;flex-shrink:0;padding:6px 14px;display:flex;flex-direction:column;align-items:flex-end;justify-content:center;border-left:1px solid var(--border);">' +
+      '<div class="wl-sum" style="width:'+SUM_W+'px;flex-shrink:0;padding:6px 14px;display:flex;flex-direction:column;align-items:flex-end;justify-content:center;border-left:1px solid var(--border);">' +
         '<div style="font-size:13px;font-weight:800;color:'+statusClr+';">'+statusTxt+olBadge+'</div>' +
         (r.busyDays > 0
           ? '<div style="font-size:10px;color:var(--txt3);margin-top:1px;">'+r.busyDays+'/'+workdays+' วัน · '+r.busyPct+'%</div>'

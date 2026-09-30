@@ -29,7 +29,7 @@
   function imtTaskRow(t, overrides) {
     return Object.assign({
       phase_id:t.phaseId, project_id:t.projectId, task_name:t.name, description:t.description,
-      owner:t.owner, start_date:t.start, due_date:t.due, priority:t.priority, status:t.status,
+      owner:window.staffIdByRef(t.ownerId), start_date:t.start, due_date:t.due, priority:t.priority, status:t.status,
       progress_percent:t.progress, sort_order:t.order,
     }, overrides || {});
   }
@@ -132,17 +132,9 @@
             + '</div>';
         }).join('');
       }
-      function positionDrop() {
-        var r = inp.getBoundingClientRect();
-        var availH = window.innerHeight - r.bottom - 16;
-        drop.style.position = 'fixed';
-        drop.style.top = (r.bottom + 4) + 'px';
-        drop.style.left = r.left + 'px';
-        drop.style.width = r.width + 'px';
-        lst.style.maxHeight = Math.max(140, Math.min(260, availH)) + 'px';
-      }
-      function openDrop() { if (isOpen) return; isOpen = true; q = ''; fi = -1; flat = bFlat(''); lst.scrollTop = 0; render(); positionDrop(); drop.style.display = 'block'; window.addEventListener('resize', positionDrop); }
-      function closeDrop() { if (!isOpen) return; isOpen = false; drop.style.display = 'none'; inp.value = selLabel; window.removeEventListener('resize', positionDrop); }
+      function positionDrop() { window.placeDropdown(inp, drop, lst, 260); }
+      function openDrop() { if (isOpen) return; isOpen = true; q = ''; fi = -1; flat = bFlat(''); lst.scrollTop = 0; render(); positionDrop(); drop.style.display = 'block'; window.addEventListener('resize', positionDrop); window.addEventListener('scroll', positionDrop, true); }
+      function closeDrop() { if (!isOpen) return; isOpen = false; drop.style.display = 'none'; inp.value = selLabel; window.removeEventListener('resize', positionDrop); window.removeEventListener('scroll', positionDrop, true); }
       function selItem(nick, label) { selNick = nick; selLabel = nick ? label : ''; hid.value = nick; closeDrop(); hid.dispatchEvent(new Event('change')); }
       lst.addEventListener('click', function (e) { var it = e.target.closest('.imto-i'); if (it) selItem(it.dataset.nick, it.dataset.label); });
       lst.addEventListener('mousemove', function (e) { var it = e.target.closest('.imto-i'); if (it) { var ni = +it.dataset.idx; if (ni !== fi) { fi = ni; render(); } } });
@@ -156,7 +148,7 @@
         else if (e.key === 'ArrowUp') { e.preventDefault(); fi = fi > 0 ? fi - 1 : 0; render(); }
         else if (e.key === 'Enter') { e.preventDefault(); if (flat[fi]) selItem(flat[fi].nick, flat[fi].label); }
       });
-      document.addEventListener('mousedown', function onOut(e) { var wrap = document.getElementById('imt-t-owner-wrap'); if (wrap && !wrap.contains(e.target)) { closeDrop(); document.removeEventListener('mousedown', onOut); } });
+      document.addEventListener('mousedown', function onOut(e) { var wrap = document.getElementById('imt-t-owner-wrap'); if (!wrap) { document.removeEventListener('mousedown', onOut); return; } if (!wrap.contains(e.target)) closeDrop(); });
       inp.value = selLabel; flat = bFlat(''); render();
     };
   })();
@@ -559,7 +551,7 @@
     var healthGrid = shown.length ? shown.map(function (x) { return imtHealthCardHtml(x.p, x.h); }).join('')
       : '<div style="grid-column:1/-1;text-align:center;color:var(--txt3);font-size:12px;padding:24px;">ไม่มีโครงการในหมวดนี้</div>';
 
-    var aiBtn = '<button class="btn btn-pri btn-sm imt-ai-btn" onclick="window.imtRunAiOverview()"'+(_imtAiOverview && _imtAiOverview.loading ? ' disabled' : '')+' title="ให้ AI สรุปว่าโครงการไหนต้องติดตาม และควรทำอะไรเพิ่ม">🤖 AI สรุปภาพรวม</button>';
+    var aiBtn = '<button class="btn btn-pri btn-sm imt-ai-btn m-icon-btn" onclick="window.imtRunAiOverview()"'+(_imtAiOverview && _imtAiOverview.loading ? ' disabled' : '')+' title="ให้ AI สรุปว่าโครงการไหนต้องติดตาม และควรทำอะไรเพิ่ม">🤖 AI สรุปภาพรวม</button>';
     var healthSection = window.IMPL_PROJECTS.length
       ? '<div class="imt-health-strip">'+chipsHtml+hideDoneProjectsChk+aiBtn+'</div>'+imtAiOverviewHtml()+'<div class="imt-pgrid">'+healthGrid+'</div>'
       : '';
@@ -754,18 +746,9 @@
       // position:absolute ผูกกับ .m-body) เพราะ .m-body มี overflow-y:auto — ถ้าโมดัลเนื้อหาสั้น (เช่น
       // ฟอร์ม "เพิ่มโครงการใหม่" มีแค่ 2 ช่อง) กล่อง dropdown ที่ยื่นเกินขอบเนื้อหาจะถูกครอบตัดจนเห็นแค่
       // บางส่วน — fixed positioning ไม่ถูกครอบตัดโดย overflow ของ ancestor เลย ──
-      function positionDrop() {
-        var r = inp.getBoundingClientRect();
-        var availH = window.innerHeight - r.bottom - 16;
-        drop.style.position = 'fixed';
-        drop.style.top = (r.bottom + 4) + 'px';
-        drop.style.left = r.left + 'px';
-        drop.style.width = r.width + 'px';
-        drop.style.right = 'auto';
-        lst.style.maxHeight = Math.max(160, Math.min(360, availH)) + 'px';
-      }
-      function openDrop() { if (isOpen) return; isOpen = true; q = ''; fi = -1; flat = bFlat(''); lst.scrollTop = 0; render(); positionDrop(); drop.style.display = 'block'; window.addEventListener('resize', positionDrop); }
-      function closeDrop() { if (!isOpen) return; isOpen = false; drop.style.display = 'none'; inp.value = selName; window.removeEventListener('resize', positionDrop); }
+      function positionDrop() { window.placeDropdown(inp, drop, lst, 360); }
+      function openDrop() { if (isOpen) return; isOpen = true; q = ''; fi = -1; flat = bFlat(''); lst.scrollTop = 0; render(); positionDrop(); drop.style.display = 'block'; window.addEventListener('resize', positionDrop); window.addEventListener('scroll', positionDrop, true); }
+      function closeDrop() { if (!isOpen) return; isOpen = false; drop.style.display = 'none'; inp.value = selName; window.removeEventListener('resize', positionDrop); window.removeEventListener('scroll', positionDrop, true); }
       function selProj(id, name) { selId = id; selName = name; hid.value = id; closeDrop(); hid.dispatchEvent(new Event('change')); }
       lst.addEventListener('click', function (e) {
         var h = e.target.closest('.imtc-h'), it = e.target.closest('.imtc-i');
@@ -785,7 +768,7 @@
         else if (e.key === 'ArrowUp') { e.preventDefault(); var ci2 = iis.indexOf(fi); fi = ci2 <= 0 ? iis[0] : iis[ci2-1]; render(); scFi(); }
         else if (e.key === 'Enter') { e.preventDefault(); var it = flat[fi]; if (it && it.k === 'i') selProj(it.id, it.name); }
       });
-      document.addEventListener('mousedown', function onOut(e) { var wrap = document.getElementById('imt-p-cmb-wrap'); if (wrap && !wrap.contains(e.target) && !drop.contains(e.target)) { closeDrop(); document.removeEventListener('mousedown', onOut); } });
+      document.addEventListener('mousedown', function onOut(e) { var wrap = document.getElementById('imt-p-cmb-wrap'); if (!wrap) { document.removeEventListener('mousedown', onOut); return; } if (!wrap.contains(e.target) && !drop.contains(e.target)) closeDrop(); });
       function scFi() { if (fi < 0) return; var top = 0; for (var i = 0; i < fi; i++) top += flat[i] ? (flat[i].k === 'h' ? HH : IH) : 0; if (top < lst.scrollTop) lst.scrollTop = top; else if (top + IH > lst.scrollTop + lst.clientHeight) lst.scrollTop = top + IH - lst.clientHeight; }
       inp.value = selName; flat = bFlat(''); render();
     };
@@ -1392,7 +1375,7 @@
 
       var atts = imtAttachmentsOf(id);
       attachHtml = '<div class="sec-label" style="margin-bottom:8px;">ไฟล์แนบ</div>'
-        + atts.map(function (a) { return '<div class="m-row"><a href="'+esc(a.fileUrl)+'" target="_blank" style="flex:1;color:var(--indigo);">📎 '+esc(a.fileName)+'</a><button class="m-x" onclick="window.imtDeleteAttachmentUI(\''+a.id+'\')">✕</button></div>'; }).join('')
+        + atts.map(function (a) { return '<div class="m-row"><a href="'+esc(a.fileUrl)+'" target="_blank" download="'+esc(a.fileName)+'" style="flex:1;color:var(--indigo);">📎 '+esc(a.fileName)+'</a><button class="m-x" onclick="window.imtDeleteAttachmentUI(\''+a.id+'\')">✕</button></div>'; }).join('')
         + (canEdit ? '<input type="file" id="imt-t-file-input" style="margin-top:8px;" onchange="window.imtHandleFileInput(\''+id+'\',this)">' : '');
     }
 
@@ -1438,7 +1421,7 @@
     var row = {
       phase_id: finalPhaseId, project_id: pid, task_name: name,
       description: document.getElementById('imt-t-desc').value.trim(),
-      owner: document.getElementById('imt-t-owner').value.trim(),
+      owner: window.staffIdByRef(document.getElementById('imt-t-owner').value.trim()), // ช่องเลือกให้ชื่อเล่น → เก็บเป็นรหัสพนักงาน
       start_date: document.getElementById('imt-t-start').value || null,
       due_date: document.getElementById('imt-t-due').value || null,
       priority: document.getElementById('imt-t-priority').value,
@@ -1659,6 +1642,7 @@
       +     '<button class="btn btn-xls btn-sm" onclick="window.exportImtIssuesExcel()" title="ส่งออก Excel">📥<span class="btn-label"> Excel</span></button>'
       +     '<button class="btn btn-ghost btn-sm" onclick="window.openImtIssuePrintModal()" title="พิมพ์รายงานสรุปให้ รพ. เซ็นรับทราบ">🖨️<span class="btn-label"> พิมพ์รายงาน</span></button>'
       +     '<button class="btn btn-ghost btn-sm" onclick="window.imtOpenPublicDashboard()" title="เปิด/คัดลอกลิงก์ Dashboard สาธารณะของ รพ. นี้ ไม่ต้อง login — ใช้นำเสนอตอนสรุปงานได้">🖼️<span class="btn-label"> Dashboard</span></button>'
+      +     (window.canAdd(window.IMPL_MODULE) ? '<button class="btn btn-ghost btn-sm" onclick="window.openImtBulkModal()" title="วางแชท LINE หรือเปิดไฟล์บันทึกแชท (.txt) / บันทึกประชุม ให้ AI แยกเป็นปัญหาหลายข้อในครั้งเดียว">🤖<span class="btn-label"> วางแชท LINE (AI)</span></button>' : '')
       +     (window.canAdd(window.IMPL_MODULE) ? '<button class="btn btn-pri btn-sm" onclick="window.openImtIssueModal(null)">+<span class="btn-label"> แจ้งปัญหาใหม่</span></button>' : '')
       +   '</div>'
       + '</div>';
@@ -1819,6 +1803,189 @@
     navigator.clipboard.writeText(s.solution).then(function () { window.showAlert && window.showAlert('คัดลอกแนวทางแก้ไขแล้ว', 'success'); });
   };
 
+  // ── วางแชท LINE (ไฟล์ .txt / ข้อความ) / บันทึกประชุม → AI แยกเป็นปัญหาการใช้งานหลายข้อ ──
+  // อ่านแชท/เลือกช่วงวันที่ และขั้นตรวจทาน ใช้ตัวกลางใน src/utils/chat-import.util.js (lineChat / aiReview)
+  // ส่วนนี้กำหนดเฉพาะของโครงการ: ค่าเริ่มต้นผู้แจ้ง/หน่วยงาน/ผู้รับปัญหา, คำสั่ง AI, ช่องของปัญหา และการบันทึก ──
+  function imtBkVal(id) { return ((document.getElementById(id) || {}).value || '').trim(); }
+  // ── ตัวเลือก "ผู้รับปัญหา" จากรายชื่อในระบบ: ทีมโครงการก่อน แล้วพนักงานอื่น · เก็บเป็นชื่อ (ตามข้อมูลเดิม)
+  // ค่าเดิมที่ไม่อยู่ในรายชื่อ (เช่น ข้อมูลนำเข้า/คนนอกทีม) แทรกไว้บนสุดให้ยังเลือกค้างได้ ──
+  function imtReceiverOptions(pid, cur) {
+    var team = imtProjectTeamStaff(pid), inTeam = {};
+    team.forEach(function (s) { inTeam[s.id] = true; });
+    var others = (window.STAFF || []).filter(function (s) { return s.active !== false && s.name && !inTeam[s.id]; });
+    var byName = function (a, b) { return a.name.localeCompare(b.name, 'th'); };
+    var opt = function (s) { return '<option value="' + esc(s.name) + '"' + (s.name === cur ? ' selected' : '') + '>' + esc(s.name) + (s.nickname ? ' (' + esc(s.nickname) + ')' : '') + '</option>'; };
+    var known = team.concat(others).some(function (s) { return s.name === cur; });
+    return (cur && !known ? '<option value="' + esc(cur) + '" selected>' + esc(cur) + '</option>' : '')
+      + (cur ? '' : '<option value="">-- เลือกผู้รับปัญหา --</option>')
+      + (team.length ? '<optgroup label="ทีมโครงการ">' + team.slice().sort(byName).map(opt).join('') + '</optgroup>' : '')
+      + (others.length ? '<optgroup label="พนักงานอื่น">' + others.sort(byName).map(opt).join('') + '</optgroup>' : '');
+  }
+  window.openImtBulkModal = function () {
+    var pid = window.imtCurrentProjectId, proj = imtProject(pid);
+    if (!proj) return;
+    var curName = (window.cu && (window.cu.name || window.cu.username)) || '';
+    var deptOpts = imtIssueDepartments(pid).map(function (d) { return '<option value="' + esc(d) + '">'; }).join('');
+    document.getElementById('m-imt-bulk-body').innerHTML =
+      '<div id="imtbk-step1">'
+      + '<div style="font-size:12.5px;margin-bottom:8px;">โครงการ: <b>' + esc(proj.name) + '</b></div>'
+      + window.lineChat.panelHtml('imtbk')
+      + '<div class="m-stack" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:4px;">'
+      +   '<div class="f-group"><label class="f-label">ผู้แจ้ง (ถ้าแชทไม่ระบุ)</label><input class="f-input" id="imt-bk-rep" placeholder="ชื่อผู้แจ้ง"></div>'
+      +   '<div class="f-group"><label class="f-label">หน่วยงาน (ถ้าแชทไม่ระบุ)</label><input class="f-input" id="imt-bk-dept" list="imt-bk-dept-dl" placeholder="เช่น ห้องจ่ายยา IPD"><datalist id="imt-bk-dept-dl">' + deptOpts + '</datalist></div>'
+      +   '<div class="f-group"><label class="f-label">ผู้รับปัญหา <span class="imt-req">*</span></label><select class="f-input" id="imt-bk-recv">' + imtReceiverOptions(pid, curName) + '</select></div>'
+      + '</div>'
+      + '<button type="button" class="btn btn-ghost btn-sm" onclick="window.imtBulkParse(this)">🤖 ให้ AI แยกปัญหา</button>'
+      + '<div id="imtbk-out" style="margin-top:12px;"></div>'
+      + '</div>'
+      + '<div id="imtbk-step2" class="air-step2" style="display:none;"><div id="imtbk-review"></div></div>';
+    window.aiReview.reset('m-imt-bulk', 'm-imt-bulk-foot');
+    window.openM('m-imt-bulk');
+    window.lineChat.bind('imtbk', {});
+    setTimeout(function () { var el = document.getElementById('imtbk-src'); if (el) el.focus(); }, 60);
+  };
+  window.imtBulkParse = async function (btn) {
+    var out = document.getElementById('imtbk-out');
+    var c = window.lineChat.collect('imtbk');
+    if (c.error) { window.showAlert && window.showAlert(c.error, 'warn'); return; }
+    var pid = window.imtCurrentProjectId, cats = imtIssueCategories(), depts = imtIssueDepartments(pid);
+    var team = imtProjectTeamStaff(pid);
+    var sys = 'คุณเป็นผู้ช่วยทีมติดตั้งระบบซอฟต์แวร์โรงพยาบาล อ่านข้อความที่วางมา (แชท LINE / บันทึกประชุม / รายการปัญหา) '
+      + 'แล้วแยกเป็น "ปัญหาการใช้งานโปรแกรม" ทีละข้อ ' + (c.numbered ? 'แต่ละบรรทัดขึ้นต้นด้วยเลขข้อความ (#) ' : '')
+      + 'ตอบ "เฉพาะ JSON" รูปแบบ: {"items":[{"problem":"<สรุปปัญหาให้ชัด 1–2 ประโยค ภาษาไทย>","department":"<หน่วยงาน/แผนกที่แจ้ง หรือ empty>",'
+      + '"reported_by":"<ชื่อผู้แจ้ง หรือ empty>","category":"<ชื่อกลุ่มปัญหาจากรายการ หรือ empty>",'
+      + '"solved":true|false,"solution":"<วิธีแก้ ถ้าข้อความบอกว่าแก้แล้ว หรือ empty>","handled_by":"<ชื่อทีมงานที่แก้เรื่องนี้ หรือ empty>"'
+      + (c.numbered ? ',"first_msg":<เลขข้อความที่เริ่มแจ้ง>,"last_msg":<เลขข้อความสุดท้ายของเรื่องนี้>' : '') + '}]} '
+      + 'กฎ: ข้อความทักทาย/ขอบคุณ/สติกเกอร์/รูป/นัดหมาย/คุยเรื่องอื่นที่ไม่ใช่ปัญหา ให้ข้าม · ปัญหาเดียวกันที่พูดซ้ำหลายข้อความ ให้รวมเป็นข้อเดียว · '
+      + 'ผู้แจ้งคือฝั่งโรงพยาบาล ไม่ใช่คนในรายชื่อทีมงาน · ห้ามแต่งข้อมูลที่ไม่มีในข้อความ · หน่วยงานให้ใช้ชื่อจากรายการที่มีอยู่ถ้าตรงกัน';
+    var ctx = 'กลุ่มปัญหาที่เลือกได้ (ตอบชื่อให้ตรงตัวอักษร):\n' + cats.map(function (x) { return '- ' + x; }).join('\n')
+      + (depts.length ? '\n\nหน่วยงานที่เคยแจ้งในโครงการนี้:\n' + depts.slice(0, 60).join(', ') : '')
+      + (team.length ? '\n\nรายชื่อทีมงานของเรา (ไม่ใช่ผู้แจ้ง):\n' + team.map(function (x) { return x.name + (x.nickname ? ' (' + x.nickname + ')' : ''); }).join(', ') : '');
+    var oldTxt = btn.textContent, raw = [];
+    btn.disabled = true;
+    out.innerHTML = '';
+    try {
+      for (var k = 0; k < c.chunks.length; k++) {
+        btn.textContent = '⏳ AI กำลังแยกปัญหา' + (c.chunks.length > 1 ? ' ส่วนที่ ' + (k + 1) + '/' + c.chunks.length : '') + '...';
+        var res = await window.aiChatJson(sys, ctx + '\n\n--- ข้อความ ---\n' + c.chunks[k], { maxTokens: 3500 });
+        (Array.isArray(res.items) ? res.items : []).forEach(function (x) { raw.push(x); });
+      }
+      var existing = imtIssuesOfProject(pid), items = [];
+      raw.forEach(function (x) {
+        var problem = String(x.problem || '').trim(), solution = String(x.solution || '').trim();
+        if (!problem) return;
+        var ex = window.lineChat.excerpt(c.msgs, x.first_msg, x.last_msg), closed = x.solved === true && !!solution;
+        var fixer = closed ? window.lineChat.matchPerson(x.handled_by, team) : null;
+        var it = {
+          problem: problem,
+          department: String(x.department || '').trim(),
+          reportedBy: String(x.reported_by || '').trim(),
+          category: cats.indexOf(x.category) > -1 ? x.category : '',
+          status: closed ? 'closed' : 'open',
+          solution: solution,
+          fixedBy: fixer ? (fixer.nickname || fixer.name) : '',
+          fixedDate: closed ? String(ex.endAt || '').slice(0, 10) : '',
+          createdAt: ex.createdAt, whenLabel: ex.whenLabel, chat: ex.chat, dup: '',
+        };
+        // ซ้ำกับปัญหาเดิมของโครงการ หรือซ้ำกับข้อก่อนหน้าในรอบนี้ (ก้อนแชทคาบเกี่ยว)
+        var dup = null, best = 0;
+        existing.forEach(function (e) { var sc = window.aiTextSim(problem, e.problem); if (sc > best) { best = sc; dup = e; } });
+        if (best >= 0.6) it.dup = 'อาจซ้ำกับปัญหาเดิม: ' + String(dup.problem).slice(0, 60);
+        else if (items.some(function (y) { return window.aiTextSim(problem, y.problem) >= 0.7; })) it.dup = 'อาจซ้ำกับข้อก่อนหน้าในรายการนี้';
+        items.push(it);
+      });
+      if (!items.length) { out.innerHTML = '<div style="font-size:12px;color:var(--txt3);">AI ไม่พบปัญหาในข้อความนี้</div>'; return; }
+      imtBulkReview(items);
+    } catch (e) {
+      out.innerHTML = '<div class="ai-out" style="color:var(--coral);font-size:12px;">' + esc(String(e.message || e)) + '</div>';
+    } finally {
+      btn.disabled = false; btn.textContent = oldTxt;
+    }
+  };
+  // ── ขั้นตรวจทาน: กำหนดช่องของปัญหาให้ aiReview ──
+  function imtBulkReview(items) {
+    var pid = window.imtCurrentProjectId, proj = imtProject(pid);
+    var stOf = function (id) { return window.IMPL_ISSUE_STATUS.find(function (x) { return x.id === id; }) || window.IMPL_ISSUE_STATUS[0]; };
+    window.aiReview.mount({
+      modalId: 'm-imt-bulk', step1Id: 'imtbk-step1', step2Id: 'imtbk-step2', reviewId: 'imtbk-review', footId: 'm-imt-bulk-foot',
+      items: items, unit: 'รายการ',
+      ctxHtml: function () {
+        var recv = imtBkVal('imt-bk-recv');
+        return '📁 <b>' + esc(proj ? proj.name : '') + '</b> · ผู้รับปัญหา: ' + (recv ? esc(recv) : '<span style="color:var(--coral);">ยังไม่ระบุ</span>');
+      },
+      title: function (x) { return x.problem; },
+      card: function (x) {
+        var st = stOf(x.status);
+        return {
+          done: x.status === 'closed',
+          status: '<span class="air-st" style="color:' + st.color + ';">' + st.icon + ' ' + esc(st.label) + '</span>',
+          chips: [
+            ['🏢', 'หน่วยงาน', x.department || imtBkVal('imt-bk-dept')],
+            ['👤', 'ผู้แจ้ง', x.reportedBy || imtBkVal('imt-bk-rep')],
+            ['🗂', 'กลุ่มปัญหา', x.category],
+          ].concat(x.status === 'closed' ? [['🔧', 'ผู้แก้ไข', x.fixedBy ? imtStaffNameByNick(x.fixedBy) : '']] : []),
+          note: x.status === 'closed' && String(x.solution || '').trim() ? '<div class="air-fix"><b>วิธีแก้:</b> ' + esc(x.solution) + '</div>' : '',
+        };
+      },
+      missing: function (x) {
+        var m = [];
+        if (!String(x.problem || '').trim()) m.push('รายละเอียดปัญหา');
+        if (!String(x.department || '').trim() && !imtBkVal('imt-bk-dept')) m.push('หน่วยงาน');
+        if (!String(x.reportedBy || '').trim() && !imtBkVal('imt-bk-rep')) m.push('ผู้แจ้ง');
+        if (!x.category) m.push('กลุ่มปัญหา');
+        return m;
+      },
+      filters: [['open', '🔴 ยังไม่แก้', function (x) { return x.status !== 'closed'; }], ['done', '✅ แก้แล้ว', function (x) { return x.status === 'closed'; }]],
+      statusKey: 'status',
+      statuses: window.IMPL_ISSUE_STATUS.map(function (x) { return { v: x.id, label: x.icon + ' ' + x.label, cls: x.id === 'closed' ? 'done' : x.id === 'open' ? 'open' : '' }; }),
+      fields: function (x, i, h) {
+        var team = imtProjectTeamStaff(pid);
+        var defDept = imtBkVal('imt-bk-dept'), defRep = imtBkVal('imt-bk-rep');
+        return h.fld('รายละเอียดปัญหา', '<textarea class="f-input' + h.bad('รายละเอียดปัญหา') + '" rows="3"' + h.txt('problem', 1) + '>' + esc(x.problem) + '</textarea>', 1)
+          + '<div class="air-grid">'
+          +   h.fld('หน่วยงาน', '<input class="f-input' + h.bad('หน่วยงาน') + '" list="imt-bk-dept-dl" value="' + esc(x.department) + '" placeholder="' + esc(defDept ? 'ค่าเริ่มต้น: ' + defDept : 'หน่วยงาน') + '"' + h.txt('department') + '>', 1)
+          +   h.fld('ผู้แจ้ง', '<input class="f-input' + h.bad('ผู้แจ้ง') + '" value="' + esc(x.reportedBy) + '" placeholder="' + esc(defRep ? 'ค่าเริ่มต้น: ' + defRep : 'ชื่อผู้แจ้ง') + '"' + h.txt('reportedBy') + '>', 1)
+          +   h.fld('กลุ่มปัญหา', '<select class="f-input' + h.bad('กลุ่มปัญหา') + '"' + h.pick('category') + '>' + h.opt('', '-- เลือก --', !x.category) + imtIssueCategories().map(function (c) { return h.opt(c, c, c === x.category); }).join('') + '</select>', 1)
+          + '</div>'
+          + (x.status === 'closed'
+            ? h.fld('วิธีการแก้ไข', '<textarea class="f-input" rows="2"' + h.txt('solution') + '>' + esc(x.solution) + '</textarea>')
+              + '<div class="air-grid">'
+              +   h.fld('ผู้แก้ไข', '<select class="f-input"' + h.pick('fixedBy') + '>' + h.opt('', '— ไม่ระบุ —', !x.fixedBy) + team.map(function (s) { var nk = s.nickname || s.name; return h.opt(nk, s.name + ' (' + nk + ')', nk === x.fixedBy); }).join('') + '</select>')
+              +   h.fld('วันที่แก้ไขปัญหา', '<input type="date" class="f-input" value="' + esc(x.fixedDate) + '"' + h.pick('fixedDate') + '>')
+              + '</div>'
+            : '');
+      },
+      beforeSave: function () {
+        if (imtBkVal('imt-bk-recv')) return true;
+        window.showAlert && window.showAlert('กรุณาระบุผู้รับปัญหาก่อน', 'warn'); // ช่องอยู่ขั้นที่ 1 — พากลับไปกรอก
+        window.aiReview.back();
+        var el = document.getElementById('imt-bk-recv'); imtMarkInvalid(el, true); if (el) el.focus();
+        return false;
+      },
+      saveOne: function (x) {
+        var closed = x.status === 'closed';
+        return window.imtAddIssue({
+          projectId: pid, problem: String(x.problem).trim(),
+          department: String(x.department || '').trim() || imtBkVal('imt-bk-dept'),
+          reportedBy: String(x.reportedBy || '').trim() || imtBkVal('imt-bk-rep'),
+          category: x.category, status: x.status, solution: String(x.solution || '').trim(),
+          receivedBy: imtBkVal('imt-bk-recv'), receivedDate: x.createdAt || '',
+          fixedBy: closed ? x.fixedBy : '', fixedDate: closed ? x.fixedDate : '',
+        });
+      },
+      onDone: function (made) {
+        window.imtLogActivity(pid, 'issue', '', 'create', 'แยกปัญหาจากแชท/ข้อความด้วย AI ' + made + ' รายการ');
+        window.closeM('m-imt-bulk');
+        window.showAlert && window.showAlert('บันทึกปัญหา ' + made + ' รายการแล้ว', 'success');
+        window.renderImplTracker();
+      },
+      onFail: function (made) {
+        if (made) window.imtLogActivity(pid, 'issue', '', 'create', 'แยกปัญหาจากแชท/ข้อความด้วย AI ' + made + ' รายการ');
+        window.renderImplTracker();
+      },
+    });
+  }
+
   // ── Add/Edit Modal ──
   window.openImtIssueModal = function (id) {
     window.imtEditIssueId = id;
@@ -1859,7 +2026,7 @@
       ? '<div style="border:1.5px solid var(--violet);background:rgba(124,92,252,.06);border-radius:10px;margin-top:14px;padding:12px 14px;">'
         + '<div class="f-label" style="font-weight:700;color:var(--violet);margin-bottom:2px;">🔧 การแก้ไข</div>'
         + '<div class="f-group"><label class="f-label">วิธีการแก้ไข</label><textarea class="f-input" id="imt-is-solution" rows="4" placeholder="พิมพ์รายละเอียดการแก้ไขที่นี่...">'+esc(i.solution)+'</textarea></div>'
-        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'
+        + '<div class="m-stack" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'
         +   '<div class="f-group"><label class="f-label">ผู้แก้ไข</label><select class="f-input" id="imt-is-fixed-by" onchange="window.imtCheckIssueAutoClose()">'+fixedByOpts+'</select></div>'
         +   '<div class="f-group"><label class="f-label">วันที่แก้ไขปัญหา</label><input type="date" class="f-input" id="imt-is-fixed-date" value="'+esc(i.fixedDate||'')+'" onchange="window.imtCheckIssueAutoClose()"></div>'
         + '</div>'
@@ -1870,7 +2037,7 @@
     var deptOpts = imtIssueDepartments(pid).map(function (d) { return '<option value="'+esc(d)+'">'; }).join('');
     var body = document.getElementById('m-imt-issue-body');
     body.innerHTML =
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'
+      '<div class="m-stack" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'
       +   '<div class="f-group"><label class="f-label">ผู้แจ้งปัญหา <span class="imt-req">*</span></label><input class="f-input" id="imt-is-reported-by" value="'+esc(i.reportedBy)+'" placeholder="ชื่อผู้แจ้ง"></div>'
       +   '<div class="f-group"><label class="f-label">หน่วยงาน/แผนกที่แจ้ง <span class="imt-req">*</span></label><input class="f-input" id="imt-is-dept" value="'+esc(i.department)+'" placeholder="เช่น ห้องจ่ายยา IPD" list="imt-dept-datalist"><datalist id="imt-dept-datalist">'+deptOpts+'</datalist></div>'
       + '</div>'
@@ -1880,7 +2047,7 @@
       + '<div class="imt-issue-row3" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">'
       +   '<div class="f-group"><label class="f-label">กลุ่มปัญหา <span class="imt-req">*</span></label><select class="f-input" id="imt-is-cat">'+catOpts+'</select></div>'
       +   '<div class="f-group"><label class="f-label">สถานะ <span class="imt-req">*</span></label><select class="f-input" id="imt-is-status">'+stOpts+'</select></div>'
-      +   '<div class="f-group"><label class="f-label">ผู้รับปัญหา <span class="imt-req">*</span></label><input class="f-input" id="imt-is-received-by" value="'+esc(i.receivedBy)+'"></div>'
+      +   '<div class="f-group"><label class="f-label">ผู้รับปัญหา <span class="imt-req">*</span></label><select class="f-input" id="imt-is-received-by">'+imtReceiverOptions(pid, i.receivedBy)+'</select></div>'
       + '</div>'
       + resolutionSection;
     document.getElementById('m-imt-issue-title').textContent = id ? 'แก้ไขปัญหา' : 'แจ้งปัญหาใหม่';
@@ -2006,8 +2173,9 @@
   // ── หาตำแหน่ง+แผนก (STAFF.role + STAFF.dept ต่อกันเป็นชื่อตำแหน่งเดียว ไม่มีตัวคั่น เช่น "ผู้จัดการ
   // โครงการ"+"ติดตั้งระบบคลังสินค้า" → "ผู้จัดการโครงการติดตั้งระบบคลังสินค้า") จากชื่อพนักงาน — ใช้ทั้ง
   // ค่าเริ่มต้นตอนเปิด modal และตอนพิมพ์ชื่อใหม่เอง (รูปแบบเดียวกับ posDept ใน site-notice-form.js) ──
+  // เทียบชื่อแบบไม่สนคำนำหน้า/ช่องว่าง (window.sameName) — "เจ้าของไซต์" เก่าเก็บแค่ชื่อ-นามสกุล
   function imtStaffPositionByName(name) {
-    var s = (window.STAFF || []).find(function (x) { return x.name === (name || '').trim(); });
+    var s = (window.STAFF || []).find(function (x) { return window.sameName(x.name, name); });
     if (!s) return '';
     return (s.role || '') + (s.dept || '');
   }
@@ -2068,23 +2236,7 @@
       // ── ช่องนี้มักอยู่ท้ายฟอร์ม (ใกล้ขอบล่าง modal) — พื้นที่ด้านล่างเหลือน้อยจนรายการยาว ๆ (รพ. เป็น
       // ร้อยรายการ) ถูกบีบเตี้ยจนแทบเลือกไม่ได้ ถ้าเหลือที่ด้านบน input มากกว่า ให้เปิด dropdown ขึ้น
       // ด้านบนแทน (เหมือน native <select> ที่เบราว์เซอร์ทำให้อัตโนมัติ) ──
-      function positionDrop() {
-        var r = inp.getBoundingClientRect();
-        var spaceBelow = window.innerHeight - r.bottom - 16;
-        var spaceAbove = r.top - 16;
-        drop.style.position = 'fixed';
-        drop.style.left = r.left + 'px';
-        drop.style.width = r.width + 'px';
-        if (spaceBelow < 180 && spaceAbove > spaceBelow) {
-          drop.style.bottom = (window.innerHeight - r.top + 4) + 'px';
-          drop.style.top = 'auto';
-          lst.style.maxHeight = Math.max(120, Math.min(320, spaceAbove)) + 'px';
-        } else {
-          drop.style.top = (r.bottom + 4) + 'px';
-          drop.style.bottom = 'auto';
-          lst.style.maxHeight = Math.max(120, Math.min(320, spaceBelow)) + 'px';
-        }
-      }
+      function positionDrop() { window.placeDropdown(inp, drop, lst, 320); }
       function openDrop() { if (isOpen) return; isOpen = true; flat = bFlat(inp.value.trim()); fi = -1; lst.scrollTop = 0; render(); positionDrop(); drop.style.display = 'block'; window.addEventListener('resize', positionDrop); window.addEventListener('scroll', positionDrop, true); }
       function closeDrop() { if (!isOpen) return; isOpen = false; drop.style.display = 'none'; window.removeEventListener('resize', positionDrop); window.removeEventListener('scroll', positionDrop, true); }
       function selItem(id, name, label) { selId = id; hid.value = id; inp.value = label; closeDrop(); }
@@ -2101,7 +2253,7 @@
         else if (e.key === 'ArrowUp') { e.preventDefault(); fi = fi > 0 ? fi - 1 : 0; render(); }
         else if (e.key === 'Enter') { e.preventDefault(); if (flat[fi]) selItem(flat[fi].id, flat[fi].name, flat[fi].name); }
       });
-      document.addEventListener('mousedown', function onOut(e) { var wrap = document.getElementById('iip-hosp-cmb-wrap'); if (wrap && !wrap.contains(e.target) && !drop.contains(e.target)) { closeDrop(); document.removeEventListener('mousedown', onOut); } });
+      document.addEventListener('mousedown', function onOut(e) { var wrap = document.getElementById('iip-hosp-cmb-wrap'); if (!wrap) { document.removeEventListener('mousedown', onOut); return; } if (!wrap.contains(e.target) && !drop.contains(e.target)) closeDrop(); });
       inp.value = curText || '';
     };
   })();
@@ -2158,15 +2310,7 @@
             + '</div>';
         }).join('');
       }
-      function positionDrop() {
-        var r = inp.getBoundingClientRect();
-        var availH = window.innerHeight - r.bottom - 16;
-        drop.style.position = 'fixed';
-        drop.style.top = (r.bottom + 4) + 'px';
-        drop.style.left = r.left + 'px';
-        drop.style.width = r.width + 'px';
-        lst.style.maxHeight = Math.max(120, Math.min(260, availH)) + 'px';
-      }
+      function positionDrop() { window.placeDropdown(inp, drop, lst, 260); }
       function openDrop() { if (isOpen) return; isOpen = true; flat = bFlat(inp.value.trim()); fi = -1; lst.scrollTop = 0; render(); positionDrop(); drop.style.display = 'block'; window.addEventListener('resize', positionDrop); window.addEventListener('scroll', positionDrop, true); }
       function closeDrop() { if (!isOpen) return; isOpen = false; drop.style.display = 'none'; window.removeEventListener('resize', positionDrop); window.removeEventListener('scroll', positionDrop, true); }
       function selItem(name) { inp.value = name; closeDrop(); window.imtOnIssueSignLNameChange(); }
@@ -2182,7 +2326,7 @@
         else if (e.key === 'ArrowUp') { e.preventDefault(); fi = fi > 0 ? fi - 1 : 0; render(); }
         else if (e.key === 'Enter') { e.preventDefault(); if (flat[fi]) selItem(flat[fi].name); }
       });
-      document.addEventListener('mousedown', function onOut(e) { var wrap = document.getElementById('iip-lname-wrap'); if (wrap && !wrap.contains(e.target) && !drop.contains(e.target)) { closeDrop(); document.removeEventListener('mousedown', onOut); } });
+      document.addEventListener('mousedown', function onOut(e) { var wrap = document.getElementById('iip-lname-wrap'); if (!wrap) { document.removeEventListener('mousedown', onOut); return; } if (!wrap.contains(e.target) && !drop.contains(e.target)) closeDrop(); });
     };
   })();
 
@@ -3165,18 +3309,25 @@
 
     if (msgEl) msgEl.innerHTML = '<span style="color:var(--txt3)">⏳ กำลังนำเข้า...</span>';
 
+    // ── หลอดความคืบหน้า (ตัวเดียวกับนำเข้า CSV ใน modals.js) — นับรวมแถวที่ลบก่อนนำเข้าด้วย ──
+    var toDelete = clearFirst ? (window.IMPL_ISSUES || []).filter(function (x) { return x.projectId === pid; }) : [];
+    var total = toDelete.length + rows.length, step = 0;
+    var prog = function (label) { window._importProgress && window._importProgress(step, total, label); };
+
     // ── ลบปัญหาเดิม "เฉพาะของโครงการที่เลือกไว้" ก่อนนำเข้า (กรณีนำเข้าซ้ำ) — กรองด้วย projectId
     // ทุกครั้งกันพลาดลบข้ามโครงการอื่นโดยไม่ตั้งใจ ──
-    if (clearFirst) {
-      var toDelete = (window.IMPL_ISSUES || []).filter(function (x) { return x.projectId === pid; });
+    if (toDelete.length) {
+      prog('กำลังลบปัญหาเดิม');
       for (var j = 0; j < toDelete.length; j++) {
         try { await window.deleteDoc(window.getDocRef('IMPL_ISSUES', toDelete[j].id)); }
         catch (e) { console.warn('[impl issue import] delete old row failed', toDelete[j].id, e); }
+        step++; prog('กำลังลบปัญหาเดิม');
       }
       window.IMPL_ISSUES = (window.IMPL_ISSUES || []).filter(function (x) { return x.projectId !== pid; });
     }
 
     var done = 0, failed = 0;
+    prog('กำลังนำเข้า');
     for (var i = 0; i < rows.length; i++) {
       var d = rows[i].data;
       try {
@@ -3185,15 +3336,17 @@
           project_id: pid, task_id: '',
           department: d.department, reported_by: d.reportedBy, problem: d.problem,
           category: d.category, severity: d.severity, status: d.status, solution: d.solution,
-          received_by: d.receivedBy, fixed_by: d.fixedBy, fixed_date: d.fixedDate || null,
+          received_by: window.staffIdByRef(d.receivedBy), fixed_by: window.staffIdByRef(d.fixedBy), fixed_date: d.fixedDate || null,
           created_at: d.createdAt,
         };
         window.imtApplyLocal('IMPL_ISSUES', id, row);
         await window.setDoc(window.getDocRef('IMPL_ISSUES', id), row);
         done++;
       } catch (e) { failed++; console.warn('[impl issue import] row', rows[i].row, e); }
+      step++; prog('กำลังนำเข้า');
     }
 
+    window._importProgress && window._importProgress(null);
     window.closeM('m-import');
     var summary = 'นำเข้าปัญหาเข้าโครงการ "' + (proj ? proj.name : pid) + '" สำเร็จ ' + done + ' รายการ'
       + (badRows.length ? ' · ข้าม ' + badRows.length + ' รายการ (ไม่มีรายละเอียดปัญหา)' : '')

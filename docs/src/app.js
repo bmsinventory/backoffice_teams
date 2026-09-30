@@ -111,7 +111,9 @@
     var tt = document.getElementById('tp-overdue-txt');
     if (ov > 0) {
       if (td) td.style.display = 'flex';
-      if (tt) tt.textContent = ov + ' Advance เกินกำหนด';
+      // มือถือแถบบนแคบ แสดงแบบย่อ "N Adv." (topbar.css สลับ tp-ov-full / tp-ov-short) — ข้อความเต็มอยู่ใน title
+      if (tt) { tt.innerHTML = ov + '<span class="tp-ov-full"> Advance เกินกำหนด</span><span class="tp-ov-short"> Adv.</span>'; }
+      if (td) td.title = ov + ' Advance เกินกำหนด';
     } else {
       if (td) td.style.display = 'none';
     }

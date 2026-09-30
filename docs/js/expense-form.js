@@ -436,7 +436,7 @@ window.ecfOnProjectChange = function () {
   var staffName = document.getElementById('ecf-staff-name'); if (staffName) staffName.value = proj.installer || '';
   var staffPhone = document.getElementById('ecf-staff-phone');
   if (staffPhone) {
-    var installerStaff = proj.installer ? window.STAFF.find(function (s) { return s.name === proj.installer; }) : null;
+    var installerStaff = window.staffByRef(proj.installerId);
     staffPhone.value = installerStaff ? (installerStaff.phone || '') : '';
   }
   var loc = document.getElementById('ecf-work-location'); if (loc) loc.value = proj.name || '';

@@ -294,7 +294,7 @@ function _renderOwner(){
         +'</div>'
       +'</div>'
       +'<div class="so-sub" style="display:none;border-top:1px solid var(--border);">'
-        +'<table class="t-table" style="width:100%;">'
+        +'<table class="m-scroll-tbl t-table" style="width:100%;">'
           +'<thead><tr><th>ชื่อโครงการ</th><th>ประเภท</th><th>Stage</th><th style="text-align:right">มูลค่า (฿)</th></tr></thead>'
           +'<tbody>'+subRows+'</tbody>'
         +'</table>'

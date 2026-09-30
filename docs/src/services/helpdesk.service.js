@@ -96,6 +96,22 @@
     return prefix + String(max + 1).padStart(4, '0');
   };
 
+  // ── เลขที่ Ticket ถัดไป อ่านเลขล่าสุดจากฐานข้อมูลจริง — รายการในเครื่อง (HELPDESK_TICKETS) อาจยังไม่ทันล่าสุด
+  // เช่น ตอนสร้างหลายใบติดกัน realtime ดึงข้อมูลเสร็จช้าแล้วทับรายการด้วยชุดเก่า ทำให้ได้เลขซ้ำ ──
+  window.hdNextTicketNo = async function () {
+    var local = window.hdGenTicketNo(), prefix = local.slice(0, 6);
+    var n = parseInt(local.slice(prefix.length), 10) || 1;
+    var db = window.getDb && window.getDb();
+    if (db) {
+      var r = await db.from('helpdesk_tickets').select('ticket_no').like('ticket_no', prefix + '%');
+      (r.data || []).forEach(function (x) {
+        var k = parseInt(String(x.ticket_no || '').slice(prefix.length), 10);
+        if (!isNaN(k) && k >= n) n = k + 1;
+      });
+    }
+    return prefix + String(n).padStart(4, '0');
+  };
+
   window.hdGenToken = function () {
     var s = '';
     var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
@@ -199,8 +215,7 @@
     var db = window.getDb && window.getDb();
     if (!db) throw new Error('ไม่ได้เชื่อมต่อฐานข้อมูล');
     if (file.size > window.HD_ATTACH_MAX) throw new Error('ไฟล์ "' + file.name + '" ใหญ่เกิน 15MB');
-    var safe = String(file.name).replace(/[^\w.\-]+/g, '_');
-    var path = ticketId + '/' + Date.now() + '_' + safe;
+    var path = window.storageKey(ticketId, file.name);
     var up = await db.storage.from('helpdesk').upload(path, file, { contentType: file.type || 'application/octet-stream' });
     if (up.error) throw up.error;
     var pub = db.storage.from('helpdesk').getPublicUrl(path);
@@ -238,27 +253,46 @@
 
   // ── AI ช่วยวิเคราะห์ — ตัวเรียก AI กลางอยู่ที่ src/services/ai.service.js (aiChat / aiChatJson) ──
 
-  // เลือก Ticket เก่าที่ปิดแล้ว + คล้ายข้อความ เพื่อเป็น context ให้ AI (ความคล้ายแบบ bigram — รองรับภาษาไทย)
-  window.hdAiSimilar = async function (text, limit) {
+  // ── คลังความรู้ (Knowledge Base) = comment ในไทม์ไลน์ที่ขึ้นต้น "วิธีแก้ไข:" (บันทึกตอนปิดงาน / นำเข้าข้อมูลเก่า)
+  // ใช้ทั้งแท็บ "คลังความรู้" และเป็นตัวอย่างให้ AI (hdAiSimilar) — cache สั้น ๆ กันยิงซ้ำถี่ ──
+  var _kbCache = null, _kbAt = 0;
+  window.hdKbInvalidate = function () { _kbCache = null; };
+  window.hdKbFetch = async function () {
+    if (_kbCache && Date.now() - _kbAt < 120000) return _kbCache;
     var db = window.getDb && window.getDb();
     if (!db) return [];
-    var res = await db.from('helpdesk_tickets').select('id,subject,description,category_id,status,resolved_at')
-      .in('status', ['resolved', 'closed']).order('resolved_at', { ascending: false }).limit(150);
-    if (res.error) return [];
-    var evMap = {};
-    // วิธีแก้ไขเก็บเป็น comment ในไทม์ไลน์ — ดึง event ล่าสุดต่อ ticket ที่ขึ้นต้น "วิธีแก้ไข:"
-    var ids = (res.data || []).map(function (r) { return r.id; });
-    if (ids.length) {
-      var er = await db.from('helpdesk_ticket_events').select('ticket_id,body,created_at')
-        .in('ticket_id', ids).eq('type', 'comment').order('created_at', { ascending: true });
-      (er.data || []).forEach(function (e) {
-        if (/^วิธีแก้ไข\s*[:：]/.test(e.body || '')) evMap[e.ticket_id] = e.body;
-      });
+    var er = await db.from('helpdesk_ticket_events').select('ticket_id,body,actor_id,created_at')
+      .eq('type', 'comment').like('body', 'วิธีแก้ไข%').order('created_at', { ascending: false }).limit(1000);
+    if (er.error) { console.warn('[helpdesk] kbFetch:', er.error); return []; }
+    var seen = {}, evs = [];
+    (er.data || []).forEach(function (e) { // ต่อ Ticket เอาอันล่าสุด (เรียงใหม่ → เก่า)
+      if (seen[e.ticket_id] || !/^วิธีแก้ไข\s*[:：]/.test(e.body || '')) return;
+      seen[e.ticket_id] = true; evs.push(e);
+    });
+    var tk = {}, ids = evs.map(function (e) { return e.ticket_id; });
+    for (var i = 0; i < ids.length; i += 150) {
+      var tr = await db.from('helpdesk_tickets').select('id,ticket_no,subject,description,category_id,hospital_id,source_system')
+        .in('id', ids.slice(i, i + 150));
+      (tr.data || []).forEach(function (r) { tk[r.id] = r; });
     }
-    return (res.data || []).map(function (r) {
-      var score = window.aiTextSim(text, (r.subject || '') + ' ' + (r.description || ''));
-      return { score: score, subject: r.subject, description: r.description, fix: evMap[r.id] || '' };
-    }).filter(function (x) { return x.score >= 0.2 && x.fix; })
+    _kbCache = evs.filter(function (e) { return tk[e.ticket_id]; }).map(function (e) {
+      var r = tk[e.ticket_id];
+      return {
+        ticketId: r.id, ticketNo: r.ticket_no || '', subject: r.subject || '', description: r.description || '',
+        categoryId: r.category_id || '', hospitalId: r.hospital_id || '', sourceSystem: r.source_system || '',
+        fix: String(e.body || '').replace(/^วิธีแก้ไข\s*[:：]\s*/, ''), actorId: e.actor_id || '', at: e.created_at || '',
+      };
+    });
+    _kbAt = Date.now();
+    return _kbCache;
+  };
+
+  // เลือกรายการในคลังความรู้ที่คล้ายข้อความ เพื่อเป็น context ให้ AI (ความคล้ายแบบ bigram — รองรับภาษาไทย)
+  window.hdAiSimilar = async function (text, limit) {
+    var kb = await window.hdKbFetch();
+    return kb.map(function (k) {
+      return { score: window.aiTextSim(text, k.subject + ' ' + k.description), subject: k.subject, description: k.description, fix: 'วิธีแก้ไข: ' + k.fix };
+    }).filter(function (x) { return x.score >= 0.2; })
       .sort(function (a, b) { return b.score - a.score; })
       .slice(0, limit || 3);
   };

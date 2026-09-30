@@ -267,7 +267,10 @@ window.execImport=async function(){
   if(selType==='IMPL_ISSUES'){
     const pid=(document.getElementById('import-imt-project')||{}).value||'';
     if(!pid){document.getElementById('import-msg').innerHTML='<span style="color:var(--coral)">⚠ กรุณาเลือกโครงการปลายทางก่อน</span>';return;}
-    window.imtRunIssueImportInline&&await window.imtRunIssueImportInline(fileInput.files[0],pid,isClearFirst);
+    // ล็อกปุ่มตลอดการทำงาน (รวมช่วงอ่านไฟล์ก่อนหลอดความคืบหน้าจะขึ้น) กันกดซ้ำแล้วนำเข้าซ้ำ
+    const execBtn=document.getElementById('import-exec-btn');if(execBtn)execBtn.disabled=true;
+    try{window.imtRunIssueImportInline&&await window.imtRunIssueImportInline(fileInput.files[0],pid,isClearFirst);}
+    finally{window._importProgress(null);}
     return;
   }
   if(selType==='HOSPITALS'){window.closeM('m-import');await window.importHospitalsFromFile(fileInput.files[0]);return;}

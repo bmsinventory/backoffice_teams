@@ -64,6 +64,7 @@ window.renderKanban = function(){
           </div>
         </div>
         ${p.cost?`<div style="margin-top:8px;padding-top:6px;border-top:1px dashed var(--border);font-size:10px;color:var(--txt3);text-align:right;">${fc(p.cost)}</div>`:''}
+        ${window.canEdit('kanban')?`<select class="kb-stage-sel" onclick="event.stopPropagation()" onchange="window.kbMoveStage('${p.id}',this.value)" aria-label="ย้าย Stage">${window.STAGES.map(function(s){return'<option value="'+s.id+'"'+(s.id===p.stage?' selected':'')+'>'+(s.id===p.stage?'Stage: ':'ย้ายไป → ')+esc(s.label)+'</option>';}).join('')}</select>`:''}
       </div>`;
     }).join('');
     return`<div class="kb-col" id="kc-${sg.id}" ondragover="event.preventDefault();this.classList.add('kb-drop')" ondragleave="this.classList.remove('kb-drop')" ondrop="window.kbDrop(event,'${sg.id}')">
@@ -180,6 +181,14 @@ window.startAutoStageLoop=function(){
 }
 
 window.kbDrag=function(e,pid){window.kbPid=pid;}
+// ── ย้าย Stage จากเมนูบนการ์ด (มือถือ — จอสัมผัสลากการ์ดแบบ HTML5 drag ไม่ได้) ใช้ kbDrop เดิม
+// ทุกอย่างเหมือนการลาก (บังคับ 100%, แจ้งเตือน Adv./ปิดโครงการ) ──
+window.kbMoveStage=function(pid,sid){
+  var p=window.PROJECTS.find(function(x){return x.id===pid;});
+  if(!p||!sid||p.stage===sid)return;
+  window.kbPid=pid;
+  window.kbDrop({preventDefault:function(){}},sid);
+};
 // ── STAGE PROGRESS RULE: stages that always force 100% ──
 window.onStageChange=function(sid){
   if(window.stageForces100(sid)){

@@ -463,7 +463,8 @@ window.ldAiDecideOpen=function(pid){
 window.ldAiApprove=async function(){
   var s=window._ldAiLast;if(!s||!s.ldId)return;
   var l=window.LODGINGS.find(function(x){return x.id===s.ldId;});
-  if(!confirm('อนุมัติที่พัก "'+((l&&l.name)||'')+'" แบบ'+(s.type==='daily'?'รายวัน':'รายเดือน')+' ?'))return;
+  if(!(await window.confirmAsync('อนุมัติที่พัก "'+((l&&l.name)||'')+'" แบบ'+(s.type==='daily'?'รายวัน':'รายเดือน')+' ?',
+    {icon:'🏨',title:'อนุมัติที่พัก',okText:'อนุมัติ',okColor:'var(--teal)'})))return;
   await window.approveLdType(s.pid,s.ldId,s.type);
   window.openLodgingGroupModal(s.pid);
 };
@@ -511,7 +512,7 @@ window.showLdForm=function(pid,ldId){
   var html=`<input type="hidden" id="ld-pid" value="${pid}">
 
   <!-- ข้อมูลพื้นฐาน -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+  <div class="m-stack" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
     <div class="f-group" style="margin-bottom:0"><label class="f-label">ชื่อที่พัก *</label>
       <input type="text" class="f-input" id="ld-name" value="${l?esc(l.name):''}" placeholder="ชื่อโรงแรม / หอพัก..." ${dis}></div>
     <div class="f-group" style="margin-bottom:0"><label class="f-label">📞 เบอร์ติดต่อ</label>
@@ -575,7 +576,7 @@ window.showLdForm=function(pid,ldId){
         <!-- ค่าใช้จ่ายเพิ่มเติมรายวัน (ไม่นับรวม) -->
         <div style="border-top:1px dashed var(--indigo)30;margin-top:10px;padding-top:10px;">
           <div style="font-size:10px;font-weight:700;color:var(--indigo);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;">📋 ค่าใช้จ่ายเพิ่มเติม <span style="font-weight:400;font-style:italic;opacity:.7;">(ไม่นับรวม)</span></div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div class="m-stack" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
             <div class="f-group" style="margin-bottom:0;"><label class="f-label" style="font-size:10px;">🔐 ค่ามัดจำ (฿)</label>
               <input type="number" id="ld-d-deposit" class="f-input" placeholder="0" value="${l&&l.dDeposit?l.dDeposit:''}" ${dis}></div>
             <div class="f-group" style="margin-bottom:0;"><label class="f-label" style="font-size:10px;">📝 รายละเอียดมัดจำ</label>
@@ -623,7 +624,7 @@ window.showLdForm=function(pid,ldId){
         <!-- ค่ามัดจำ -->
         <div style="border-top:1px dashed var(--coral)30;margin-top:10px;padding-top:10px;">
           <div style="font-size:10px;font-weight:700;color:var(--coral);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;">📋 ค่าใช้จ่ายเพิ่มเติม <span style="font-weight:400;font-style:italic;opacity:.7;">(ไม่นับรวม)</span></div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+          <div class="m-stack" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
             <div class="f-group" style="margin-bottom:0;"><label class="f-label" style="font-size:10px;">🔐 ค่ามัดจำ (฿)</label>
               <input type="number" id="ld-m-deposit" class="f-input" placeholder="0" value="${l&&l.mDeposit?l.mDeposit:''}" ${dis}></div>
             <div class="f-group" style="margin-bottom:0;"><label class="f-label" style="font-size:10px;">📝 รายละเอียดมัดจำ</label>

@@ -855,7 +855,7 @@ window.renderHospital = function() {
 
     return '<div style="border:1px solid var(--border);border-left:3px solid ' + t.color + ';border-radius:12px;overflow:hidden;margin-bottom:10px;background:var(--surface);cursor:pointer;transition:box-shadow .15s;" onclick="window.openHospitalDetail(\'' + esc(h.id) + '\')" onmouseover="this.style.boxShadow=\'0 2px 14px rgba(0,0,0,.09)\'" onmouseout="this.style.boxShadow=\'\'">' +
       header +
-      '<div style="display:grid;grid-template-columns:minmax(160px,1.2fr) minmax(160px,1fr) minmax(160px,1.2fr);">' +
+      '<div class="hsp-card-grid" style="display:grid;grid-template-columns:minmax(160px,1.2fr) minmax(160px,1fr) minmax(160px,1.2fr);">' +
       sec1 + sec2 + sec3 +
       '</div></div>';
   }).join('');
@@ -1380,7 +1380,7 @@ window._hspAddAnydesk = function(a) {
   row.className = 'hsp-anydesk-row';
   row.style.cssText = 'background:var(--bg);border-radius:8px;padding:10px 12px;margin-bottom:8px;border:1px solid var(--border);';
   row.innerHTML =
-    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;align-items:start;">' +
+    '<div class="m-2col" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;align-items:start;">' +
       '<input class="f-input" placeholder="ชื่อเครื่อง/หมายเหตุ" data-cf="label" value="' + esc(a?.label||'') + '" style="margin:0;">' +
       '<input class="f-input" placeholder="Anydesk IP" data-cf="ip" value="' + esc(a?.ip||'') + '" style="margin:0;">' +
       _hspPwField('Anydesk Password', 'password', a?.password) +
@@ -3608,7 +3608,7 @@ window.renderHspAnalysis = function() {
 
     return '<div style="border:1px solid var(--border);border-left:3px solid ' + ti.color + ';border-radius:12px;overflow:hidden;margin-bottom:10px;background:var(--surface);cursor:pointer;transition:box-shadow .15s;" onclick="window.openHospitalDetail(\'' + esc(h.id) + '\')" onmouseover="this.style.boxShadow=\'0 2px 14px rgba(0,0,0,.09)\'" onmouseout="this.style.boxShadow=\'\'">' +
       header +
-      '<div style="display:grid;grid-template-columns:minmax(150px,1fr) minmax(180px,2fr) minmax(160px,1.5fr);">' +
+      '<div class="hsp-card-grid" style="display:grid;grid-template-columns:minmax(150px,1fr) minmax(180px,2fr) minmax(160px,1.5fr);">' +
       sec1 + sec2 + sec3 +
       '</div></div>';
   }).join('');
@@ -3873,7 +3873,7 @@ function _hspShowProdImportPreview() {
         + '</div>' : '')
       + '</div>'
       + (found.length ? '<div style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-bottom:10px;">'
-        + '<table style="width:100%;border-collapse:collapse;">'
+        + '<table class="m-scroll-tbl" style="width:100%;border-collapse:collapse;">'
         + '<thead><tr style="background:var(--surface2);position:sticky;top:0;">'
           + '<th style="padding:6px 10px;text-align:left;font-size:11px;font-weight:700;color:var(--txt3);">รหัส</th>'
           + '<th style="padding:6px 10px;text-align:left;font-size:11px;font-weight:700;color:var(--txt3);">ชื่อ รพ.</th>'
@@ -3954,7 +3954,7 @@ window._hspDashPopup = function(title, filter) {
       + '</div>'
       + '<div style="overflow-y:auto;flex:1;">'
         + (rows
-          ? '<table style="width:100%;border-collapse:collapse;">'
+          ? '<table class="m-scroll-tbl" style="width:100%;border-collapse:collapse;">'
               + '<thead style="position:sticky;top:0;background:var(--surface);z-index:1;">'
                 + '<tr style="border-bottom:2px solid var(--border);">'
                   + '<th style="padding:7px 12px;text-align:left;font-size:10px;color:var(--txt-muted);font-weight:700;text-transform:uppercase;">รหัส</th>'
@@ -4137,7 +4137,7 @@ window.renderHspDashboard = function() {
 
   html += '<div style="flex:1 1 380px;min-width:0;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;overflow:hidden;">';
   html += '<div style="font-size:13px;font-weight:700;color:var(--txt);margin-bottom:16px;">🏷️ แยกตามระดับ รพ. <span style="font-size:10px;font-weight:400;color:var(--txt-muted);">คลิกเพื่อดูรายชื่อ</span></div>';
-  html += '<table style="width:100%;border-collapse:collapse;table-layout:fixed;">'
+  html += '<table class="m-scroll-tbl" style="width:100%;border-collapse:collapse;table-layout:fixed;">'
     + '<colgroup><col style="width:50px;"><col style="width:115px;"><col><col style="width:50px;"><col style="width:36px;"></colgroup>'
     + '<tbody>' + typeRows + '</tbody></table>';
   html += '</div>';
@@ -4183,7 +4183,7 @@ window.renderHspDashboard = function() {
     html += '<details style="margin-top:12px;">'
       + '<summary style="font-size:11px;color:var(--txt-muted);cursor:pointer;padding:4px 0;user-select:none;">&#9658; ดูทั้งหมด ' + provSorted.length + ' จังหวัด</summary>'
       + '<div style="max-height:240px;overflow-y:auto;margin-top:8px;">'
-      + '<table style="width:100%;border-collapse:collapse;"><tbody>'
+      + '<table class="m-scroll-tbl" style="width:100%;border-collapse:collapse;"><tbody>'
       + expandRows(provSorted, maxProv, '#4cc9f0', 'province')
       + '</tbody></table></div></details>';
   }
@@ -4198,7 +4198,7 @@ window.renderHspDashboard = function() {
     html += '<details style="margin-top:12px;">'
       + '<summary style="font-size:11px;color:var(--txt-muted);cursor:pointer;padding:4px 0;user-select:none;">&#9658; ดูทั้งหมด ' + affilSorted.length + ' สังกัด</summary>'
       + '<div style="max-height:240px;overflow-y:auto;margin-top:8px;">'
-      + '<table style="width:100%;border-collapse:collapse;"><tbody>'
+      + '<table class="m-scroll-tbl" style="width:100%;border-collapse:collapse;"><tbody>'
       + expandRows(affilSorted, maxAffil, '#06d6a0', 'affil')
       + '</tbody></table></div></details>';
   }

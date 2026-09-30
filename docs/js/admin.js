@@ -16,13 +16,13 @@ function renderAdm(){
     if(titleEl)titleEl.innerHTML=`👥 จัดการพนักงาน <span class="tag" style="background:var(--surface2);color:var(--txt3);margin-left:10px;font-size:11px;">ใช้งาน ${activeStaff.length} คน</span>`;
     function staffRow(s,i){
       var initials=s.name.split(' ').map(function(w){return w.charAt(0);}).join('').substring(0,2).toUpperCase();
-      return`<div style="display:flex;align-items:center;gap:12px;padding:10px 16px;transition:background .15s;cursor:default;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+      return`<div class="adm-staff-row" style="display:flex;align-items:center;gap:12px;padding:10px 16px;transition:background .15s;cursor:default;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
         <div style="width:38px;height:38px;border-radius:10px;background:${avC(i)};color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;">${initials}</div>
         <div style="flex:1;min-width:0;">
           <div style="font-size:13px;font-weight:600;color:var(--txt);line-height:1.3;">${esc(s.name)}${s.nickname?` <span style="font-size:11px;color:var(--txt3);font-weight:400;">(${esc(s.nickname)})</span>`:''}</div>
           <div style="font-size:11px;color:var(--violet);font-weight:500;margin-top:1px;">${esc(s.role||'—')}</div>
         </div>
-        <div style="display:flex;align-items:center;gap:20px;flex-shrink:0;">
+        <div class="adm-staff-contact" style="display:flex;align-items:center;gap:20px;flex-shrink:0;">
           ${s.phone?`<span style="font-size:12px;color:var(--txt3);">📞 ${esc(s.phone)}</span>`:'<span style="font-size:12px;color:var(--border2);">—</span>'}
           ${s.email?`<span style="font-size:12px;color:var(--txt3);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">✉️ ${esc(s.email)}</span>`:''}
         </div>
@@ -84,7 +84,7 @@ function renderAdm(){
     c.innerHTML=`<div style="max-width:560px;display:flex;flex-direction:column;gap:20px;">
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;">
         <div style="font-size:13px;font-weight:700;color:var(--violet);margin-bottom:16px;">📋 อัตราค่าเบี้ยเลี้ยง (฿/วัน)</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="m-stack" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
           <div class="f-group"><label class="f-label">วันทำงาน — พื้นที่ปกติ</label><input type="number" class="f-input" id="rt-wn" value="${st.allowance_weekday_normal}" ${window.canEdit('admin')?'':'disabled'}></div>
           <div class="f-group"><label class="f-label">วันหยุด — พื้นที่ปกติ</label><input type="number" class="f-input" id="rt-hn" value="${st.allowance_holiday_normal}" ${window.canEdit('admin')?'':'disabled'}></div>
           <div class="f-group"><label class="f-label">วันทำงาน — พื้นที่ชายแดน</label><input type="number" class="f-input" id="rt-wb" value="${st.allowance_weekday_border}" ${window.canEdit('admin')?'':'disabled'}></div>
@@ -145,6 +145,7 @@ function renderAdm(){
     c.innerHTML=`<div style="display:flex;justify-content:flex-end;max-width:640px;margin-bottom:20px;">${canA?`<button class="btn btn-pri" onclick="window.openHspProductEdit(null);window.openM('m-hsp-products')">+ เพิ่ม Product</button>`:''}</div>`+rows;
   }
   else if(window.admCur==='users'){if(titleEl)titleEl.innerHTML=`🔑 ผู้ใช้งานระบบ`;c.innerHTML=`<div style="display:flex;justify-content:flex-end;margin-bottom:20px">${window.canAdd('admin')?`<button class="btn btn-pri" onclick="window.admUserForm(null)">+ เพิ่มบัญชีผู้ใช้</button>`:''}</div><div class="dtable-inner" style="border:1px solid var(--border);"><table><thead><tr><th>Username</th><th>ชื่อ</th><th>Role</th><th style="width:90px"></th></tr></thead><tbody>`+window.USERS.map(function(u,i){var rc={admin:'rgba(255,107,107,.15)',pm:'rgba(255,166,43,.15)',viewer:'rgba(6,214,160,.15)'};var rt={admin:'var(--coral)',pm:'var(--amber)',viewer:'var(--teal)'};return`<tr class="fade"><td style="font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--violet)">${esc(u.username)}</td><td style="font-weight:600;">${esc(u.name)}</td><td><span class="tag" style="background:${rc[u.role]||'var(--surface2)'};color:${rt[u.role]||'var(--txt2)'}">${window.roleLabel(u.role)}</span></td><td><div style="display:flex;gap:6px">${window.canEdit('admin')?`<button class="btn btn-ghost btn-sm" onclick="window.admUserForm('${u.id}')">✏️</button>`:''} ${window.canDel('admin')?`<button class="btn btn-red btn-sm" onclick="window.askDel('user','${u.id}','${esc(u.username)}')">🗑</button>`:''}</div></td></tr>`;}).join('')+`</tbody></table></div>`;}
+  if(window.initMobileTable)window.initMobileTable(c); // มือถือ: ตารางใน Admin Panel (เช่น Users) → การ์ด
 }
 
 // ── helper: show/hide ID badge in modal header ──
@@ -466,12 +467,12 @@ function renderAdmRoles(c, titleEl) {
     }).join('');
 
     // Admin column (read-only, always on)
-    var adminCells = `<td colspan="${actions.length}" style="text-align:center;font-size:11px;color:var(--txt3);padding:6px 8px;">
+    var adminCells = `<td class="adm-perm-admin" colspan="${actions.length}" style="text-align:center;font-size:11px;color:var(--txt3);padding:6px 8px;">
       ${actions.map(function(){return '<span style="color:var(--teal);font-size:14px;">✓</span>';}).join(' ')}
     </td>`;
 
     return `<tr style="border-bottom:1px solid var(--border);" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
-      <td style="padding:10px 14px;font-size:13px;font-weight:500;white-space:nowrap;">${mod.icon} ${esc(mod.label)}</td>
+      <td class="adm-perm-mod" style="padding:10px 14px;font-size:13px;font-weight:500;white-space:nowrap;">${mod.icon} ${esc(mod.label)}</td>
       ${adminCells}
       ${cells}
     </tr>`;
@@ -483,16 +484,16 @@ function renderAdmRoles(c, titleEl) {
         💡 <b>Admin</b> มีสิทธิ์เต็มทุก Module เสมอ — กำหนดสิทธิ์ได้สำหรับ Role อื่นๆ
       </div>
       <div style="overflow-x:auto;border:1px solid var(--border);border-radius:14px;">
-        <table style="width:100%;border-collapse:collapse;min-width:560px;">
+        <table class="adm-perm-tbl" style="width:100%;border-collapse:collapse;min-width:560px;">
           <thead>
             <tr style="border-bottom:1px solid var(--border);">
-              <th style="text-align:left;padding:10px 14px;font-size:12px;color:var(--txt3);">Module</th>
-              <th colspan="${actions.length}" style="text-align:center;padding:10px 6px;background:rgba(255,107,107,.08);color:var(--coral);font-size:13px;font-weight:700;">Admin</th>
+              <th class="adm-perm-mod" style="text-align:left;padding:10px 14px;font-size:12px;color:var(--txt3);">Module</th>
+              <th class="adm-perm-admin" colspan="${actions.length}" style="text-align:center;padding:10px 6px;background:rgba(255,107,107,.08);color:var(--coral);font-size:13px;font-weight:700;">Admin</th>
               ${roleHeadCells}
             </tr>
             <tr style="border-bottom:2px solid var(--border);background:var(--surface2);">
-              <th></th>
-              <th colspan="${actions.length}" style="text-align:center;font-size:10px;color:var(--txt3);padding:5px;">เต็ม</th>
+              <th class="adm-perm-mod"></th>
+              <th class="adm-perm-admin" colspan="${actions.length}" style="text-align:center;font-size:10px;color:var(--txt3);padding:5px;">เต็ม</th>
               ${actionHeadCells}
             </tr>
           </thead>

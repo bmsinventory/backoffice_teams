@@ -18,7 +18,7 @@
       return { id:d.id, projectId:d.project_id, name:d.phase_name||'', description:d.description||'', order:Number(d.sort_order)||99, status:d.status||'not_started', progress:Number(d.progress_percent)||0 };
     },
     IMPL_TASKS: function (d) {
-      return { id:d.id, phaseId:d.phase_id, projectId:d.project_id, name:d.task_name||'', description:d.description||'', owner:d.owner||'', start:d.start_date||'', due:d.due_date||'', priority:d.priority||'medium', status:d.status||'not_started', progress:Number(d.progress_percent)||0, order:Number(d.sort_order)||99, createdAt:d.created_at||'', updatedAt:d.updated_at||'' };
+      return { id:d.id, phaseId:d.phase_id, projectId:d.project_id, name:d.task_name||'', description:d.description||'', ownerId:d.owner||'', get owner(){ return window.staffNickByRef(this.ownerId); }, start:d.start_date||'', due:d.due_date||'', priority:d.priority||'medium', status:d.status||'not_started', progress:Number(d.progress_percent)||0, order:Number(d.sort_order)||99, createdAt:d.created_at||'', updatedAt:d.updated_at||'' };
     },
     IMPL_CHECKLIST_ITEMS: function (d) {
       return { id:d.id, taskId:d.task_id, name:d.checklist_name||'', done:d.is_done===true, doneDate:d.done_date||'', doneBy:d.done_by||'', remark:d.remark||'', order:Number(d.sort_order)||99 };
@@ -26,7 +26,7 @@
     // ── ปัญหาการใช้งานโปรแกรมรายโครงการ (แท็บ "ปัญหา") — createdAt = วันที่รับปัญหา, fixedDate = วันที่แก้ไขปัญหา
     // (คนละแนวคิดกับ IMPL_ISSUES เดิมที่ผูกกับ task/severity ล้วน ๆ — ตอนนี้ปรับให้ตรงกับรายงานสรุปปัญหารายโครงการ) ──
     IMPL_ISSUES: function (d) {
-      return { id:d.id, projectId:d.project_id, taskId:d.task_id||'', department:d.department||'', reportedBy:d.reported_by||'', problem:d.problem||'', category:d.category||'', severity:d.severity||'medium', status:d.status||'open', solution:d.solution||'', receivedBy:d.received_by||'', fixedBy:d.fixed_by||'', fixedDate:d.fixed_date||'', createdAt:d.created_at||'', updatedAt:d.updated_at||'' };
+      return { id:d.id, projectId:d.project_id, taskId:d.task_id||'', department:d.department||'', reportedBy:d.reported_by||'', problem:d.problem||'', category:d.category||'', severity:d.severity||'medium', status:d.status||'open', solution:d.solution||'', receivedById:d.received_by||'', fixedById:d.fixed_by||'', get receivedBy(){ return window.staffNameByRef(this.receivedById); }, get fixedBy(){ return window.staffNickByRef(this.fixedById); }, fixedDate:d.fixed_date||'', createdAt:d.created_at||'', updatedAt:d.updated_at||'' };
     },
     IMPL_RISKS: function (d) {
       return { id:d.id, projectId:d.project_id, title:d.risk_title||'', detail:d.risk_detail||'', impact:d.impact_level||'medium', probability:d.probability||'medium', mitigation:d.mitigation_plan||'', owner:d.owner||'', status:d.status||'open' };
@@ -131,7 +131,7 @@
       project_id: data.projectId, task_id: data.taskId || '',
       department: data.department || '', reported_by: data.reportedBy || '', problem: data.problem || '', category: data.category || '',
       severity: data.severity || 'medium', status: data.status || 'open', solution: data.solution || '',
-      received_by: data.receivedBy || '', fixed_by: data.fixedBy || '',
+      received_by: window.staffIdByRef(data.receivedBy), fixed_by: window.staffIdByRef(data.fixedBy), // เก็บเป็นรหัสพนักงาน
       fixed_date: data.fixedDate || null,
     };
     // receivedDate ระบุเองได้ (ย้อนหลัง/นำเข้าข้อมูลเก่า) — ไม่ระบุ ปล่อยให้ DB default NOW() ทำงาน
@@ -145,7 +145,7 @@
     var row = {
       department: data.department || '', reported_by: data.reportedBy || '', problem: data.problem || '', category: data.category || '',
       severity: data.severity || 'medium', status: data.status || 'open', solution: data.solution || '',
-      received_by: data.receivedBy || '', fixed_by: data.fixedBy || '',
+      received_by: window.staffIdByRef(data.receivedBy), fixed_by: window.staffIdByRef(data.fixedBy), // เก็บเป็นรหัสพนักงาน
       fixed_date: data.fixedDate || null, updated_at: new Date().toISOString(),
     };
     if (data.receivedDate) row.created_at = new Date(data.receivedDate).toISOString();
@@ -265,8 +265,8 @@
   // ── Attachment Upload (Storage bucket: impl-attachments) ──
   window.imtUploadAttachment = async function (taskId, file) {
     var sb = window.getDb();
-    var path = taskId + '/' + Date.now() + '_' + file.name;
-    var up = await sb.storage.from('impl-attachments').upload(path, file);
+    var path = window.storageKey(taskId, file.name);
+    var up = await sb.storage.from('impl-attachments').upload(path, file, { contentType: file.type || 'application/octet-stream' });
     if (up.error) throw up.error;
     var pub = sb.storage.from('impl-attachments').getPublicUrl(path);
     var id = window.imtUid('IATT');

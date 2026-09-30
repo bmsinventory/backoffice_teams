@@ -117,6 +117,31 @@
   // opts (ไม่บังคับ): allLabel = เพิ่มตัวเลือกบนสุด (ค่า '') เช่น "ทุกโครงการ" สำหรับช่องกรอง ·
   // fixed = วาง dropdown แบบ position:fixed (ใช้ในโมดัล — .m-body มี overflow ทำให้ dropdown ถูกครอบตัด) ·
   // minWidth = ความกว้างขั้นต่ำของ dropdown (px) เผื่อช่องแคบในแถบเครื่องมือ
+  // ── วางตำแหน่ง dropdown แบบ position:fixed ให้อยู่ในจอเสมอ (ใช้ร่วมกันทุกช่องค้นหา-เลือก) ──
+  // พื้นที่ด้านล่างไม่พอ (ช่องอยู่ล่างจอ / popup แบบ bottom-sheet บนมือถือ) → เปิดขึ้นด้านบนแทน ·
+  // ความสูงจอใช้ visualViewport (คีย์บอร์ดมือถือเปิดแล้วจอเตี้ยลง) · จอแคบ: กว้างไม่เกินจอ
+  var _lastDrop = null;
+  window.placeDropdown = function (inp, drop, lst, maxH, minW) {
+    maxH = maxH || 280;
+    var vv = window.visualViewport, vh = vv ? vv.height + vv.offsetTop : window.innerHeight;
+    var r = inp.getBoundingClientRect();
+    var below = vh - r.bottom - 12, above = r.top - 12;
+    var up = below < Math.min(maxH, 200) && above > below;
+    var vw = window.innerWidth, w = Math.min(Math.max(r.width, minW || 0), vw - 16);
+    drop.style.position = 'fixed';
+    drop.style.right = 'auto';
+    drop.style.width = w + 'px';
+    drop.style.left = Math.max(8, Math.min(r.left, vw - w - 8)) + 'px';
+    if (up) { drop.style.top = 'auto'; drop.style.bottom = (window.innerHeight - r.top + 4) + 'px'; }
+    else { drop.style.bottom = 'auto'; drop.style.top = (r.bottom + 4) + 'px'; }
+    lst.style.maxHeight = Math.max(96, Math.min(maxH, up ? above : below)) + 'px';
+    _lastDrop = { inp: inp, drop: drop, lst: lst, maxH: maxH, minW: minW };
+  };
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', function () {
+    var d = _lastDrop;
+    if (d && d.drop.style.display !== 'none' && document.body.contains(d.drop)) window.placeDropdown(d.inp, d.drop, d.lst, d.maxH, d.minW);
+  });
+
   window.initProjectCombobox = function (elIds, projects, curPid, onSelect, opts) {
     opts = opts || {};
     var inp = document.getElementById(elIds.inputId), drop = document.getElementById(elIds.dropId),
@@ -165,15 +190,12 @@
     function positionDrop() {
       if (!opts.fixed && !opts.minWidth) return;
       var r = inp.getBoundingClientRect(), w = Math.max(r.width, opts.minWidth || 0);
-      if (opts.fixed) {
-        drop.style.position = 'fixed'; drop.style.top = (r.bottom + 4) + 'px'; drop.style.right = 'auto';
-        drop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + 'px';
-        lst.style.maxHeight = Math.max(160, Math.min(360, window.innerHeight - r.bottom - 16)) + 'px';
-      } else { drop.style.right = 'auto'; }
+      if (opts.fixed) { window.placeDropdown(inp, drop, lst, 360, opts.minWidth); return; }
+      drop.style.right = 'auto';
       drop.style.width = w + 'px';
     }
-    function openDrop() { if (isOpen) return; isOpen = true; q = ''; fi = -1; flat = bFlat(''); lst.scrollTop = 0; render(); positionDrop(); drop.style.display = 'block'; if (opts.fixed) window.addEventListener('resize', positionDrop); }
-    function closeDrop() { if (!isOpen) return; isOpen = false; drop.style.display = 'none'; inp.value = selName; if (opts.fixed) window.removeEventListener('resize', positionDrop); }
+    function openDrop() { if (isOpen) return; isOpen = true; q = ''; fi = -1; flat = bFlat(''); lst.scrollTop = 0; render(); positionDrop(); drop.style.display = 'block'; if (opts.fixed) { window.addEventListener('resize', positionDrop); window.addEventListener('scroll', positionDrop, true); } }
+    function closeDrop() { if (!isOpen) return; isOpen = false; drop.style.display = 'none'; inp.value = selName; if (opts.fixed) { window.removeEventListener('resize', positionDrop); window.removeEventListener('scroll', positionDrop, true); } }
     function selProj(id, name) { selId = id; selName = name; hid.value = id; closeDrop(); inp._cmbOnSelect && inp._cmbOnSelect(id, name); }
     function scFi() { if (fi < 0) return; var top = 0; for (var i = 0; i < fi; i++) top += flat[i] ? (flat[i].k === 'h' ? HH : IH) : 0; if (top < lst.scrollTop) lst.scrollTop = top; else if (top + IH > lst.scrollTop + lst.clientHeight) lst.scrollTop = top + IH - lst.clientHeight; }
 
@@ -282,8 +304,20 @@
   var _att = {}, _attOrder = [];
   function attFmtSize(n) { return n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; }
   function attIcon(n) { return /\.pdf$/i.test(n) ? '📕' : /\.docx?$/i.test(n) ? '📘' : /\.xlsx?$/i.test(n) ? '📗' : '📄'; }
+  // ── path ไฟล์บน Storage: ตัดจุดหน้านามสกุลออก (photo.jpg → photo_jpg) เพราะ Proxy หน้าเซิร์ฟเวอร์ดัก URL
+  // ที่ลงท้าย .jpg/.png ไปหน้าเว็บแทน Supabase (ได้ 404) · ชนิดไฟล์เก็บใน contentType ตอนอัปโหลด จึงเปิดเป็นรูปได้ปกติ
+  // ชื่อจริงเก็บใน file_name ของตาราง (ใช้แสดงผล/ตั้งชื่อตอนดาวน์โหลด) — help.html มีสำเนาแบบเดียวกัน ──
+  window.storageKey = function (prefix, name) {
+    return prefix + '/' + Date.now() + '_' + String(name || 'file').replace(/[^\w.\-]+/g, '_').replace(/\.(\w+)$/, '_$1');
+  };
   window.attPickerHtml = function (id, opts) {
     opts = opts || {};
+    // compact = ปุ่ม 📎 เล็ก ๆ อย่างเดียว (ใช้ในกล่องพิมพ์แบบแชท) — ผู้เรียกวาง <div id="{id}-list"> / "{id}-err" เอง
+    // และส่ง opts.dropOn (id กล่องพิมพ์) ตอน init ให้ลากไฟล์มาวางทั้งกล่องได้
+    if (opts.compact) {
+      return '<input type="file" id="' + id + '" multiple accept="' + window.esc(opts.accept || '') + '" hidden>'
+        + '<button type="button" class="att-btn" id="' + id + '-drop" title="แนบไฟล์ — ลากไฟล์มาวาง หรือกด Ctrl+V วางภาพได้' + (opts.hint ? '\n' + window.esc(opts.hint) : '') + '">📎</button>';
+    }
     return '<div class="att-drop" id="' + id + '-drop" tabindex="0" role="button">'
       + '<input type="file" id="' + id + '" multiple accept="' + window.esc(opts.accept || '') + '" hidden>'
       + '<div class="att-drop-ic">📎</div>'
@@ -296,19 +330,22 @@
   };
   window.attPickerInit = function (id, opts) {
     opts = opts || {};
-    _att[id] = { files: [], ext: String(opts.accept || '').toLowerCase().split(',').filter(Boolean), max: opts.max || 0 };
+    // opts.keep = วาดหน้าเดิมซ้ำ (เช่น realtime) → คงไฟล์ที่เลือกไว้ ไม่ล้างทิ้ง
+    _att[id] = { files: (opts.keep && _att[id] && _att[id].files) || [], ext: String(opts.accept || '').toLowerCase().split(',').filter(Boolean), max: opts.max || 0 };
     _attOrder = _attOrder.filter(function (k) { return k !== id; }).concat(id);
     var inp = document.getElementById(id), drop = document.getElementById(id + '-drop');
     if (!inp || !drop) return;
     drop.onclick = function () { inp.click(); };
     drop.onkeydown = function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inp.click(); } };
     inp.onchange = function () { attAdd(id, inp.files); inp.value = ''; };
-    ['dragenter', 'dragover'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('over'); }); });
-    ['dragleave', 'drop'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('over'); }); });
-    drop.addEventListener('drop', function (e) { attAdd(id, e.dataTransfer && e.dataTransfer.files); });
+    var zone = (opts.dropOn && document.getElementById(opts.dropOn)) || drop; // พื้นที่รับลากวางไฟล์
+    ['dragenter', 'dragover'].forEach(function (ev) { zone.addEventListener(ev, function (e) { e.preventDefault(); zone.classList.add('over'); }); });
+    ['dragleave', 'drop'].forEach(function (ev) { zone.addEventListener(ev, function (e) { e.preventDefault(); zone.classList.remove('over'); }); });
+    zone.addEventListener('drop', function (e) { attAdd(id, e.dataTransfer && e.dataTransfer.files); });
     renderAttList(id);
   };
   window.attPickerFiles = function (id) { return (_att[id] && _att[id].files) || []; };
+  window.attPickerClear = function (id) { if (_att[id]) { _att[id].files = []; renderAttList(id); } }; // หลังส่งสำเร็จ
   function attAdd(id, list) {
     var st = _att[id]; if (!st) return;
     var bad = [];

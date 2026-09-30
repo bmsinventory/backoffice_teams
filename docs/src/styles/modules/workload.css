@@ -17,3 +17,14 @@
 
 .wl-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 4px; padding-bottom: 20px; }
 .wl-card { padding: 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); box-shadow: var(--sh-sm); }
+
+/* ── ตารางภาระงานบนมือถือ — เดิมคอลัมน์ชื่อ 240px + ภาระงาน 120px (รวม 360px) กินเต็มจอ ไม่เห็นช่องวันที่
+   → ย่อคอลัมน์ชื่อเหลือชื่อเล่น ตรึงไว้ซ้ายตอนเลื่อนดูวัน ซ่อนคอลัมน์ภาระงาน แสดงสถานะย่อใต้ชื่อแทน ── */
+.wl-mname, .wl-mstat { display: none; }
+@media (max-width: 768px) {
+  .wl-name { width: 104px !important; padding: 6px 8px !important; gap: 6px !important; position: sticky; left: 0; z-index: 2; background: var(--surface); }
+  .wl-name .wl-av, .wl-name .wl-role, .wl-name .wl-fullname { display: none; }
+  .wl-mname, .wl-mstat { display: block; }
+  .wl-mname { font-size: 12px; }
+  .wl-sum { display: none !important; }
+}

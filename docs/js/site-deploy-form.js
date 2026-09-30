@@ -45,17 +45,9 @@ window._sdfSiteCombo = (function () {
         + hi(it.name, q) + '</div>';
     }).join('');
   }
-  function positionDrop() {
-    var r = inp.getBoundingClientRect();
-    var availH = window.innerHeight - r.bottom - 16;
-    drop.style.position = 'fixed';
-    drop.style.top = (r.bottom + 4) + 'px';
-    drop.style.left = r.left + 'px';
-    drop.style.width = r.width + 'px';
-    lst.style.maxHeight = Math.max(140, Math.min(260, availH)) + 'px';
-  }
-  function openDrop() { if (isOpen) return; isOpen = true; q = ''; fi = -1; flat = bFlat(''); lst.scrollTop = 0; render(); positionDrop(); drop.style.display = 'block'; window.addEventListener('resize', positionDrop); }
-  function closeDrop() { if (!isOpen) return; isOpen = false; drop.style.display = 'none'; inp.value = selName; window.removeEventListener('resize', positionDrop); }
+  function positionDrop() { window.placeDropdown(inp, drop, lst, 260); }
+  function openDrop() { if (isOpen) return; isOpen = true; q = ''; fi = -1; flat = bFlat(''); lst.scrollTop = 0; render(); positionDrop(); drop.style.display = 'block'; window.addEventListener('resize', positionDrop); window.addEventListener('scroll', positionDrop, true); }
+  function closeDrop() { if (!isOpen) return; isOpen = false; drop.style.display = 'none'; inp.value = selName; window.removeEventListener('resize', positionDrop); window.removeEventListener('scroll', positionDrop, true); }
   function selItem(id, name) {
     selId = id; selName = name;
     if (hid) hid.value = id;

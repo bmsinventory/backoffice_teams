@@ -13,7 +13,7 @@
       return { id:d.id, projectId:d.project_id, name:d.group_name||'', order:Number(d.sort_order)||99, createdAt:d.created_at||'' };
     },
     FORM_ITEMS: function (d) {
-      return { id:d.id, projectId:d.project_id, groupId:d.group_id, name:d.form_name||'', formType:d.form_type||'', status:d.status||'not_started', owner:d.owner||'', receivedDate:d.received_date||'', description:d.description||'', order:Number(d.sort_order)||99, createdAt:d.created_at||'', updatedAt:d.updated_at||'' };
+      return { id:d.id, projectId:d.project_id, groupId:d.group_id, name:d.form_name||'', formType:d.form_type||'', status:d.status||'not_started', ownerId:d.owner||'', get owner(){ return window.staffNickByRef(this.ownerId); }, receivedDate:d.received_date||'', description:d.description||'', order:Number(d.sort_order)||99, createdAt:d.created_at||'', updatedAt:d.updated_at||'' };
     },
     FORM_TEMPLATES: function (d) {
       return { id:d.id, name:d.name||'', order:Number(d.sort_order)||99, createdAt:d.created_at||'' };

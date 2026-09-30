@@ -38,6 +38,7 @@
   div[style*="grid-template-columns:repeat(4,1fr)"] { grid-template-columns: repeat(2,1fr) !important; }
   .ov-grid { grid-template-columns: 1fr 1fr !important; }
   div[style*="1fr 1fr 280px"] { grid-template-columns: 1fr 1fr !important; }
+  .ov-row-3 { grid-template-columns: 1fr 1fr !important; }
 
   .f-input { min-height: 42px; }
   .toolbar { flex-wrap: wrap; }
@@ -124,8 +125,8 @@
      ความสูงที่ตั้งใจไว้ของปุ่มเล็กๆ เหล่านั้นทุกจุดโดยไม่จำเป็น ทำให้บวมใหญ่ผิดสัดส่วน (บั๊กเดียวกับ
      .pku-x-btn ที่เจอและแก้ไปก่อนหน้า) แก้โดยให้กฎนี้จับเฉพาะปุ่มที่ใช้ระบบ .btn/.tp-btn จริงๆ เท่านั้น
      (ปุ่มเหล่านี้ไม่ได้ตั้ง padding เองเพื่อให้เล็กเป็นพิเศษ จึงควรได้ touch-target ตามปกติ) ── */
-  .btn:not(.pku-x-btn), .tp-btn { min-height: 44px; padding-top: 10px !important; padding-bottom: 10px !important; }
-  .btn-sm:not(.pku-x-btn) { min-height: 36px; }
+  .btn:not(.pku-x-btn), .tp-btn { min-height: 44px; padding-top: 10px !important; padding-bottom: 10px !important; padding-left: 12px; padding-right: 12px; }
+  .btn-sm:not(.pku-x-btn) { min-height: 36px; padding-top: 6px !important; padding-bottom: 6px !important; padding-left: 10px; padding-right: 10px; }
   /* ยังใหญ่อยู่แม้ยกเว้น padding แล้ว เพราะ .btn-sm ข้างบนยังบังคับ min-height:36px ทับปุ่มเล็กนี้อยู่ดี
      — กำหนดขนาดของตัวเองไปเลยแทนที่จะพึ่ง .btn/.btn-sm base ให้เป็นชิปกลมเล็กพอดีตัว ✕ ── */
   .pku-x-btn { min-height: 0 !important; width: 20px !important; height: 20px !important; padding: 0 !important; font-size: 11px !important; display: inline-flex !important; align-items: center; justify-content: center; border-radius: 50% !important; }
@@ -135,13 +136,19 @@
   td { min-height: 44px; }
 
   /* ── Toolbar ── */
+  /* ตัวกรองทุกแบบ (dropdown / ตัวกรองหลายค่า / ช่องค้นหา / ค้นหาโครงการ) ขนาดตัวอักษรและความสูงเท่ากัน
+     — เดิม dropdown 13px + สูงขั้นต่ำ 44px, ช่องค้นหา 14px ใหญ่กว่าปุ่ม (12px/36px) ข้าง ๆ ในแถบเดียวกัน ── */
+  .t-sel, .ms-filter .ms-btn, .t-search input, .toolbar select, .lv-filter-bar select, .toolbar > [id$="-cmb-wrap"] input {
+    font-size: 12px !important; min-height: 38px !important; padding-top: 7px !important; padding-bottom: 7px !important;
+  }
   .toolbar { padding: 10px 12px; gap: 6px; flex-wrap: wrap; }
   .t-search { flex: 1 1 140px; min-width: 120px; }
-  .t-search input { width: 100% !important; min-width: 0; font-size: 14px; }
-  .t-sel { font-size: 13px; max-width: 100%; min-width: 0; flex-shrink: 1; flex: 1 1 120px; }
+  .t-search input { width: 100% !important; min-width: 0; }
+  .t-sel { max-width: 100%; min-width: 0; flex-shrink: 1; flex: 1 1 120px; }
   .ms-filter { max-width: 100%; min-width: 0; flex-shrink: 1; flex: 1 1 120px; }
-  .toolbar > .btn { flex-shrink: 0; }
-  .toolbar .btn { padding: 8px 12px; font-size: 12px; }
+  .toolbar > [id$="-cmb-wrap"] { flex: 1 1 160px; width: auto !important; min-width: 0; }
+  .toolbar > .btn { flex-shrink: 1; min-width: 0; }
+  .toolbar .btn { padding: 8px 10px; font-size: 12px; }
 
   /* ── Stat Row ── */
   .stat-row,
@@ -155,10 +162,49 @@
   /* ── Overview ── */
   .ov-grid { grid-template-columns: 1fr !important; padding: 0 12px 80px !important; gap: 12px !important; }
   div[style*="1fr 1fr 280px"] { grid-template-columns: 1fr !important; }
+  .ov-row { grid-template-columns: 1fr !important; padding: 0 12px 12px !important; gap: 12px !important; }
+  #ov-ai-wrap { padding: 12px 12px 0 !important; }
 
   /* ── Advance / Lodging card grids: เดิม minmax(340px,1fr) ไม่มี mobile override เลย
      (บั๊กเดียวกับที่เจอใน Leave dept-grid ก่อนหน้านี้) กว้าง 340px ล้นจอมือถือทั่วไปแน่นอน ── */
   #adv-cards, #lodging-cards { grid-template-columns: 1fr !important; padding: 0 12px 80px !important; gap: 12px !important; }
+
+  /* ── รายชื่อ รพ.: การ์ดแต่ละ รพ. เดิม 3 ส่วนเรียงแนวนอน (minmax รวม ≥480px) กว้างเกินจอมือถือ
+     และถูกตัดหายเงียบ ๆ (body ปิด overflow-x) — สแตกเป็นแนวตั้ง เส้นคั่นเปลี่ยนจากขวาเป็นบน ── */
+  .hsp-card-grid { grid-template-columns: 1fr !important; }
+  .hsp-card-grid > div { border-right: none !important; }
+  .hsp-card-grid > div + div { border-top: 1px solid var(--border); }
+
+  /* ── กริด inline ที่ CSS กลางเข้าไม่ถึง (ฟอร์มใน JS) — ใส่ class เฉพาะจุดที่ควรยุบ
+     m-stack = 1 คอลัมน์ (ช่องกรอกที่ label ยาว), m-2col = 3 คอลัมน์ → 2 ── */
+  .m-stack { grid-template-columns: 1fr !important; }
+  .m-2col  { grid-template-columns: 1fr 1fr !important; }
+
+  /* ── Advance: แถวรายการค่าใช้จ่าย 4 คอลัมน์แคบเกิน → 2 บรรทัด: [หมวด · จำนวนเงิน · ✕] / [รายละเอียดเต็มแถว] ── */
+  .adv-exp-head { display: none !important; }
+  .adv-exp-row { grid-template-columns: 1fr 1fr auto !important; }
+  .adv-exp-row > :nth-child(2) { grid-column: 1 / -1; order: 5; }
+
+  /* ── ปัญหาทุกโครงการ: ตารางกลายเป็นการ์ดแล้ว ช่องสถานะไม่ต้องกว้างขั้นต่ำ 180px (ล้นการ์ด) ── */
+  .aio-matrix-tbl td { min-width: 0 !important; }
+
+  /* ── ตารางที่ไม่ได้อยู่ใน .dtable-inner (popup/พรีวิว) — เลื่อนแนวนอนได้ แทนการถูกตัดขอบ ── */
+  table.m-scroll-tbl { display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* ── ขนาดตัวอักษรขั้นต่ำบนมือถือ — inline style ตั้ง 9px ไว้ ~55 จุด (ป้าย/วันที่/หมายเหตุบนการ์ด)
+     อ่านยากบนจอเล็ก ขยับเป็น 10px · หัววันในตารางภาระงาน 7px → 9px (ช่องแคบ ขยายได้แค่นี้) ── */
+  [style*="font-size:9px"], [style*="font-size: 9px"] { font-size: 10px !important; }
+  [style*="font-size:7px"] { font-size: 9px !important; }
+  .ss-lbl { font-size: 9.5px; }
+  .imt-issue-stat-row .stat-k { font-size: 9.5px !important; }
+
+  /* ── แถว flex ที่มีปุ่ม (inline style จาก JS ~17 จุดไม่ได้ตั้ง flex-wrap) → ขึ้นบรรทัดใหม่แทนการดันล้นขอบ
+     ใช้ :has() จับเฉพาะแถวที่มีปุ่มเป็นลูกโดยตรง ไม่แตะแถวอื่น ── */
+  #content [style*="display:flex"]:has(> .btn), .modal [style*="display:flex"]:has(> .btn),
+  #content [style*="display: flex"]:has(> .btn), .modal [style*="display: flex"]:has(> .btn) { flex-wrap: wrap; }
+
+  /* ── ข้อความยาวที่ไม่มีช่องว่าง (URL, เลข Ticket, ID, อีเมล) ตัดขึ้นบรรทัดใหม่ แทนการยืดกล่องจนล้นขอบ ── */
+  #content, .modal { overflow-wrap: break-word; }
 
   /* ── Data Table → Card View ── */
   table.m-card-table              { display: block; min-width: unset !important; }
@@ -171,10 +217,18 @@
      ผ่าน tr) ถ้าปล่อยไว้ทุกช่องจะถูกยืดสูงอย่างน้อย 44px แม้เนื้อหาจริงสั้นแค่บรรทัดเดียว ทำให้
      การ์ดทั้งใบ (Projects/Impl-Tracker/Helpdesk/Form-Tracker) สูงเทอะทะเกินจำเป็น ── */
   table.m-card-table td           { display: flex; flex-direction: column; gap: 2px; padding: 3px 0; border: none; font-size: 12.5px; min-height: 0; }
-  table.m-card-table td::before   { content: attr(data-label); font-size: 9.5px; font-weight: 700; color: var(--txt3); text-transform: uppercase; letter-spacing: .6px; }
+  table.m-card-table td::before   { content: attr(data-label); font-size: 10.5px; font-weight: 700; color: var(--txt3); text-transform: uppercase; letter-spacing: .6px; }
   table.m-card-table td:first-child { grid-column: 1 / -1; font-size: 13.5px; font-weight: 700; color: var(--txt); padding-bottom: 6px; border-bottom: 1px solid var(--border); margin-bottom: 3px; }
   table.m-card-table td:first-child::before { display: none; }
   table.m-card-table td:last-child  { grid-column: 1 / -1; }
+  /* ช่องสั้นครึ่งแถว/ช่องยาวเต็มแถว (mobile.js mCardCell) — dense เติมช่องว่างที่เกิดจากช่องเต็มแถวคั่น */
+  table.m-card-table tr { grid-auto-flow: row dense; }
+  table.m-card-table td.m-wide { grid-column: 1 / -1; }
+  /* ข้อความยาวมาก: ตัดที่ 3 บรรทัด + … · แถวที่กดไม่ได้ แตะเพื่อกาง/พับ */
+  .m-clampbox { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
+  .m-clampbox.open { display: block; -webkit-line-clamp: unset; line-clamp: unset; }
+  .m-clamp-tap { cursor: pointer; }
+  table.m-card-table td:has(> .m-clamp-tap:not(.open))::after { content: "แตะเพื่อดูทั้งหมด"; font-size: 10px; color: var(--violet); }
   /* ช่องที่ไม่มีข้อมูลจริง (ทำเครื่องหมายไว้จาก JS ว่า data-empty="1") ไม่ต้องแสดงเลยบนการ์ดมือถือ
      กันรกด้วย "-"/"—" ที่ไม่มีความหมาย — desktop (ไม่มี .m-card-table) ยังโชว์ "-" ปกติเพื่อคงคอลัมน์ตรงแถว ── */
   table.m-card-table td[data-empty="1"] { display: none !important; }
@@ -188,7 +242,7 @@
   .lv-stat      { padding: 8px !important; }
   .lv-stat-top  { margin-bottom: 3px !important; gap: 5px !important; }
   .lv-stat-icon { width: 20px !important; height: 20px !important; font-size: 10px !important; border-radius: 6px !important; }
-  .lv-stat-label{ font-size: 8.5px !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+  .lv-stat-label{ font-size: 9.5px !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
   .lv-stat-val  { font-size: 15px !important; }
 
   /* ── Leave: แถบตัวกรองเดิมเป็น flex-wrap ที่แต่ละช่องกว้างไม่เท่ากัน (ตาม flex-basis 120px)
@@ -214,7 +268,10 @@
   .modal.md, .modal.lg, .modal.xl { max-width: 100vw !important; }
   .m-body  { padding: 16px !important; }
   .m-foot  { padding: 12px 16px !important; padding-bottom: max(12px, env(safe-area-inset-bottom)) !important; flex-wrap: wrap; gap: 8px; }
-  .m-foot .btn { flex: 1; justify-content: center; }
+  .m-foot .btn { flex: 1 1 auto; min-width: 0; justify-content: center; }
+  .m-foot .btn-pri, .m-foot .btn-teal { flex-grow: 2; }
+  .m-foot .btn-red, .m-foot .imt-ws-danger { flex: 0 0 auto; }
+  .m-foot > div:empty { display: none; }
   .modal::before { content: ''; display: block; width: 40px; height: 4px; border-radius: 2px; background: var(--border2); margin: 10px auto -4px; flex-shrink: 0; }
 
   /* ── Admin Modal ── */
@@ -263,7 +320,7 @@
   /* ── Advance Stepper ── */
   .adv-stepper { overflow-x: auto; gap: 0; padding-bottom: 4px; }
   .adv-s { min-width: 64px; }
-  .adv-lbl { font-size: 8px; max-width: 56px; }
+  .adv-lbl { font-size: 9.5px; max-width: 60px; }
 
   /* ── Timesheet ── */
   .ts-row-staff { width: 140px !important; }
@@ -278,25 +335,30 @@
 @media (max-width: 480px) {
   .btn-lbl { display: none !important; }
   #topbar  { gap: 4px; padding: 0 8px; }
-  .t-search { flex: 1 1 auto; min-width: 0; }
+  /* ── แถบตัวกรอง (≤480): เดิม flex:1 (เริ่มกว้าง 0) ทำให้ทุกช่องไม่ยอมขึ้นบรรทัดใหม่ ถูกบีบรวมแถวเดียว
+     จน dropdown เหลือแต่ลูกศร (พบ 10 หน้า: Kanban, โครงการ, Advance, ที่พัก, ปฏิทิน, Timesheet, Cost,
+     รพ., งบประมาณ, สัญญา) → ช่องค้นหาเต็มแถว · ตัวกรองแถวละ 2 ช่องเท่ากัน ── */
+  .t-search { flex: 1 1 100%; min-width: 0; }
   .t-search input { width: 100% !important; min-width: 0; }
-  .toolbar .t-sel { min-width: 0; flex: 1; font-size: 12px; }
-  .toolbar .ms-filter { min-width: 0; flex: 1; }
-  .toolbar .ms-filter .ms-btn { font-size: 12px; }
+  .toolbar .t-sel { min-width: 0; flex: 1 1 calc(50% - 6px); }
+  .toolbar .ms-filter { min-width: 0; flex: 1 1 calc(50% - 6px); }
+  /* ช่องเลือกโครงการแบบค้นหา (Timesheet/Cost/ปฏิทิน) เดิมกว้างตายตัว 230px → ยืดตามแถวเหมือนตัวกรองอื่น */
+  .toolbar > [id$="-cmb-wrap"] { flex: 1 1 calc(50% - 6px); width: auto !important; min-width: 0; }
   .ms-panel { max-width: calc(100vw - 24px); }
   .stat-c { padding: 12px 10px; }
   .stat-v { font-size: 17px; }
-  .stat-k { font-size: 9px; }
+  .stat-k { font-size: 10px; }
   .f-grid { grid-template-columns: 1fr !important; }
-  .m-foot .btn { flex: 1 1 100%; justify-content: center; }
-  table.m-card-table td::before { font-size: 9px; }
+  .m-foot { gap: 6px !important; }
+  .m-foot .btn { font-size: 12.5px; }
+  table.m-card-table td::before { font-size: 10px; }
   .lcard { padding: 28px 0 0 !important; }
 }
 
 /* ════ VERY SMALL: ≤ 375px ════ */
 @media (max-width: 375px) {
   .stat-v { font-size: 16px; }
-  .stat-k { font-size: 9px; }
+  .stat-k { font-size: 10px; }
   .tp-title { font-size: 13px; }
   .bottom-nav-label { display: none; }
   .bottom-nav-icon  { font-size: 20px; }

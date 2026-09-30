@@ -321,7 +321,7 @@ window.openLeaveDetail=function(lvId){
       +'<div><div style="font-size:15px;font-weight:800;color:var(--txt);">'+esc(stf.name)+'</div>'
       +(stf.role||stf.dept?'<div style="font-size:12px;color:var(--txt3);margin-top:2px;">'+esc(stf.role||'')+(stf.role&&stf.dept?' · ':'')+esc(stf.dept||'')+'</div>':'')
       +'</div></div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'
+    +'<div class="m-stack" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'
       +'<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;">'
         +'<div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">ประเภทการลา</div>'
         +'<div style="font-size:14px;font-weight:700;color:var(--txt);">'+esc(typeLabel)+'</div>'

@@ -32,3 +32,94 @@
 .ai-sug[open] .ai-sug-more::after { content: 'ซ่อน ▴'; }
 .ai-sug > summary:hover .ai-sug-more { color: var(--violet); }
 .ai-sug-body { padding: 2px 10px 10px; border-top: 1px dashed var(--border); }
+
+/* ══ นำเข้าแชท LINE ให้ AI แยกรายการ (src/utils/chat-import.util.js) ══ */
+/* ── ขั้นที่ 1: แผงวางแชท ── */
+.lc-head { display: flex; gap: 10px; align-items: flex-start; flex-wrap: wrap; margin-bottom: 8px; }
+.lc-hint { flex: 1; min-width: 220px; font-size: 12px; color: var(--txt3); }
+.lc-info { font-size: 12px; color: var(--txt3); margin-top: 6px; min-height: 16px; }
+.lc-range { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+
+/* ── ขั้นที่ 2: ตรวจทาน — หน้าต่างขยาย · รายการการ์ด (+ แผงแก้ไขด้านขวาเมื่อกดแก้ไข) ── */
+.overlay.air-on .modal { max-width: min(1280px, 96vw) !important; height: 92vh; max-height: 92vh; }
+.overlay.air-on .m-body { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; padding-bottom: 0; }
+.overlay.air-on .air-step2, .air-step2 > div, .air { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.air-top { flex-shrink: 0; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.air-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; }
+.air-ctx { font-size: 12.5px; color: var(--txt2); }
+.air-sel { font-size: 12.5px; }
+.air-sel b { color: var(--violet); }
+.air-note { font-size: 11.5px; color: var(--coral); }
+.air-filters { display: flex; flex-wrap: wrap; gap: 6px; }
+.air-fbtn { border: 1px solid var(--border); background: var(--bg); color: var(--txt2); border-radius: 999px; padding: 4px 11px; font-size: 12px; cursor: pointer; font-family: inherit; }
+.air-fbtn b { margin-left: 5px; }
+.air-fbtn.on { background: var(--violet); border-color: var(--violet); color: #fff; }
+.air-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr; }
+.air.editing .air-body { grid-template-columns: minmax(0, 1fr) minmax(360px, 44%); }
+.air-list { overflow-y: auto; padding: 12px 6px 16px 0; }
+.air-detail { display: none; overflow-y: auto; padding: 12px 4px 16px 16px; border-left: 1px solid var(--border); }
+.air.editing .air-detail { display: block; }
+.air-empty { padding: 30px 10px; text-align: center; color: var(--txt3); font-size: 12.5px; }
+
+/* การ์ดรายการ */
+.air-card { display: flex; align-items: flex-start; gap: 10px; border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; background: var(--surface); }
+.air-card.done { border-left: 4px solid var(--teal); }
+.air-card.dup { border-color: #ffa62b; background: rgba(255,166,43,.05); }
+.air-card.need { border-color: rgba(229,72,77,.5); }
+.air-card.on { box-shadow: 0 0 0 2px var(--violet); }
+.air-card.made { opacity: .6; }
+.air-card.off .air-card-main { opacity: .45; }
+.air-pick { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11px; color: var(--txt3); cursor: pointer; padding-top: 2px; }
+.air-pick input { width: 19px; height: 19px; }
+.air-card-main { flex: 1; min-width: 0; }
+.air-line1 { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 11.5px; }
+.air-st { font-weight: 700; }
+.air-st.done { color: var(--teal); }
+.air-st.open { color: var(--coral); }
+.air-made { color: var(--teal); }
+.air-when { font-size: 11.5px; color: var(--txt3); }
+.air-title { font-size: 14px; font-weight: 600; line-height: 1.5; margin: 5px 0 7px; white-space: pre-wrap; }
+.air-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.air-chip { font-size: 11.5px; padding: 3px 9px; border-radius: 999px; background: var(--bg); border: 1px solid var(--border); color: var(--txt2); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.air-chip.miss { color: var(--coral); border-color: rgba(229,72,77,.45); background: rgba(229,72,77,.06); }
+.air-fix { margin-top: 8px; font-size: 12.5px; padding: 7px 10px; border-left: 3px solid var(--teal); background: rgba(6,214,160,.07); border-radius: 0 8px 8px 0; white-space: pre-wrap; }
+.air-warn { margin-top: 6px; font-size: 12px; color: #c9820c; }
+.air-miss { margin-top: 6px; font-size: 12px; color: var(--coral); font-weight: 600; }
+.air-miss:empty { display: none; }
+.air-card-chat { margin-top: 8px; font-size: 12px; }
+.air-card-chat summary { cursor: pointer; color: var(--violet); font-weight: 600; }
+.air-card-chat .air-chat-b { margin-top: 6px; border-radius: 8px; background: var(--bg); max-height: 220px; }
+.air-edit-btn { flex-shrink: 0; }
+
+/* แผงแก้ไข */
+.air-d-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 13px; }
+.air-d-pick { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.air-d-pick input { width: 17px; height: 17px; }
+.air-detail .air-warn, .air-detail .air-miss { margin: 0 0 6px; }
+.air-seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin: 2px 0 12px; }
+.air-seg button { border: none; background: var(--surface); padding: 7px 14px; font-size: 12.5px; cursor: pointer; font-family: inherit; color: var(--txt2); }
+.air-seg button + button { border-left: 1px solid var(--border); }
+.air-seg button.on.open { background: rgba(229,72,77,.1); color: var(--coral); font-weight: 700; }
+.air-seg button.on.done { background: rgba(6,214,160,.12); color: var(--teal); font-weight: 700; }
+.air-seg button.on.mid { background: rgba(67,97,238,.1); color: var(--indigo); font-weight: 700; }
+.air-f { display: flex; flex-direction: column; gap: 4px; font-size: 11.5px; color: var(--txt3); margin-bottom: 10px; }
+.air-f textarea { resize: vertical; }
+.air-req { color: var(--coral); font-weight: 700; }
+.air-req-hint { font-size: 11.5px; color: var(--txt3); margin: -4px 0 8px; }
+.air-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0 10px; }
+.air-why { font-size: 11px; color: var(--txt3); }
+.air-chat { margin-top: 4px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.air-chat-h { font-size: 12px; font-weight: 700; padding: 7px 12px; background: var(--bg); border-bottom: 1px solid var(--border); }
+.air-chat-b { font-size: 12.5px; line-height: 1.6; white-space: pre-wrap; padding: 10px 12px; max-height: 280px; overflow: auto; color: var(--txt2); }
+.air-chat-b b { color: var(--violet); font-weight: 600; }
+
+@media (max-width: 768px) {
+  .overlay.air-on .modal { height: 96dvh; max-height: 96dvh; }
+  .lc-range { grid-template-columns: 1fr 1fr; }
+  .air.editing .air-body { grid-template-columns: 1fr; }
+  .air.editing .air-list { display: none; }   /* มือถือ: แผงแก้ไขเต็มจอ กด ✕ ปิด กลับมาที่รายการ */
+  .air-detail { border-left: none; padding-left: 0; }
+  .air-note { display: none; }
+  .air-card { padding: 10px 12px; }
+  .air-edit-btn { padding: 4px 8px; }
+}

@@ -64,3 +64,19 @@
   box-shadow: var(--sh-lg); display: flex; align-items: center; gap: 16px;
   font-weight: 600; font-size: 15px; color: var(--txt); border: 1px solid var(--border);
 }
+
+/* ── แถบบนบนมือถือ — เดิมชื่อหน้ายาวตกหลายบรรทัด และป้ายสถานะ/ปุ่มทับซ้อนกัน ──
+   ชื่อหน้าบรรทัดเดียว (ตัด …) · ป้าย Realtime เหลือจุดสถานะ (แตะซิงค์ได้เหมือนเดิม) · ป้าย Advance เกินกำหนดแบบย่อ
+   · ปุ่มเหลือไอคอน (.btn-lbl ซ่อน) ขนาดเล็กเท่ากัน */
+.tp-ov-short { display: none; }
+@media (max-width: 768px) {
+  #topbar { gap: 6px; }
+  .tp-title { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #tp-status { font-size: 0; padding: 8px; gap: 0; flex-shrink: 0; }
+  #tp-status .pulse { width: 9px; height: 9px; }
+  #tp-overdue { flex-shrink: 0; white-space: nowrap; padding: 4px 8px; font-size: 10.5px; }
+  .tp-ov-full { display: none; }
+  .tp-ov-short { display: inline; }
+  #topbar .btn-lbl { display: none !important; }
+  #topbar > .btn, #topbar > #dm-toggle { flex-shrink: 0; min-height: 34px !important; padding: 6px 8px !important; font-size: 14px; line-height: 1; }
+}
