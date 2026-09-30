@@ -1617,11 +1617,6 @@
     return s ? s.name : nick;
   }
 
-  function imtIssueStatC(k, v, icon, color) {
-    return '<div class="stat-c imt-stat-c"><div class="stat-icon" style="background:'+color+'18;color:'+color+'">'+icon+'</div>'
-      + '<div class="imt-stat-text"><div class="stat-k">'+k+'</div><div class="stat-v">'+v+'</div></div></div>';
-  }
-
   function renderImtIssues(mount) {
     var pid = window.imtCurrentProjectId;
     var proj = imtProject(pid);
@@ -1632,10 +1627,7 @@
     var progN = all.filter(function (i) { return i.status === 'in_progress'; }).length;
     var doneN = all.filter(function (i) { return i.status === 'closed'; }).length;
 
-    // ── ชื่อโครงการซ้ำ (ตัวเลือก "กำลังดู" ด้านบนก็โชว์อยู่แล้ว) + KPI 4 ใบใหญ่ กินพื้นที่จอมือถือเยอะ
-    // เกินไปก่อนจะเห็นรายการปัญหาสักใบ — ใส่ class เฉพาะจุด (imt-issue-ws-title/imt-issue-stat-row) ให้
-    // ซ่อน/ย่อบนมือถือ (ดู responsive override ใน impl-tracker.css) โดยไม่กระทบแท็บอื่นที่ใช้ class ฐาน
-    // เดียวกัน (imt-ws-title/imt-stat-row) ร่วมกันอยู่ ──
+    // ── ชื่อโครงการซ้ำกับตัวเลือก "กำลังดู" ด้านบน — ซ่อนบนมือถือ (.imt-issue-ws-title ใน impl-tracker.css) ──
     var header = '<div class="imt-ws-header">'
       +   '<div class="imt-ws-title-block"><div class="imt-ws-title imt-issue-ws-title">🩹 ปัญหาการใช้งาน — '+esc(proj.name)+'</div></div>'
       +   '<div class="imt-ws-actions">'
@@ -1645,13 +1637,6 @@
       +     (window.canAdd(window.IMPL_MODULE) ? '<button class="btn btn-ghost btn-sm" onclick="window.openImtBulkModal()" title="วางแชท LINE หรือเปิดไฟล์บันทึกแชท (.txt) / บันทึกประชุม ให้ AI แยกเป็นปัญหาหลายข้อในครั้งเดียว">🤖<span class="btn-label"> วางแชท LINE (AI)</span></button>' : '')
       +     (window.canAdd(window.IMPL_MODULE) ? '<button class="btn btn-pri btn-sm" onclick="window.openImtIssueModal(null)">+<span class="btn-label"> แจ้งปัญหาใหม่</span></button>' : '')
       +   '</div>'
-      + '</div>';
-
-    var kpis = '<div class="stat-row imt-stat-row imt-issue-stat-row" style="grid-template-columns:repeat(4,1fr);margin:0 24px 12px;">'
-      + imtIssueStatC('ทั้งหมด', all.length, '🗂️', 'var(--indigo)')
-      + imtIssueStatC('รอดำเนินการ', openN, '🔴', 'var(--coral)')
-      + imtIssueStatC('กำลังดำเนินการ', progN, '🔵', 'var(--indigo)')
-      + imtIssueStatC('ดำเนินการแล้ว', doneN, '✅', 'var(--teal)')
       + '</div>';
 
     var f = window.imtIssueFilter || {};
@@ -1665,6 +1650,13 @@
       + '<div class="t-search"><input placeholder="ค้นหาปัญหา/หน่วยงาน..." value="'+esc(f.q||'')+'" oninput="window.imtSetIssueFilter(\'q\',this.value)"></div>'
       + '<select class="t-sel" onchange="window.imtSetIssueFilter(\'status\',this.value)">'+stOpts+'</select>'
       + '<select class="t-sel" onchange="window.imtSetIssueFilter(\'category\',this.value)">'+catOpts+'</select>'
+      // ── สรุปจำนวนตามสถานะ เป็นชิปเล็กท้ายแถวตัวกรอง (แทน KPI 4 ใบใหญ่ที่กินพื้นที่) · กดชิป = กรองสถานะนั้น
+      // มือถือเหลือไอคอน+ตัวเลข (ซ่อน .lbl — มี title บอกชื่อเต็ม) ──
+      + '<div class="imt-iss-stats">' + [['', '🗂️', 'ทั้งหมด', all.length, 'var(--indigo)'], ['open', '🔴', 'รอดำเนินการ', openN, 'var(--coral)'],
+          ['in_progress', '🔵', 'กำลังดำเนินการ', progN, 'var(--indigo)'], ['closed', '✅', 'ดำเนินการแล้ว', doneN, 'var(--teal)']].map(function (c) {
+          return '<button type="button" class="imt-iss-chip' + ((f.status || '') === c[0] ? ' on' : '') + '" style="--c:' + c[4] + '" title="' + c[2] + '"'
+            + ' onclick="window.imtSetIssueFilter(\'status\',\'' + c[0] + '\')">' + c[1] + '<span class="lbl"> ' + c[2] + '</span> <b>' + c[3] + '</b></button>';
+        }).join('') + '</div>'
       + '</div>';
 
     var rows = imtFilteredIssues(pid);
@@ -1693,7 +1685,7 @@
         + '</div>';
     }).join('') || '<div class="imt-iss-empty">' + (all.length ? 'ไม่มีปัญหาที่ตรงตัวกรอง' : 'ยังไม่มีปัญหาที่บันทึกไว้ในโครงการนี้') + '</div>';
 
-    mount.innerHTML = header + kpis + filterBar
+    mount.innerHTML = header + filterBar
       + '<div class="imt-ws-scroll imt-iss-list" style="padding:0 24px 24px;overflow-y:auto;flex:1;">'+cardsHtml+'</div>'
       + '<div class="imt-print-only" id="imt-issue-print-doc"></div>';
     imtIssFitMore(mount);

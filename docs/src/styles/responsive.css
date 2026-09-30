@@ -196,7 +196,6 @@
   [style*="font-size:9px"], [style*="font-size: 9px"] { font-size: 10px !important; }
   [style*="font-size:7px"] { font-size: 9px !important; }
   .ss-lbl { font-size: 9.5px; }
-  .imt-issue-stat-row .stat-k { font-size: 9.5px !important; }
 
   /* ── แถว flex ที่มีปุ่ม (inline style จาก JS ~17 จุดไม่ได้ตั้ง flex-wrap) → ขึ้นบรรทัดใหม่แทนการดันล้นขอบ
      ใช้ :has() จับเฉพาะแถวที่มีปุ่มเป็นลูกโดยตรง ไม่แตะแถวอื่น ── */
