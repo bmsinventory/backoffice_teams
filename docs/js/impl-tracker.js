@@ -1685,7 +1685,8 @@
         +   (i.category ? '<span class="imt-iss-cat">' + esc(i.category) + '</span>' : '')
         +   '<span class="imt-iss-date">📅 ' + fd(i.createdAt) + '</span></div>'
         + '<div class="imt-iss-body">'
-        +   '<div class="imt-iss-box prob"><div class="imt-iss-lbl">❓ ปัญหา</div><div class="imt-iss-txt">' + esc(i.problem || '-') + '</div></div>'
+        +   '<div class="imt-iss-box prob"><div class="imt-iss-lbl">❓ ปัญหา</div><div class="imt-iss-txt clamp">' + esc(i.problem || '-') + '</div>'
+        +     '<button type="button" class="imt-iss-more" onclick="event.stopPropagation();window.imtIssMore(this)">ดูเพิ่มเติม ▾</button></div>'
         +   '<div class="imt-iss-box sol' + (i.solution ? '' : ' empty') + '"><div class="imt-iss-lbl">💡 วิธีการแก้ไข</div><div class="imt-iss-txt">' + (i.solution ? esc(i.solution) : 'ยังไม่ได้บันทึกวิธีแก้') + '</div></div>'
         + '</div>'
         + (meta ? '<div class="imt-iss-meta">' + meta + '</div>' : '')
@@ -1695,6 +1696,21 @@
     mount.innerHTML = header + kpis + filterBar
       + '<div class="imt-ws-scroll imt-iss-list" style="padding:0 24px 24px;overflow-y:auto;flex:1;">'+cardsHtml+'</div>'
       + '<div class="imt-print-only" id="imt-issue-print-doc"></div>';
+    imtIssFitMore(mount);
+  }
+
+  // ── "❓ ปัญหา" แสดงแค่ 2 บรรทัด (ไล่ดูรายการได้เร็ว) · ปุ่ม "ดูเพิ่มเติม" โชว์เฉพาะข้อความที่ถูกตัดจริง ──
+  function imtIssFitMore(root) {
+    root.querySelectorAll('.imt-iss-txt.clamp').forEach(function (t) {
+      var btn = t.nextElementSibling;
+      // เกินจริงอย่างน้อยครึ่งบรรทัด (สระบน/วรรณยุกต์ไทยทำให้สูงเกินกล่องไม่กี่ px แม้ข้อความพอดี 2 บรรทัด)
+      var half = (parseFloat(getComputedStyle(t).lineHeight) || 20) / 2;
+      if (btn && t.scrollHeight - t.clientHeight < half) btn.style.display = 'none';
+    });
+  }
+  window.imtIssMore = function (btn) {
+    var t = btn.previousElementSibling, open = t.classList.toggle('open');
+    btn.textContent = open ? 'ย่อ ▴' : 'ดูเพิ่มเติม ▾';
   }
 
   // ── กรอก "ผู้แก้ไข" + "วันที่แก้ไขปัญหา" ครบทั้งคู่ = ถือว่าจบงานแล้ว เปลี่ยนสถานะเป็น "ดำเนินการแล้ว"
