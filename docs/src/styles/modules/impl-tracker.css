@@ -630,3 +630,10 @@
   .imt-iss-chip { padding: 4px 10px; flex: 1; }
   .imt-iss-chip .lbl { display: none; }
 }
+
+/* ── AI แนะนำปัญหา: ข้อเสนอที่ให้เลือก ใช้ (แทนที่ทั้งหมด) / ไม่ใช้ — imtAiChoicesHtml ใน js/impl-tracker.js ── */
+.imt-ai-choice { margin-top: 6px; border: 1px solid var(--violet); border-radius: 8px; background: rgba(124,92,252,.06); padding: 8px 10px; font-size: 12px; }
+.imt-ai-choice-l { font-weight: 700; color: var(--violet); margin-bottom: 4px; }
+.imt-ai-choice-t { white-space: pre-wrap; color: var(--txt); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; line-height: 1.55; }
+.imt-ai-choice-b { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.imt-ai-choice-done { margin-top: 6px; font-size: 11.5px; color: var(--txt3); }

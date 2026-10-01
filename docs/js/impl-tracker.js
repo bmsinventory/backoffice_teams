@@ -1775,27 +1775,60 @@
       var res = await window.aiChatJson(
         'คุณเป็นผู้ช่วยทีมติดตั้งระบบซอฟต์แวร์โรงพยาบาล วิเคราะห์ปัญหาการใช้งานที่ รพ. แจ้ง แล้วตอบ "เฉพาะ JSON" รูปแบบ: '
         + '{"category":"<ชื่อกลุ่มปัญหาจากรายการ หรือ empty ถ้าไม่แน่ใจ>","solution_hint":"<แนวทางแก้ไขภาษาไทย 1–4 ประโยค>",'
-        + '"confidence":"low|medium|high","reason":"<เหตุผลสั้น ๆ>"} · ถ้ามีปัญหาเก่าที่คล้ายกัน ให้อิงวิธีแก้เหล่านั้นเป็นหลัก',
-        user, { maxTokens: 500 });
+        + '"problem_std":"<รายละเอียดปัญหาที่เรียบเรียงใหม่ให้เป็นมาตรฐาน>",'
+        + '"confidence":"low|medium|high","reason":"<เหตุผลสั้น ๆ>"} · ถ้ามีปัญหาเก่าที่คล้ายกัน ให้อิงวิธีแก้เหล่านั้นเป็นหลัก'
+        + ' · problem_std: เรียบเรียงรายละเอียดปัญหาเดิมเป็นภาษาไทยทางการ กระชับ ชัดเจน 1–3 ประโยค ขึ้นต้นด้วยระบบ/เมนูที่พบปัญหา (ถ้ารู้)'
+        + ' ตามด้วยอาการที่พบ และผลกระทบ (ถ้ามีในข้อมูล) — คงข้อเท็จจริง ชื่อเมนู ตัวเลข รหัส ไว้ครบ ห้ามเพิ่มข้อมูลที่ไม่มีในต้นฉบับ'
+        + ' ห้ามใส่วิธีแก้ ห้ามใช้คำลงท้าย/คำสุภาพแบบแชท (ครับ ค่ะ คะ นะ)',
+        user, { maxTokens: 900 });
       _imtAiLast = {
         category: cats.indexOf(res.category) > -1 ? res.category : '',
         solution: String(res.solution_hint || '').trim(),
+        problemStd: String(res.problem_std || '').trim(),
         confidence: res.confidence || '', reason: String(res.reason || '').trim(), similar: sim,
       };
       imtAiAutoFill(_imtAiLast);
-      out.innerHTML = imtAiCardHtml(_imtAiLast);
+      out.innerHTML = imtAiChoicesHtml(_imtAiLast) + imtAiCardHtml(_imtAiLast);
     } catch (e) {
       out.innerHTML = '<div class="ai-out" style="color:var(--coral);font-size:12px;">' + esc(String(e.message || e)) + '</div>';
     } finally {
       if (btn) { btn.disabled = false; btn.textContent = oldTxt; }
     }
   };
+  // ── ข้อเสนอที่ต้องให้คนเลือก "ใช้ (แทนที่ทั้งหมด) / ไม่ใช้" — แสดงนอกการ์ดย่อ เห็นทันทีไม่ต้องกดขยาย ──
+  // รายละเอียดปัญหาแบบมาตรฐาน: เสนอเสมอถ้าต่างจากเดิม · วิธีแก้ไข: เฉพาะตอนช่องมีข้อความอยู่แล้ว (ช่องว่างเติมให้เลย)
+  var IMT_AI_CHOICE = {
+    problem:  { field: 'imt-is-problem',  key: 'problemStd', label: '📝 AI เรียบเรียงรายละเอียดปัญหาให้เป็นมาตรฐาน' },
+    solution: { field: 'imt-is-solution', key: 'solution',   label: '💡 AI แนะนำวิธีการแก้ไข (ช่องนี้มีข้อความอยู่แล้ว)' },
+  };
+  function imtAiChoicesHtml(s) {
+    return (s.pending || []).map(function (k) {
+      var c = IMT_AI_CHOICE[k];
+      return '<div class="imt-ai-choice" data-k="' + k + '">'
+        + '<div class="imt-ai-choice-l">' + c.label + '</div>'
+        + '<div class="imt-ai-choice-t">' + esc(s[c.key]) + '</div>'
+        + '<div class="imt-ai-choice-b">'
+        +   '<button type="button" class="btn btn-pri btn-sm" onclick="window.imtAiChoose(\'' + k + '\',true)">✓ ใช้ข้อความนี้ (แทนที่ทั้งหมด)</button>'
+        +   '<button type="button" class="btn btn-ghost btn-sm" onclick="window.imtAiChoose(\'' + k + '\',false)">ไม่ใช้</button>'
+        + '</div></div>';
+    }).join('');
+  }
+  window.imtAiChoose = function (k, use) {
+    var s = _imtAiLast, c = IMT_AI_CHOICE[k];
+    var box = document.querySelector('#imt-is-ai-out .imt-ai-choice[data-k="' + k + '"]');
+    if (!s || !c) return;
+    s.pending = (s.pending || []).filter(function (x) { return x !== k; });
+    var el = document.getElementById(c.field);
+    if (use && el) { el.value = s[c.key]; imtMarkInvalid(el, false); window.aiFlagField(el, true); }
+    if (box) box.outerHTML = '<div class="imt-ai-choice-done">' + (use ? '✓ ใช้ข้อความจาก AI แทนที่แล้ว' : 'ไม่ใช้ — คงข้อความเดิมไว้') + ' · ' + c.label.replace(/^\S+\s/, '') + '</div>';
+  };
   function imtAiCardHtml(s) {
     var conf = { low: 'ต่ำ', medium: 'ปานกลาง', high: 'สูง' }[s.confidence] || s.confidence || '-';
     var hasSolutionBox = !!document.getElementById('imt-is-solution');
     var filled = '<span class="ai-use" style="color:var(--teal);font-size:11.5px;font-weight:700;">✓ เติมให้แล้ว</span>';
+    var solFilled = s.solution && hasSolutionBox && (s.pending || []).indexOf('solution') < 0;
     // แบบย่อ 1 บรรทัด (กลุ่มปัญหา) กด "ดูเพิ่มเติม" เพื่อดูแนวทางแก้/ปัญหาเก่าที่คล้ายกัน
-    var filledAny = s.category || (s.solution && hasSolutionBox);
+    var filledAny = s.category || solFilled;
     return window.aiSuggestHtml({
       title: 'AI',
       summary: (s.category ? 'กลุ่ม: ' + esc(s.category) : '<span style="color:var(--txt3);">ไม่แน่ใจกลุ่มปัญหา</span>')
@@ -1806,7 +1839,7 @@
       +   (s.category ? filled : '') + '</div>'
       + (s.solution ? '<div class="ai-row" style="align-items:flex-start;"><span>แนวทางแก้ไข: ' + esc(s.solution) + '</span>'
       // แจ้งปัญหาใหม่ยังไม่มีช่อง "วิธีการแก้ไข" → คงปุ่มคัดลอกไว้ให้
-      +   (hasSolutionBox ? filled : '<button type="button" class="btn btn-ghost btn-sm ai-use" onclick="window.imtAiCopyHint()">คัดลอก</button>') + '</div>' : '')
+      +   (hasSolutionBox ? (solFilled ? filled : '') : '<button type="button" class="btn btn-ghost btn-sm ai-use" onclick="window.imtAiCopyHint()">คัดลอก</button>') + '</div>' : '')
       + (s.similar.length ? '<details style="font-size:11.5px;margin-top:4px;"><summary style="cursor:pointer;color:var(--txt2);">ปัญหาเก่าที่คล้ายกัน</summary>'
       +   s.similar.map(function (x) {
             return '<div style="padding:4px 0;border-bottom:1px dashed var(--border);"><b>' + esc(String(x.problem).slice(0, 120)) + '</b>'
@@ -1816,15 +1849,19 @@
       + '<div style="font-size:10.5px;color:var(--txt3);margin-top:4px;">* AI ช่วยแนะนำเท่านั้น ตรวจสอบก่อนใช้เสมอ</div>',
     });
   }
-  // ── เติมกลุ่มปัญหา + วิธีแก้ไขจากผล AI ให้ทันที (ไม่ต้องกดเลือก) พร้อมป้ายสีแดงว่ามาจาก AI ──
-  // วิธีแก้ไข: ช่องว่าง = ใส่ให้เลย · มีข้อความอยู่แล้ว = ต่อท้าย (ไม่ซ้ำถ้ากด AI ซ้ำ) · แจ้งปัญหาใหม่ไม่มีช่องนี้
+  // ── เติมกลุ่มปัญหาจากผล AI ให้ทันที พร้อมป้ายสีแดงว่ามาจาก AI · วิธีแก้ไข: ช่องว่าง = ใส่ให้เลย,
+  // มีข้อความอยู่แล้ว = ให้เลือกใช้ (แทนที่ทั้งหมด) หรือไม่ · รายละเอียดปัญหาแบบมาตรฐาน = ให้เลือกเสมอ
+  // (s.pending = รายการที่รอให้เลือก ดู imtAiChoicesHtml) · แจ้งปัญหาใหม่ไม่มีช่องวิธีแก้ไข ──
   function imtAiAutoFill(s) {
+    s.pending = [];
     var c = document.getElementById('imt-is-cat');
     if (c && s.category) { c.value = s.category; imtMarkInvalid(c, false); window.aiFlagField(c, c.value === s.category); }
+    var pr = document.getElementById('imt-is-problem');
+    if (pr && s.problemStd && s.problemStd !== pr.value.trim()) s.pending.push('problem');
     var ta = document.getElementById('imt-is-solution');
-    if (ta && s.solution && ta.value.indexOf(s.solution) < 0) {
-      ta.value = ta.value.trim() ? ta.value.trim() + '\n' + s.solution : s.solution;
-      window.aiFlagField(ta, true);
+    if (ta && s.solution) {
+      if (!ta.value.trim()) { ta.value = s.solution; window.aiFlagField(ta, true); }
+      else if (ta.value.trim() !== s.solution) s.pending.push('solution');
     }
   }
   window.imtAiCopyHint = function () {
