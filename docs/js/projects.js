@@ -476,18 +476,6 @@ window.updateProjFormByGroup=function(initialParentId){
 window._ppProjects=function(){
   return window.PROJECTS.filter(function(p){return window.isOnsiteGroup(p.groupId);});
 };
-window.ppSearchOpen=function(){
-  var txt=document.getElementById('pf-parent-search');
-  if(!txt||txt.disabled)return;
-  window.ppSearchFilter();
-  document.addEventListener('click',window._ppOutsideClose,{once:true});
-};
-window._ppOutsideClose=function(e){
-  var wrap=document.getElementById('pf-revisit-parent-wrap');
-  if(wrap&&wrap.contains(e.target))return;
-  var drop=document.getElementById('pf-parent-drop');
-  if(drop)drop.style.display='none';
-};
 window.ppSearchFilter=function(){
   var txt=document.getElementById('pf-parent-search');
   var drop=document.getElementById('pf-parent-drop');
@@ -595,28 +583,6 @@ window.ppSearchClear=function(){
 window.pfTab=function(tab){
   ['info','team','visits'].forEach(function(t){var el=document.getElementById('pf-pane-'+t);if(el)el.style.display=t===tab?'':'none';});
   document.querySelectorAll('#pf-tabs .pf-tab-btn').forEach(function(el){var t=el.getAttribute('data-tab');var on=t===tab;el.style.background=on?'var(--violet)':'var(--surface2)';el.style.color=on?'#fff':'var(--txt2)';el.style.borderColor=on?'var(--violet)':'var(--border)';});
-};
-window.addMem=function(){
-  if(!window.canEdit('projects'))return;
-  var sel=document.getElementById('add-mem-sel');if(!sel||!sel.value)return;
-  var sid=sel.value;var s=gSt(sid);var j=window.STAFF.findIndex(function(x){return x.id===sid;});
-  var mid='M'+uid();var sdt=(document.getElementById('pf-start')||{}).value||'';var edt=(document.getElementById('pf-end')||{}).value||'';
-  var overlaps=getStaffOverlaps(sid,sdt,edt,window.editPid);var warnText=overlaps.length>0?overlapWarnText(overlaps):'';
-  var list=document.getElementById('mem-list');var div=document.createElement('div');div.className='m-row';div.id='mr-'+mid;
-  div.innerHTML=`<div style="display:flex;align-items:center;gap:8px;width:100%"><div class="av" style="background:${avC(Math.max(j,0))}">${s.name.charAt(0)}</div><span style="flex:1;font-size:12px;font-weight:600">${esc(s.name)}</span><input type="hidden" id="msid-${mid}" value="${sid}">${window.beDateField('ms-'+mid,sdt,{onchange:"window.checkMemOverlap('"+mid+"')",wrapStyle:'width:130px',dispStyle:'padding:6px 8px;font-size:11px'})}<span style="color:var(--txt3)">→</span>${window.beDateField('me-'+mid,edt,{onchange:"window.checkMemOverlap('"+mid+"')",wrapStyle:'width:130px',dispStyle:'padding:6px 8px;font-size:11px'})}<button class="btn btn-red btn-sm" onclick="window.rmMem('${mid}')">✕</button></div><div id="mwarn-${mid}" style="font-size:10px;color:var(--coral);width:100%;margin-top:4px;padding-left:36px;display:${warnText?'block':'none'}">${warnText}</div>`;
-  list.appendChild(div);
-}
-window.rmMem=function(mid){
-  if(!window.canEdit('projects'))return;
-  var el=document.getElementById('mr-'+mid);if(!el)return;
-  var sidEl=document.getElementById('msid-'+mid);
-  if(sidEl){
-    // Re-enable in pickup list left panel
-    var avItem=document.querySelector('#pku-avail .pku-avail-item[data-sid="'+sidEl.value+'"]');
-    if(avItem){avItem.style.opacity='';avItem.style.pointerEvents='';var plus=avItem.querySelector('span:last-child');if(plus)plus.textContent='＋';}
-  }
-  el.remove();
-  var cnt=document.getElementById('pku-sel-cnt');if(cnt){var n=document.querySelectorAll('#mem-list .m-row').length;cnt.textContent=n>0?'('+n+')':'';}
 };
 
 // ── SMART SCHEDULE ──
@@ -1020,34 +986,10 @@ window.vtPkuRemove=function(vid,sid){
   var cnt=document.getElementById('vt-cnt-'+vid);if(cnt){var n=selBox.querySelectorAll('.v-team-tag').length;cnt.textContent=n>0?'('+n+')':'';}
 };
 
-window.toggleVisits = function(){
-  var body=document.getElementById('visits-body');
-  var btn=document.getElementById('btn-toggle-visits');
-  if(!body||!btn)return;
-  var open=body.style.display!=='none';
-  body.style.display=open?'none':'block';
-  btn.textContent=open?'+ เพิ่มรอบเข้าไซต์หลายช่วง':'▲ ซ่อน';
-};
-
 window.addVisitRow = function(){
   var list=document.getElementById('visits-list');if(!list)return;
   var no=list.querySelectorAll('.visit-row').length+1;
   list.insertAdjacentHTML('beforeend',window._buildVisitRow(null,no));
-};
-
-window.addVisitTeam = function(vid){
-  var sel=document.getElementById('vadd-'+vid);if(!sel||!sel.value)return;
-  var sid=sel.value;
-  var tags=document.querySelector('#vr-'+vid+' .v-team-tags');if(!tags)return;
-  if(tags.querySelector('[data-sid="'+sid+'"]'))return; // ห้ามซ้ำ
-  var s=window.STAFF.find(function(x){return x.id===sid;});
-  var tag=document.createElement('div');
-  tag.className='visit-team-tag';
-  tag.setAttribute('data-vid',vid);
-  tag.setAttribute('data-sid',sid);
-  tag.style.cssText='display:inline-flex;align-items:center;gap:4px;background:var(--violet)18;color:var(--violet);padding:2px 8px;border-radius:10px;font-size:11px;margin:2px;';
-  tag.innerHTML=(s?esc(s.nickname||s.name.split(' ')[0]):'?')+'<span style="cursor:pointer;opacity:.6" onclick="this.parentElement.remove()">✕</span>';
-  tags.appendChild(tag);
 };
 
 window.reNumberVisits = function(){

@@ -61,9 +61,6 @@
 [data-theme="dark"] .lcard-t1       { color: var(--txt); }
 [data-theme="dark"] .lcard-t2,
 [data-theme="dark"] .lcard-foot     { color: var(--txt3); }
-[data-theme="dark"] .lbtn-sso       { background: var(--surface2); border-color: var(--border); color: var(--txt); }
-[data-theme="dark"] .lf-div::before,
-[data-theme="dark"] .lf-div::after  { background: var(--border); }
 [data-theme="dark"] .login-err      { background: rgba(220,38,38,.15); border-color: rgba(220,38,38,.3); }
 
 [data-theme="dark"] .stat-c         { background: var(--surface); border-color: var(--border); }
@@ -94,7 +91,6 @@
 [data-theme="dark"] .ts-card-body   { background: var(--surface2); }
 [data-theme="dark"] .ts-row-item:hover { background: var(--surface3); }
 [data-theme="dark"] .ov-card        { background: var(--surface); border-color: var(--border); }
-[data-theme="dark"] .wl-card        { background: var(--surface); border-color: var(--border); }
 
 /* ── System Dark: Mirror Overrides ── */
 @media (prefers-color-scheme: dark) {
@@ -122,7 +118,6 @@
   :root:not([data-theme="light"]) .ts-card      { background: var(--surface); border-color: var(--border); }
   :root:not([data-theme="light"]) .ts-card-body { background: var(--surface2); }
   :root:not([data-theme="light"]) .ov-card      { background: var(--surface); border-color: var(--border); }
-  :root:not([data-theme="light"]) .wl-card      { background: var(--surface); border-color: var(--border); }
   :root:not([data-theme="light"]) .af-tabs      { background: var(--surface); }
   :root:not([data-theme="light"]) .af-tab       { background: var(--surface2); color: var(--txt3); }
 }

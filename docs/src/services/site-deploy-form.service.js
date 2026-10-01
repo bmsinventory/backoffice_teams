@@ -55,10 +55,6 @@
     if (idx >= 0) arr[idx] = obj; else arr.unshift(obj);
   };
 
-  window.sdfRemoveLocal = function (id) {
-    window.SITE_DEPLOY_FORMS = window.SITE_DEPLOY_FORMS.filter(function (x) { return x.id !== id; });
-  };
-
   // ── Realtime Subscription (background, ไม่ block loader) ──
   var _renderTimer = null;
   window.onSnapshot(window.getColRef('SITE_DEPLOY_FORMS'), function (s) {

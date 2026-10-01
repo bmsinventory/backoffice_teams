@@ -99,7 +99,6 @@
       var CORE_COLS = ['STAGES','PTYPES','PGROUPS','STAFF','USERS','PROJECTS','ADVANCES','LODGINGS','POSITIONS','HOLIDAYS','LEAVES','TIMESHEETS','COSTS','DEPARTMENTS'];
       var loadCount = 0;
       var _initialLoadDone = false;
-      var _updateTimer = null;
 
       // Debounce timers for per-collection renders
       var _metaTimer = null;
@@ -115,21 +114,6 @@
         if (!window.cu || !window.isDbLoaded) return;
         clearTimeout(_metaTimer);
         _metaTimer = setTimeout(function () { window.renderAll && window.renderAll(); }, 300);
-      }
-
-      function _flashUpdate() {
-        if (!_initialLoadDone) return;
-        var stat = document.getElementById('tp-status');
-        if (!stat) return;
-        var now = new Date();
-        var t = ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2) + ':' + ('0' + now.getSeconds()).slice(-2);
-        window._lastSyncTime = t;
-        if (_updateTimer) clearTimeout(_updateTimer);
-        stat.className = 'tp-badge ok';
-        stat.innerHTML = '<span class="pulse ok"></span> กำลังอัปเดต...';
-        _updateTimer = setTimeout(function () {
-          stat.innerHTML = '<span class="pulse ok"></span> ' + t;
-        }, 800);
       }
 
       function checkLoaded() {
@@ -149,10 +133,8 @@
             else window._pendingDailyCheck = true;
             window._handleDeepLink && window._handleDeepLink();
           }
-        } else if (window.cu) {
-          _flashUpdate();
-          // Per-collection onSnapshot handlers manage their own debounced renders
         }
+        // หลังโหลดครั้งแรก — onSnapshot ของแต่ละ collection render เอง (debounced)
       }
 
       // ── Core Collections ──

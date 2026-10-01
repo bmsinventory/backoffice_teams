@@ -7,7 +7,6 @@
 (function () {
 
   // ── Module Id (ใช้กับ PERM_MODULES / ROUTE_MAP / can()) ──
-  window.ECF_MODULE = 'expense_form';
 
   // ── Global Data Store ──
   // ชื่อ global ตรงกับชื่อ table แบบ UPPERCASE (getColRef fallback lower-case ชื่อ collection
@@ -42,6 +41,5 @@
 
   // ── UI State ──
   window.ecfEditId   = null;   // id ของฟอร์มที่กำลังแก้ไข (null = ฟอร์มใหม่)
-  window.ecfWorkers   = [];    // rowId ของแถวผู้ปฏิบัติงานที่กำลังแสดงผล
 
 })();

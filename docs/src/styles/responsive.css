@@ -27,7 +27,7 @@
   #sidebar { width: 64px; min-width: 64px; }
   #sidebar .sb-title, #sidebar .sb-sub,
   #sidebar .nl, #sidebar .sb-sec,
-  #sidebar .nb, #sidebar .u-name, #sidebar .u-role { display: none !important; }
+  #sidebar .nb, #sidebar .u-name, #sidebar .u-role, #sidebar .u-caret { display: none !important; }
   #sidebar .nav-btn { justify-content: center; padding: 10px; }
   #sidebar .nav-btn::before { display: none; }
   #sidebar .sb-toggle { display: none; }
@@ -36,7 +36,6 @@
   .stat-row,
   div[id="stat-row"],
   div[style*="grid-template-columns:repeat(4,1fr)"] { grid-template-columns: repeat(2,1fr) !important; }
-  .ov-grid { grid-template-columns: 1fr 1fr !important; }
   div[style*="1fr 1fr 280px"] { grid-template-columns: 1fr 1fr !important; }
   .ov-row-3 { grid-template-columns: 1fr 1fr !important; }
 
@@ -48,7 +47,6 @@
 @media (min-width: 1025px) and (max-width: 1366px) {
   #bottom-nav { display: none !important; }
   .stat-row   { grid-template-columns: repeat(4,1fr) !important; }
-  .ov-grid    { grid-template-columns: 1fr 1fr 260px !important; }
 }
 
 /* ════ DESKTOP: ≥ 1367px ════ */
@@ -73,18 +71,21 @@
   /* ── Calendar: hide add-project button on smartphone ── */
   #cal-add-proj-btn { display: none !important; }
 
-  /* ── Sidebar: slide-in drawer ── */
+  /* ── Sidebar: slide-in drawer ── จบเหนือเมนูล่าง (#bottom-nav z-index สูงกว่า เดิมบังแถวชื่อผู้ใช้
+     .sb-foot ที่ใช้เปิดเมนู เปลี่ยนรหัสผ่าน / ออกจากระบบ จนกดไม่ได้) ── */
   #sidebar {
-    position: fixed; left: -240px; top: 0; bottom: 0;
+    position: fixed; left: -240px; top: 0; bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px));
     width: 240px !important; min-width: 240px !important;
     z-index: 30; transition: left .28s cubic-bezier(.4,0,.2,1); box-shadow: none;
   }
   #sidebar.mob-open { left: 0; box-shadow: 4px 0 24px rgba(0,0,0,.18); }
   #sidebar.mob-open .sb-title, #sidebar.mob-open .sb-sub,
   #sidebar.mob-open .nl, #sidebar.mob-open .sb-sec,
-  #sidebar.mob-open .nb, #sidebar.mob-open .u-name,
+  #sidebar.mob-open .u-name,
   #sidebar.mob-open .u-role { display: block !important; }
-  #sidebar.mob-open .nb       { display: inline-block !important; }
+  #sidebar.mob-open .u-caret { display: inline !important; }
+  /* ตัวเลขที่ updateBadge ซ่อนไว้ (ค่า 0 → style display:none) ต้องซ่อนต่อ เดิม !important ทับจนขึ้นเลข 0 */
+  #sidebar.mob-open .nb:not([style*="none"]) { display: inline-block !important; }
   #sidebar.mob-open .nav-btn  { justify-content: flex-start; padding: 9px 10px; }
   #sidebar.mob-open .nav-btn::before { display: block; }
   #sidebar .sb-toggle { display: none !important; }
@@ -93,7 +94,6 @@
   /* ── Topbar ── */
   #topbar { padding: 0 12px; gap: 8px; height: 52px; }
   .tp-title { font-size: 15px; }
-  .tp-badge { font-size: 10px; padding: 4px 8px; }
 
   /* ── Bottom Navigation ── */
   #bottom-nav {
@@ -125,7 +125,7 @@
      ความสูงที่ตั้งใจไว้ของปุ่มเล็กๆ เหล่านั้นทุกจุดโดยไม่จำเป็น ทำให้บวมใหญ่ผิดสัดส่วน (บั๊กเดียวกับ
      .pku-x-btn ที่เจอและแก้ไปก่อนหน้า) แก้โดยให้กฎนี้จับเฉพาะปุ่มที่ใช้ระบบ .btn/.tp-btn จริงๆ เท่านั้น
      (ปุ่มเหล่านี้ไม่ได้ตั้ง padding เองเพื่อให้เล็กเป็นพิเศษ จึงควรได้ touch-target ตามปกติ) ── */
-  .btn:not(.pku-x-btn), .tp-btn { min-height: 44px; padding-top: 10px !important; padding-bottom: 10px !important; padding-left: 12px; padding-right: 12px; }
+  .btn:not(.pku-x-btn) { min-height: 44px; padding-top: 10px !important; padding-bottom: 10px !important; padding-left: 12px; padding-right: 12px; }
   .btn-sm:not(.pku-x-btn) { min-height: 36px; padding-top: 6px !important; padding-bottom: 6px !important; padding-left: 10px; padding-right: 10px; }
   /* ยังใหญ่อยู่แม้ยกเว้น padding แล้ว เพราะ .btn-sm ข้างบนยังบังคับ min-height:36px ทับปุ่มเล็กนี้อยู่ดี
      — กำหนดขนาดของตัวเองไปเลยแทนที่จะพึ่ง .btn/.btn-sm base ให้เป็นชิปกลมเล็กพอดีตัว ✕ ── */
@@ -160,7 +160,6 @@
   .stat-icon { width: 34px; height: 34px; font-size: 14px; margin-bottom: 10px; }
 
   /* ── Overview ── */
-  .ov-grid { grid-template-columns: 1fr !important; padding: 0 12px 80px !important; gap: 12px !important; }
   div[style*="1fr 1fr 280px"] { grid-template-columns: 1fr !important; }
   .ov-row { grid-template-columns: 1fr !important; padding: 0 12px 12px !important; gap: 12px !important; }
   #ov-ai-wrap { padding: 12px 12px 0 !important; }
@@ -195,7 +194,6 @@
      อ่านยากบนจอเล็ก ขยับเป็น 10px · หัววันในตารางภาระงาน 7px → 9px (ช่องแคบ ขยายได้แค่นี้) ── */
   [style*="font-size:9px"], [style*="font-size: 9px"] { font-size: 10px !important; }
   [style*="font-size:7px"] { font-size: 9px !important; }
-  .ss-lbl { font-size: 9.5px; }
 
   /* ── แถว flex ที่มีปุ่ม (inline style จาก JS ~17 จุดไม่ได้ตั้ง flex-wrap) → ขึ้นบรรทัดใหม่แทนการดันล้นขอบ
      ใช้ :has() จับเฉพาะแถวที่มีปุ่มเป็นลูกโดยตรง ไม่แตะแถวอื่น ── */
@@ -297,7 +295,6 @@
   .tl-left { width: 130px !important; min-width: 130px !important; }
   .tl-wrap { padding: 8px !important; }
   .wl-container { flex-direction: column; }
-  .wl-col       { min-width: unset; }
 
   /* ── Tabs ── */
   .af-tabs { padding: 8px 10px; gap: 6px; }
@@ -375,7 +372,7 @@
 
 /* ════ PRINT ════ */
 @media print {
-  #bottom-nav, #sidebar, #topbar, .tp-btn, .toolbar { display: none !important; }
+  #bottom-nav, #sidebar, #topbar, .toolbar { display: none !important; }
   #main  { margin: 0; }
   .modal { position: static !important; box-shadow: none !important; }
   body   { overflow: visible !important; }

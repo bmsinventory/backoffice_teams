@@ -1,6 +1,6 @@
 /* ================================================================
    TOPBAR.CSS — Top Navigation Bar Component
-   #topbar, .tp-*, .pulse, .tp-btn, .tp-badge
+   #topbar, .tp-*, .pulse, #noti-bell, #noti-menu
 ================================================================ */
 
 #topbar {
@@ -26,14 +26,20 @@
   background-clip: text;
 }
 
-.tp-badge {
-  display: flex; align-items: center; gap: 5px;
-  padding: 5px 11px; border-radius: 20px;
-  font-size: 11px; font-weight: 600; transition: all .2s;
+/* ── กระดิ่งแจ้งเตือน (หน้าตาปุ่มอยู่ใน utilities.css คู่กับ #dm-toggle) + เมนู #noti-menu (src/app.js) ── */
+#noti-bell { position: relative; }
+#noti-count {
+  position: absolute; top: -6px; right: -6px; min-width: 17px; height: 17px; padding: 0 4px;
+  border-radius: 9px; background: var(--coral); color: #fff; font-size: 10px; font-weight: 700;
+  line-height: 17px; text-align: center; box-shadow: 0 0 0 2px var(--surface);
 }
-.tp-badge.ok   { background: rgba(6,214,160,.12); color: var(--teal); }
-.tp-badge.warn { background: rgba(255,107,107,.12); color: var(--coral); }
-.tp-badge:hover { opacity: .8; }
+#noti-menu { position: fixed; z-index: 9000; width: min(280px, calc(100vw - 16px)); background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.18); padding: 6px; }
+#noti-menu .nm-head { padding: 8px 10px 6px; border-bottom: 1px solid var(--border); margin-bottom: 4px; font-size: 12.5px; font-weight: 700; color: var(--txt); }
+#noti-menu button { display: flex; align-items: center; gap: 9px; width: 100%; padding: 9px 10px; border: none; border-radius: 8px; background: none; font: inherit; font-size: 13px; color: var(--txt); cursor: pointer; text-align: left; }
+#noti-menu button:hover, #noti-menu button:focus-visible { background: var(--surface2); outline: none; }
+#noti-menu .nm-lbl { flex: 1; }
+#noti-menu .nm-n { background: var(--coral); color: #fff; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 10px; }
+#noti-menu .nm-empty { padding: 14px 10px; font-size: 12.5px; color: var(--txt3); text-align: center; }
 
 /* ── Pulse Indicator ── */
 .pulse {
@@ -41,22 +47,6 @@
   animation: pulse 2s ease-in-out infinite;
 }
 .pulse.ok   { background: var(--teal); }
-.pulse.warn { background: var(--coral); }
-
-/* ── Topbar Button ── */
-.tp-btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 7px 16px; border-radius: 20px;
-  font-size: 12px; font-weight: 600; cursor: pointer;
-  border: none; transition: all .2s; font-family: inherit;
-}
-.tp-btn.pri {
-  background: linear-gradient(135deg, var(--violet), var(--coral));
-  color: #fff; box-shadow: 0 4px 14px rgba(124,92,252,.4);
-}
-.tp-btn.pri:hover { box-shadow: 0 6px 20px rgba(124,92,252,.55); transform: translateY(-1px); }
-.tp-btn.sec { background: var(--surface2); color: var(--txt2); border: 1px solid var(--border); }
-.tp-btn.sec:hover { background: var(--surface3); color: var(--txt); }
 
 /* ── Loader Box ── */
 .loader-box {
@@ -65,18 +55,11 @@
   font-weight: 600; font-size: 15px; color: var(--txt); border: 1px solid var(--border);
 }
 
-/* ── แถบบนบนมือถือ — เดิมชื่อหน้ายาวตกหลายบรรทัด และป้ายสถานะ/ปุ่มทับซ้อนกัน ──
-   ชื่อหน้าบรรทัดเดียว (ตัด …) · ป้าย Realtime เหลือจุดสถานะ (แตะซิงค์ได้เหมือนเดิม) · ป้าย Advance เกินกำหนดแบบย่อ
-   · ปุ่มเหลือไอคอน (.btn-lbl ซ่อน) ขนาดเล็กเท่ากัน */
-.tp-ov-short { display: none; }
+/* ── แถบบนบนมือถือ — เดิมชื่อหน้ายาวตกหลายบรรทัด และปุ่มทับซ้อนกัน ──
+   ชื่อหน้าบรรทัดเดียว (ตัด …) · ปุ่มเหลือไอคอน (.btn-lbl ซ่อน) ขนาดเล็กเท่ากัน */
 @media (max-width: 768px) {
   #topbar { gap: 6px; }
   .tp-title { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  #tp-status { font-size: 0; padding: 8px; gap: 0; flex-shrink: 0; }
-  #tp-status .pulse { width: 9px; height: 9px; }
-  #tp-overdue { flex-shrink: 0; white-space: nowrap; padding: 4px 8px; font-size: 10.5px; }
-  .tp-ov-full { display: none; }
-  .tp-ov-short { display: inline; }
   #topbar .btn-lbl { display: none !important; }
-  #topbar > .btn, #topbar > #dm-toggle { flex-shrink: 0; min-height: 34px !important; padding: 6px 8px !important; font-size: 14px; line-height: 1; }
+  #topbar > .btn, #topbar > #dm-toggle, #topbar > #noti-bell { flex-shrink: 0; min-height: 34px !important; padding: 6px 8px !important; font-size: 14px; line-height: 1; }
 }

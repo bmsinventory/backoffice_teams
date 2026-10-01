@@ -50,10 +50,6 @@
     if (idx >= 0) arr[idx] = obj; else arr.unshift(obj);
   };
 
-  window.ecfRemoveLocal = function (id) {
-    window.EXPENSE_CLEARING_FORMS = window.EXPENSE_CLEARING_FORMS.filter(function (x) { return x.id !== id; });
-  };
-
   // ── Realtime Subscription (background, ไม่ block loader) ──
   var _renderTimer = null;
   window.onSnapshot(window.getColRef('EXPENSE_CLEARING_FORMS'), function (s) {

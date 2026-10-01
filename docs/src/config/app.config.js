@@ -81,7 +81,6 @@
   window.editLdId      = null;
   window.currentLdPid  = null;
   window.cStage        = null;
-  window.cBudget       = null;
   window.kbPid         = null;
   window.admCur        = 'staff';
   window._loginRetryInterval = null;

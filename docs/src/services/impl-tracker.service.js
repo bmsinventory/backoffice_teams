@@ -154,11 +154,6 @@
     await window.updateDoc(window.getDocRef('IMPL_ISSUES', issueId), row);
   };
 
-  window.imtDeleteIssue = async function (issueId) {
-    window.imtRemoveLocal('IMPL_ISSUES', issueId);
-    await window.deleteDoc(window.getDocRef('IMPL_ISSUES', issueId));
-  };
-
   // ── ประเมิน "น้ำหนักวัน" ของ Task จากชื่องาน (heuristic, ไม่ต้องเรียก AI ภายนอก/ไม่ต้องใช้ API key) ──
   // งานที่ต้องลงมือหน้างานหนัก ๆ (ติดตั้ง/เดินสาย/ตั้งค่า/ทดสอบ/อบรม) ได้น้ำหนักมากกว่า งานเอกสาร/อนุมัติ/ส่งมอบ
   var IMT_TASK_WEIGHT_RULES = [

@@ -9,9 +9,8 @@
     opts = opts || {};
     var viewId = (window.ROUTE_MAP && window.ROUTE_MAP[moduleId]) || ('view-' + moduleId);
 
-    // Permission check — 'all_issues' ไม่ได้ขึ้นกับระบบ can()/ROLE_PERMISSIONS (ไม่ได้ลงทะเบียนใน
-    // PERM_MODULES โดยตั้งใจ) จำกัดสิทธิ์แบบตายตัวด้วย window.ce() (PM/Admin) แทน
-    var _canSeeModule = moduleId === 'all_issues' ? (window.ce && window.ce()) : (!window.canView || window.canView(moduleId));
+    // Permission check
+    var _canSeeModule = !window.canView || window.canView(moduleId);
     if (!_canSeeModule) {
       console.warn('[router] No permission to view:', moduleId);
       return;
@@ -36,10 +35,10 @@
     var bottomBtn = document.querySelector('.bottom-nav-item[data-view="' + moduleId + '"]');
     if (bottomBtn) bottomBtn.classList.add('active');
 
-    // Update topbar title ('all_issues' ไม่ได้อยู่ใน PERM_MODULES โดยตั้งใจ — ดูเหตุผลด้านบน)
+    // Update topbar title
     var mod = window.PERM_MODULES && window.PERM_MODULES.find(function (m) { return m.id === moduleId; });
     var titleEl = document.getElementById('tp-title');
-    if (titleEl) titleEl.textContent = mod ? mod.label : (moduleId === 'all_issues' ? 'ปัญหาทุกโครงการ' : moduleId);
+    if (titleEl) titleEl.textContent = mod ? mod.label : moduleId;
 
     // Update URL hash (deep link)
     if (!opts.silent) {
@@ -53,9 +52,8 @@
   // ── goView: main navigation called by HTML nav buttons ──
   // Wraps goTo + triggers the render function for the target view
   window.goView = function (id, el) {
-    // Permission check with user-visible alert — 'all_issues' จำกัดสิทธิ์ด้วย window.ce() แบบตายตัว
-    // (ดูหมายเหตุใน goTo ด้านบน) แทนระบบ can()/ROLE_PERMISSIONS ปกติ
-    var _canSee = id === 'all_issues' ? (window.ce && window.ce()) : (!window.canView || window.canView(id));
+    // Permission check with user-visible alert
+    var _canSee = !window.canView || window.canView(id);
     if (!_canSee) {
       window.showAlert && window.showAlert('คุณไม่มีสิทธิ์เข้าถึง Module นี้', 'warn');
       return;
@@ -131,20 +129,6 @@
     var ov = document.getElementById('mob-sb-overlay');
     if (sb) sb.classList.remove('mob-open');
     if (ov) ov.classList.remove('on');
-  };
-
-  // ── Force Sync: re-render active view and update status timestamp ──
-  window.forceSync = function () {
-    var stat = document.getElementById('tp-status');
-    if (stat) stat.innerHTML = '<span class="pulse ok"></span> กำลังโหลด...';
-    window.renderAll && window.renderAll();
-    setTimeout(function () {
-      if (!stat) return;
-      var now = new Date();
-      var t = ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2) + ':' + ('0' + now.getSeconds()).slice(-2);
-      window._lastSyncTime = t;
-      stat.innerHTML = '<span class="pulse ok"></span> ' + t;
-    }, 400);
   };
 
   // ── Handle Deep Links from URL hash ──

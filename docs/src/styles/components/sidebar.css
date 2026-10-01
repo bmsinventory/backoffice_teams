@@ -93,6 +93,16 @@
 }
 .u-name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .u-role { font-size: 10px; color: var(--txt3); font-family: 'JetBrains Mono', monospace; }
+.u-caret { color: var(--txt3); font-size: 16px; line-height: 1; flex-shrink: 0; }
+
+/* ── เมนูบัญชีผู้ใช้ (กดชื่อผู้ใช้ท้าย sidebar) — เปลี่ยนรหัสผ่าน / ออกจากระบบ · วางลอยเหนือแถวผู้ใช้ (ตั้งตำแหน่งใน app.js) ── */
+#user-menu { position: fixed; z-index: 9000; min-width: 200px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.18); padding: 6px; }
+#user-menu .um-head { padding: 8px 10px 6px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+#user-menu .um-head b { display: block; font-size: 12.5px; color: var(--txt); }
+#user-menu .um-head span { font-size: 10.5px; color: var(--txt3); }
+#user-menu button { display: flex; align-items: center; gap: 9px; width: 100%; padding: 9px 10px; border: none; border-radius: 8px; background: none; font: inherit; font-size: 13px; color: var(--txt); cursor: pointer; text-align: left; }
+#user-menu button:hover, #user-menu button:focus-visible { background: var(--surface2); outline: none; }
+#user-menu button.danger { color: var(--coral); }
 
 /* ── Toggle Button ── */
 .sb-toggle {
@@ -112,6 +122,6 @@
 #sidebar.slim .sb-title, #sidebar.slim .sb-sub,
 #sidebar.slim .nl,       #sidebar.slim .sb-sec,
 #sidebar.slim .nb,       #sidebar.slim .u-name,
-#sidebar.slim .u-role { display: none !important; }
+#sidebar.slim .u-role, #sidebar.slim .u-caret { display: none !important; }
 #sidebar.slim .nav-btn  { justify-content: center; padding: 10px; }
 #sidebar.slim .nav-btn::before { display: none; }

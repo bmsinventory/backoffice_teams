@@ -7,7 +7,6 @@
 (function () {
 
   // ── Module Id (ใช้กับ PERM_MODULES / ROUTE_MAP / can() — ใช้ module เดียวกับ FM-AC-01/02) ──
-  window.SNL_MODULE = 'expense_form';
 
   // ── Global Data Store ──
   // ชื่อ global ตรงกับชื่อ table แบบ UPPERCASE (getColRef fallback lower-case ชื่อ collection

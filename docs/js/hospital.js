@@ -2165,18 +2165,6 @@ window.importHospitalsFromFile = async function(file) {
   }
 };
 
-window.importHospitalsExcel = function() {
-  var inp = document.createElement('input');
-  inp.type = 'file';
-  inp.accept = '.xlsx,.xls,.csv';
-  inp.onchange = function(e) {
-    var file = e.target.files[0];
-    if (!file) return;
-    window.importHospitalsFromFile(file);
-  };
-  inp.click();
-};
-
 // ── STEP 2: แสดง Preview Modal ───────────────────────────────────────────────
 
 function _hspShowImportPreview() {
@@ -2471,84 +2459,6 @@ window.confirmImportHospitals = async function() {
   }
 };
 
-// ── HOS CODE LOOKUP — ค้นหาจาก window.HOSPITALS (Firestore realtime) ─────────
-// ไม่ต้องโหลดหรือ import เพิ่ม — ใช้ข้อมูลที่ sync จาก Firestore โดยตรง
-
-window.openHspLookup = function() {
-  var inp = document.getElementById('hsp-lookup-q');
-  var box = document.getElementById('hsp-lookup-result');
-  if (inp) inp.value = '';
-  if (box) box.innerHTML = _hspLookupPlaceholder();
-  window.openM('m-hsp-lookup');
-  setTimeout(function(){ if(inp) inp.focus(); }, 200);
-};
-
-function _hspLookupPlaceholder() {
-  var total = (window.HOSPITALS || []).length;
-  if (!total) {
-    return '<div style="text-align:center;padding:32px 20px;">' +
-      '<div style="font-size:32px;margin-bottom:8px;">🏥</div>' +
-      '<div style="font-weight:600;color:var(--txt);margin-bottom:6px;">ยังไม่มีข้อมูลโรงพยาบาลในระบบ</div>' +
-      '<div style="font-size:12px;color:var(--txt-muted);">Admin สามารถนำเข้าผ่านปุ่ม 📥 Import Excel</div>' +
-    '</div>';
-  }
-  return '<div style="text-align:center;color:var(--txt-muted);padding:24px;font-size:13px;">' +
-    '🔍 พิมพ์รหัส HOS Code หรือชื่อ รพ.<br>' +
-    '<span style="font-size:11px;">มีข้อมูล ' + total.toLocaleString() + ' แห่ง</span>' +
-  '</div>';
-}
-
-window.hspLookupSearch = function() {
-  var q   = (document.getElementById('hsp-lookup-q')?.value || '').trim().toLowerCase();
-  var box = document.getElementById('hsp-lookup-result');
-  if (!box) return;
-
-  var list = window.HOSPITALS || [];
-
-  if (!list.length) { box.innerHTML = _hspLookupPlaceholder(); return; }
-
-  if (q.length < 1) { box.innerHTML = _hspLookupPlaceholder(); return; }
-
-  var hits = list.filter(function(h) {
-    return h.code.toLowerCase().includes(q) ||
-           h.name.toLowerCase().includes(q) ||
-           (h.province || '').toLowerCase().includes(q) ||
-           (h.district || '').toLowerCase().includes(q) ||
-           (h.affiliation || '').toLowerCase().includes(q);
-  }).sort(function(a, b) {
-    // exact code match first
-    var aEx = a.code.toLowerCase() === q ? 0 : 1;
-    var bEx = b.code.toLowerCase() === q ? 0 : 1;
-    return aEx - bEx || (a.code || '').localeCompare(b.code || '');
-  }).slice(0, 40);
-
-  if (!hits.length) {
-    box.innerHTML = '<div style="text-align:center;color:var(--txt-muted);padding:32px;">' +
-      'ไม่พบ "' + esc(q) + '"<br><span style="font-size:11px;">ลองค้นหาด้วยรหัสหรือชื่อภาษาไทย</span></div>';
-    return;
-  }
-
-  box.innerHTML = hits.map(function(h) {
-    var t = _hspType(h.type);
-    return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;' +
-      'border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;" ' +
-      'onclick="window.openHospitalDetail(\'' + esc(h.id) + '\');window.closeM(\'m-hsp-lookup\');" ' +
-      'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">' +
-      '<div style="font-family:monospace;font-weight:700;color:var(--primary);white-space:nowrap;min-width:58px;font-size:13px;">' + esc(h.code) + '</div>' +
-      '<div style="flex:1;min-width:0;">' +
-        '<div style="font-weight:600;font-size:13px;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(h.name) + '</div>' +
-        '<div style="font-size:11px;color:var(--txt-muted);">' +
-          esc(h.province || '') +
-          (h.district ? ' · ' + esc(h.district) : '') +
-          (h.beds ? ' · ' + Number(h.beds).toLocaleString() + ' เตียง' : '') +
-          (h.affiliation ? ' · ' + esc(h.affiliation) : '') +
-        '</div>' +
-      '</div>' +
-      '<span style="background:' + t.color + '22;color:' + t.color + ';padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;flex-shrink:0;">' + esc(h.type || '?') + '</span>' +
-    '</div>';
-  }).join('');
-};
-
 // ── SMART CODE AUTOFILL — Live search while typing ───────────────────────────
 var _hspCodeTimer = null;
 
@@ -2711,9 +2621,6 @@ function _hspCodeFill(h) {
   window._hspFormDistrictChanged(false);
 }
 
-// compat — เก็บไว้ในกรณีที่ code อื่นยังเรียก
-window.hspCodeAutofill = window.hspCodeLiveSearch;
-
 // ── POPULATE FILTERS ────────────────────────────────────────────────────────
 window._hspPopulateFilters = function() {
   var provSel = document.getElementById('hsp-prov');
@@ -2818,19 +2725,6 @@ window._hspFormDistrictChanged = function(clearTambon) {
 function _hspIsIncomplete(h) {
   return !h.province || !h.district || !h.type || h.type === 'other' ||
          !h.affiliation || !h.beds || !h.tambon;
-}
-
-// สร้าง badge แสดง field ที่หายไปของแต่ละ รพ.
-function _hspMissingBadges(h) {
-  var missing = [];
-  if (!h.province || !h.district)    missing.push('ที่ตั้ง');
-  if (!h.tambon)                     missing.push('ตำบล');
-  if (!h.type || h.type === 'other') missing.push('ระดับ');
-  if (!h.affiliation)                missing.push('สังกัด');
-  if (!h.beds)                       missing.push('เตียง');
-  return missing.map(function(m) {
-    return '<span style="background:var(--border);color:var(--txt-muted);font-size:10px;padding:1px 6px;border-radius:8px;margin-right:3px;">' + m + '</span>';
-  }).join('');
 }
 
 window.openHspAutoEnrich = async function() {
@@ -3198,15 +3092,6 @@ const HSP_PROD_GROUPS = [
   { id: 'application',  label: 'Application',       color: '#059669' },
   { id: 'smart',        label: 'Smart Hospital',    color: '#d97706' },
 ];
-
-window.openHspProductMgmt = function() {
-  window.renderHspProductMgmt();
-  // ซ่อน form เพิ่ม/แก้ไข ตอนเปิด
-  var editArea = document.getElementById('hsp-prod-edit-area');
-  if (editArea) editArea.style.display = 'none';
-  document.getElementById('hsp-prod-edit-id') && (document.getElementById('hsp-prod-edit-id').value = '');
-  window.openM('m-hsp-products');
-};
 
 window.renderHspProductMgmt = function() {
   var body = document.getElementById('hsp-prod-list');

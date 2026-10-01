@@ -34,9 +34,7 @@
     }, overrides || {});
   }
 
-  function lookupIn(list, id) { return list.find(function (x) { return x.id === id; }) || list[1] || { label:id, color:'#9ba3b8' }; }
   function imtStatus(id)      { return window.IMPL_STATUS.find(function (s) { return s.id === id; }) || window.IMPL_STATUS[0]; }
-  function imtPriority(id)    { return lookupIn(window.IMPL_PRIORITY, id); }
   function imtIssueStatus(id) { return window.IMPL_ISSUE_STATUS.find(function (s) { return s.id === id; }) || window.IMPL_ISSUE_STATUS[0]; }
 
   // ── สีสุขภาพของ Phase อ้างอิงจาก % ความคืบหน้าจริง (ไม่ใช่ field สถานะที่ตั้งเองซึ่งบางทีลืมอัปเดต) —
@@ -1328,7 +1326,6 @@
   // ── Task Modal (Detail: checklist / comment / attachment / activity / issue / status) ──
   window.openImtTaskModal = function (id, phaseId) {
     window.imtEditTaskId = id;
-    window.imtCurrentTaskId = id;
     var t = id ? imtTask(id) : { phaseId:phaseId, name:'', description:'', owner:'', start:'', due:'', priority:'medium', status:'not_started', progress:0 };
     document.getElementById('m-imt-task-title').textContent = id ? 'รายละเอียดงาน' : 'เพิ่ม Task ใหม่';
     var canEdit = window.canEdit(window.IMPL_MODULE) || window.canAdd(window.IMPL_MODULE);
@@ -1734,17 +1731,26 @@
   // ให้น้ำหนักโครงการประเภทเดียวกันมากกว่า · แสดงผลเป็นคำแนะนำ มีปุ่ม "ใช้ค่านี้" ให้คนตัดสินใจเองเสมอ ──
   var _imtAiLast = null;
   function imtProjectTypeId(pid) { var sp = imtResolveSourceProject(imtProject(pid)); return sp ? sp.typeId : ''; }
-  function imtAiSimilarIssues(text, pid, excludeId) {
+  // ค้นร่วมกับคลังความรู้ของศูนย์ช่วยเหลือ (Ticket ที่บันทึก "วิธีแก้ไข:" แล้ว — hdKbFetch แคช 2 นาที) เรียงรวมตามความคล้าย
+  // ผลลัพธ์รูปแบบเดียวกัน { problem, solution, category, from } · from = ที่มา (ชื่อโครงการ / เลข Ticket)
+  async function imtAiSimilarIssues(text, pid, excludeId) {
     var myType = imtProjectTypeId(pid), typeCache = {};
-    return (window.IMPL_ISSUES || []).filter(function (x) { return x.id !== excludeId && (x.solution || '').trim(); })
+    var impl = (window.IMPL_ISSUES || []).filter(function (x) { return x.id !== excludeId && (x.solution || '').trim(); })
       .map(function (x) {
         if (!(x.projectId in typeCache)) typeCache[x.projectId] = imtProjectTypeId(x.projectId);
         var score = window.aiTextSim(text, x.problem) + (myType && typeCache[x.projectId] === myType ? 0.08 : 0);
-        return { issue: x, score: score };
-      })
-      .filter(function (r) { return r.score >= 0.2; })
+        return { score: score, problem: x.problem, solution: x.solution, category: x.category, from: (imtProject(x.projectId) || {}).name || '' };
+      });
+    var kb = [];
+    try { kb = window.hdKbFetch ? await window.hdKbFetch() : []; } catch (e) {}
+    var hd = kb.map(function (k) {
+      var cat = (window.HELPDESK_CATEGORIES || []).find(function (c) { return c.id === k.categoryId; });
+      return { score: window.aiTextSim(text, k.subject + ' ' + k.description), problem: k.description || k.subject,
+        solution: k.fix, category: cat ? cat.name : '', from: 'ศูนย์ช่วยเหลือ ' + k.ticketNo };
+    });
+    return impl.concat(hd).filter(function (r) { return r.score >= 0.2; })
       .sort(function (a, b) { return b.score - a.score; })
-      .slice(0, 5).map(function (r) { return r.issue; });
+      .slice(0, 5);
   }
   window.imtAiSuggestIssue = async function (btn) {
     var out = document.getElementById('imt-is-ai-out');
@@ -1757,14 +1763,14 @@
     try {
       var pid = window.imtCurrentProjectId;
       var cats = imtIssueCategories();
-      var sim = imtAiSimilarIssues(problem, pid, window.imtEditIssueId);
+      var sim = await imtAiSimilarIssues(problem, pid, window.imtEditIssueId);
       var proj = imtProject(pid);
       var user = 'กลุ่มปัญหาที่เลือกได้ (ตอบชื่อให้ตรงตัวอักษร):\n' + cats.map(function (c) { return '- ' + c; }).join('\n')
         + '\n\nโครงการ: ' + ((proj && proj.name) || '-')
         + '\nแผนกที่แจ้ง: ' + (((document.getElementById('imt-is-dept') || {}).value || '').trim() || '-')
         + '\nรายละเอียดปัญหา: ' + problem.slice(0, 1500)
         + (sim.length ? '\n\nปัญหาเก่าที่คล้ายกันและวิธีแก้ที่เคยใช้:\n' + sim.map(function (x, n) {
-            return (n + 1) + ') [' + (x.category || '-') + '] ' + String(x.problem).slice(0, 200) + '\n   วิธีแก้: ' + String(x.solution).slice(0, 300);
+            return (n + 1) + ') [' + (x.category || '-') + ' · ' + x.from + '] ' + String(x.problem).slice(0, 200) + '\n   วิธีแก้: ' + String(x.solution).slice(0, 300);
           }).join('\n') : '');
       var res = await window.aiChatJson(
         'คุณเป็นผู้ช่วยทีมติดตั้งระบบซอฟต์แวร์โรงพยาบาล วิเคราะห์ปัญหาการใช้งานที่ รพ. แจ้ง แล้วตอบ "เฉพาะ JSON" รูปแบบ: '
@@ -1804,7 +1810,7 @@
       + (s.similar.length ? '<details style="font-size:11.5px;margin-top:4px;"><summary style="cursor:pointer;color:var(--txt2);">ปัญหาเก่าที่คล้ายกัน</summary>'
       +   s.similar.map(function (x) {
             return '<div style="padding:4px 0;border-bottom:1px dashed var(--border);"><b>' + esc(String(x.problem).slice(0, 120)) + '</b>'
-              + '<div style="color:var(--txt3);">' + esc((imtProject(x.projectId) || {}).name || '') + ' · วิธีแก้: ' + esc(String(x.solution).slice(0, 200)) + '</div></div>';
+              + '<div style="color:var(--txt3);">' + esc(x.from) + ' · วิธีแก้: ' + esc(String(x.solution).slice(0, 200)) + '</div></div>';
           }).join('') + '</details>' : '')
       + (s.reason ? '<div style="font-size:11px;color:var(--txt3);margin-top:4px;">เหตุผล: ' + esc(s.reason) + '</div>' : '')
       + '<div style="font-size:10.5px;color:var(--txt3);margin-top:4px;">* AI ช่วยแนะนำเท่านั้น ตรวจสอบก่อนใช้เสมอ</div>',

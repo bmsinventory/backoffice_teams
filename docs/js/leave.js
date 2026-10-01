@@ -98,9 +98,15 @@ window.renderLeave=function(){
   var fStaff=(document.getElementById('leave-filter-staff')||{}).value||'';
   var fType=(document.getElementById('leave-filter-type')||{}).value||'';
   var statusSel=document.getElementById('leave-filter-status');
-  // ค่าเริ่มต้น: แสดงเฉพาะ "รออนุมัติ" — ติ๊ก "แสดงทั้งหมด" เพื่อดูทุกสถานะ (แล้วค่อยเลือกกรองสถานะ
-  // เฉพาะเจาะจงต่อได้จาก dropdown) ปิด dropdown ไว้ตอนไม่ติ๊ก กันเลือกสถานะขัดกับโหมดเริ่มต้น
-  var showAllLV=!!(document.getElementById('leave-show-all')||{}).checked;
+  // ไม่ติ๊ก "แสดงทั้งหมด" = เฉพาะ "รออนุมัติ" · ติ๊ก = ทุกสถานะ (แล้วค่อยเลือกกรองสถานะเฉพาะเจาะจงต่อได้
+  // จาก dropdown) ปิด dropdown ไว้ตอนไม่ติ๊ก กันเลือกสถานะขัดกับโหมดรออนุมัติ
+  // ค่าเริ่มต้นตามผู้ใช้ (ตั้งครั้งเดียวต่อผู้ใช้ที่ล็อกอิน — หลังจากนั้นผู้ใช้ติ๊กเองได้): Role PM/Admin เห็นเฉพาะ
+  // "รออนุมัติ" ที่ต้องจัดการ · Role อื่น (viewer ฯลฯ) ติ๊ก "แสดงทั้งหมด" ไว้ให้เห็นประวัติการลาครบ — ดูจาก Role
+  // ไม่ใช่สิทธิ์แก้ไขการลา (ระบบจริงอาจให้สิทธิ์แก้ไขกับ Role พนักงานไว้ แก้ใบลาของตัวเอง)
+  var showAllEl=document.getElementById('leave-show-all');
+  var _cuKey=window.cu?String(window.cu.id||window.cu.username||''):'';
+  if(showAllEl&&showAllEl.dataset.user!==_cuKey){showAllEl.dataset.user=_cuKey;showAllEl.checked=!window.ce();}
+  var showAllLV=!!(showAllEl||{}).checked;
   if(statusSel){statusSel.disabled=!showAllLV;statusSel.parentElement.style.opacity=showAllLV?'':'.55';}
   var fStatus=showAllLV?((statusSel||{}).value||''):'pending';
   // VIEWER: force own-staff filter + hide dept/staff filter controls (but keep add button)

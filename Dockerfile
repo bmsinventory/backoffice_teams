@@ -1,6 +1,8 @@
 FROM nginx:alpine
 
 COPY docs/ /usr/share/nginx/html/
+# ประทับเวอร์ชันแคชของ Service Worker ใหม่ทุกครั้งที่ build — sw.js เปลี่ยน = เบราว์เซอร์/PWA รู้ว่ามีเวอร์ชันใหม่
+RUN V=$(date +%s) && sed -i "s/'bms-app-v[0-9]*'/'bms-app-v$V'/; s/'bms-img-v[0-9]*'/'bms-img-v$V'/" /usr/share/nginx/html/sw.js
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 

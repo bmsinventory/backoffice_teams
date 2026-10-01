@@ -554,14 +554,3 @@ window._ctSelectCustomer = function(name){
   if(dd)  dd.style.display = 'none';
 };
 
-// ── DELETE ────────────────────────────────────────────────────────────────────
-window.deleteContract = async function(id){
-  if(!window.auth||!window.auth.currentUser) return;
-  window.CONTRACTS = window.CONTRACTS.filter(function(x){return x.id!==id;});
-  window.renderContract();
-  try {
-    await deleteDoc(getDocRef('CONTRACTS', id));
-  } catch(e){
-    window.showDbError(e);
-  }
-};

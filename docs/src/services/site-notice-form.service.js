@@ -71,10 +71,6 @@
     if (idx >= 0) arr[idx] = obj; else arr.unshift(obj);
   };
 
-  window.snlRemoveLocal = function (id) {
-    window.SITE_NOTICE_FORMS = window.SITE_NOTICE_FORMS.filter(function (x) { return x.id !== id; });
-  };
-
   // ── Realtime Subscription (background, ไม่ block loader) ──
   var _renderTimer = null;
   window.onSnapshot(window.getColRef('SITE_NOTICE_FORMS'), function (s) {

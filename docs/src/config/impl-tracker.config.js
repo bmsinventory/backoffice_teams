@@ -60,23 +60,10 @@
     { id:'high',   label:'สูง',    color:'#ff6b6b' },
   ];
 
-  window.IMPL_PROBABILITY = [
-    { id:'low',    label:'น้อย',    color:'#9ba3b8' },
-    { id:'medium', label:'ปานกลาง', color:'#ffa62b' },
-    { id:'high',   label:'สูง',    color:'#ff6b6b' },
-  ];
-
-  window.IMPL_RISK_STATUS = [
-    { id:'open',      label:'เฝ้าระวัง',  color:'#ffa62b' },
-    { id:'mitigated', label:'บรรเทาแล้ว', color:'#06d6a0' },
-    { id:'closed',    label:'ปิดแล้ว',    color:'#6c757d' },
-  ];
-
   // ── UI State ──
   window.imtTab            = 'dashboard';  // dashboard | projects | detail | calendar | issues | risks | report
   window.imtBoardView       = 'card';       // card | list | kanban  (มุมมอง Task ภายในหน้ารายละเอียดโครงการ)
   window.imtCurrentProjectId = '';
-  window.imtCurrentTaskId    = '';
   window.imtCalY            = new Date().getFullYear();
   window.imtCalM            = new Date().getMonth();
   window.imtTaskFilter      = { q:'', status:'', owner:'', phaseId:'' };
@@ -85,7 +72,6 @@
   window.imtEditPhaseId     = null;
   window.imtEditTaskId      = null;
   window.imtEditIssueId     = null;
-  window.imtEditRiskId      = null;
   window.imtDragTaskId      = null;
   window.imtDragTaskPhaseId = null;  // ใช้จำกัดการลากสลับลำดับ Task (Card view) ให้ทำได้แค่ภายใน Phase เดียวกัน
   window.imtDragPhaseId     = null;  // ลากสลับลำดับ Phase (Card view)

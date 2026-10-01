@@ -225,18 +225,10 @@ function patchGoView() {
 // ── Bottom nav badge sync ───────────────────────────────────
 function syncBottomBadges() {
   var advNb = document.getElementById('adv-nb');
-  var leaveNb = document.getElementById('leave-nb');
   var bAdvNb = document.getElementById('bnav-adv-badge');
-  var bLeaveNb = document.getElementById('bnav-leave-badge');
   if (advNb && bAdvNb) {
-    var t = advNb.textContent;
-    bAdvNb.textContent = t;
+    bAdvNb.textContent = advNb.textContent;
     bAdvNb.style.display = advNb.style.display;
-  }
-  if (leaveNb && bLeaveNb) {
-    var t2 = leaveNb.textContent;
-    bLeaveNb.textContent = t2;
-    bLeaveNb.style.display = leaveNb.style.display;
   }
 }
 

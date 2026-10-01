@@ -84,14 +84,29 @@
 
     // Remember me — จำทั้ง username และ password (base64 เบา ๆ ใน StorageService) เมื่อติ๊กไว้
     var remEl = document.getElementById('l-rem');
-    if (remEl && remEl.checked) {
+    var remember = !!(remEl && remEl.checked);
+    if (remember) {
       window.StorageService.setRememberedUser(usr.username);
       window.StorageService.setRememberedPassword(password);
     } else {
       window.StorageService.clearRememberedUser();
       window.StorageService.clearRememberedPassword();
     }
+    // เก็บ session ไว้ — กด Refresh แล้วไม่ต้องล็อกอินใหม่ (ดู _restoreSession)
+    window.StorageService.setSession({ uid: usr.id, sig: _sessSig(usr) }, remember);
+    _enterApp(usr, false);
+  }
 
+  // ── ลายเซ็น session จาก id + รหัสผ่านปัจจุบัน — เปลี่ยนรหัสผ่านแล้ว session เก่าใช้ไม่ได้ (ไม่เก็บรหัสผ่านเอง) ──
+  function _sessSig(u) {
+    var s = String(u.id) + '|' + String(u.password || ''), h = 5381;
+    for (var i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+    return (h >>> 0).toString(36);
+  }
+
+  // ── เข้าสู่หน้าแอป (หลังตรวจรหัสผ่าน หรือกู้ session หลัง Refresh) ──
+  // restore = true → กลับไปหน้าที่เปิดค้างไว้ก่อน Refresh (#ชื่อหน้า ใน URL) แทนหน้าเริ่มต้นตามสิทธิ์
+  function _enterApp(usr, restore) {
     // Set current user & switch to app view
     window.cu = usr;
     document.getElementById('login').style.display = 'none';
@@ -111,10 +126,14 @@
     var _dlEq = _dlHash.indexOf('=');
     var _dlModule = _dlEq > -1 ? _dlHash.slice(0, _dlEq) : '';
     var _hasDeepLink = !!(_dlEq > -1 && _dlModule && window.ROUTE_MAP && window.ROUTE_MAP[_dlModule]);
-    if (!_hasDeepLink) {
+    // Refresh: hash เปล่า ๆ ชื่อหน้า (เช่น #kanban) คือหน้าที่เปิดค้างอยู่ → กลับไปหน้าเดิม
+    var _restoreView = restore && !_hasDeepLink && window.ROUTE_MAP && window.ROUTE_MAP[_dlHash] ? _dlHash : '';
+    if (!_hasDeepLink && !_restoreView) {
       try { history.replaceState(null, '', location.pathname); } catch (e) {}
     }
-    var _goAfterLoad = _hasDeepLink ? window._handleDeepLink : window._goDefaultView;
+    var _goAfterLoad = _hasDeepLink ? window._handleDeepLink
+      : _restoreView ? function () { window.goView && window.goView(_restoreView); }
+      : window._goDefaultView;
 
     if (window.isDbLoaded) {
       window.setupUser && window.setupUser();
@@ -185,6 +204,7 @@
   // ── Logout ──
   window.doLogout = function () {
     window.cu = null;
+    window.StorageService.clearSession();
     if (window._loginRetryInterval) { clearInterval(window._loginRetryInterval); window._loginRetryInterval = null; }
     window.closeMobSidebar && window.closeMobSidebar();
     try { history.replaceState(null, '', location.pathname); } catch (e) {}
@@ -223,6 +243,29 @@
       window.doLogin && window.doLogin();
     });
   });
+
+  // ── กู้ session หลัง Refresh: ซ่อนหน้าล็อกอินทันที (ไม่ให้วาบ) รอข้อมูลผู้ใช้โหลด แล้วตรวจว่ายังใช้ได้
+  // (บัญชียังเปิดอยู่ + รหัสผ่านไม่เปลี่ยน) → เข้าแอปต่อหน้าเดิม · ไม่ผ่าน/โหลดไม่ทัน → ลบ session กลับหน้าล็อกอิน ──
+  function _restoreSession() {
+    var sess = window.StorageService.getSession();
+    if (!sess || !sess.uid) return;
+    var loginEl = document.getElementById('login');
+    if (loginEl) loginEl.style.display = 'none';
+    window.showLoader && window.showLoader('กำลังโหลดข้อมูล...');
+    var tries = 0;
+    var t = setInterval(function () {
+      tries++;
+      if (!window.isDbLoaded && tries < 60) return; // รอสูงสุด ~30 วินาที
+      clearInterval(t);
+      var list = (window.USERS && window.USERS.length) ? window.USERS : DEFAULT_USERS;
+      var usr = window.isDbLoaded && list.find(function (x) { return x.id === sess.uid && x.active !== false; });
+      if (usr && _sessSig(usr) === sess.sig) { window.hideLoader && window.hideLoader(); _enterApp(usr, true); return; }
+      window.StorageService.clearSession();
+      window.hideLoader && window.hideLoader();
+      if (loginEl) loginEl.style.display = 'flex';
+    }, 500);
+  }
+  document.addEventListener('DOMContentLoaded', _restoreSession);
 
   // ── Initialize: seed + start realtime ──
   seedDatabaseIfEmpty().then(function () {

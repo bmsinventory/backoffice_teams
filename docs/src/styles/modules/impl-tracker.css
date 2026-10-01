@@ -49,7 +49,6 @@
 }
 .imt-switcher-back:hover { background: var(--surface3); color: var(--violet); }
 .imt-switcher-lbl { font-size: 11.5px; color: var(--txt3); white-space: nowrap; }
-.imt-switcher-sel { max-width: 260px; padding: 6px 10px; font-size: 12.5px; }
 .imt-switcher-progress { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .imt-switcher-pbar { width: 110px; }
 
@@ -494,12 +493,6 @@
   /* Project switcher — บาร์ progress ย้ายลงแถวของตัวเอง ป้องกันล้นขอบจอ (ความกว้าง 110px คงที่เดิม
      บวก select บวกปุ่มย้อนกลับ รวมกันเกินความกว้างจอเล็กเสมอ) */
   .imt-switcher { padding: 8px 12px; gap: 8px; }
-  .imt-switcher-sel { max-width: none; flex: 1 1 140px; min-width: 0; }
-  /* responsive.css บังคับ .f-input เป็น 16px !important บนมือถือ (กัน iOS auto-zoom ตอนแตะ select) —
-     select ตัวนี้มีคลาส .f-input ด้วยเลยติดไปด้วย ทำให้รายการใน dropdown ฟอนต์ใหญ่กว่า UI ส่วนอื่น
-     ตั้ง font-size บน <option> แยกต่างหากให้เท่า UI ปกติ (เบราว์เซอร์ที่วาด dropdown เองอย่าง Chrome/Firefox/
-     Edge จะใช้ค่านี้ ส่วน iOS ใช้ picker ของระบบซึ่งไม่สนใจ font-size อยู่แล้ว จึงไม่กระทบการกัน zoom) */
-  .imt-switcher-sel option { font-size: 13px; }
   .imt-switcher-lbl { display: none; }
   /* เดิม progress เต็มแถวแยกต่างหาก (order:3) + checkbox "แสดงเฉพาะ..." ลอยอีกแถว รวมเป็น 3 แถว —
      ย่อ progress ให้กว้างเท่าที่จำเป็นแล้วแชร์แถวเดียวกับ checkbox (ทั้งคู่ order:2) เหลือ 2 แถวรวม
@@ -532,29 +525,14 @@
      ใช้ 3 คอลัมน์เหมือนกันจะเหลือช่องว่างลอย 1 ช่อง แบ่งเป็น 2 คอลัมน์เท่ากันให้เต็มแถวพอดี */
   .imt-issue-filterbar { grid-template-columns: 1fr 1fr; }
 
-  /* ตารางทะเบียน "ปัญหา": คอลัมน์แรกจริง ๆ คือ "ลำดับ" (ตัวเลขล้วน ธรรมเนียมปกติต้องอยู่คอลัมน์แรก)
-     แต่กฎ .m-card-table ทั่วไปดันคอลัมน์แรกให้เป็นหัวการ์ดเสมอ — ที่นี่ไม่เหมาะ (แค่เลข ไม่สื่อความหมาย)
-     คืนคอลัมน์แรกเป็นช่องปกติ แล้วยกให้ td.imt-card-title (คอลัมน์ "ปัญหา") เป็นหัวการ์ดแทน โดยไม่แตะ
-     ลำดับคอลัมน์จริงหรือ .m-card-table ตารางอื่นในแอป — ทำเป็นแถบเล็ก ๆ แนวนอนคั่นบนสุดของการ์ด (เช่น
-     "ลำดับ 1") แทนที่จะปล่อยให้ลอยเป็นช่องกริด 2 คอลัมน์เดี่ยว ๆ ที่มีช่องข้างว่างเปล่าดูแปลกตา ── */
+  /* ตารางปัญหาในป๊อปอัปของหน้า "ปัญหาทุกโครงการ" (.imt-issues-tbl): คอลัมน์แรกคือ "ลำดับ" (ตัวเลขล้วน)
+     กฎ .m-card-table ทั่วไปจะดันคอลัมน์แรกเป็นหัวการ์ด — ไม่เหมาะกับแค่ตัวเลข จึงทำเป็นแถบเล็กแนวนอนบนสุดของการ์ดแทน ── */
   .imt-issues-tbl.m-card-table td:first-child {
     grid-column: 1 / -1 !important; display: flex !important; flex-direction: row; align-items: baseline; gap: 4px;
     font-size: 10.5px; font-weight: 600; color: var(--txt3);
     padding-bottom: 2px; border-bottom: none; margin-bottom: 0;
   }
   .imt-issues-tbl.m-card-table td:first-child::before { display: inline; }
-  .imt-issues-tbl.m-card-table td.imt-card-title {
-    grid-column: 1 / -1; font-size: 13.5px; font-weight: 700; color: var(--txt);
-    padding-bottom: 6px; border-bottom: 1px solid var(--border); margin-bottom: 3px;
-  }
-  .imt-issues-tbl.m-card-table td.imt-card-title::before { display: none; }
-  /* ปัญหายาวมาก (เช่น ข้อความทดสอบซ้ำ ๆ ยาวหลายร้อยตัวอักษร) ทำให้การ์ดสูงยืดจนกินทั้งจอ — จำกัดหัวการ์ด
-     ไว้ไม่เกิน 3 บรรทัด (…ต่อท้าย) แตะทั้งการ์ดเพื่อดูรายละเอียดเต็มในหน้าแก้ไขได้อยู่แล้ว ไม่จำเป็นต้อง
-     เห็นครบทุกตัวอักษรตั้งแต่ในรายการ ── */
-  .imt-issues-tbl.m-card-table td.imt-card-title {
-    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
-  }
-
   /* หัวข้อ "🩹 ปัญหาการใช้งาน — [ชื่อโครงการ]" ซ้ำกับชื่อโครงการที่เลือกไว้ในแถบ "กำลังดู" ด้านบนอยู่แล้ว
      ซ่อนบนมือถือกันเสียพื้นที่จอเปล่า ๆ ก่อนถึงเนื้อหาจริง (แท็บอื่นที่ใช้ .imt-ws-title ฐานเดียวกันไม่ได้ผล
      เพราะ scope เฉพาะ .imt-issue-ws-title เท่านั้น) ── */

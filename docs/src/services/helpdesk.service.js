@@ -67,7 +67,6 @@
       active: d.active !== false,
     };
   }
-  window.hdTransformTicket = tTicket;
 
   // ── รวม default + override (label/color/icon/priority) เป็นชุดที่ใช้งานจริง — เรียกทุกครั้งที่
   // settings.app เปลี่ยน (ดู onSnapshot ท้ายไฟล์) ไม่แก้ default array ตรง ๆ กันข้อมูลเก่าค้างตอน
@@ -237,16 +236,6 @@
     return res.data || [];
   };
 
-  window.hdDeleteAttachment = async function (att) {
-    var db = window.getDb && window.getDb();
-    if (db && att.file_url) {
-      var marker = '/helpdesk/';
-      var idx = att.file_url.indexOf(marker);
-      if (idx >= 0) { try { await db.storage.from('helpdesk').remove([att.file_url.slice(idx + marker.length)]); } catch (e) {} }
-    }
-    await window.deleteDoc(window.getDocRef('HELPDESK_ATTACHMENTS', att.id));
-  };
-
   window.hdIsImage = function (mime, name) {
     return /^image\//.test(mime || '') || /\.(jpe?g|png|gif|webp)$/i.test(name || '');
   };
@@ -288,11 +277,17 @@
   };
 
   // เลือกรายการในคลังความรู้ที่คล้ายข้อความ เพื่อเป็น context ให้ AI (ความคล้ายแบบ bigram — รองรับภาษาไทย)
+  // ── กรณีเก่าที่คล้ายกัน: คลังความรู้ Helpdesk + ปัญหาใน Impl Tracker ที่มีวิธีแก้แล้ว (ค้นร่วมกัน เรียงตามความคล้าย)
+  // IMPL_ISSUES โหลดเบื้องหลังหลังล็อกอิน (ImplTrackerService) — ยังไม่มาก็ใช้แค่ฝั่ง Helpdesk ──
   window.hdAiSimilar = async function (text, limit) {
-    var kb = await window.hdKbFetch();
-    return kb.map(function (k) {
-      return { score: window.aiTextSim(text, k.subject + ' ' + k.description), subject: k.subject, description: k.description, fix: 'วิธีแก้ไข: ' + k.fix };
-    }).filter(function (x) { return x.score >= 0.2; })
+    var kb = (await window.hdKbFetch()).map(function (k) {
+      return { score: window.aiTextSim(text, k.subject + ' ' + k.description), subject: k.subject, description: k.description, fix: 'วิธีแก้ไข: ' + k.fix, from: 'Ticket ' + k.ticketNo };
+    });
+    var impl = (window.IMPL_ISSUES || []).filter(function (x) { return (x.solution || '').trim() && (x.problem || '').trim(); }).map(function (x) {
+      var p = (window.IMPL_PROJECTS || []).find(function (pp) { return pp.id === x.projectId; });
+      return { score: window.aiTextSim(text, x.problem), subject: '', description: x.problem, fix: 'วิธีแก้ไข: ' + x.solution, from: 'ปัญหาโครงการ ' + ((p && p.name) || '') };
+    });
+    return kb.concat(impl).filter(function (x) { return x.score >= 0.2; })
       .sort(function (a, b) { return b.score - a.score; })
       .slice(0, limit || 3);
   };
@@ -305,8 +300,8 @@
     var sim = [];
     try { sim = await window.hdAiSimilar(desc, 3); } catch (e) {}
     var simTxt = sim.length
-      ? '\n\nตัวอย่าง Ticket เก่าที่คล้ายกัน (ใช้ประกอบการแนะนำวิธีแก้ไข):\n'
-        + sim.map(function (x, i) { return (i + 1) + ') ปัญหา: ' + (x.description || x.subject || '').slice(0, 200) + '\n   ' + x.fix.slice(0, 300); }).join('\n')
+      ? '\n\nกรณีเก่าที่คล้ายกัน (จาก Ticket และปัญหาในโครงการติดตั้ง — ใช้ประกอบการแนะนำวิธีแก้ไข):\n'
+        + sim.map(function (x, i) { return (i + 1) + ') [' + x.from + '] ปัญหา: ' + (x.description || x.subject || '').slice(0, 200) + '\n   ' + x.fix.slice(0, 300); }).join('\n')
       : '';
     var user = 'รายการหมวดปัญหา (เลือก id ให้ตรงที่สุด):\n' + cats
       + '\n\n--- ปัญหาที่ต้องวิเคราะห์ ---\n'

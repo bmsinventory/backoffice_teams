@@ -189,16 +189,6 @@ window.kbMoveStage=function(pid,sid){
   window.kbPid=pid;
   window.kbDrop({preventDefault:function(){}},sid);
 };
-// ── STAGE PROGRESS RULE: stages that always force 100% ──
-window.onStageChange=function(sid){
-  if(window.stageForces100(sid)){
-    var pr=document.getElementById('pf-prog');var lb=document.getElementById('prog-lbl');
-    if(pr){pr.value=100;pr.disabled=true;pr.style.opacity='.5';}
-    if(lb)lb.textContent='100%';
-  } else {
-    var pr=document.getElementById('pf-prog');if(pr){pr.disabled=false;pr.style.opacity='';}
-  }
-}
 window.stageForces100=function(stageId){
   // Any stage with setProgress=100 in config, OR deliver/close by convention
   var s=window.STAGES.find(function(x){return x.id===stageId;});

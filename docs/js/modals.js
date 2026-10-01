@@ -7,11 +7,11 @@ window.askDel=function(type,id,label){window.delTarget={type:type,id:id};documen
 window.execDelete=async function(){
   if(!window.delTarget)return;if(!window.auth.currentUser)return;
   var t=window.delTarget.type,id=window.delTarget.id;
-  var _delModMap={project:'projects',advance:'advance',lodging:'lodging',timesheet:'timesheet',cost:'cost',leave:'leave',contract:'contract',imt_project:'impl_tracker',imt_phase:'impl_tracker',imt_task:'impl_tracker',imt_issue:'impl_tracker',imt_template:'impl_tracker',form_group:'impl_tracker',form_item:'impl_tracker',form_template:'impl_tracker',hdcat:'helpdesk'};
+  var _delModMap={project:'projects',advance:'advance',lodging:'lodging',timesheet:'timesheet',leave:'leave',contract:'contract',imt_project:'impl_tracker',imt_phase:'impl_tracker',imt_task:'impl_tracker',imt_issue:'impl_tracker',imt_template:'impl_tracker',form_group:'impl_tracker',form_item:'impl_tracker',form_template:'impl_tracker',hdcat:'helpdesk'};
   if(['staff','type','position','group','user','stage','department'].includes(t)){if(!window.canDel('admin'))return;}
   else if(_delModMap[t]){if(!window.canDel(_delModMap[t]))return;}
   else{if(!window.isAdmin())return;}
-  var sheetMap={project:'PROJECTS',advance:'ADVANCES',staff:'STAFF',type:'PTYPES',user:'USERS',position:'POSITIONS',group:'PGROUPS',lodging:'LODGINGS',stage:'STAGES',timesheet:'TIMESHEETS',cost:'COSTS',department:'DEPARTMENTS',contract:'CONTRACTS',imt_project:'IMPL_PROJECTS',imt_phase:'IMPL_PHASES',imt_task:'IMPL_TASKS',imt_issue:'IMPL_ISSUES',imt_template:'IMPL_TEMPLATES',form_group:'FORM_GROUPS',form_item:'FORM_ITEMS',form_template:'FORM_TEMPLATES',hdcat:'HELPDESK_CATEGORIES'};
+  var sheetMap={project:'PROJECTS',advance:'ADVANCES',staff:'STAFF',type:'PTYPES',user:'USERS',position:'POSITIONS',group:'PGROUPS',lodging:'LODGINGS',stage:'STAGES',timesheet:'TIMESHEETS',department:'DEPARTMENTS',contract:'CONTRACTS',imt_project:'IMPL_PROJECTS',imt_phase:'IMPL_PHASES',imt_task:'IMPL_TASKS',imt_issue:'IMPL_ISSUES',imt_template:'IMPL_TEMPLATES',form_group:'FORM_GROUPS',form_item:'FORM_ITEMS',form_template:'FORM_TEMPLATES',hdcat:'HELPDESK_CATEGORIES'};
   function _ftkCascadeGroup(groupId){
     window.FORM_ITEMS.filter(x=>x.groupId===groupId).forEach(i=>deleteDoc(getDocRef('FORM_ITEMS',i.id)));
     window.FORM_ITEMS=window.FORM_ITEMS.filter(x=>x.groupId!==groupId);
@@ -44,7 +44,6 @@ window.execDelete=async function(){
   else if(t==='stage')window.STAGES=window.STAGES.filter(x=>x.id!==id);
   else if(t==='department'){window.DEPT_LIST=window.DEPT_LIST.filter(x=>x.id!==id);window.DEPARTMENTS=window.DEPT_LIST.map(d=>d.label);}
   else if(t==='timesheet')window.TIMESHEETS=window.TIMESHEETS.filter(x=>x.id!==id);
-  else if(t==='cost')window.COSTS=window.COSTS.filter(x=>x.id!==id);
   else if(t==='contract')window.CONTRACTS=window.CONTRACTS.filter(x=>x.id!==id);
   else if(t==='imt_project'){
     window.IMPL_PHASES.filter(x=>x.projectId===id).forEach(p=>{_imtCascadePhase(p.id);deleteDoc(getDocRef('IMPL_PHASES',p.id));});

@@ -110,15 +110,26 @@
     var _retryDelay = 2000; // exponential backoff เริ่ม 2s, cap 30s
     var _reconnectPending = false; // กันจอง retry ซ้อนกันหลายอันตอน event ยิงรัว ๆ
 
+    // ── ข้อมูลไม่เปลี่ยนจากครั้งก่อน → ไม่เรียก callback (ไม่วาดหน้าจอซ้ำ) — ต้นเหตุหน้าจอกระตุก: กลับมาที่แท็บ
+    // ดึงใหม่ทุก collection พร้อมกัน / realtime ต่อใหม่ / event ที่ไม่ได้เปลี่ยนข้อมูลจริง ต่างสั่งวาดใหม่ทั้งที่ข้อมูลเหมือนเดิม
+    // ครั้งแรกเรียกเสมอ (realtime.service นับจำนวน collection ที่โหลดครบจาก callback แรก)
+    // หลังเราเขียน collection นี้ (_writeGen เปลี่ยน) → ส่งรอบถัดไปเสมอ แม้ข้อมูลเท่าเดิม: กันกรณีเขียนไม่สำเร็จ
+    // แต่หน้าจอแก้ค่าในเครื่องไปแล้ว (optimistic) จะได้กลับเป็นข้อมูลจริงจากฐาน ──
+    var _lastSig = null;
+    function _changed(data) {
+      var sig = (_writeGen[ref._fs] || 0) + '|' + JSON.stringify(data);
+      if (sig === _lastSig) return false;
+      _lastSig = sig; return true;
+    }
     async function _fetch() {
       try {
         if (isDoc) {
           var res = await _sb.from(sbTable).select('*').eq('id', docId).maybeSingle();
           if (res.error) throw res.error;
-          callback(_makeDocSnap(res.data));
+          if (_changed(res.data)) callback(_makeDocSnap(res.data));
         } else {
           var records = await _fullList(sbTable);
-          callback(_makeColSnap(ref._fs, records));
+          if (_changed(records)) callback(_makeColSnap(ref._fs, records));
         }
       } catch (e) {
         if (onError) onError(e);
@@ -192,8 +203,10 @@
   // ── Own-Write Suppression: prevent realtime echo from re-rendering ──
   window._ownWrite      = window._ownWrite      || {};
   window._ownWriteTimer = window._ownWriteTimer || {};
+  var _writeGen = {}; // นับการเขียนต่อ collection — onSnapshot ใช้บังคับส่งข้อมูลรอบถัดไปหลังเขียน (ดู _changed)
   function _markOwnWrite(fsName) {
     if (!fsName) return;
+    _writeGen[fsName] = (_writeGen[fsName] || 0) + 1;
     window._ownWrite[fsName] = true;
     clearTimeout(window._ownWriteTimer[fsName]);
     window._ownWriteTimer[fsName] = setTimeout(function () {

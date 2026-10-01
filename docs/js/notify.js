@@ -82,17 +82,6 @@ window.renderNotifySettings=function(){
     +'</div>';
 };
 
-// ── SAVE PROXY URL ───────────────────────────────────────────────────────────
-window.saveNotifyProxyUrl=async function(){
-  var val=((document.getElementById('notify-proxy-input')||{}).value||'').trim();
-  var msg=document.getElementById('notify-proxy-msg');
-  try{
-    await setDoc(getDocRef('SETTINGS','app'),{notify_proxy_url:val},{merge:true});
-    window.NOTIFY_PROXY_URL=val;
-    if(msg){msg.textContent='✅ บันทึกแล้ว';setTimeout(function(){msg.textContent='';},2500);}
-  }catch(e){window.showDbError(e);}
-};
-
 // ── SAVE TOKENS ──────────────────────────────────────────────────────────────
 window.saveNotifyToken=async function(){
   var val=(document.getElementById('notify-token-input')||{}).value||'';

@@ -173,7 +173,8 @@
       <div class="sb-logo" style="background:#fff;padding:2px;"><img src="img/BMS_T.png" style="width:100%;height:100%;object-fit:contain;display:block;"></div>
       <div>
         <div class="sb-title">Backoffice Teams</div>
-        <div class="sb-sub">v1.0 - Cloud</div>
+        <!-- เลขเวอร์ชัน: +0.001 ทุกครั้งที่ปล่อยเวอร์ชัน (deploy) -->
+        <div class="sb-sub">V1.001</div>
       </div>
     </div>
     <div class="sb-nav">
@@ -200,7 +201,7 @@
       <div class="nav-btn" onclick="window.goView('impl_tracker',this)">
         <span class="ni">🛠️</span><span class="nl">ติดตามสถานะโครงการ</span>
       </div>
-      <div class="nav-btn ce-only" style="display:none" onclick="window.goView('all_issues',this)">
+      <div class="nav-btn" onclick="window.goView('all_issues',this)">
         <span class="ni">🩹</span><span class="nl">ปัญหาทุกโครงการ</span>
       </div>
       <div class="sb-sec">ต้นทุน</div>
@@ -257,12 +258,14 @@
       </div>
     </div>
     <div class="sb-foot">
-      <div class="user-row" onclick="window.openAdminModal()">
+      <!-- กดชื่อผู้ใช้ → เมนู เปลี่ยนรหัสผ่าน / ออกจากระบบ (window.toggleUserMenu ใน src/app.js) -->
+      <div class="user-row" onclick="window.toggleUserMenu(event)" title="บัญชีผู้ใช้">
         <div class="u-av" id="u-av">A</div>
-        <div style="min-width:0">
+        <div style="min-width:0;flex:1;">
           <div class="u-name" id="u-name">Admin</div>
           <div class="u-role" id="u-role">ADMIN</div>
         </div>
+        <span class="u-caret">⋯</span>
       </div>
     </div>
     <div class="sb-toggle" onclick="window.toggleSB()">◀</div>
@@ -300,15 +303,10 @@
     <div id="topbar">
       <button id="mob-menu-btn" class="btn btn-ghost btn-sm" onclick="window.toggleMobSidebar()" style="display:none;" aria-label="เมนู">☰</button>
       <div class="tp-title" id="tp-title">Overview</div>
-      <div class="tp-badge ok" id="tp-status" style="cursor:pointer;" onclick="window.forceSync()" title="คลิกเพื่อซิงค์ข้อมูลทันที">
-        <span class="pulse ok"></span> Realtime
-      </div>
-      <div class="tp-badge warn" id="tp-overdue" style="display:none"><span class="pulse warn"></span><span id="tp-overdue-txt"></span></div>
       <div id="tp-actions"></div>
       <button class="btn btn-ghost btn-sm admin-only" id="btn-import-top" style="display:none" onclick="window.openImportModal()" title="นำเข้าข้อมูล">📥 <span class="btn-lbl">นำเข้า</span></button>
       <button id="dm-toggle" onclick="window.toggleDarkMode()" title="Dark/Light Mode" aria-label="สลับธีม">🌙</button>
-      <button class="btn btn-ghost btn-sm" onclick="window.openChangePassword()" title="เปลี่ยนรหัสผ่าน">🔒</button>
-      <button class="btn btn-ghost btn-sm" onclick="window.doLogout()">🚪 <span class="btn-lbl">ออกจากระบบ</span></button>
+      <button id="noti-bell" onclick="window.toggleNotiMenu(event)" title="ไม่มีการแจ้งเตือน" aria-label="การแจ้งเตือน">🔔<span id="noti-count" style="display:none">0</span></button>
     </div>
 
     <div id="content">
@@ -951,7 +949,7 @@
       <!-- HELPDESK (ศูนย์ช่วยเหลือ) — เนื้อหา render โดย js/helpdesk.js -->
       <div class="view" id="view-helpdesk"></div>
 
-      <!-- ปัญหาทุกโครงการ (all_issues) — เฉพาะ PM/Admin (window.ce()) เนื้อหา render โดย js/all-issues.js -->
+      <!-- ปัญหาทุกโครงการ (all_issues) — สิทธิ์ตามระบบสิทธิ์ปกติ (canView) เนื้อหา render โดย js/all-issues.js -->
       <div class="view" id="view-all-issues"></div>
 
     </div>
@@ -1491,67 +1489,6 @@
   </div>
 </div>
 
-<!-- COST MODAL -->
-<div class="overlay" id="m-cost">
-  <div class="modal md" style="max-width:520px">
-    <div class="m-head">
-      <div class="m-icon" style="background:rgba(6,214,160,.12)">💰</div>
-      <div class="m-title" id="m-cost-title">บันทึกค่าใช้จ่าย</div>
-      <button class="m-x" onclick="window.closeM('m-cost')">✕</button>
-    </div>
-    <div class="m-body">
-      <input type="hidden" id="cost-edit-id">
-      <div class="f-grid">
-        <div class="f-group" style="grid-column:span 2">
-          <label class="f-label">โครงการ *</label>
-          <div id="costf-proj-host"></div>
-        </div>
-        <div class="f-group">
-          <label class="f-label">หมวดค่าใช้จ่าย *</label>
-          <select class="f-input" id="costf-cat">
-            <option value="phone">📱 ค่าโทรศัพท์</option>
-            <option value="travel">🚗 ค่าเดินทาง</option>
-            <option value="postal">📮 ค่าไปรษณีย์</option>
-            <option value="taxi">🚕 ค่าแท็กซี่</option>
-            <option value="fuel">⛽ ค่าน้ำมัน</option>
-            <option value="toll">🛣️ ค่าทางด่วน</option>
-            <option value="food">🍱 ค่าอาหาร</option>
-            <option value="lodging">🏨 ค่าที่พัก</option>
-            <option value="stationery">🖨️ เครื่องเขียนแบบพิมพ์</option>
-            <option value="labor">👷 ค่าแรง</option>
-            <option value="allowance">💵 ค่าเบี้ยเลี้ยง</option>
-            <option value="other">📝 อื่นๆ</option>
-          </select>
-        </div>
-        <div class="f-group">
-          <label class="f-label">จำนวนเงิน (฿) *</label>
-          <input type="number" class="f-input" id="costf-amount" min="0" step="0.01" placeholder="0.00">
-        </div>
-        <div class="f-group">
-          <label class="f-label">วันที่ *</label>
-          <input type="date" class="f-input" id="costf-date">
-        </div>
-        <div class="f-group">
-          <label class="f-label">ผู้บันทึก</label>
-          <select class="f-input" id="costf-staff"></select>
-        </div>
-        <div class="f-group" style="grid-column:span 2">
-          <label class="f-label">รายละเอียด *</label>
-          <textarea class="f-input" id="costf-desc" rows="3" placeholder="อธิบายค่าใช้จ่าย..."></textarea>
-        </div>
-        <div class="f-group" style="grid-column:span 2">
-          <label class="f-label">เลขที่ใบเสร็จ / อ้างอิง</label>
-          <input class="f-input" id="costf-receipt" placeholder="เช่น RCT-001">
-        </div>
-      </div>
-    </div>
-    <div class="m-foot">
-      <button class="btn btn-ghost" onclick="window.closeM('m-cost')">ยกเลิก</button>
-      <button class="btn btn-teal" onclick="window.saveCost()">💾 บันทึก</button>
-    </div>
-  </div>
-</div>
-
 <!-- CONTRACT MODAL -->
 <div class="overlay" id="m-contract">
   <div class="modal lg" style="max-width:720px">
@@ -2062,26 +1999,6 @@
   </div>
 </div>
 
-<!-- HOSPITAL LOOKUP (ฐานกลาง) MODAL -->
-<div class="overlay" id="m-hsp-lookup">
-  <div class="modal md">
-    <div class="m-head">
-      <div class="m-icon" style="background:rgba(6,214,160,.12)">🔍</div>
-      <div class="m-title">ค้นหาจากฐานข้อมูลกลาง</div>
-      <button class="m-x" onclick="window.closeM('m-hsp-lookup')">✕</button>
-    </div>
-    <div class="m-body" style="padding:20px 24px;">
-      <div style="display:flex;gap:8px;margin-bottom:4px;">
-        <input class="f-input" id="hsp-lookup-q" placeholder="พิมพ์รหัส HOS Code หรือชื่อโรงพยาบาล..." autocomplete="off"
-          oninput="window.hspLookupSearch()" style="flex:1;">
-        <button class="btn btn-pri" onclick="window.hspLookupSearch()">ค้นหา</button>
-      </div>
-      <div style="font-size:11px;color:var(--txt-muted);margin-bottom:14px;">ฐานข้อมูลโรงพยาบาลรัฐและเอกชนทั่วประเทศ (สธ.) · พิมพ์อย่างน้อย 2 ตัวอักษร</div>
-      <div id="hsp-lookup-result" style="max-height:380px;overflow-y:auto;"></div>
-    </div>
-  </div>
-</div>
-
 <!-- HOSPITAL IMPORT PREVIEW MODAL -->
 <div class="overlay" id="m-hsp-import">
   <div class="modal xl" style="max-width:880px;display:flex;flex-direction:column;max-height:90vh;">
@@ -2539,7 +2456,6 @@
 <script type="module" src="js/timesheet.js"></script>
 <script type="module" src="js/cost.js"></script>
 <script type="module" src="js/modals.js"></script>
-<script type="module" src="js/gcal.js"></script>
 <script type="module" src="js/hospital.js"></script>
 <script type="module" src="js/contract.js"></script>
 <script type="module" src="js/worklog.js"></script>
@@ -2553,11 +2469,8 @@
 <!-- 5. App Entry Point (โหลดสุดท้าย หลัง feature modules ทั้งหมด) -->
 <script src="src/app.js"></script>
 
-<!-- PWA Install Bar (Android) -->
-<div id="pwa-bar" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:9998;
-  background:#1e3a8a;color:#fff;padding:14px 20px;
-  display:none;align-items:center;gap:12px;
-  box-shadow:0 -4px 24px rgba(0,0,0,.25);font-family:inherit;">
+<!-- PWA Install Bar (Android) — การ์ดลอยมุมขวาล่าง (สไตล์ใน login.css) ไม่บังชื่อผู้ใช้/เมนูล่าง -->
+<div id="pwa-bar" style="display:none;">
   <div style="width:36px;height:36px;border-radius:10px;overflow:hidden;flex-shrink:0;">
     <img src="img/BMS_T.png" style="width:100%;height:100%;object-fit:contain;">
   </div>
@@ -2574,24 +2487,7 @@
 </div>
 
 <script>
-// ── PWA: Service Worker ──
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', function() {
-    navigator.serviceWorker.register('sw.js').then(function(reg) {
-      // Check for SW updates every 5 minutes (covers tabs left open for hours)
-      setInterval(function() { reg.update(); }, 5 * 60 * 1000);
-    }).catch(function(e) {
-      console.warn('[SW] register failed:', e);
-    });
-
-    // When a new SW activates it broadcasts SW_UPDATED → reload to get latest code
-    navigator.serviceWorker.addEventListener('message', function(e) {
-      if (e.data && e.data.type === 'SW_UPDATED') {
-        window.location.reload();
-      }
-    });
-  });
-}
+// ── PWA: Service Worker — ลงทะเบียน/ตรวจเวอร์ชันใหม่ที่ src/app.js จุดเดียว ──
 
 // ── PWA: Android install prompt ──
 var _pwaPrompt = null;

@@ -17,6 +17,7 @@
     { id:'leave',        label:'การลางาน',       icon:'🏖️' },
     { id:'timesheet',    label:'Timesheet',      icon:'⏱️' },
     { id:'cost',         label:'Cost Tracking',  icon:'💵' },
+    { id:'budget',       label:'สรุปงบประมาณ',   icon:'📊' },
     { id:'availability', label:'ทีมว่าง',         icon:'👥' },
     { id:'holiday',      label:'วันหยุด',         icon:'🎌' },
     { id:'admin',        label:'Admin Panel',    icon:'⚙️' },
@@ -25,6 +26,7 @@
     { id:'contract',     label:'ข้อมูลสัญญา',     icon:'📄' },
     { id:'worklog',      label:'บันทึกงาน',       icon:'📝' },
     { id:'impl_tracker', label:'ติดตามสถานะโครงการ', icon:'🛠️' },
+    { id:'all_issues',   label:'ปัญหาทุกโครงการ', icon:'🩹' },
     { id:'helpdesk',     label:'ศูนย์ช่วยเหลือ',   icon:'🎧' },
   ];
 
@@ -50,12 +52,9 @@
     budget:       'view-budget',
     impl_tracker: 'view-impl-tracker',
     helpdesk:     'view-helpdesk',
-    // ── all_issues: ไม่ใส่ใน PERM_MODULES โดยตั้งใจ — เมนูนี้จำกัดสิทธิ์ PM/Admin แบบตายตัว (window.ce())
-    // ไม่ต้องการให้ Admin ไปเปิดสิทธิ์ให้ role อื่นผ่านหน้า Admin Panel ได้ (ดู router.js goTo/goView) ──
     all_issues:   'view-all-issues',
   };
 
   // ── Default Route ──
-  window.DEFAULT_ROUTE = 'overview';
 
 })();

@@ -106,7 +106,6 @@
   window.hdFilter   = { q:'', status:'', priority:'', assignee:'', category:'' };
   window.hdOpenId   = null;      // ticket id ที่เปิดหน้ารายละเอียดอยู่ (null = แสดงตาราง)
   window.hdEditId   = null;      // ticket id ที่กำลังแก้ใน modal (null = สร้างใหม่)
-  window.hdReplyInternal = false;
   window.hdPage     = 1;         // หน้าปัจจุบันของตารางทะเบียน
   window.hdPageSize = 50;        // จำนวนแถว/หน้า — ตัวเลือก: 50/100/500/1000
 

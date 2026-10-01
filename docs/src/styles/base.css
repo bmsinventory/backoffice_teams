@@ -31,8 +31,7 @@ body {
 ::-webkit-scrollbar-thumb:hover { background: var(--txt3); }
 
 /* ── Momentum scroll (iOS) ── */
-.sb-nav, .m-body, .dtable-wrap, .kb-body,
-.view, #content, .ov-grid {
+.sb-nav, .m-body, .dtable-wrap, .kb-body, .view, #content {
   -webkit-overflow-scrolling: touch;
 }
 
@@ -46,8 +45,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 }
 
 /* ── Cursor ── */
-button, [role="button"], .nav-btn, .kb-card, tbody tr,
-.stat-c, .tp-btn, .btn { cursor: pointer; }
+button, [role="button"], .nav-btn, .kb-card, tbody tr, .stat-c, .btn { cursor: pointer; }
 
 /* ── Animations ── */
 @keyframes pulse {

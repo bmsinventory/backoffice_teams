@@ -35,20 +35,6 @@
     if (idx >= 0) arr[idx] = obj; else arr.push(obj);
   };
 
-  window.ftkRemoveLocal = function (jsName, id) {
-    if (!Array.isArray(window[jsName])) return;
-    window[jsName] = window[jsName].filter(function (x) { return x.id !== id; });
-  };
-
-  // ── Progress Calculators (bottom-up: Item → Group → Project) ──
-  window.calcFormGroupProgress = function (group) {
-    if (!group) return 0;
-    var items = window.FORM_ITEMS.filter(function (i) { return i.groupId === group.id; });
-    if (!items.length) return 0;
-    var doneCount = items.filter(function (i) { return i.status === 'done'; }).length;
-    return Math.round((doneCount / items.length) * 100);
-  };
-
   // ── รับ id ของ impl_project ตรง ๆ (ไม่มี "โครงการแบบฟอร์ม" แยกให้ resolve อีกชั้นแล้ว) ──
   window.calcFormProjectProgress = function (pid) {
     if (!pid) return 0;

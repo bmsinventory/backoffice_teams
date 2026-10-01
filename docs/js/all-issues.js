@@ -1,8 +1,7 @@
 /**
  * all-issues.js — เมนู "ปัญหาทุกโครงการ" (all_issues)
  * ภาพรวมปัญหาการใช้งานโปรแกรม (IMPL_ISSUES) ข้ามทุกโครงการ สำหรับมุมมอง PM
- * จำกัดสิทธิ์แบบตายตัวด้วย window.ce() (PM/Admin เท่านั้น) — ดูเหตุผลใน router.js/routes.config.js
- * (ไม่ได้ลงทะเบียนใน PERM_MODULES ตั้งใจ ไม่ต้องการให้ Admin ไปเปิดสิทธิ์ผ่าน Admin Panel ได้)
+ * สิทธิ์เข้าถึงใช้ระบบสิทธิ์ปกติ (module 'all_issues' ใน PERM_MODULES — Admin ตั้งค่าต่อ Role ได้ใน Admin Panel)
  *
  * ดีไซน์ตามตัวอย่างที่ผู้ใช้ส่งมา (อ้างอิงระบบภายนอก): ตัวกรองปี พ.ศ. → KPI 5 ใบ → การ์ดสรุปต่อ
  * "Product" (= ประเภทโครงการ window.PROJECTS.typeId/PTYPES ที่มีอยู่แล้ว ไม่ได้เพิ่ม field ใหม่ในฐานข้อมูล)
@@ -415,8 +414,8 @@
     if (!mount) return;
 
     // ── กันเข้าถึงตรงในฟังก์ชัน render เอง — เผื่อกรณี URL hash ตรงเข้ามาโดยไม่ผ่าน goView ──
-    if (!window.ce || !window.ce()) {
-      mount.innerHTML = '<div class="aio-guard">🔒 หน้านี้จำกัดสิทธิ์เฉพาะ PM/Admin</div>';
+    if (window.canView && !window.canView('all_issues')) {
+      mount.innerHTML = '<div class="aio-guard">🔒 Role ของคุณยังไม่ได้รับสิทธิ์ดูหน้านี้ (ติดต่อ Admin)</div>';
       return;
     }
 
