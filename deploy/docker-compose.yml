@@ -13,5 +13,9 @@ services:
       # docker-entrypoint.sh เอาค่านี้ไปสร้าง env-config.js ใหม่ทุกครั้งที่ container start
       SUPABASE_URL: "https://backoffice-teams.bmscloud.in.th"
       SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzg2MDY5OTg0LCJleHAiOjE5NDM3NDk5ODR9.87h6yNOOf2UIVLygJp-hap-Y0n37xQ7OzPfv7HTlrbY"
+      # เข้าสู่ระบบด้วยใบหน้า (FaceHub) — ได้คีย์จริงแล้วใส่ในไฟล์ .env ข้างไฟล์นี้บนเซิร์ฟเวอร์ (บรรทัด FACEHUB_API_KEY=...)
+      # ไม่อยู่ใน git · ยังไม่มี .env = ใช้คีย์ทดลองของหน้า demo (เปิดเผย → Role admin ใช้ใบหน้าไม่ได้) · hcode ค่าเริ่มต้น 99999
+      FACEHUB_API_KEY: "${FACEHUB_API_KEY:-demo-key-123}"
+      FACEHUB_HCODE: "${FACEHUB_HCODE:-99999}"
     ports:
       - "8089:80"

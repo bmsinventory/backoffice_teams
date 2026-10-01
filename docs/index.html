@@ -146,7 +146,7 @@
           <span class="lf-chk-box"></span>
           <span>จดจำการเข้าสู่ระบบ</span>
         </label>
-        <a href="#" class="lf-forgot" onclick="return false">ลืมรหัสผ่าน?</a>
+        <a href="#" class="lf-forgot" onclick="window.openForgotPassword();return false">ลืมรหัสผ่าน?</a>
       </div>
 
       <button class="lbtn" id="login-btn">
@@ -156,6 +156,8 @@
           กำลังเข้าสู่ระบบ...
         </span>
       </button>
+      <!-- แสดงเมื่อเซิร์ฟเวอร์ตั้งค่า FaceHub แล้ว (src/services/face-auth.service.js) -->
+      <button type="button" class="lbtn-face" id="face-login-btn" style="display:none" onclick="window.openFaceLogin()">🙂 เข้าสู่ระบบด้วยใบหน้า</button>
 
       <p class="lcard-foot">© 2026 Backoffice System · All rights reserved</p>
       <p class="lcard-ios-tip" id="ios-tip" style="display:none">
@@ -2427,6 +2429,7 @@
 <script src="src/services/db.service.js"></script>
 <script src="src/services/realtime.service.js"></script>
 <script src="src/services/auth.service.js"></script>
+<script src="src/services/face-auth.service.js"></script>
 <script src="src/services/impl-tracker.service.js"></script>
 <script src="src/services/form-tracker.service.js"></script>
 <script src="src/services/expense-form.service.js"></script>

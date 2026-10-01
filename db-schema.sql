@@ -1127,3 +1127,7 @@ END $$;
 
 -- ── ลบ Gemini API Key เดิม (สรุปด้วย AI ใน Impl Tracker เปลี่ยนไปใช้ vLLM ภายในที่ไม่ต้องใช้คีย์แล้ว) ──
 ALTER TABLE settings DROP COLUMN IF EXISTS imt_ai_key;
+
+-- ── "ลืมรหัสผ่าน?" หน้า Login → ส่งคำขอถึง Admin (กระดิ่งแจ้งเตือน + ป้ายในรายชื่อผู้ใช้)
+-- ล้างเป็น NULL เมื่อ Admin ตั้งรหัสใหม่ให้ หรือผู้ใช้ตั้งเองผ่านการสแกนใบหน้า ──
+ALTER TABLE users ADD COLUMN IF NOT EXISTS pw_reset_requested_at TIMESTAMPTZ;

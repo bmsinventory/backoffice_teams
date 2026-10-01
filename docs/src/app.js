@@ -127,6 +127,9 @@
       { mod: 'advance',  icon: '💳', n: can('advance')  ? ov    : 0, label: 'Advance เกินกำหนด' },
       { mod: 'leave',    icon: '🏖', n: can('leave')    ? pend  : 0, label: 'การลาของคุณรออนุมัติ' },
       { mod: 'helpdesk', icon: '🎧', n: can('helpdesk') ? hdNew : 0, label: 'Ticket ใหม่รอรับเรื่อง' },
+      // คำขอจาก "ลืมรหัสผ่าน?" หน้า Login → Admin ตั้งรหัสใหม่ใน Admin Panel › ผู้ใช้งานระบบ
+      { mod: 'pwreset', icon: '🔑', label: 'คำขอรีเซ็ตรหัสผ่าน',
+        n: window.isAdmin && window.isAdmin() ? (window.USERS || []).filter(function (u) { return u.resetRequestedAt; }).length : 0 },
     ].filter(function (x) { return x.n > 0; });
     var total = _notiItems.reduce(function (s, x) { return s + x.n; }, 0);
     var bc = document.getElementById('noti-count');
@@ -165,6 +168,7 @@
       if (!b) return;
       var mod = b.getAttribute('data-mod');
       _closeNotiMenu();
+      if (mod === 'pwreset') { window.openAdminModal(); window.admTab('users'); return; }
       window.goView(mod, document.querySelector('.nav-btn[onclick*="\'' + mod + '\'"]'));
     });
   };
@@ -220,7 +224,7 @@
     window.updateBadge && window.updateBadge();
   };
 
-  // ── เมนูบัญชีผู้ใช้: กดชื่อผู้ใช้ท้าย sidebar → เปลี่ยนรหัสผ่าน / ออกจากระบบ (แทนปุ่ม 🔒 🚪 เดิมบน topbar)
+  // ── เมนูบัญชีผู้ใช้: กดชื่อผู้ใช้ท้าย sidebar → ลงทะเบียนใบหน้า (เมื่อเปิดใช้ FaceHub) / เปลี่ยนรหัสผ่าน / ออกจากระบบ
   // วางเหนือแถวผู้ใช้ · sidebar แบบย่อ (เหลือแค่อวาตาร์) → วางด้านขวาแทน · ปิดเมื่อกดที่อื่น/Esc ──
   function _closeUserMenu() { var m = document.getElementById('user-menu'); if (m) m.remove(); }
   window.toggleUserMenu = function (e) {
@@ -231,6 +235,7 @@
     m.id = 'user-menu';
     m.innerHTML = '<div class="um-head"><b>' + window.esc(cu.name || cu.username || '') + '</b><span>'
       + window.esc(window.roleLabel ? window.roleLabel(cu.role) : (cu.role || '')) + '</span></div>'
+      + (window.FACE_LOGIN && !(window.FACE_DEMO && cu.role === 'admin') ? '<button type="button" data-act="face">🙂 ลงทะเบียนใบหน้า</button>' : '')
       + '<button type="button" data-act="pw">🔒 เปลี่ยนรหัสผ่าน</button>'
       + '<button type="button" data-act="out" class="danger">🚪 ออกจากระบบ</button>';
     document.body.appendChild(m);
@@ -243,6 +248,7 @@
       _closeUserMenu();
       window.closeMobSidebar && window.closeMobSidebar();
       if (act === 'pw') window.openChangePassword && window.openChangePassword();
+      else if (act === 'face') window.openFaceEnroll && window.openFaceEnroll();
       else window.doLogout && window.doLogout();
     });
   };

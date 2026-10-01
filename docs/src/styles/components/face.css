@@ -1,0 +1,40 @@
+/* ================================================================
+   FACE.CSS — เข้าสู่ระบบ / ลงทะเบียนด้วยใบหน้า (src/services/face-auth.service.js)
+   .lbtn-face (ปุ่มหน้า Login), #face-modal (หน้าต่างกล้อง), .face-*
+================================================================ */
+
+/* ปุ่มรองใต้ "เข้าสู่ระบบ" — หน้า Login ใช้สีตายตัวของตัวเอง (login.css) */
+.lbtn-face { width: 100%; margin-top: 10px; padding: 11px; background: #fff; color: #1e3a8a; border: 1.5px solid #c7d2fe; border-radius: 11px; font-size: 14px; font-weight: 700; font-family: inherit; cursor: pointer; transition: background .15s, border-color .15s; }
+.lbtn-face:hover { background: #eef2ff; border-color: #a5b4fc; }
+.lbtn-face:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+
+/* อยู่เหนือหน้า Login (z-index 999) และแถบติดตั้งแอป (9998) */
+#face-modal { position: fixed; inset: 0; z-index: 10050; background: rgba(10,14,28,.62); display: flex; align-items: center; justify-content: center; padding: 12px; }
+.face-box { width: min(420px, 100%); max-height: calc(100dvh - 24px); overflow-y: auto; background: var(--surface); color: var(--txt); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 20px 50px rgba(0,0,0,.35); padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 10px; }
+.face-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.face-head b { font-size: 15px; }
+.face-x { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface2); color: var(--txt2); cursor: pointer; font-size: 13px; }
+#face-body { display: flex; flex-direction: column; gap: 10px; }
+.face-p { margin: 0; font-size: 13px; color: var(--txt2); line-height: 1.6; }
+.face-status { font-size: 12.5px; padding: 8px 10px; border-radius: 8px; background: var(--surface2); color: var(--txt2); }
+.face-status.ok { background: rgba(6,214,160,.12); color: var(--teal); font-weight: 600; }
+
+/* กล้อง: แสดงแบบกระจก (ถ่ายส่ง API เป็นภาพจริงไม่กลับด้าน) + กรอบวงรีให้วางหน้า */
+.face-cam { position: relative; width: 100%; aspect-ratio: 4 / 3; max-width: 100%; border-radius: 12px; overflow: hidden; background: #0b0f1a; }
+.face-cam video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); display: block; }
+.face-oval { position: absolute; left: 50%; top: 50%; width: 46%; height: 78%; transform: translate(-50%, -50%); border: 3px dashed rgba(255,255,255,.75); border-radius: 50%; box-shadow: 0 0 0 999px rgba(0,0,0,.28); pointer-events: none; }
+.face-instr { font-size: 16px; font-weight: 700; text-align: center; min-height: 24px; }
+.face-steps { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.face-steps span { font-size: 11.5px; padding: 3px 9px; border-radius: 99px; background: var(--surface2); color: var(--txt3); border: 1px solid var(--border); }
+.face-steps span.cur { color: var(--violet); border-color: var(--violet); font-weight: 700; }
+.face-steps span.done { color: var(--teal); border-color: transparent; background: rgba(6,214,160,.12); }
+.face-msg { font-size: 12.5px; text-align: center; color: var(--txt3); min-height: 18px; line-height: 1.5; }
+.face-msg.err { color: var(--coral); }
+.face-msg.ok { color: var(--teal); }
+/* ลืมรหัสผ่าน: ทางเลือก (สแกนใบหน้า / ส่งคำขอถึง Admin) และช่องตั้งรหัสใหม่ */
+.face-opt { display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
+.face-opt > b { font-size: 13.5px; }
+.face-opt .face-msg { text-align: left; }
+.face-fields { display: flex; flex-direction: column; gap: 6px; }
+.face-foot { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.face-foot:empty { display: none; }

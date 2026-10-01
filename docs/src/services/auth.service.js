@@ -201,6 +201,20 @@
     }
   };
 
+  // ── เข้าสู่ระบบหลังสแกนใบหน้าเจอ (face-auth.service.js) — บัญชีต้องยังเปิดใช้งาน · session/จดจำ เหมือน Login ปกติ
+  // คืนข้อความ error (string) ถ้าเข้าไม่ได้ · null = เข้าสำเร็จ ──
+  window.loginWithUserId = async function (uid) {
+    for (var i = 0; i < 30 && !window.isDbLoaded; i++) await new Promise(function (r) { setTimeout(r, 500); });
+    if (!window.isDbLoaded) return 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาลองใหม่';
+    var usr = (window.USERS || []).find(function (x) { return String(x.id) === String(uid); });
+    if (!usr) return 'ไม่พบบัญชีผู้ใช้ของใบหน้านี้';
+    if (usr.active === false) return 'บัญชีนี้ถูกปิดการใช้งาน ติดต่อ Admin';
+    var remEl = document.getElementById('l-rem');
+    window.StorageService.setSession({ uid: usr.id, sig: _sessSig(usr) }, !!(remEl && remEl.checked));
+    _enterApp(usr, false);
+    return null;
+  };
+
   // ── Logout ──
   window.doLogout = function () {
     window.cu = null;
