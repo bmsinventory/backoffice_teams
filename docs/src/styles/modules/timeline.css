@@ -30,7 +30,7 @@
 }
 
 /* จำนวนคอลัมน์ (1 คอลัมน์ = 1 วัน หรือ 1 เดือน) กำหนดผ่าน inline style
-   grid-template-columns ที่ JS ส่งมาต่อแถว (docs/js/calendar.js renderCalendar) —
+   grid-template-columns ที่ JS ส่งมาต่อแถว (docs/src/modules/calendar.js renderCalendar) —
    ทุกคอลัมน์กว้างเท่ากันแบบ minmax(0,1fr) กระจายเต็มพื้นที่ที่เหลือ ไม่ใช้ fixed px
    จึงไม่มี horizontal scroll ไม่ว่าเดือนจะมี 28–31 วัน ── */
 .tl-right   { display: grid; position: relative; flex: 1; min-width: 0; }
@@ -44,6 +44,8 @@
 .tl-bg-cell { min-width: 0; border-right: 1px dashed var(--border); height: 100%; z-index: 1; }
 .tl-bg-cell.wk  { background: rgba(0,0,0,.015); }
 .tl-bg-cell.hol { background: rgba(255,107,107,.04); }
+.tl-bg-cell.tl-add { cursor: pointer; }
+.tl-bg-cell.tl-add:hover { background: rgba(124,92,252,.08); }
 
 .tl-bar {
   position: absolute; height: 26px; border-radius: 6px;

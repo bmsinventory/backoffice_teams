@@ -1,5 +1,5 @@
-const CACHE      = 'bms-app-v1790875032';
-const IMG_CACHE  = 'bms-img-v1790875032';
+const CACHE      = 'bms-app-v1791223080';
+const IMG_CACHE  = 'bms-img-v1791223080';
 
 const IMG_EXTS = ['.png', '.jpg', '.jpeg', '.gif', '.ico', '.webp', '.woff', '.woff2'];
 
@@ -40,7 +40,7 @@ self.addEventListener('fetch', (e) => {
 
   if (e.request.method !== 'GET') return;
   if (url.origin !== self.location.origin) return;
-  if (url.pathname.startsWith('/api/')) return; // Backend (เช่น /api/face/*) — ไม่เก็บแคช
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/db/')) return; // Backend (/api/face/*, ข้อมูล /db/rest/v1/) — ไม่เก็บแคช
 
   const ext = '.' + url.pathname.split('.').pop().toLowerCase();
 

@@ -35,6 +35,7 @@
 @import './modules/form-tracker.css';
 @import './modules/helpdesk.css';
 @import './modules/all-issues.css';
+@import './modules/contract.css';
 
 /* ── Utilities (last to allow overrides) ── */
 @import './utilities.css';

@@ -4,3 +4,5 @@
 README.md
 migration/
 db-schema.sql
+db-training.sql
+deploy/

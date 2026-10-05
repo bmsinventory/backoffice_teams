@@ -1,0 +1,2554 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>BMS Training System</title>
+<!--
+  ระบบอบรม — หน้าเดียว 4 ส่วน (ตัวเลือกส่วนและ style/script ของแต่ละส่วนอยู่ที่ src/utils/training-page.util.js)
+    /training/?site=รหัส รพ.               หน้าผู้เข้าอบรม: ลงทะเบียน · ตรวจสอบการลงทะเบียน (ดู QR)  → <template id="trn-page-app">
+                                           (งานผู้ดูแลทั้งหมดเปิดผ่าน Backoffice — iframe ?embed=1 ซ่อนแถบเมนูนี้)
+    /training/?page=survey&site=รหัส รพ.   แบบประเมินหลังอบรม                                   → <template id="trn-page-survey">
+    /training/?page=quiz&site=รหัส[&cat=]   แบบทดสอบหลังอบรม · ?page=quiz&cert=เลขที่ = ดูใบประกาศ  → <template id="trn-page-quiz">
+    /training/?page=manual                 คู่มือการใช้งาน                                       → <template id="trn-page-manual">
+-->
+
+<!-- PWA -->
+<link rel="manifest" id="pwa-manifest-link" href="../manifest-training.json">
+<meta name="theme-color" content="#7c5cfc">
+<link rel="icon" type="image/png" sizes="192x192" href="../img/training/icon-192.png">
+<link rel="apple-touch-icon" href="../img/training/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="BMS Training">
+
+<!-- สี/ฟอนต์/โหมดมืด ชุดเดียวกับ Backoffice (ค่าสีอยู่ที่ src/styles/variables.css ไฟล์เดียว) -->
+<script src="../src/utils/theme.util.js"></script>
+<script src="../src/utils/training-embed.util.js"></script>
+<link rel="stylesheet" href="../src/styles/variables.css">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css">
+<script src="../src/utils/training-page.util.js"></script>
+</head>
+<body>
+
+<!-- ═══════════ หน้าหลัก (ลงทะเบียน · เช็คชื่อ · Analytics · ผู้ดูแล) — src/modules/training-app.js · training.css ═══════════ -->
+<template id="trn-page-app">
+<!-- App Loading -->
+<div id="app-loading">
+  <div class="app-loading-spinner"></div>
+  <div class="app-loading-text"><i class="ti ti-building-warehouse"></i> BMS Training</div>
+  <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">กำลังโหลดข้อมูล...</div>
+</div>
+
+<nav class="nav">
+  <div class="nav-brand">
+    <i class="ti ti-building-hospital"></i>
+    <span>BMS Training</span>
+    <span class="nav-brand-dot"></span>
+    <span class="nav-site-badge" id="nav-site-badge"></span>
+  </div>
+  <!-- หน้าผู้เข้าอบรม: ลงทะเบียน + ตรวจสอบการลงทะเบียน (ดู QR ซ้ำได้) — งานผู้ดูแลอยู่ที่ Backoffice -->
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showPage('register')" id="tab-register">
+      <i class="ti ti-pencil-plus"></i><span>ลงทะเบียน</span>
+    </button>
+    <button class="nav-tab" onclick="showPage('track')" id="tab-track">
+      <i class="ti ti-user-search"></i><span>ตรวจสอบการลงทะเบียน</span>
+    </button>
+  </div>
+</nav>
+
+<!-- Offline / Update banners -->
+<div class="pwa-banner offline" id="offline-banner">
+  <i class="ti ti-wifi-off"></i>
+  <span>ออฟไลน์ — ไม่มีการเชื่อมต่ออินเทอร์เน็ต ข้อมูลบางส่วนอาจไม่เป็นปัจจุบัน</span>
+</div>
+<div class="pwa-banner update" id="update-banner">
+  <i class="ti ti-refresh"></i>
+  <span>มีเวอร์ชันใหม่ของระบบ</span>
+  <button onclick="pwaApplyUpdate()">อัปเดตเลย</button>
+</div>
+
+<!-- ═══ REGISTER ═══ -->
+<div class="page active" id="page-register">
+  <div class="step-bar">
+    <div class="step active" id="step1"><div class="step-num">1</div><div class="step-label">เลือกหลักสูตร</div></div>
+    <div class="step-line" id="line1"><span></span></div>
+    <div class="step" id="step2"><div class="step-num">2</div><div class="step-label">เลือกรอบอบรม</div></div>
+    <div class="step-line" id="line2"><span></span></div>
+    <div class="step" id="step3"><div class="step-num">3</div><div class="step-label">กรอกข้อมูล</div></div>
+  </div>
+  <div id="view-categories">
+    <!-- Hero หน้าเลือกหลักสูตร — ตัวเลขสรุปเติมโดย renderCatHero() -->
+    <div class="reg-hero">
+      <div class="reg-hero-bg"><span class="reg-orb o1"></span><span class="reg-orb o2"></span><span class="reg-orb o3"></span><span class="reg-grid"></span></div>
+      <div class="reg-hero-body">
+        <div class="reg-hero-text">
+          <span class="reg-hero-eyebrow"><span class="reg-live-dot"></span>เปิดรับลงทะเบียน</span>
+          <h2 class="reg-hero-title">หลักสูตรอบรม<span class="reg-hero-site" id="reg-hero-site"></span></h2>
+          <p class="reg-hero-sub">เลือกหลักสูตรที่ต้องการ แล้วเลือกรอบและกรอกข้อมูลเพื่อลงทะเบียน — รับ QR Code เข้าอบรมทันที</p>
+        </div>
+        <div class="reg-hero-stats" id="reg-hero-stats"></div>
+      </div>
+    </div>
+    <div class="cat-search-bar">
+      <div class="cat-search-wrap">
+        <i class="ti ti-search"></i>
+        <input type="text" id="cat-search" class="cat-search-input" placeholder="ค้นหาหลักสูตร..." oninput="filterCats()" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')">
+      </div>
+      <div class="cat-filter-pills" id="cat-status-pills">
+        <button class="cat-filter-pill active" onclick="setCatFilter('all',this)"><i class="ti ti-layout-grid"></i>ทั้งหมด</button>
+        <button class="cat-filter-pill" onclick="setCatFilter('avail',this)"><i class="ti ti-circle-check"></i>มีที่ว่าง</button>
+        <button class="cat-filter-pill" onclick="setCatFilter('near',this)"><i class="ti ti-alert-circle"></i>ใกล้เต็ม</button>
+        <button class="cat-filter-pill" onclick="setCatFilter('full',this)"><i class="ti ti-lock"></i>เต็มแล้ว</button>
+      </div>
+    </div>
+    <div class="cat-grid" id="cat-grid"></div>
+    <div class="cat-empty" id="cat-empty">
+      <i class="ti ti-search-off"></i>
+      <p id="cat-empty-msg">ไม่พบหลักสูตรที่ค้นหา</p>
+    </div>
+  </div>
+  <div id="view-sessions" style="display:none;">
+    <!-- Hero ของหลักสูตรที่เลือก — renderSessHero() -->
+    <div class="sess-hero" id="sess-hero"></div>
+    <div class="sess-toolbar">
+      <div class="cat-filter-pills" id="sess-filters">
+        <button class="cat-filter-pill active" onclick="filterSess('all',this)"><i class="ti ti-layout-grid"></i>ทั้งหมด</button>
+        <button class="cat-filter-pill" onclick="filterSess('avail',this)"><i class="ti ti-circle-check"></i>มีที่ว่าง</button>
+        <button class="cat-filter-pill" onclick="filterSess('full',this)"><i class="ti ti-lock"></i>เต็มแล้ว</button>
+      </div>
+      <label class="sess-toggle">
+        <input type="checkbox" id="sess-show-full" onchange="renderSessionList()">
+        <span class="sess-toggle-ui"></span>แสดงรอบที่เต็มแล้ว
+      </label>
+    </div>
+    <div class="session-list" id="session-list"></div>
+  </div>
+</div>
+
+<!-- ═══ CHECKIN (รวมเช็คชื่อ + Scan QR) ═══ -->
+<div class="page" id="page-checkin">
+
+  <!-- Page Hero -->
+  <div class="checkin-hero">
+    <div class="checkin-hero-left">
+      <div class="hero-icon-wrap"><i class="ti ti-scan"></i></div>
+      <div>
+        <div class="hero-title">เช็คชื่อผู้เข้าอบรม</div>
+        <div class="hero-sub">สแกน QR Code หรือติ๊กชื่อจากรายการ</div>
+      </div>
+    </div>
+    <div id="checkin-live-stats" class="hero-stats"></div>
+  </div>
+
+  <!-- Sub-tabs inside checkin page -->
+  <div class="checkin-toolbar">
+    <div class="checkin-subtabs">
+      <button class="checkin-subtab active" onclick="switchCheckinTab('scan',this)" id="subtab-scan">
+        <i class="ti ti-qrcode"></i>
+        <span>Scan QR</span>
+      </button>
+      <button class="checkin-subtab" onclick="switchCheckinTab('list',this)" id="subtab-list">
+        <i class="ti ti-list-check"></i>
+        <span>รายชื่อ</span>
+      </button>
+    </div>
+    <!-- ตัวเลือกรอบ (แสดงเฉพาะแท็บรายชื่อ) -->
+    <div class="att-filter-bar">
+      <div class="att-filter-field"><i class="ti ti-books"></i>
+        <select id="att-cat-sel" onchange="attFilterCat()" title="หลักสูตรอบรม"><option value="">ทุกหลักสูตร</option></select>
+      </div>
+      <div class="att-filter-field"><i class="ti ti-calendar-event"></i>
+        <select id="att-sess-sel" onchange="loadAttendance()" title="รอบอบรม"><option value="">เลือกรอบ...</option></select>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="exportAttendance()" title="Export Excel (.xlsx)">
+        <i class="ti ti-file-spreadsheet"></i>Excel
+      </button>
+    </div>
+  </div>
+
+  <!-- ── SUB: SCAN ── -->
+  <div class="checkin-sub active" id="csub-scan">
+    <div class="scan-area">
+      <!-- compact top bar: status + manual entry -->
+      <div class="scan-topbar">
+        <div class="scan-topbar-status">
+          <div id="scan-status-dot" class="status-dot offline"></div>
+          <span id="scan-status-txt">กล้องปิดอยู่</span>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="manualCheckIn()">
+          <i class="ti ti-keyboard"></i>พิมพ์ชื่อ
+        </button>
+        <button class="btn btn-sm" onclick="openWalkinModal(parseInt(document.getElementById('att-sess-sel')?.value)||0)" style="background:#7c3aed;color:#fff;border:none;gap:5px;">
+          <i class="ti ti-walk"></i>Walk-in
+        </button>
+      </div>
+      <!-- camera view -->
+      <div class="cam-wrap">
+        <video id="scanner-video" autoplay playsinline muted></video>
+        <!-- scan frame overlay (shown when active) -->
+        <div class="scan-overlay" id="scan-overlay" style="display:none;">
+          <div class="scan-frame"><div class="scan-line"></div></div>
+        </div>
+        <!-- idle screen (covers camera when off) -->
+        <div class="scan-idle" id="scan-idle">
+          <div class="scan-idle-icon-big"><i class="ti ti-qrcode"></i></div>
+          <div class="scan-idle-txt">ส่อง QR Code ของผู้เข้าอบรม</div>
+          <div class="scan-idle-hint">สแกนแล้วบันทึกทันที — ไม่ต้องเลือกรอบ</div>
+          <button class="scan-start-btn" id="btn-start-scan" onclick="startScan()">
+            <i class="ti ti-camera"></i>เปิดกล้องสแกน
+          </button>
+        </div>
+        <!-- floating controls at bottom (shown when camera is on) -->
+        <div class="scan-cam-controls">
+          <button class="scan-ctrl-btn" id="btn-switch-cam" onclick="toggleCamera()" style="display:none;">
+            <i class="ti ti-refresh"></i>สลับกล้อง
+          </button>
+          <button class="scan-ctrl-btn scan-ctrl-stop" id="btn-stop-scan" onclick="stopScan()" style="display:none;">
+            <i class="ti ti-camera-off"></i>ปิดกล้อง
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scan Result -->
+    <div id="scan-result-area"></div>
+
+    <!-- Scan Log -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title"><i class="ti ti-history"></i>ประวัติการสแกนวันนี้</div>
+        <button class="btn btn-ghost btn-sm" onclick="clearScanLog()"><i class="ti ti-trash"></i>ล้าง</button>
+      </div>
+      <div id="scan-log-list">
+        <div class="empty" style="padding:24px;">
+          <i class="ti ti-wave-sine" style="font-size:32px;display:block;margin-bottom:8px;opacity:.3;"></i>
+          <p>ยังไม่มีการสแกน</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SUB: LIST ── -->
+  <div class="checkin-sub" id="csub-list">
+    <div id="att-content">
+      <div class="empty"><i class="ti ti-calendar-search" style="font-size:40px;display:block;margin-bottom:10px;opacity:.35;"></i><p>เลือกรอบอบรมเพื่อดูรายชื่อ</p></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══ TRACK ═══ -->
+<div class="page" id="page-track">
+  <!-- Hero ตรวจสอบการลงทะเบียน — ตัวเลขสรุปเติมโดย renderTrackHero() -->
+  <div class="reg-hero tk-hero">
+    <div class="reg-hero-bg"><span class="reg-orb o1"></span><span class="reg-orb o2"></span><span class="reg-orb o3"></span><span class="reg-grid"></span></div>
+    <div class="reg-hero-body">
+      <div class="reg-hero-text">
+        <span class="reg-hero-eyebrow"><i class="ti ti-qrcode"></i>ดู QR Code เช็คชื่อได้ตลอด</span>
+        <h2 class="reg-hero-title">ตรวจสอบการลงทะเบียน</h2>
+        <p class="reg-hero-sub">ค้นหาชื่อของคุณเพื่อดู QR Code สำหรับเช็คชื่อเข้าอบรม แก้ไขข้อมูล หรือตรวจสอบว่าลงทะเบียนรอบไหนไว้</p>
+      </div>
+      <div class="reg-hero-stats" id="track-hero-stats"></div>
+    </div>
+  </div>
+  <div class="tk-panel">
+    <div class="tk-search">
+      <div class="tk-field tk-field-main"><i class="ti ti-search"></i><input id="track-name" placeholder="พิมพ์ชื่อ หรือ นามสกุล..." oninput="trackSearch()" autocomplete="off"></div>
+      <div class="tk-field"><i class="ti ti-briefcase"></i><input id="track-pos" placeholder="ตำแหน่ง..." oninput="trackSearch()" autocomplete="off"></div>
+    </div>
+    <div class="tk-filters">
+      <div class="tk-field tk-select"><i class="ti ti-books"></i><select id="track-cat" aria-label="หลักสูตรอบรม" onchange="onTrackCatChange()"><option value="">ทุกหลักสูตร</option></select></div>
+      <div class="tk-field tk-select"><i class="ti ti-calendar-event"></i><select id="track-sess" aria-label="รอบอบรม" onchange="trackSearch()"><option value="">ทุกรอบ</option></select></div>
+      <button class="tk-clear" onclick="clearTrack()" title="ล้างตัวกรอง"><i class="ti ti-filter-off"></i><span>ล้างตัวกรอง</span></button>
+    </div>
+  </div>
+  <div id="track-results"></div>
+</div>
+
+<!-- ═══ ANALYTICS ═══ -->
+<div class="page" id="page-analytics">
+  <div class="section-header">
+    <div class="section-title"><i class="ti ti-chart-dots"></i>Analytics</div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-primary btn-sm" onclick="trnAiAnalytics()" style="gap:6px;" title="ให้ AI สรุปสถานะการอบรมของโครงการ (src/modules/training-ai.js)">
+        <i class="ti ti-sparkles"></i>สรุปด้วย AI
+      </button>
+      <button class="btn btn-primary btn-sm" onclick="trnAiFollowNoReg()" style="gap:6px;" title="ให้ AI ร่างข้อความติดตามหน่วยงานที่ยังไม่ลงทะเบียน (src/modules/training-ai.js)">
+        <i class="ti ti-sparkles"></i>ร่างข้อความตามด้วย AI
+      </button>
+      <button class="btn btn-success btn-sm" onclick="exportAllRegsExcel()" style="gap:6px;">
+        <i class="ti ti-file-spreadsheet"></i>Export Excel
+      </button>
+    </div>
+  </div>
+
+  <!-- KPI ทุกมิติ (การจัด · การเข้าร่วม · ความครอบคลุม · คุณภาพ · ความพร้อมใช้งาน) — renderAnalytics() -->
+  <div id="analytics-summary" class="an-kpis"></div>
+
+  <!-- Row 1: Scorecard ทุกมิติ + Donut -->
+  <div class="an-row an-row-score">
+    <div class="card an-card">
+      <div class="an-card-head">
+        <div class="card-title"><i class="ti ti-target-arrow"></i>Scorecard ทุกมิติ</div>
+        <span id="analytics-score-total" class="an-head-note"></span>
+      </div>
+      <div id="analytics-scorecard"></div>
+    </div>
+    <div class="card an-card">
+      <div class="card-title an-title"><i class="ti ti-chart-donut-3"></i>สถานะผู้ลงทะเบียน</div>
+      <div style="position:relative;height:240px;"><canvas id="chart-overall"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Row 2: หลักสูตรอบรม + ผลประเมินรายด้าน -->
+  <div class="an-row">
+    <div class="card an-card">
+      <div class="card-title an-title"><i class="ti ti-category"></i>แยกตามหลักสูตรอบรม</div>
+      <div style="position:relative;height:240px;"><canvas id="chart-by-cat"></canvas></div>
+    </div>
+    <div class="card an-card">
+      <div class="an-card-head">
+        <div class="card-title"><i class="ti ti-star"></i>ผลประเมินความพึงพอใจรายด้าน</div>
+        <span id="analytics-survey-note" class="an-head-note"></span>
+      </div>
+      <div id="analytics-survey-sec"></div>
+    </div>
+  </div>
+
+  <!-- Row 3: รายหน่วยงาน (ทุกมิติ) -->
+  <div class="card an-card">
+    <div class="an-card-head">
+      <div class="card-title"><i class="ti ti-building"></i>สรุปรายหน่วยงาน (ทุกมิติ)</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <span id="analytics-dept-total" class="an-head-note"></span>
+        <input class="form-control" id="an-dept-q" placeholder="ค้นหาหน่วยงาน" style="width:170px;height:32px;font-size:12px;" oninput="renderAnalyticsDeptTable()">
+        <select class="form-control" id="an-dept-f" style="width:auto;height:32px;font-size:12px;" onchange="renderAnalyticsDeptTable()">
+          <option value="">ทุกหน่วยงาน</option><option value="issue">เฉพาะที่ต้องติดตาม</option><option value="ok">พร้อมแล้ว</option>
+        </select>
+      </div>
+    </div>
+    <div id="analytics-dept-table" class="an-table-wrap"></div>
+  </div>
+
+  <!-- Row 4: รายรอบอบรม -->
+  <div class="card an-card">
+    <div class="card-title an-title"><i class="ti ti-calendar-stats"></i>ผลแต่ละรอบอบรม (ลงทะเบียน · เข้าอบรม · ที่นั่ง)</div>
+    <div style="position:relative;height:280px;"><canvas id="chart-by-sess"></canvas></div>
+  </div>
+
+  <!-- Row 5: วิทยากร + ผลสอบ -->
+  <div class="an-row">
+    <div class="card an-card">
+      <div class="card-title an-title"><i class="ti ti-presentation"></i>ผลงานรายวิทยากร</div>
+      <div id="analytics-trainer" class="an-table-wrap"></div>
+    </div>
+    <div class="card an-card">
+      <div class="an-card-head">
+        <div class="card-title"><i class="ti ti-certificate"></i>ผลการทดสอบหลังอบรม</div>
+        <span id="analytics-quiz-note" class="an-head-note"></span>
+      </div>
+      <div id="analytics-quiz" class="an-table-wrap"></div>
+    </div>
+  </div>
+
+  <!-- Row 6: Departments not registered -->
+  <div class="card" style="padding:18px;margin-bottom:16px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+      <div class="card-title" style="font-size:13px;margin-bottom:0;"><i class="ti ti-building-community"></i>สถานะการลงทะเบียนตามหน่วยงาน</div>
+    </div>
+    <div id="analytics-noreg-list"></div>
+  </div>
+</div>
+
+<!-- ═══ ADMIN ═══ -->
+<!-- เมนู "ระบบอบรม" ของ Backoffice (?view=overview) — renderOverview() · ภาพรวมทุกโครงการ + ตั้งค่ากลางที่ใช้ร่วมทุกโครงการ -->
+<div class="page" id="page-overview">
+  <div class="tqa-subtabs" id="ov-tabs">
+    <button class="tqa-subtab active" data-t="overview" onclick="ovTab('overview')"><i class="ti ti-chart-bar"></i>ภาพรวมผลการอบรม</button>
+    <button class="tqa-subtab" data-t="cats" onclick="ovTab('cats')"><i class="ti ti-category"></i>หลักสูตรอบรม</button>
+    <button class="tqa-subtab" data-t="quiz" onclick="ovTab('quiz')"><i class="ti ti-books"></i>คลังแบบทดสอบ</button>
+    <button class="tqa-subtab" data-t="cert" onclick="ovTab('cert')"><i class="ti ti-certificate"></i>ใบประกาศ &amp; อีเมล</button>
+  </div>
+  <div id="ov-content"></div>
+</div>
+
+<!-- แท็บอบรมของโครงการ (?project=) ที่ยังไม่เปิดอบรม / ไม่อยู่ในทีม — renderUnopened() -->
+<div class="page" id="page-unopened">
+  <div class="card" id="unopened-content" style="max-width:560px;margin:40px auto;text-align:center;padding:32px 24px;"></div>
+</div>
+
+<!-- พิมพ์เอกสาร (แยกจาก Admin เป็นหน้าของตัวเอง) — initPrintSection() -->
+<div class="page" id="page-print">
+    <div style="display:grid;grid-template-columns:270px 1fr;gap:0;align-items:stretch;flex:1;min-height:0;overflow:hidden;">
+
+      <!-- Config column -->
+      <div style="overflow-y:auto;height:100%;border-right:1px solid var(--border);padding:12px;">
+        <!-- Title card -->
+        <div class="card" style="margin-bottom:12px;padding:14px;">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:10px;">หัวข้อเอกสาร</div>
+          <div class="form-group">
+            <label class="form-label" style="font-size:12px;">เลือกจากรายการ</label>
+            <select class="form-control" id="print-title-sel" onchange="onPrintTitleSel()" style="font-size:13px;"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" style="font-size:12px;">หรือพิมพ์หัวข้อเอง</label>
+            <textarea class="form-control" id="print-title-txt" rows="3" placeholder="พิมพ์หัวข้อที่ต้องการ..." style="font-size:13px;resize:none;" oninput="updatePrintPreview()"></textarea>
+          </div>
+          <button class="btn btn-ghost btn-sm" style="width:100%;gap:6px;margin-top:4px;" onclick="openDocTitleModal()">
+            <i class="ti ti-edit"></i>จัดการหัวข้อ (เพิ่ม / แก้ไข / ลบ)
+          </button>
+        </div>
+
+        <!-- Doc info card -->
+        <div class="card" style="margin-bottom:12px;padding:14px;">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:10px;">ข้อมูลเอกสาร</div>
+          <div class="form-group">
+            <label class="form-label" style="font-size:12px;">สถานพยาบาล</label>
+            <select class="form-control" id="print-loc-sel" onchange="onPrintLocSel()" style="font-size:13px;"><option value="">— เลือกสถานพยาบาล —</option></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" style="font-size:12px;">วันที่</label>
+            <input type="date" class="form-control" id="print-date" onchange="updatePrintPreview()" style="font-size:13px;">
+          </div>
+          <div class="form-group">
+            <label class="form-label" style="font-size:12px;">จำนวนแถว</label>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <select class="form-control" id="print-rows" onchange="updatePrintPreview()" style="font-size:13px;width:90px;">
+                <option value="25" selected>25</option>
+                <option value="50">50</option>
+                <option value="75">75</option>
+                <option value="100">100</option>
+              </select>
+              <span style="font-size:12px;color:var(--text-muted);">แถว</span>
+            </div>
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;margin-top:4px;">
+            <input type="checkbox" id="print-officer" onchange="onPrintOfficerToggle()">
+            <span>แสดงช่อง "เจ้าหน้าที่"</span>
+          </label>
+          <div id="print-officer-sel-wrap" style="display:none;margin-top:8px;">
+            <label class="form-label" style="font-size:12px;">ชื่อเจ้าหน้าที่</label>
+            <div id="print-officer-loading" style="display:none;font-size:12px;color:var(--text-muted);padding:4px 0;">⏳ กำลังโหลดรายชื่อ...</div>
+            <select class="form-control" id="print-officer-sel" onchange="updatePrintPreview()" style="font-size:13px;"></select>
+          </div>
+        </div>
+
+        <!-- Signatories card -->
+        <div class="card" style="padding:14px;">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:10px;">ผู้ลงนาม</div>
+          <div style="background:#EFF6FF;border-radius:8px;padding:10px;margin-bottom:10px;">
+            <div style="font-size:11px;font-weight:700;color:#1d4ed8;margin-bottom:8px;">ซ้าย — BMS</div>
+            <div class="form-group"><input class="form-control" id="print-lname" placeholder="ชื่อ-นามสกุล" oninput="updatePrintPreview()" style="font-size:13px;"></div>
+            <div class="form-group"><input class="form-control" id="print-lpos" placeholder="ตำแหน่ง" oninput="updatePrintPreview()" style="font-size:13px;"></div>
+            <div style="font-size:11px;color:#93c5fd;margin-top:2px;">บริษัท บางกอก เมดิคอล ซอฟต์แวร์ จำกัด</div>
+          </div>
+          <div style="background:var(--bg-subtle);border-radius:8px;padding:10px;margin-bottom:10px;">
+            <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:8px;">ขวา — สถานพยาบาล</div>
+            <div class="form-group"><input class="form-control" id="print-rname" placeholder="ชื่อ-นามสกุล" oninput="updatePrintPreview()" style="font-size:13px;"></div>
+            <div class="form-group"><input class="form-control" id="print-rpos" placeholder="ตำแหน่ง" oninput="updatePrintPreview()" style="font-size:13px;"></div>
+            <div class="form-group"><input class="form-control" id="print-rinst" placeholder="ชื่อหน่วยงาน / โรงพยาบาล" oninput="updatePrintPreview()" style="font-size:13px;"></div>
+          </div>
+          <button class="btn btn-ghost btn-sm" style="width:100%;gap:6px;" onclick="savePrintSignatories()">
+            <i class="ti ti-device-floppy"></i>บันทึกเป็นค่าเริ่มต้น
+          </button>
+        </div>
+      </div>
+
+      <!-- Preview column -->
+      <div style="display:flex;flex-direction:column;height:100%;overflow:hidden;background:#e8ecf0;">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--card);flex-shrink:0;">
+          <span style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">ตัวอย่างเอกสาร</span>
+          <button class="btn btn-primary btn-sm" onclick="doPrint()" style="gap:6px;">
+            <i class="ti ti-printer"></i>พิมพ์เอกสาร
+          </button>
+        </div>
+        <div style="flex:1;overflow:auto;padding:16px;display:flex;flex-direction:column;align-items:center;gap:12px;" id="print-preview-wrap">
+          <div class="print-font-warn" id="print-font-warn" style="align-self:flex-start;">
+            <i class="ti ti-alert-triangle"></i>
+            <span>ไม่พบฟอนต์ <b>TH SarabunPSK</b> บนเครื่องนี้ — เอกสารอาจแสดงผล/พิมพ์ด้วยฟอนต์อื่นแทน กรุณาติดตั้งฟอนต์ TH SarabunPSK ก่อนพิมพ์เพื่อให้ตรงมาตรฐานราชการ</span>
+          </div>
+          <div id="print-preview" style="display:contents;"></div>
+        </div>
+      </div>
+    </div>
+</div>
+
+<div class="page" id="page-admin">
+  <div class="section-header">
+    <div class="section-title"><i class="ti ti-settings"></i><span id="admin-title">Admin</span></div>
+    <div style="display:flex;gap:8px;">
+      <button id="btn-import" class="btn btn-ghost btn-sm" onclick="openImportModal()" style="gap:6px;" title="นำเข้าข้อมูล CSV">
+        <i class="ti ti-table-import"></i>นำเข้าข้อมูล
+      </button>
+    </div>
+  </div>
+  <div class="stats-grid" id="admin-stats"></div>
+  <button class="admin-tabs-toggle" id="admin-tabs-toggle" onclick="toggleAdminTabsMenu()">
+    <span style="display:flex;align-items:center;gap:8px;"><i class="ti ti-menu-2"></i><span id="admin-tabs-toggle-label">รอบอบรม</span></span>
+    <i class="ti ti-chevron-down"></i>
+  </button>
+  <div class="admin-tabs" id="admin-tabs">
+    <button class="admin-tab" data-tab="masters" onclick="switchAdminTab('masters')"><i class="ti ti-list"></i> ข้อมูลพื้นฐาน</button>
+    <button class="admin-tab" data-tab="categories" onclick="switchAdminTab('categories')"><i class="ti ti-category"></i> หลักสูตรอบรม</button>
+    <button class="admin-tab active" data-tab="sessions" onclick="switchAdminTab('sessions')"><i class="ti ti-calendar"></i> รอบอบรม</button>
+    <button class="admin-tab" data-tab="registrations" onclick="switchAdminTab('registrations')"><i class="ti ti-users"></i> รายชื่อผู้ลงทะเบียน</button>
+    <button class="admin-tab" data-tab="loginverify" onclick="switchAdminTab('loginverify')"><i class="ti ti-shield-check"></i> ตรวจสอบสิทธิ์</button>
+    <button class="admin-tab" data-tab="keyentry" onclick="switchAdminTab('keyentry')"><i class="ti ti-database-export"></i> ตรวจสอบคีย์ยอด</button>
+    <button class="admin-tab" data-tab="survey" onclick="switchAdminTab('survey')"><i class="ti ti-chart-radar"></i> ผลประเมิน</button>
+    <button class="admin-tab" data-tab="quiz" onclick="switchAdminTab('quiz')"><i class="ti ti-pencil-check"></i> ผลสอบ &amp; ใบประกาศ</button>
+    <button class="admin-tab" data-tab="projsettings" onclick="switchAdminTab('projsettings')"><i class="ti ti-adjustments"></i> ตั้งค่าโครงการ</button>
+  </div>
+
+  <!-- Sessions -->
+  <div class="admin-section active" id="asec-sessions">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title"><i class="ti ti-calendar-plus"></i>จัดการรอบอบรม</div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-sm" onclick="trnAiInvite()" style="background:linear-gradient(135deg,#7c3aed,#db2777);color:#fff;gap:5px;border:none;" title="ให้ AI ร่างข้อความเชิญเข้าอบรม (LINE/อีเมล)"><i class="ti ti-sparkles"></i>ร่างข้อความเชิญ</button>
+          <button class="btn btn-primary btn-sm" onclick="openAddSession()"><i class="ti ti-plus"></i>เพิ่มรอบ</button>
+        </div>
+      </div>
+      <div style="margin-bottom:12px;">
+        <select class="form-control" id="admin-filter-cat" onchange="renderAdminSessions()" style="max-width:260px;"><option value="">ทุกหลักสูตร</option></select>
+      </div>
+      <div class="table-wrap table-cards table-cards-compact"><table><thead><tr><th>รอบอบรม</th><th>วันที่</th><th>เวลา</th><th>สถานที่</th><th>วิทยากร</th><th>ลง/ทั้งหมด</th><th>เข้าอบรม</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody id="admin-sess-tbody"></tbody></table></div>
+    </div>
+  </div>
+
+  <!-- Categories -->
+  <div class="admin-section" id="asec-categories">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title"><i class="ti ti-category"></i>หลักสูตรอบรมในโครงการนี้</div>
+        <button class="btn btn-ghost btn-sm" id="btn-central-cats" style="display:none;" onclick="goCentralTraining('cats')" title="เพิ่ม/แก้ไขหลักสูตรอบรมและแบบทดสอบ — ใช้ร่วมทุกโครงการ"><i class="ti ti-settings"></i>จัดการหลักสูตรกลาง</button>
+      </div>
+      <div id="admin-cat-tbody"></div>
+    </div>
+  </div>
+
+  <!-- Masters -->
+  <div class="admin-section" id="asec-masters">
+    <div class="masters-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+      <!-- วิทยากร = รายชื่อพนักงาน (เพิ่ม/แก้ที่ Backoffice › Admin Panel › พนักงาน) — ไม่มีรายการแยกที่นี่ -->
+      <!-- Venues -->
+      <div class="card" style="margin-bottom:0;">
+        <div class="card-header"><div class="card-title"><i class="ti ti-map-pin"></i>สถานที่</div></div>
+        <div class="master-list" id="venue-list"></div>
+        <div class="master-add-row">
+          <input class="form-control" id="new-venue-input" placeholder="ชื่อสถานที่..." style="flex:1;" onkeydown="if(event.key==='Enter')addMaster('venue')">
+          <button class="btn btn-primary btn-sm" onclick="addMaster('venue')"><i class="ti ti-plus"></i></button>
+        </div>
+      </div>
+      <!-- Departments -->
+      <div class="card" style="margin-bottom:0;">
+        <div class="card-header"><div class="card-title"><i class="ti ti-building"></i>แผนก</div></div>
+        <div class="master-list" id="dept-list"></div>
+        <div class="master-add-row">
+          <input class="form-control" id="new-dept-input" placeholder="ชื่อแผนก..." style="flex:1;" onkeydown="if(event.key==='Enter')addMaster('dept')">
+          <button class="btn btn-primary btn-sm" onclick="addMaster('dept')"><i class="ti ti-plus"></i></button>
+        </div>
+      </div>
+      <!-- Prefixes -->
+      <div class="card" style="margin-bottom:0;">
+        <div class="card-header"><div class="card-title"><i class="ti ti-id-badge"></i>คำนำหน้าชื่อ</div></div>
+        <div class="master-list" id="prefix-list"></div>
+        <div class="master-add-row">
+          <input class="form-control" id="new-prefix-input" placeholder="เช่น นาย, นาง..." style="flex:1;" onkeydown="if(event.key==='Enter')addMaster('prefix')">
+          <button class="btn btn-primary btn-sm" onclick="addMaster('prefix')"><i class="ti ti-plus"></i></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Registrations -->
+  <div class="admin-section" id="asec-registrations">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title"><i class="ti ti-list-details"></i>รายชื่อผู้ลงทะเบียน</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button id="btn-clear-regs" class="btn btn-ghost btn-sm" onclick="openClearRegsBySite()" style="gap:6px;color:var(--danger);border-color:rgba(239,68,68,.3);"><i class="ti ti-trash-x"></i>เคียร์ตามโครงการ</button>
+          <button class="btn btn-ghost btn-sm" onclick="openPrintForm()" style="gap:6px;"><i class="ti ti-printer"></i>พิมพ์แบบฟอร์ม</button>
+          <button class="btn btn-primary btn-sm" onclick="adminAddReg()"><i class="ti ti-plus"></i>เพิ่มรายการ</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+        <div style="position:relative;flex:1;min-width:150px;">
+          <i class="ti ti-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:15px;"></i>
+          <input class="form-control" id="admin-search" placeholder="ค้นหา..." oninput="renderAdminRegs()" style="padding-left:32px;">
+        </div>
+        <select class="form-control" id="admin-reg-filter-cat" style="width:180px;" onchange="onAdminCatChange()"><option value="">ทุกหลักสูตร</option></select>
+        <select class="form-control" id="admin-filter-sess" style="width:200px;" onchange="renderAdminRegs()"><option value="">ทุกรอบ</option></select>
+      </div>
+      <div class="table-wrap table-cards table-cards-compact"><table><thead><tr><th>#</th><th>คำนำหน้า</th><th>ชื่อ-นามสกุล</th><th>ตำแหน่ง</th><th>แผนก</th><th>หลักสูตร</th><th>รอบ</th><th>วันที่ลง</th><th>สถานะ</th><th>QR</th><th>แก้ไข</th><th>ลบ</th></tr></thead><tbody id="admin-reg-tbody"></tbody></table></div>
+    </div>
+  </div>
+
+  <!-- ═══ Survey Dashboard ═══ -->
+  <div class="admin-section" id="asec-survey">
+
+    <!-- Filter bar -->
+    <div class="card" style="margin-bottom:14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+        <div class="card-title" style="margin-bottom:0;"><i class="ti ti-chart-radar" style="color:#7c3aed;"></i>Dashboard ผลการประเมินความพึงพอใจ</div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-sm" onclick="trnAiSurvey()" style="background:linear-gradient(135deg,#7c3aed,#db2777);color:#fff;gap:5px;border:none;" title="ให้ AI สรุปคะแนนและข้อเสนอแนะ (src/modules/training-ai.js)"><i class="ti ti-sparkles"></i>สรุปด้วย AI</button>
+          <button class="btn btn-ghost btn-sm" onclick="loadSurveyDashboard()" style="gap:5px;"><i class="ti ti-refresh"></i>รีเฟรช</button>
+          <button class="btn btn-ghost btn-sm" onclick="exportSurveyExcel()" style="gap:5px;"><i class="ti ti-file-spreadsheet"></i>Export Excel</button>
+          <button class="btn btn-sm" onclick="saveSurveyImage()" style="background:#7c3aed;color:#fff;gap:5px;border:none;"><i class="ti ti-photo-down"></i>บันทึกเป็นภาพ</button>
+          <button id="btn-clear-survey" class="btn btn-sm" onclick="openClearSurveyBySite()" style="background:transparent;color:#dc2626;border:1px solid #fecaca;gap:5px;"><i class="ti ti-trash"></i>เคียร์ตามโครงการ</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+        <div class="form-group svd-site-group" style="margin:0;min-width:150px;flex:1;">
+          <label class="form-label"><i class="ti ti-map-pin" style="margin-right:3px;"></i>โครงการ</label>
+          <select class="form-control" id="svd-site" onchange="onSvdSiteChange()"></select>
+        </div>
+        <div class="form-group" style="margin:0;min-width:200px;flex:2;">
+          <label class="form-label"><i class="ti ti-calendar" style="margin-right:3px;"></i>รอบอบรม</label>
+          <select class="form-control" id="svd-sess" onchange="renderSurveyCharts()"><option value="">ทุกรอบ</option></select>
+        </div>
+        <div class="form-group" style="margin:0;min-width:130px;">
+          <label class="form-label"><i class="ti ti-clock" style="margin-right:3px;"></i>ช่วงเวลา</label>
+          <select class="form-control" id="svd-period" onchange="renderSurveyCharts()">
+            <option value="all">ทั้งหมด</option>
+            <option value="90">90 วันล่าสุด</option>
+            <option value="30">30 วันล่าสุด</option>
+            <option value="7">7 วันล่าสุด</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Loading -->
+    <div id="svd-loading" style="display:none;text-align:center;padding:48px;color:var(--text-muted);">
+      <div style="width:36px;height:36px;border:3px solid var(--border);border-top-color:#7c3aed;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 14px;"></div>
+      กำลังโหลดข้อมูลการประเมิน...
+    </div>
+
+    <!-- Empty -->
+    <div id="svd-empty" style="display:none;" class="card">
+      <div class="empty" style="padding:48px;">
+        <i class="ti ti-clipboard-off" style="font-size:48px;display:block;margin-bottom:12px;opacity:.3;color:#7c3aed;"></i>
+        <p>ยังไม่มีข้อมูลการประเมิน<br><span style="font-size:12px;">สำหรับโครงการและตัวกรองที่เลือก</span></p>
+      </div>
+    </div>
+
+    <!-- Dashboard content -->
+    <div id="svd-content" style="display:none;">
+
+      <!-- KPI Row -->
+      <div id="svd-kpi" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px;"></div>
+
+      <!-- Gauge + Section bars -->
+      <div style="display:grid;grid-template-columns:minmax(220px,1fr) 2fr;gap:14px;margin-bottom:14px;">
+        <div class="card" style="padding:16px;">
+          <div class="card-title" style="margin-bottom:12px;font-size:13px;"><i class="ti ti-chart-radar" style="color:#7c3aed;"></i>ภาพรวม 6 ด้าน</div>
+          <div style="position:relative;height:230px;"><canvas id="svd-chart-radar"></canvas></div>
+        </div>
+        <div class="card" style="padding:16px;">
+          <div class="card-title" style="margin-bottom:14px;font-size:13px;"><i class="ti ti-list-check"></i>คะแนนเฉลี่ยแต่ละด้าน (เต็ม 5.00)</div>
+          <div id="svd-section-bars"></div>
+        </div>
+      </div>
+
+      <!-- Distribution + Q6.6 -->
+      <div style="display:grid;grid-template-columns:2fr minmax(200px,1fr);gap:14px;margin-bottom:14px;">
+        <div class="card" style="padding:16px;">
+          <div class="card-title" style="margin-bottom:14px;font-size:13px;"><i class="ti ti-chart-bar-popular"></i>การกระจายระดับคะแนนแต่ละด้าน (%)</div>
+          <div style="position:relative;height:260px;"><canvas id="svd-chart-dist"></canvas></div>
+        </div>
+        <div class="card" style="padding:16px;display:flex;flex-direction:column;">
+          <div class="card-title" style="margin-bottom:12px;font-size:13px;"><i class="ti ti-repeat" style="color:#7c3aed;"></i>ต้องการอบรมเพิ่มเติม?</div>
+          <div style="position:relative;height:170px;"><canvas id="svd-chart-yn"></canvas></div>
+          <div id="svd-yn-stats" style="margin-top:auto;padding-top:10px;text-align:center;font-size:13px;color:var(--text-muted);"></div>
+        </div>
+      </div>
+
+      <!-- Best / Worst questions -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+        <div class="card" style="padding:16px;">
+          <div class="card-title" style="margin-bottom:12px;font-size:13px;color:#16a34a;"><i class="ti ti-award" style="color:#16a34a;"></i>5 หัวข้อคะแนนสูงสุด</div>
+          <div id="svd-best-qs"></div>
+        </div>
+        <div class="card" style="padding:16px;">
+          <div class="card-title" style="margin-bottom:12px;font-size:13px;color:#dc2626;"><i class="ti ti-alert-triangle" style="color:#dc2626;"></i>5 หัวข้อที่ควรพัฒนา</div>
+          <div id="svd-worst-qs"></div>
+        </div>
+      </div>
+
+      <!-- All questions heatmap -->
+      <div class="card" style="padding:16px;margin-bottom:14px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+          <div class="card-title" style="margin:0;font-size:13px;"><i class="ti ti-table-heat-map"></i>ตารางคะแนนรายข้อทุกด้าน</div>
+          <div style="display:flex;gap:6px;align-items:center;font-size:11px;flex-wrap:wrap;">
+            <span style="display:flex;align-items:center;gap:3px;"><span style="width:10px;height:10px;border-radius:2px;background:#22c55e;display:inline-block;"></span>≥4.5</span>
+            <span style="display:flex;align-items:center;gap:3px;"><span style="width:10px;height:10px;border-radius:2px;background:#84cc16;display:inline-block;"></span>4.0–4.4</span>
+            <span style="display:flex;align-items:center;gap:3px;"><span style="width:10px;height:10px;border-radius:2px;background:#eab308;display:inline-block;"></span>3.0–3.9</span>
+            <span style="display:flex;align-items:center;gap:3px;"><span style="width:10px;height:10px;border-radius:2px;background:#f97316;display:inline-block;"></span>&lt;3.0</span>
+          </div>
+        </div>
+        <div id="svd-heatmap"></div>
+      </div>
+
+      <!-- Session comparison -->
+      <div class="card" style="padding:16px;margin-bottom:14px;">
+        <div class="card-title" style="margin-bottom:14px;font-size:13px;"><i class="ti ti-calendar-stats"></i>เปรียบเทียบคะแนนเฉลี่ยแต่ละรอบ</div>
+        <div style="position:relative;height:230px;"><canvas id="svd-chart-sess"></canvas></div>
+      </div>
+
+      <!-- Trend over sessions (per section) -->
+      <div class="card" style="padding:16px;margin-bottom:14px;">
+        <div class="card-title" style="margin-bottom:14px;font-size:13px;"><i class="ti ti-trending-up"></i>แนวโน้มคะแนนแต่ละด้านตามรอบอบรม</div>
+        <div style="position:relative;height:240px;"><canvas id="svd-chart-trend"></canvas></div>
+      </div>
+
+      <!-- Comments -->
+      <div class="card" style="padding:16px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+          <div class="card-title" style="margin:0;font-size:13px;"><i class="ti ti-message-2"></i>ข้อเสนอแนะจากผู้ประเมิน <span id="svd-comment-count" style="font-size:11px;font-weight:400;color:var(--text-muted);"></span></div>
+        </div>
+        <div id="svd-comments-list"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ผลสอบ & ใบประกาศของโครงการ — src/modules/training-quiz.js (ผู้สอบใช้ ?page=quiz · คลังแบบทดสอบ/ตั้งค่าใบประกาศ อยู่ที่เมนูระบบอบรม) -->
+  <div class="admin-section" id="asec-quiz">
+    <div id="tqa-body"></div>
+  </div>
+
+  <!-- ตั้งค่าโครงการ (โครงการปัจจุบัน) — renderProjSettings() -->
+  <div class="admin-section" id="asec-projsettings"><div id="projsettings-content"></div></div>
+
+  <div class="admin-section" id="asec-loginverify">
+    <div class="card">
+      <div class="card-header" style="justify-content:flex-start;gap:14px;flex-wrap:wrap;row-gap:8px;">
+        <div class="card-title"><i class="ti ti-shield-check"></i>ตรวจสอบสิทธิ์ผู้ใช้งาน (Login Verify)</div>
+        <div id="lv-summary" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+        <button class="btn btn-ghost btn-sm" onclick="loadLoginVerify()" style="margin-left:auto;"><i class="ti ti-refresh"></i>รีโหลด</button>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+        <div style="position:relative;flex:1;min-width:200px;">
+          <i class="ti ti-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:15px;pointer-events:none;"></i>
+          <input class="form-control" id="lv-search" placeholder="ค้นหาชื่อ หรือ หน่วยงาน..." oninput="renderLoginVerify()" style="padding-left:32px;">
+        </div>
+        <select class="form-control" id="lv-status-filter" style="width:180px;" onchange="renderLoginVerify()">
+          <option value="">-- ทุกสถานะ --</option>
+          <option value="has_login">มี Login</option>
+          <option value="no_login">ไม่มี Login</option>
+          <option value="disabled">ปิดใช้งาน</option>
+          <option value="pending">ยังไม่ระบุสถานะ</option>
+        </select>
+        <button class="btn btn-primary" id="lv-save-btn" onclick="saveLoginVerifyAll()"><i class="ti ti-device-floppy"></i>บันทึกสถานะ</button>
+      </div>
+      <div class="table-wrap table-cards">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:40px;">#</th>
+              <th>ชื่อ-นามสกุล</th>
+              <th>ตำแหน่ง/หน่วยงาน</th>
+              <th style="width:190px;">สถานะ Login</th>
+              <th>หมายเหตุ (Login)</th>
+            </tr>
+          </thead>
+          <tbody id="lv-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Key Entry Status (ตรวจสอบคีย์ยอด) -->
+  <div class="admin-section" id="asec-keyentry">
+    <div class="card">
+      <div class="card-header" style="flex-wrap:wrap;">
+        <div class="card-title"><i class="ti ti-database-export"></i>ตรวจสอบคีย์ยอดตั้งต้น</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-ghost btn-sm" onclick="loadKeyEntryStatus()"><i class="ti ti-refresh"></i>รีโหลด</button>
+          <button class="btn btn-primary btn-sm" onclick="saveKeyEntryImage()"><i class="ti ti-photo"></i>สรุปเป็นภาพ</button>
+        </div>
+      </div>
+
+      <div class="stats-grid ke-stats">
+        <div class="stat-card blue">
+          <div class="stat-label">แผนกทั้งหมด</div>
+          <div class="stat-value" id="ke-stat-total">0</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-label">คีย์ยอดแล้ว</div>
+          <div class="stat-value" id="ke-stat-keyed">0</div>
+        </div>
+        <div class="stat-card red">
+          <div class="stat-label">ยังไม่คีย์</div>
+          <div class="stat-value" id="ke-stat-notkeyed">0</div>
+        </div>
+        <div class="stat-card amber">
+          <div class="stat-label">ความคืบหน้า</div>
+          <div class="stat-value" id="ke-stat-pct">0%</div>
+        </div>
+      </div>
+      <div style="background:var(--bg);border-radius:20px;height:10px;overflow:hidden;margin-bottom:18px;">
+        <div id="ke-progress-bar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--success-mid),var(--success));border-radius:20px;transition:width .4s;"></div>
+      </div>
+
+      <div class="ke-search-wrap" style="position:relative;max-width:320px;margin-bottom:14px;">
+        <i class="ti ti-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:15px;pointer-events:none;"></i>
+        <input class="form-control" id="ke-search" placeholder="ค้นหาแผนก..." oninput="filterKeyEntry()" style="padding-left:32px;">
+      </div>
+
+      <div class="table-wrap ke-table-wrap table-cards">
+        <table>
+          <thead>
+            <tr>
+              <th>แผนก</th>
+              <th style="width:160px;">สถานะ</th>
+              <th style="width:170px;">วันที่/เวลาคีย์ยอด</th>
+              <th>สาเหตุที่ยังไม่คีย์</th>
+            </tr>
+          </thead>
+          <tbody id="ke-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Crop Image Modal -->
+<div class="modal-overlay" id="modal-crop" style="z-index:250;">
+  <div class="modal" style="max-width:800px;padding:0;overflow:hidden;">
+    <div style="background:linear-gradient(135deg,#1a3a6b,#1a56a0);padding:18px 22px;color:#fff;">
+      <div style="font-family:Prompt,sans-serif;font-size:16px;font-weight:700;"><i class="ti ti-crop"></i> ตัดรูปภาพแบนเนอร์</div>
+    </div>
+    <div style="padding:20px 22px;">
+      <div style="max-height:400px;overflow:hidden;background:var(--surface3);border:1px solid var(--border);border-radius:8px;">
+        <img id="crop-image-target" src="" style="max-width:100%;display:block;">
+      </div>
+      <div style="margin-top:16px;font-size:12px;color:var(--text-muted);text-align:center;">สัดส่วน 800 x 300 px (อัตราส่วน 8:3)</div>
+      <div style="display:flex;gap:10px;margin-top:20px;">
+        <button class="btn btn-ghost" onclick="cancelCrop()" style="flex:1;"><i class="ti ti-x"></i>ยกเลิก</button>
+        <button class="btn btn-primary" onclick="applyCrop()" style="flex:2;justify-content:center;"><i class="ti ti-check"></i>ยืนยันการตัดรูป</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Register Form - Redesigned -->
+<!-- Import Data Modal -->
+<div class="modal-overlay" id="modal-import">
+  <div class="modal" style="max-width:min(1320px,95vw);padding:0;overflow:hidden;">
+    <div style="background:linear-gradient(135deg,#0f766e,#0d9488);padding:18px 22px;color:#fff;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="background:rgba(255,255,255,.15);border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;font-size:20px;"><i class="ti ti-table-import"></i></div>
+        <div>
+          <div style="font-size:11px;opacity:.7;text-transform:uppercase;letter-spacing:.8px;">Admin</div>
+          <div style="font-weight:700;font-size:17px;">นำเข้าข้อมูล (Import CSV/Excel)</div>
+        </div>
+      </div>
+    </div>
+    <div style="padding:20px 22px;max-height:68vh;overflow-y:auto;">
+      <div style="display:flex;gap:10px;align-items:flex-end;margin-bottom:16px;">
+        <div class="form-group" style="flex:1;margin-bottom:0;">
+          <label class="form-label">ประเภทข้อมูลที่ต้องการนำเข้า</label>
+          <select class="form-control" id="import-type" onchange="onImportTypeChange()">
+            <optgroup label="ระบบลงทะเบียนอบรม">
+              <option value="venue">สถานที่</option>
+              <option value="dept">แผนก</option>
+              <option value="prefix">คำนำหน้า</option>
+              <option value="session">รอบอบรม</option>
+              <option value="registration">ผู้ลงทะเบียน (Excel/CSV — หลายรอบพร้อมกัน)</option>
+            </optgroup>
+            <optgroup label="ระบบแบบทดสอบ">
+            </optgroup>
+          </select>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="downloadImportTemplate()" style="height:40px;white-space:nowrap;gap:6px;">
+          <i class="ti ti-download"></i>ดาวน์โหลด Template
+        </button>
+      </div>
+      <div id="import-reg-hint" style="display:none;margin-bottom:16px;font-size:12px;padding:10px 12px;border-radius:8px;background:var(--accent-light);color:var(--accent);border:1px solid var(--accent);">
+        <i class="ti ti-info-circle"></i> ระบบจะจับคู่แต่ละแถวเข้ารอบอบรมให้อัตโนมัติจากคอลัมน์ "หลักสูตร" และ "ชื่อรอบ" — 1 ไฟล์นำเข้าได้หลายรอบพร้อมกัน ไม่ต้องแยกไฟล์ต่อรอบ
+      </div>
+      <div id="import-dropzone" class="import-dropzone"
+           onclick="document.getElementById('import-file-input').click()"
+           ondragover="event.preventDefault();this.classList.add('dragover')"
+           ondragleave="this.classList.remove('dragover')"
+           ondrop="event.preventDefault();this.classList.remove('dragover');onImportFileDrop(event)">
+        <input type="file" id="import-file-input" accept=".csv" style="display:none;" onchange="onImportFileChange(event)">
+        <i class="ti ti-file-spreadsheet" style="font-size:32px;"></i>
+        <div style="font-weight:600;font-size:14px;">คลิกหรือลากไฟล์ CSV มาวางที่นี่</div>
+        <div style="font-size:12px;opacity:.7;">รองรับเฉพาะไฟล์ .csv (UTF-8 หรือ UTF-8 BOM)</div>
+      </div>
+      <div id="import-preview-area" style="display:none;margin-top:16px;">
+        <div id="import-stats" style="margin-bottom:10px;"></div>
+        <div id="import-preview-table" style="overflow-x:auto;max-height:340px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;font-size:12px;"></div>
+        <div id="import-clear-wrap" style="margin-top:12px;padding:12px 14px;background:var(--bg);border-radius:8px;">
+          <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;margin-bottom:8px;">
+            <input type="checkbox" id="import-clear" style="width:16px;height:16px;margin-top:1px;cursor:pointer;" onchange="refreshImportStats()">
+            <div>
+              <div style="font-weight:600;">ลบข้อมูลเดิมทั้งหมด<span style="color:var(--danger);">ของโครงการนี้</span>ก่อนนำเข้า</div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">ลบเฉพาะข้อมูลโครงการปัจจุบัน ไม่กระทบโครงการอื่น — ถ้าไม่เลือก จะข้ามรายการซ้ำ เพิ่มเฉพาะรายการใหม่</div>
+            </div>
+          </label>
+          <div id="import-mode-info" style="font-size:12px;padding:6px 10px;border-radius:6px;background:var(--card);border:1px solid var(--border);"></div>
+        </div>
+        <div id="import-reg-clear-wrap" style="display:none;margin-top:12px;padding:12px 14px;background:var(--bg);border-radius:8px;">
+          <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;margin-bottom:8px;">
+            <input type="checkbox" id="import-reg-clear" style="width:16px;height:16px;margin-top:1px;cursor:pointer;" onchange="refreshImportStats()">
+            <div>
+              <div style="font-weight:600;">ลบผู้ลงทะเบียนเดิม<span style="color:var(--danger);">เฉพาะรอบที่อยู่ในไฟล์นี้</span>ก่อนนำเข้า</div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">ลบเฉพาะรอบอบรมที่ปรากฏในไฟล์ และเฉพาะโครงการปัจจุบันเท่านั้น — รอบอื่นหรือโครงการอื่นจะไม่ถูกแตะต้อง ใช้เมื่อต้องการนำเข้าไฟล์เดิมซ้ำเพื่อแก้ข้อมูลที่ผิด/ซ้ำ</div>
+            </div>
+          </label>
+          <div id="import-reg-clear-info" style="font-size:12px;padding:6px 10px;border-radius:6px;background:var(--card);border:1px solid var(--border);"></div>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;padding:0 22px 20px;">
+      <button class="btn btn-ghost" onclick="closeModal('modal-import')" style="flex:1;"><i class="ti ti-x"></i>ยกเลิก</button>
+      <button class="btn btn-primary" id="import-submit-btn" onclick="executeImport()" style="flex:2;justify-content:center;display:none;gap:6px;"><i class="ti ti-table-import"></i>นำเข้าข้อมูล</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Dialog -->
+<div class="modal-overlay" id="modal-confirm" style="z-index:300;">
+  <div class="modal" style="max-width:360px;text-align:center;padding:28px 24px 24px;">
+    <div id="confirm-icon" style="font-size:44px;margin-bottom:12px;"></div>
+    <div id="confirm-msg" style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px;"></div>
+    <div id="confirm-sub" style="font-size:13px;color:var(--text-muted);margin-bottom:22px;line-height:1.6;"></div>
+    <div style="display:flex;gap:8px;justify-content:center;">
+      <button class="btn btn-ghost" id="confirm-cancel-btn" style="min-width:90px;"><i class="ti ti-x"></i>ยกเลิก</button>
+      <button class="btn" id="confirm-ok-btn" style="min-width:100px;justify-content:center;"></button>
+    </div>
+  </div>
+</div>
+
+<!-- Admin Login -->
+<div class="modal-overlay" id="modal-admin-login">
+  <div class="modal" style="max-width:380px;padding:0;overflow:hidden;">
+    <div style="background:linear-gradient(135deg,#1a56a0,#2563eb);padding:20px 24px;color:#fff;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="background:rgba(255,255,255,.15);border-radius:50%;width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:22px;">
+          <i class="ti ti-shield-lock"></i>
+        </div>
+        <div>
+          <div style="font-size:11px;opacity:.7;text-transform:uppercase;letter-spacing:.8px;">ยืนยันตัวตน</div>
+          <div style="font-weight:700;font-size:18px;">เข้าสู่ระบบด้วยบัญชี Backoffice</div>
+        </div>
+      </div>
+    </div>
+    <div style="padding:20px 22px;">
+      <div class="form-group">
+        <label class="form-label"><i class="ti ti-user"></i> ชื่อผู้ใช้</label>
+        <input class="form-control" id="login-user" type="text" placeholder="กรอกชื่อผู้ใช้" autocomplete="off" onkeydown="if(event.key==='Enter')document.getElementById('login-pass').focus()">
+      </div>
+      <div class="form-group">
+        <label class="form-label"><i class="ti ti-key"></i> รหัสผ่าน</label>
+        <div style="position:relative;">
+          <input class="form-control" id="login-pass" type="text" placeholder="กรอกรหัสผ่าน" autocomplete="off" onkeydown="if(event.key==='Enter')adminLogin()" style="padding-right:40px;-webkit-text-security:disc;">
+          <button type="button" onclick="toggleLoginPass()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--muted);font-size:18px;padding:0;line-height:1;">
+            <i class="ti ti-eye" id="login-eye-icon"></i>
+          </button>
+        </div>
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);cursor:pointer;margin:-4px 0 4px;">
+        <input type="checkbox" id="login-remember" style="width:15px;height:15px;cursor:pointer;">
+        จดจำการเข้าสู่ระบบ (ใช้ร่วมกับ Backoffice)
+      </label>
+      <div id="login-error" style="display:none;color:var(--danger);font-size:13px;margin-top:4px;padding:8px 12px;background:#fee2e2;border-radius:8px;align-items:center;gap:6px;">
+        <i class="ti ti-alert-circle"></i><span id="login-error-msg"></span>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;padding:0 22px 20px;">
+      <button class="btn btn-ghost" onclick="closeModal('modal-admin-login')" style="flex:1;"><i class="ti ti-x"></i>ยกเลิก</button>
+      <button class="btn btn-primary" onclick="adminLogin()" style="flex:2;justify-content:center;"><i class="ti ti-login"></i>เข้าสู่ระบบ</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-register">
+  <div class="modal rg-modal">
+    <!-- Header: ข้อมูลรอบ (สีตามหลักสูตร) — openRegister() · ที่นั่งว่าง _renderRegSeat() อัปเดตตาม Realtime -->
+    <div class="rg-head" id="reg-modal-header">
+      <i class="ti ti-pencil-plus rg-head-deco" id="reg-head-deco"></i>
+      <div class="rg-head-top">
+        <span class="rg-eyebrow"><i class="ti ti-sparkles"></i><span id="reg-cat-name">กรอกข้อมูลเพื่อลงทะเบียน</span></span>
+        <button type="button" class="rg-close" onclick="closeModal('modal-register');setStep(2)" title="ปิด"><i class="ti ti-x"></i></button>
+      </div>
+      <div class="rg-title" id="reg-sess-title"></div>
+      <div class="rg-meta" id="reg-sess-meta"></div>
+      <div id="reg-seat-info"></div>
+    </div>
+
+    <!-- Form body -->
+    <div class="rg-body">
+      <section class="rg-sec">
+        <div class="rg-sec-head"><span class="rg-sec-ic"><i class="ti ti-user"></i></span><div><b>ข้อมูลส่วนตัว</b><small>ชื่อ-นามสกุลจะแสดงบนใบประกาศนียบัตร</small></div></div>
+        <div class="reg-name-row">
+          <div class="reg-field-prefix">
+            <div class="reg-field-label">คำนำหน้า <span class="rg-req">*</span></div>
+            <div class="csel-wrap"><button type="button" class="form-control csel-btn" id="cselb-reg-prefix" data-empty="1" onclick="cselToggle('reg-prefix')"><span class="csel-btn-txt">คำนำหน้า...</span></button><div class="csel-list" id="csell-reg-prefix"></div><input type="hidden" id="reg-prefix"><select class="csel-native-select" id="cselm-reg-prefix" onchange="cselNativePick('reg-prefix',this)"><option value="">คำนำหน้า...</option></select></div>
+          </div>
+          <div class="reg-field-fname">
+            <div class="reg-field-label">ชื่อ <span class="rg-req">*</span></div>
+            <div class="rg-input"><i class="ti ti-id-badge-2"></i><input class="form-control" id="reg-fname" placeholder="ชื่อ" oninput="previewRegName()" autocomplete="given-name"></div>
+          </div>
+          <div class="reg-field-lname">
+            <div class="reg-field-label">นามสกุล <span class="rg-req">*</span></div>
+            <div class="rg-input"><i class="ti ti-signature"></i><input class="form-control" id="reg-lname" placeholder="นามสกุล" oninput="previewRegName()" autocomplete="family-name"></div>
+          </div>
+        </div>
+        <!-- Email: แสดงเฉพาะโครงการที่ตั้งค่าบังคับกรอก (locations.require_email) -->
+        <div id="reg-email-wrap" class="rg-email" style="display:none;">
+          <div class="reg-field-label">อีเมล <span class="rg-req">*</span></div>
+          <div class="rg-input"><i class="ti ti-mail"></i><input class="form-control" id="reg-email" type="email" placeholder="name@example.com" inputmode="email" autocomplete="email"></div>
+          <div class="rg-hint"><i class="ti ti-info-circle"></i> อีเมลสำหรับใช้เป็น User Login เข้าใช้งานระบบ</div>
+        </div>
+      </section>
+
+      <section class="rg-sec">
+        <div class="rg-sec-head"><span class="rg-sec-ic"><i class="ti ti-briefcase"></i></span><div><b>ข้อมูลงาน</b><small>ตำแหน่งและแผนกที่สังกัด</small></div></div>
+        <div class="form-row">
+          <div>
+            <div class="reg-field-label">ตำแหน่ง <span class="rg-req">*</span></div>
+            <div class="rg-input"><i class="ti ti-user-star"></i><input class="form-control" id="reg-pos" placeholder="เช่น พนักงานคลังสินค้า" autocomplete="organization-title"></div>
+          </div>
+          <div>
+            <div class="reg-field-label">แผนก <span class="rg-req">*</span></div>
+            <div class="csel-wrap"><button type="button" class="form-control csel-btn" id="cselb-reg-dept" data-empty="1" onclick="cselToggle('reg-dept')"><span class="csel-btn-txt">เลือกแผนก...</span></button><div class="csel-list" id="csell-reg-dept"></div><input type="hidden" id="reg-dept"><select class="csel-native-select" id="cselm-reg-dept" onchange="cselNativePick('reg-dept',this)"><option value="">เลือกแผนก...</option></select></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Live name preview (บัตรผู้เข้าอบรม) — previewRegName() -->
+      <div id="reg-name-preview" class="rg-preview" style="display:none;">
+        <span class="rg-avatar" id="reg-name-avatar"></span>
+        <div class="rg-preview-txt"><small>ผู้เข้าอบรม</small><b id="reg-name-preview-txt"></b></div>
+        <i class="ti ti-qrcode rg-preview-qr"></i>
+      </div>
+
+      <div class="rg-hint rg-hint-req"><i class="ti ti-info-circle"></i> กรอกข้อมูลที่มี <span class="rg-req">*</span> ให้ครบทุกช่อง — ลงทะเบียนแล้วรับ QR Code สำหรับเช็คชื่อทันที</div>
+    </div>
+
+    <div class="rg-foot">
+      <button class="rg-btn-back" onclick="closeModal('modal-register');setStep(2)"><i class="ti ti-arrow-left"></i>ย้อนกลับ</button>
+      <button class="rg-btn-submit" onclick="submitReg()"><i class="ti ti-circle-check"></i><span>ยืนยันลงทะเบียน</span></button>
+    </div>
+  </div>
+</div>
+
+<!-- QR Viewer -->
+<div class="modal-overlay" id="modal-qr">
+  <!-- บัตรเข้าอบรม (ตั๋ว) — showQR() เติมเนื้อหา · saveQRasImage() วาดรูปชุดเดียวกันลง canvas -->
+  <div class="modal qt-modal">
+    <div class="qr-modal-inner" id="qr-modal-inner"></div>
+    <div class="qt-foot">
+      <button class="rg-btn-back" onclick="closeModal('modal-qr')"><i class="ti ti-x"></i>ปิด</button>
+      <button class="qt-btn-save" onclick="saveQRasImage()"><i class="ti ti-download"></i>บันทึกรูปลงเครื่อง</button>
+    </div>
+  </div>
+</div>
+
+<!-- Walk-in -->
+<div class="modal-overlay" id="modal-walkin">
+  <div class="modal" style="max-width:480px;padding:0;">
+    <div style="background:linear-gradient(135deg,#4c1d95,#7c3aed);padding:18px 22px;color:#fff;border-radius:var(--radius) var(--radius) 0 0;">
+      <div style="font-size:11px;opacity:.7;margin-bottom:2px;text-transform:uppercase;letter-spacing:.8px;">🚶 บันทึก Walk-in</div>
+      <div id="walkin-sess-title" style="font-family:Prompt,sans-serif;font-size:16px;font-weight:700;"></div>
+      <div id="walkin-sess-meta" style="font-size:12px;opacity:.8;margin-top:3px;"></div>
+    </div>
+    <div style="padding:20px 22px;">
+      <input type="hidden" id="walkin-sess-id">
+      <div class="form-group" id="walkin-sess-picker-wrap" style="margin-bottom:16px;display:none;">
+        <label class="form-label">เลือกรอบอบรม <span style="color:var(--danger)">*</span></label>
+        <select class="form-control" id="walkin-sess-picker" onchange="onWalkinSessPick()">
+          <option value="">เลือกรอบอบรม...</option>
+        </select>
+      </div>
+      <div style="margin-bottom:14px;">
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;">ข้อมูลผู้เข้าอบรม</div>
+        <div class="reg-name-row">
+          <div class="reg-field-prefix">
+            <div class="reg-field-label">คำนำหน้า <span style="color:var(--danger)">*</span></div>
+            <div class="csel-wrap"><button type="button" class="form-control csel-btn" id="cselb-walkin-prefix" data-empty="1" onclick="cselToggle('walkin-prefix')"><span class="csel-btn-txt">คำนำหน้า...</span></button><div class="csel-list" id="csell-walkin-prefix"></div><input type="hidden" id="walkin-prefix"><select class="csel-native-select" id="cselm-walkin-prefix" onchange="cselNativePick('walkin-prefix',this)"><option value="">คำนำหน้า...</option></select></div>
+          </div>
+          <div class="reg-field-fname">
+            <div class="reg-field-label">ชื่อ <span style="color:var(--danger)">*</span></div>
+            <input class="form-control" id="walkin-fname" placeholder="ชื่อ">
+          </div>
+          <div class="reg-field-lname">
+            <div class="reg-field-label">นามสกุล <span style="color:var(--danger)">*</span></div>
+            <input class="form-control" id="walkin-lname" placeholder="นามสกุล">
+          </div>
+        </div>
+        <div id="walkin-email-wrap" style="margin-top:14px;display:none;">
+          <div class="form-group" style="margin-bottom:0;">
+            <div class="reg-field-label">อีเมล <span style="color:var(--danger)">*</span></div>
+            <input class="form-control" id="walkin-email" type="email" placeholder="name@example.com" inputmode="email">
+            <div style="font-size:11px;color:var(--text-muted);margin-top:5px;"><i class="ti ti-info-circle" style="vertical-align:-1px;"></i> อีเมลสำหรับใช้เป็น User Login เข้าใช้งานระบบ</div>
+          </div>
+        </div>
+      </div>
+      <div style="height:1px;background:var(--border);margin-bottom:14px;"></div>
+      <div class="form-row" style="margin-bottom:18px;">
+        <div class="form-group" style="margin-bottom:0;">
+          <div class="reg-field-label">ตำแหน่ง <span style="color:var(--danger)">*</span></div>
+          <input class="form-control" id="walkin-pos" placeholder="เช่น พนักงานคลังสินค้า">
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <div class="reg-field-label">แผนก <span style="color:var(--danger)">*</span></div>
+          <div class="csel-wrap"><button type="button" class="form-control csel-btn" id="cselb-walkin-dept" data-empty="1" onclick="cselToggle('walkin-dept')"><span class="csel-btn-txt">เลือกแผนก...</span></button><div class="csel-list" id="csell-walkin-dept"></div><input type="hidden" id="walkin-dept"><select class="csel-native-select" id="cselm-walkin-dept" onchange="cselNativePick('walkin-dept',this)"><option value="">เลือกแผนก...</option></select></div>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-ghost" onclick="closeModal('modal-walkin')" style="flex:1;"><i class="ti ti-arrow-left"></i>ยกเลิก</button>
+        <button class="btn" onclick="submitWalkin()" style="flex:2;background:#7c3aed;color:#fff;border:none;justify-content:center;font-size:14px;padding:10px;gap:6px;"><i class="ti ti-walk"></i>บันทึก Walk-in (เข้าอบรมแล้ว)</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Manual Check-in -->
+<div class="modal-overlay" id="modal-manual">
+  <div class="modal">
+    <div class="modal-title"><i class="ti ti-keyboard"></i>เช็คชื่อด้วยชื่อ</div>
+    <div class="form-group">
+      <label class="form-label">ค้นหาชื่อ</label>
+      <input class="form-control" id="manual-search" placeholder="พิมพ์ชื่อ หรือนามสกุล..." oninput="manualSearchResult()">
+    </div>
+    <div id="manual-results" style="max-height:280px;overflow-y:auto;"></div>
+    <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal('modal-manual')">ปิด</button></div>
+  </div>
+</div>
+
+<!-- Edit Registration -->
+<div class="modal-overlay" id="modal-edit-reg">
+  <div class="modal" style="max-width:520px;padding:0;">
+    <div style="background:linear-gradient(135deg,#1a3a6b,#1a56a0);padding:18px 22px;color:#fff;border-radius:var(--radius) var(--radius) 0 0;">
+      <div style="font-size:11px;opacity:.7;margin-bottom:2px;text-transform:uppercase;letter-spacing:.8px;">แก้ไขข้อมูลการลงทะเบียน</div>
+      <div style="font-family:Prompt,sans-serif;font-size:15px;font-weight:700;">แก้ไขข้อมูลผู้เข้าอบรม</div>
+      <div style="background:rgba(255,255,255,.15);border-radius:6px;padding:6px 10px;margin-top:8px;font-size:12px;display:flex;align-items:center;gap:6px;">
+        <i class="ti ti-calendar-time"></i><span id="edit-deadline-txt"></span>
+      </div>
+    </div>
+    <div style="padding:20px 22px;">
+      <div class="form-group" style="margin-bottom:16px;">
+        <label class="form-label">รอบอบรม <span style="color:var(--text-muted);font-weight:400;">(เปลี่ยนรอบได้หากยังมีที่ว่างและไม่เลยกำหนด)</span></label>
+        <select class="form-control" id="edit-sess"></select>
+      </div>
+      <div style="height:1px;background:var(--border);margin-bottom:16px;"></div>
+      <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;">ข้อมูลส่วนตัว</div>
+      <div class="reg-name-row">
+        <div class="reg-field-prefix">
+          <div class="reg-field-label">คำนำหน้า <span style="color:var(--danger)">*</span></div>
+          <div class="csel-wrap"><button type="button" class="form-control csel-btn" id="cselb-edit-prefix" data-empty="1" onclick="cselToggle('edit-prefix')"><span class="csel-btn-txt">คำนำหน้า...</span></button><div class="csel-list" id="csell-edit-prefix"></div><input type="hidden" id="edit-prefix"><select class="csel-native-select" id="cselm-edit-prefix" onchange="cselNativePick('edit-prefix',this)"><option value="">คำนำหน้า...</option></select></div>
+        </div>
+        <div class="reg-field-fname">
+          <div class="reg-field-label">ชื่อ <span style="color:var(--danger)">*</span></div>
+          <input class="form-control" id="edit-fname" placeholder="ชื่อ">
+        </div>
+        <div class="reg-field-lname">
+          <div class="reg-field-label">นามสกุล <span style="color:var(--danger)">*</span></div>
+          <input class="form-control" id="edit-lname" placeholder="นามสกุล">
+        </div>
+      </div>
+      <div id="edit-email-wrap" style="margin-top:16px;display:none;">
+        <div class="form-group" style="margin-bottom:0;">
+          <div class="reg-field-label">อีเมล <span style="color:var(--danger)">*</span></div>
+          <input class="form-control" id="edit-email" type="email" placeholder="name@example.com" inputmode="email">
+          <div style="font-size:11px;color:var(--text-muted);margin-top:5px;"><i class="ti ti-info-circle" style="vertical-align:-1px;"></i> อีเมลสำหรับใช้เป็น User Login เข้าใช้งานระบบ</div>
+        </div>
+      </div>
+      <div style="height:1px;background:var(--border);margin:16px 0;"></div>
+      <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;">ข้อมูลงาน</div>
+      <div class="form-row">
+        <div class="form-group" style="margin-bottom:0;">
+          <div class="reg-field-label">ตำแหน่ง <span style="color:var(--danger)">*</span></div>
+          <input class="form-control" id="edit-pos" placeholder="เช่น พนักงานคลังสินค้า">
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <div class="reg-field-label">แผนก <span style="color:var(--danger)">*</span></div>
+          <div class="csel-wrap"><button type="button" class="form-control csel-btn" id="cselb-edit-dept" data-empty="1" onclick="cselToggle('edit-dept')"><span class="csel-btn-txt">เลือกแผนก...</span></button><div class="csel-list" id="csell-edit-dept"></div><input type="hidden" id="edit-dept"><select class="csel-native-select" id="cselm-edit-dept" onchange="cselNativePick('edit-dept',this)"><option value="">เลือกแผนก...</option></select></div>
+        </div>
+      </div>
+      <div style="margin-top:20px;display:flex;gap:10px;">
+        <button class="btn btn-ghost" onclick="closeModal('modal-edit-reg')" style="flex:1;"><i class="ti ti-x"></i>ยกเลิก</button>
+        <button class="btn btn-primary" onclick="submitEditReg()" style="flex:2;justify-content:center;">
+          <i class="ti ti-device-floppy"></i>บันทึกการแก้ไข
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Cancel Registration (self-service, เฉพาะโครงการที่บังคับกรอกอีเมล) -->
+<div class="modal-overlay" id="modal-cancel-reg">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-title" style="color:var(--danger);"><i class="ti ti-calendar-x"></i>ยกเลิกการลงทะเบียน</div>
+    <input type="hidden" id="cancel-reg-id">
+    <div id="cancel-reg-summary" style="font-size:13px;color:var(--text-secondary);background:var(--bg-subtle);padding:10px 12px;border-radius:8px;margin-bottom:16px;line-height:1.6;"></div>
+    <div class="form-group">
+      <label class="form-label">ยืนยันอีเมลที่ใช้ลงทะเบียน <span style="color:var(--danger)">*</span></label>
+      <input class="form-control" id="cancel-reg-email" type="email" placeholder="name@example.com" inputmode="email">
+      <div style="font-size:11px;color:var(--text-muted);margin-top:5px;"><i class="ti ti-shield-lock" style="vertical-align:-1px;"></i> ต้องกรอกอีเมลให้ตรงกับที่ลงทะเบียนไว้ เพื่อยืนยันว่าเป็นเจ้าของการลงทะเบียนนี้จริง</div>
+    </div>
+    <div style="margin-top:18px;display:flex;gap:10px;">
+      <button class="btn btn-ghost" onclick="closeModal('modal-cancel-reg')" style="flex:1;"><i class="ti ti-x"></i>ปิด</button>
+      <button class="btn btn-danger" onclick="submitCancelReg()" style="flex:2;justify-content:center;">
+        <i class="ti ti-calendar-x"></i>ยืนยันยกเลิก
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Category -->
+<div class="modal-overlay" id="modal-add-cat">
+  <div class="modal modal-form">
+    <div class="modal-title" id="modal-add-cat-title"><i class="ti ti-category-plus"></i>เพิ่มหลักสูตรอบรม</div>
+    <input type="hidden" id="nc-edit-id">
+    <!-- 1) ข้อมูลหลักสูตรอบรม · 2) แบบทดสอบ & ใบประกาศ · 3) รูปลักษณ์ -->
+    <div class="tqa-sec" style="margin-top:4px;"><i class="ti ti-info-circle"></i>ข้อมูลหลักสูตรอบรม</div>
+    <div class="form-group"><label class="form-label">ชื่อหลักสูตรอบรม <span>*</span></label><input class="form-control" id="nc-name" placeholder="เช่น ระบบงานคลังสินค้า"></div>
+    <div class="form-group"><label class="form-label">คำอธิบาย</label><textarea class="form-control" id="nc-desc" rows="3" placeholder="หัวข้อที่อบรม เช่น ขั้นตอนการเพิ่มกลุ่มครุภัณฑ์, การรับสินค้า"></textarea></div>
+
+    <div class="tqa-sec"><i class="ti ti-clipboard-check"></i>แบบทดสอบ & ใบประกาศ</div>
+    <div class="form-row nc-row-quiz">
+      <div class="form-group"><label class="form-label">แบบทดสอบ</label>
+        <select class="form-control" id="nc-quiz"><option value="">— ไม่มีแบบทดสอบ —</option></select>
+        <div class="form-hint">ใช้ทุกโครงการที่เปิดหลักสูตรนี้</div></div>
+      <div class="form-group"><label class="form-label">รหัสหลักสูตร</label>
+        <input class="form-control" id="nc-cert-code" maxlength="10" placeholder="เช่น INV" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')">
+        <div class="form-hint">ในเลขใบประกาศ BMS-<b>INV</b>-2569-…</div></div>
+    </div>
+
+    <div class="tqa-sec"><i class="ti ti-palette"></i>รูปลักษณ์</div>
+    <!-- ไอคอน + สีธีม แถวเดียวกัน · แผงเลือกไอคอนเต็มความกว้างใต้แถว -->
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">ไอคอน</label>
+        <div onclick="toggleIconPicker()" id="icon-picker-btn" style="cursor:pointer;display:flex;align-items:center;gap:10px;padding:7px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);user-select:none;">
+          <span id="icon-picker-preview" style="font-size:22px;line-height:1;color:var(--primary);width:28px;text-align:center;"><i class="ti ti-box"></i></span>
+          <span id="icon-picker-name" style="font-size:14px;color:var(--text);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">box</span>
+          <i class="ti ti-chevron-down" id="icon-picker-chevron" style="margin-left:auto;color:var(--text-muted);font-size:16px;transition:transform .2s;"></i>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">สีธีม</label>
+        <select class="form-control" id="nc-color">
+          <option value="blue">น้ำเงิน</option><option value="teal">เขียวมรกต</option>
+          <option value="amber">เหลือง</option><option value="red">แดง</option>
+          <option value="purple">ม่วง</option><option value="green">เขียว</option>
+        </select>
+      </div>
+    </div>
+    <div id="icon-picker-panel" style="display:none;margin-bottom:12px;border:1px solid var(--border);border-radius:10px;padding:10px;background:var(--card);">
+      <input id="icon-search" class="form-control" placeholder="ค้นหาชื่อไอคอน..." oninput="filterIcons()" style="margin-bottom:10px;font-size:13px;">
+      <div id="icon-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;max-height:210px;overflow-y:auto;"></div>
+    </div>
+    <input type="hidden" id="nc-icon" value="box">
+    <div class="form-group"><label class="form-label">รูปแบนเนอร์ <span style="color:var(--text-muted);font-weight:400;font-size:12px;">(ไม่บังคับ — ไม่ใส่ = ใช้สีธีม)</span></label>
+      <div id="nc-banner-wrap" class="banner-upload-wrap" onclick="document.getElementById('nc-banner-file').click()">
+        <div id="nc-banner-placeholder" class="banner-upload-placeholder">
+          <i class="ti ti-photo"></i>
+          <span>คลิกเพื่ออัปโหลดรูปภาพ</span>
+          <span style="font-size:12px;opacity:.7;">JPG, PNG, WEBP — แนะนำ 800×300px ขึ้นไป</span>
+        </div>
+      </div>
+      <input type="file" id="nc-banner-file" accept="image/*" style="display:none" onchange="previewCatBanner(event)">
+      <div style="display:flex;align-items:center;gap:6px;margin-top:6px;">
+        <span id="nc-banner-filename" style="font-size:12px;color:var(--text-muted);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+        <button type="button" id="nc-banner-clear-btn" class="btn btn-ghost btn-sm" onclick="clearCatBanner()" style="gap:5px;color:var(--danger);display:none;">
+          <i class="ti ti-trash"></i>ลบรูป
+        </button>
+      </div>
+      <input type="hidden" id="nc-banner-url">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-add-cat')">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="submitAddCat()"><i class="ti ti-device-floppy"></i>บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- Clear Registrations By Site -->
+<div class="modal-overlay" id="modal-clear-regs-site">
+  <div class="modal" style="max-width:420px;padding:0;overflow:hidden;">
+    <div style="background:linear-gradient(135deg,#7f1d1d,#b91c1c);padding:18px 22px;color:#fff;">
+      <div style="font-size:11px;opacity:.7;margin-bottom:2px;text-transform:uppercase;letter-spacing:.8px;">Admin — ลบข้อมูล</div>
+      <div style="font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px;"><i class="ti ti-trash-x"></i>เคียร์ข้อมูลตามโครงการ</div>
+    </div>
+    <div style="padding:20px;">
+      <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start;">
+        <i class="ti ti-alert-triangle" style="color:#dc2626;font-size:18px;flex-shrink:0;margin-top:1px;"></i>
+        <div style="font-size:13px;color:#7f1d1d;line-height:1.5;">การลบข้อมูลนี้ <strong>ไม่สามารถกู้คืนได้</strong><br>จะลบรายการลงทะเบียนทั้งหมดของโครงการที่เลือก</div>
+      </div>
+      <div class="form-group" style="margin-bottom:12px;">
+        <label class="form-label">เลือกโครงการที่ต้องการเคียร์ข้อมูล</label>
+        <select class="form-control" id="clear-site-sel" onchange="updateClearSiteCount()">
+          <option value="">— เลือกโครงการ —</option>
+        </select>
+      </div>
+      <div id="clear-site-preview" style="display:none;background:var(--bg-subtle);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px;"></div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-ghost" onclick="closeModal('modal-clear-regs-site')" style="flex:1;"><i class="ti ti-x"></i>ยกเลิก</button>
+        <button class="btn btn-danger" id="clear-site-ok-btn" onclick="confirmClearRegsBySite()" style="flex:2;justify-content:center;" disabled><i class="ti ti-trash"></i>ยืนยันลบข้อมูล</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Clear Survey By Site -->
+<div class="modal-overlay" id="modal-clear-survey-site">
+  <div class="modal" style="max-width:420px;padding:0;overflow:hidden;">
+    <div style="background:linear-gradient(135deg,#4c1d95,#6d28d9);padding:18px 22px;color:#fff;">
+      <div style="font-size:11px;opacity:.7;margin-bottom:2px;text-transform:uppercase;letter-spacing:.8px;">Admin — ลบข้อมูล</div>
+      <div style="font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px;"><i class="ti ti-trash-x"></i>เคียร์ข้อมูลแบบประเมินตามโครงการ</div>
+    </div>
+    <div style="padding:20px;">
+      <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start;">
+        <i class="ti ti-alert-triangle" style="color:#dc2626;font-size:18px;flex-shrink:0;margin-top:1px;"></i>
+        <div style="font-size:13px;color:#7f1d1d;line-height:1.5;">การลบข้อมูลนี้ <strong>ไม่สามารถกู้คืนได้</strong><br>จะลบข้อมูลแบบประเมินทั้งหมดของโครงการที่เลือก</div>
+      </div>
+      <div class="form-group" style="margin-bottom:12px;">
+        <label class="form-label">เลือกโครงการที่ต้องการเคียร์ข้อมูล</label>
+        <select class="form-control" id="clear-sv-site-sel" onchange="updateClearSurveySiteCount()">
+          <option value="">— เลือกโครงการ —</option>
+        </select>
+      </div>
+      <div id="clear-sv-site-preview" style="display:none;background:var(--bg-subtle);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px;"></div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-ghost" onclick="closeModal('modal-clear-survey-site')" style="flex:1;"><i class="ti ti-x"></i>ยกเลิก</button>
+        <button class="btn btn-danger" id="clear-sv-site-ok-btn" onclick="confirmClearSurveyBySite()" style="flex:2;justify-content:center;" disabled><i class="ti ti-trash"></i>ยืนยันลบข้อมูล</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Admin Add Registration -->
+<div class="modal-overlay" id="modal-admin-add-reg">
+  <div class="modal" style="max-width:520px;padding:0;">
+    <div style="background:linear-gradient(135deg,#1a3a6b,#1a56a0);padding:18px 22px;color:#fff;border-radius:var(--radius) var(--radius) 0 0;">
+      <div style="font-size:11px;opacity:.7;margin-bottom:2px;text-transform:uppercase;letter-spacing:.8px;">Admin</div>
+      <div style="font-family:Prompt,sans-serif;font-size:15px;font-weight:700;">เพิ่มผู้ลงทะเบียน</div>
+    </div>
+    <div style="padding:20px 22px;">
+      <div class="form-group" style="margin-bottom:16px;">
+        <label class="form-label">รอบอบรม <span style="color:var(--danger)">*</span></label>
+        <select class="form-control" id="ar-sess"></select>
+      </div>
+      <div style="height:1px;background:var(--border);margin-bottom:16px;"></div>
+      <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;">ข้อมูลส่วนตัว</div>
+      <div class="reg-name-row">
+        <div class="reg-field-prefix">
+          <div class="reg-field-label">คำนำหน้า <span style="color:var(--danger)">*</span></div>
+          <div class="csel-wrap"><button type="button" class="form-control csel-btn" id="cselb-ar-prefix" data-empty="1" onclick="cselToggle('ar-prefix')"><span class="csel-btn-txt">คำนำหน้า...</span></button><div class="csel-list" id="csell-ar-prefix"></div><input type="hidden" id="ar-prefix"><select class="csel-native-select" id="cselm-ar-prefix" onchange="cselNativePick('ar-prefix',this)"><option value="">คำนำหน้า...</option></select></div>
+        </div>
+        <div class="reg-field-fname">
+          <div class="reg-field-label">ชื่อ <span style="color:var(--danger)">*</span></div>
+          <input class="form-control" id="ar-fname" placeholder="ชื่อ">
+        </div>
+        <div class="reg-field-lname">
+          <div class="reg-field-label">นามสกุล <span style="color:var(--danger)">*</span></div>
+          <input class="form-control" id="ar-lname" placeholder="นามสกุล">
+        </div>
+      </div>
+      <div id="ar-email-wrap" style="margin-top:16px;display:none;">
+        <div class="form-group" style="margin-bottom:0;">
+          <div class="reg-field-label">อีเมล <span style="color:var(--danger)">*</span></div>
+          <input class="form-control" id="ar-email" type="email" placeholder="name@example.com" inputmode="email">
+          <div style="font-size:11px;color:var(--text-muted);margin-top:5px;"><i class="ti ti-info-circle" style="vertical-align:-1px;"></i> อีเมลสำหรับใช้เป็น User Login เข้าใช้งานระบบ</div>
+        </div>
+      </div>
+      <div style="height:1px;background:var(--border);margin:16px 0;"></div>
+      <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;">ข้อมูลงาน</div>
+      <div class="form-row">
+        <div class="form-group" style="margin-bottom:0;">
+          <div class="reg-field-label">ตำแหน่ง <span style="color:var(--danger)">*</span></div>
+          <input class="form-control" id="ar-pos" placeholder="เช่น พนักงานคลังสินค้า">
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <div class="reg-field-label">แผนก <span style="color:var(--danger)">*</span></div>
+          <div class="csel-wrap"><button type="button" class="form-control csel-btn" id="cselb-ar-dept" data-empty="1" onclick="cselToggle('ar-dept')"><span class="csel-btn-txt">เลือกแผนก...</span></button><div class="csel-list" id="csell-ar-dept"></div><input type="hidden" id="ar-dept"><select class="csel-native-select" id="cselm-ar-dept" onchange="cselNativePick('ar-dept',this)"><option value="">เลือกแผนก...</option></select></div>
+        </div>
+      </div>
+      <div style="margin-top:20px;display:flex;gap:10px;">
+        <button class="btn btn-ghost" onclick="closeModal('modal-admin-add-reg')" style="flex:1;"><i class="ti ti-x"></i>ยกเลิก</button>
+        <button class="btn btn-primary" onclick="adminSubmitReg()" style="flex:2;justify-content:center;">
+          <i class="ti ti-circle-check"></i>เพิ่มการลงทะเบียน
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Session -->
+<div class="modal-overlay" id="modal-session">
+  <div class="modal modal-wide modal-form">
+    <div class="modal-title" id="sess-modal-title"><i class="ti ti-calendar-plus"></i>เพิ่มรอบอบรม</div>
+    <input type="hidden" id="sess-edit-id">
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">หลักสูตร <span>*</span></label><select class="form-control" id="ns-cat"><option value="">เลือกหลักสูตร...</option></select></div>
+      <div class="form-group"><label class="form-label">ชื่อรอบ <span>*</span></label><input class="form-control" id="ns-name" placeholder="เช่น รอบที่ 1 / กลุ่ม A"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">วันที่ <span>*</span></label>
+        <div class="be-date" onclick="openSessDatePicker()">
+          <input class="form-control" id="ns-date-be" readonly placeholder="วว/ดด/ปปปป (พ.ศ.)">
+          <i class="ti ti-calendar be-date-ic"></i>
+          <input id="ns-date" type="date" tabindex="-1" onchange="_syncSessDateBE()">
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">จำนวนที่นั่ง <span>*</span></label><input class="form-control" id="ns-cap" type="number" min="1" value="15"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">เวลาเริ่ม <span>*</span></label><input class="form-control" id="ns-time-start" type="time" value="09:00" required></div>
+      <div class="form-group"><label class="form-label">เวลาสิ้นสุด <span>*</span></label><input class="form-control" id="ns-time-end" type="time" value="16:00" required></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">สถานที่ <span>*</span></label>
+        <select class="form-control" id="ns-venue"><option value="">เลือกสถานที่...</option></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">วิทยากร <span>*</span></label>
+        <select class="form-control" id="ns-trainer"><option value="">เลือกวิทยากร (พนักงาน)...</option></select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-session')">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="submitSession()"><i class="ti ti-check"></i>บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- Print Form Modal -->
+<div class="modal-overlay" id="modal-print-form">
+  <div class="modal" style="max-width:520px;padding:0;overflow:hidden;">
+    <div style="background:linear-gradient(135deg,#1a3a6b,#1a56a0);padding:18px 22px;color:#fff;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="background:rgba(255,255,255,.15);border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;font-size:20px;"><i class="ti ti-printer"></i></div>
+        <div>
+          <div style="font-size:11px;opacity:.7;text-transform:uppercase;letter-spacing:.8px;">Admin</div>
+          <div style="font-weight:700;font-size:17px;">พิมพ์ใบเซ็นต์ชื่อผู้เข้าอบรม</div>
+        </div>
+      </div>
+    </div>
+    <div style="padding:20px 22px;max-height:72vh;overflow-y:auto;">
+      <div class="form-group">
+        <label class="form-label">เลือกรอบอบรม <span style="color:var(--danger)">*</span></label>
+        <select class="form-control" id="pf-sess" onchange="onPrintFormSessChange()">
+          <option value="">-- เลือกรอบ --</option>
+        </select>
+      </div>
+      <div style="height:1px;background:var(--border);margin:14px 0;"></div>
+      <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;">ข้อมูลส่วนหัวแบบฟอร์ม</div>
+      <div class="form-group">
+        <label class="form-label">ชื่อสถานพยาบาล / หน่วยงาน <span style="color:var(--danger)">*</span></label>
+        <input class="form-control" id="pf-hospital" placeholder="เช่น โรงพยาบาลทดสอบ จ.น่าน" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">ระบบงาน / ชื่อโปรแกรม</label>
+        <input class="form-control" id="pf-program" placeholder="เช่น BMS-INVENTORY" value="BMS-INVENTORY">
+      </div>
+      <div class="form-group">
+        <label class="form-label">ระบบงาน (หลักสูตรอบรม)</label>
+        <input class="form-control" id="pf-system" placeholder="จะถูกเติมอัตโนมัติเมื่อเลือกรอบ">
+      </div>
+      <div class="form-group">
+        <label class="form-label">รายละเอียด <span style="font-weight:400;color:var(--text-muted);font-size:11px;">(เติมอัตโนมัติจากคำอธิบายหลักสูตรอบรม)</span></label>
+        <input class="form-control" id="pf-details" placeholder="รายละเอียดเนื้อหาอบรม...">
+      </div>
+      <div style="height:1px;background:var(--border);margin:14px 0;"></div>
+      <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;">ผู้ลงนาม</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+        <!-- BMS side -->
+        <div style="background:var(--bg-subtle);border:1px solid var(--border);border-radius:var(--radius);padding:12px;">
+          <div style="font-size:12px;font-weight:700;color:var(--primary);margin-bottom:10px;display:flex;align-items:center;gap:5px;"><i class="ti ti-pencil"></i>ผู้ลงนาม (ฝั่ง BMS)</div>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label class="form-label" style="font-size:11px;">ชื่อ-นามสกุล</label>
+            <input class="form-control" id="pf-bms-name" placeholder="ชื่อ-นามสกุล..." style="height:34px;font-size:13px;">
+          </div>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label class="form-label" style="font-size:11px;">ตำแหน่ง</label>
+            <input class="form-control" id="pf-bms-pos" value="ผู้จัดการโครงการติดตั้งระบบคลังสินค้า" style="height:34px;font-size:13px;color:var(--amber-dark,#92400e);">
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label" style="font-size:11px;">หน่วยงาน</label>
+            <input class="form-control" id="pf-bms-org" value="บริษัท บางกอก เมดิคอล ซอฟต์แวร์ จำกัด" style="height:34px;font-size:12px;color:var(--success-dark,#166534);">
+          </div>
+        </div>
+        <!-- Hospital side -->
+        <div style="background:var(--bg-subtle);border:1px solid var(--border);border-radius:var(--radius);padding:12px;">
+          <div style="font-size:12px;font-weight:700;color:var(--primary);margin-bottom:10px;display:flex;align-items:center;gap:5px;"><i class="ti ti-pencil"></i>ผู้ลงนาม (ฝั่งโรงพยาบาล)</div>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label class="form-label" style="font-size:11px;">ชื่อ-นามสกุล</label>
+            <input class="form-control" id="pf-signer-name" placeholder="ชื่อ-นามสกุล..." style="height:34px;font-size:13px;">
+          </div>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label class="form-label" style="font-size:11px;">ตำแหน่ง</label>
+            <input class="form-control" id="pf-signer-pos" placeholder="เช่น หัวหน้าศูนย์คอมพิวเตอร์" style="height:34px;font-size:13px;color:var(--amber-dark,#92400e);">
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label" style="font-size:11px;">โรงพยาบาล</label>
+            <input class="form-control" id="pf-signer-org" placeholder="ชื่อโรงพยาบาล..." style="height:34px;font-size:13px;color:var(--primary);" oninput="document.getElementById('pf-hospital').value=this.value">
+          </div>
+        </div>
+      </div>
+      <button type="button" class="btn btn-ghost" onclick="savePrintFormSignatories()" style="width:100%;justify-content:center;gap:6px;font-size:12.5px;margin:-4px 0 14px;"><i class="ti ti-device-floppy"></i>จำค่าเริ่มต้นผู้ลงนาม (เฉพาะโครงการนี้)</button>
+      <div style="height:1px;background:var(--border);margin:14px 0;"></div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">จำนวนแถวรวมในตาราง (รวมแถวว่าง)</label>
+        <select class="form-control" id="pf-rows" style="max-width:140px;">
+          <option value="25" selected>25</option>
+          <option value="50">50</option>
+          <option value="75">75</option>
+          <option value="100">100</option>
+        </select>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;padding:0 22px 20px;">
+      <button class="btn btn-ghost" onclick="closeModal('modal-print-form')" style="flex:1;"><i class="ti ti-x"></i>ยกเลิก</button>
+      <button class="btn btn-primary" onclick="executePrintForm()" style="flex:2;justify-content:center;gap:6px;"><i class="ti ti-printer"></i>พิมพ์แบบฟอร์ม</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><i class="ti ti-circle-check"></i><span id="toast-msg"></span></div>
+
+<!-- ═══ Analytics Detail Modal ═══ -->
+<div class="modal-overlay" id="modal-analytics-detail" onclick="if(event.target===this)closeAnalyticsDetail()">
+  <div class="modal" style="max-width:800px;width:96vw;max-height:88vh;display:flex;flex-direction:column;padding:0;overflow:hidden;">
+    <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:36px;height:36px;border-radius:10px;background:var(--primary-light);color:var(--primary);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;"><i class="ti ti-users"></i></div>
+        <div>
+          <div style="font-family:var(--heading);font-size:15px;font-weight:700;color:var(--primary);" id="adetail-title">รายชื่อ</div>
+          <div id="adetail-sub" style="font-size:12px;color:var(--text-muted);margin-top:1px;"></div>
+        </div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="closeAnalyticsDetail()"><i class="ti ti-x"></i></button>
+    </div>
+    <div style="display:flex;gap:6px;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--bg-subtle);flex-wrap:wrap;flex-shrink:0;" id="adetail-tabs">
+      <button class="adetail-tab active" onclick="filterAnalyticsDetail('all',this)">ทั้งหมด</button>
+      <button class="adetail-tab" onclick="filterAnalyticsDetail('ok',this)"><span class="adetail-dot ok"></span>เข้าอบรม</button>
+      <button class="adetail-tab" onclick="filterAnalyticsDetail('absent',this)"><span class="adetail-dot absent"></span>ขาดอบรม</button>
+    </div>
+    <div style="overflow-y:auto;flex:1;" id="adetail-body"></div>
+  </div>
+</div>
+
+<!-- Doc Title Management Modal -->
+<div class="modal-overlay" id="modal-doc-titles">
+  <div class="modal modal-wide">
+    <div class="modal-title"><i class="ti ti-clipboard-list"></i>จัดการหัวข้อเอกสาร</div>
+    <div id="doc-title-list" style="max-height:45vh;overflow-y:auto;margin-bottom:12px;"></div>
+    <div style="display:flex;gap:8px;margin-bottom:4px;">
+      <textarea class="form-control" id="doc-new-title" rows="2" placeholder="พิมพ์หัวข้อใหม่..." style="resize:none;font-size:13px;flex:1;"></textarea>
+      <button class="btn btn-primary btn-sm" style="white-space:nowrap;align-self:flex-end;" onclick="addDocTitle()"><i class="ti ti-plus"></i>เพิ่ม</button>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-doc-titles')"><i class="ti ti-x"></i>ยกเลิก</button>
+      <button class="btn btn-primary" onclick="saveDocTitles()"><i class="ti ti-device-floppy"></i>บันทึกทั้งหมด</button>
+    </div>
+  </div>
+</div>
+
+</template>
+
+<!-- ═══════════ แบบประเมินหลังอบรม (?page=survey) — src/modules/training-survey.js · training-survey.css ═══════════ -->
+<template id="trn-page-survey">
+<!-- Header -->
+<header class="sv-header">
+  <div class="sv-header-logo">
+    <i class="ti ti-building-hospital"></i>BMS Training
+  </div>
+  <span class="sv-site-badge" id="site-badge">—</span>
+  <span class="sv-date-badge" id="date-badge"></span>
+</header>
+
+<!-- Toast -->
+<div class="sv-toast" id="sv-toast"></div>
+
+<div class="sv-wrap">
+
+  <!-- ══ SCREEN: LOADING ══ -->
+  <div class="sv-screen active" id="sc-loading">
+    <div class="sv-loading">
+      <div class="sv-spinner"></div>
+      <div>กำลังโหลดข้อมูลรอบอบรม...</div>
+    </div>
+  </div>
+
+  <!-- ══ SCREEN: SELECT SESSION ══ -->
+  <div class="sv-screen" id="sc-select">
+
+    <!-- Page title -->
+    <div style="text-align:center;padding:20px 0 16px;">
+      <div style="width:56px;height:56px;border-radius:var(--radius);background:var(--primary-light);border:2px solid #bfdbfe;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:28px;color:var(--primary);">
+        <i class="ti ti-clipboard-check"></i>
+      </div>
+      <h1 style="font-size:20px;font-weight:700;color:var(--text);margin-bottom:6px;">แบบประเมินความพึงพอใจ</h1>
+      <p style="font-size:13px;color:var(--text-muted);">การอบรมระบบ BMS — กรุณาเลือกรอบอบรมที่ท่านเข้าร่วม</p>
+    </div>
+
+    <div class="sv-card">
+      <div class="sv-card-title">
+        <i class="ti ti-calendar-event"></i>เลือกรอบอบรมที่ต้องการประเมิน
+      </div>
+
+      <!-- No sessions today -->
+      <div id="no-sess-msg" class="sv-no-sess" style="display:none;">
+        <i class="ti ti-calendar-off"></i>
+        <p><strong>ไม่พบรอบอบรมในวันนี้</strong><br>สำหรับโครงการนี้ กรุณาติดต่อเจ้าหน้าที่</p>
+      </div>
+
+      <!-- Session selection form -->
+      <div id="sess-form">
+        <label class="sv-label"><i class="ti ti-category" style="margin-right:4px;"></i>หลักสูตรอบรม</label>
+        <select class="sv-select" id="sel-cat" onchange="onCatChange()">
+          <option value="">— กรุณาเลือกหลักสูตรอบรม —</option>
+        </select>
+
+        <label class="sv-label"><i class="ti ti-clock" style="margin-right:4px;"></i>รอบอบรม / วิทยากร</label>
+        <select class="sv-select" id="sel-sess" onchange="onSessChange()" disabled>
+          <option value="">— เลือกหลักสูตรก่อน —</option>
+        </select>
+
+        <!-- Selected session detail -->
+        <div class="sv-sess-info" id="sess-info">
+          <div class="sv-sess-info-row"><i class="ti ti-user-check"></i><span><strong>วิทยากร:</strong> <span id="info-trainer">—</span></span></div>
+          <div class="sv-sess-info-row"><i class="ti ti-calendar"></i><span id="info-date">—</span></div>
+          <div class="sv-sess-info-row"><i class="ti ti-clock"></i><span id="info-time">—</span></div>
+          <div class="sv-sess-info-row"><i class="ti ti-map-pin"></i><span id="info-venue">—</span></div>
+        </div>
+
+        <button class="sv-btn sv-btn-primary" id="btn-start" onclick="startSurvey()" disabled>
+          <i class="ti ti-clipboard-check"></i>เริ่มทำแบบประเมิน
+        </button>
+      </div>
+    </div>
+
+    <p style="text-align:center;font-size:12px;color:var(--text-muted);display:flex;align-items:center;justify-content:center;gap:5px;">
+      <i class="ti ti-shield-lock"></i>ข้อมูลของท่านถูกเก็บเป็นความลับ และใช้เพื่อพัฒนาคุณภาพการอบรมเท่านั้น
+    </p>
+  </div>
+
+  <!-- ══ SCREEN: QUESTIONNAIRE ══ -->
+  <div class="sv-screen" id="sc-form">
+
+    <!-- Progress -->
+    <div class="sv-progress-wrap"><div class="sv-progress-bar" id="prog-bar"></div></div>
+    <div class="sv-progress-label" id="prog-label">ตอบแล้ว 0 / 41 ข้อ</div>
+
+    <!-- Selected session bar -->
+    <div class="sv-form-sess-bar">
+      <i class="ti ti-calendar-check"></i>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="form-sess-name">—</div>
+        <div style="font-size:12px;color:var(--text-muted);" id="form-sess-sub">—</div>
+      </div>
+      <button onclick="showScreen('sc-select')" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:12px;white-space:nowrap;display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:6px;" title="เปลี่ยนรอบ">
+        <i class="ti ti-refresh" style="font-size:14px;"></i>เปลี่ยน
+      </button>
+    </div>
+
+    <!-- Scale legend -->
+    <div class="sv-scale-legend">
+      <span class="sv-scale-legend-label">ระดับ:</span>
+      <span class="sv-scale-item"><span class="sv-scale-dot" style="background:#16a34a;">5</span>มากที่สุด</span>
+      <span class="sv-scale-item"><span class="sv-scale-dot" style="background:#65a30d;">4</span>มาก</span>
+      <span class="sv-scale-item"><span class="sv-scale-dot" style="background:#ca8a04;">3</span>ปานกลาง</span>
+      <span class="sv-scale-item"><span class="sv-scale-dot" style="background:#ea580c;">2</span>น้อย</span>
+      <span class="sv-scale-item"><span class="sv-scale-dot" style="background:#dc2626;">1</span>น้อยที่สุด</span>
+    </div>
+
+    <!-- Questions injected here -->
+    <div id="questions-wrap"></div>
+
+    <!-- 6.6 Yes/No -->
+    <div class="sv-card">
+      <div style="font-size:14px;line-height:1.5;color:var(--text);margin-bottom:10px;">
+        <span style="font-size:12px;font-weight:700;color:var(--text-muted);margin-right:6px;">6.6</span>
+        ท่านต้องการเข้าร่วมการอบรมเพิ่มเติมในหัวข้ออื่นอีกหรือไม่
+      </div>
+      <div class="sv-yn-wrap" id="yn-row">
+        <button class="sv-yn-btn" id="yn-yes" onclick="setYN(true)">
+          <i class="ti ti-thumb-up"></i>ต้องการ
+        </button>
+        <button class="sv-yn-btn" id="yn-no" onclick="setYN(false)">
+          <i class="ti ti-thumb-down"></i>ไม่ต้องการ
+        </button>
+      </div>
+    </div>
+
+    <!-- Comments -->
+    <div class="sv-card">
+      <div class="sv-card-title" style="margin-bottom:10px;padding-bottom:0;border-bottom:none;">
+        <i class="ti ti-message-2"></i>ข้อเสนอแนะเพิ่มเติม <span style="font-size:12px;font-weight:400;color:var(--text-muted);">(ไม่บังคับ)</span>
+      </div>
+      <textarea class="sv-textarea" id="sv-comments" placeholder="กรุณาระบุข้อเสนอแนะหรือความคิดเห็นเพิ่มเติม..."></textarea>
+    </div>
+
+  </div>
+
+  <!-- ══ SCREEN: SUCCESS ══ -->
+  <div class="sv-screen" id="sc-success">
+    <div class="sv-success">
+      <div class="sv-success-icon"><i class="ti ti-circle-check"></i></div>
+      <h2 class="sv-success-title">ขอบคุณสำหรับการประเมิน</h2>
+      <p class="sv-success-sub">ข้อมูลของท่านได้รับการบันทึกเรียบร้อยแล้ว<br>ความคิดเห็นของท่านมีค่ายิ่งต่อการพัฒนาการอบรม</p>
+
+      <!-- Overall score -->
+      <div class="sv-score-overall" id="score-overall"></div>
+
+      <!-- Section scores -->
+      <div class="sv-score-grid" id="score-grid"></div>
+
+      <button class="sv-btn sv-btn-primary" onclick="resetSurvey()" style="max-width:280px;margin:0 auto;">
+        <i class="ti ti-arrow-back-up"></i>ประเมินรอบอื่น
+      </button>
+    </div>
+  </div>
+
+</div><!-- /sv-wrap -->
+
+<!-- Sticky submit -->
+<div class="sv-sticky-bar" id="sticky-bar">
+  <div class="sv-sticky-inner">
+    <button class="sv-btn sv-btn-success" id="btn-submit" onclick="submitSurvey()">
+      <i class="ti ti-send"></i>ส่งแบบประเมิน
+    </button>
+  </div>
+</div>
+</template>
+
+<!-- ═══════════ คู่มือการใช้งาน (?page=manual) — src/modules/training-manual.js · training-manual.css ═══════════ -->
+<!-- ═══════════ แบบทดสอบหลังอบรม (?page=quiz) — src/modules/training-quiz-take.js · training-quiz-take.css ═══════════ -->
+<template id="trn-page-quiz">
+<div class="tq-bg" aria-hidden="true"><i></i><i></i><i></i></div>
+<header class="tq-header">
+  <div class="tq-logo"><i class="ti ti-pencil-check"></i>แบบทดสอบหลังอบรม</div>
+  <span class="tq-site" id="tq-site">—</span>
+  <button class="tq-sound" id="tq-sound" onclick="toggleSound()"></button>
+</header>
+<div class="tq-toast" id="tq-toast"></div>
+<div class="tq-wrap">
+
+  <div class="tq-screen active" id="sc-loading"><div class="tq-loading"><span class="tq-spin dark"></span>กำลังโหลด...</div></div>
+  <div class="tq-screen" id="sc-msg"><div id="tq-msg"></div></div>
+
+  <!-- เลือกแบบทดสอบ (โครงการมีหลายหลักสูตรอบรม) -->
+  <div class="tq-screen" id="sc-list">
+    <h1 class="tq-h1">เลือกแบบทดสอบ</h1>
+    <div id="tq-list"></div>
+  </div>
+
+  <!-- ยืนยันตัวตน — ฮีโร่ (ชื่อแบบทดสอบ · สถิติ · ขั้นตอน) + ฟอร์มยืนยันตัวตน (จอกว้างวางคู่กัน) -->
+  <div class="tq-screen" id="sc-who">
+   <div class="tq-who">
+    <section class="tq-hero">
+      <div class="tq-hero-fx" aria-hidden="true"><i></i><i></i><i></i><b></b><b></b><b></b><b></b><b></b><b></b></div>
+      <div class="tq-emblem" aria-hidden="true">
+        <span class="tq-orbit o1"><em></em></span><span class="tq-orbit o2"><em></em></span><span class="tq-orbit o3"><em></em></span>
+        <div class="tq-emblem-core"><i class="ti ti-certificate"></i></div>
+      </div>
+      <div class="tq-eyebrow"><i class="ti ti-sparkles"></i>แบบทดสอบหลังอบรม · Post-Training Assessment</div>
+      <h1 class="tq-hero-title" id="tq-quiz-name"></h1>
+      <div class="tq-stats" id="tq-quiz-info"></div>
+      <ol class="tq-steps">
+        <li class="on"><span><i class="ti ti-user-check"></i></span><b>ยืนยันตัวตน</b></li>
+        <li><span><i class="ti ti-pencil"></i></span><b>ทำแบบทดสอบ</b></li>
+        <li><span><i class="ti ti-award"></i></span><b>รับใบประกาศ</b></li>
+      </ol>
+    </section>
+    <section class="tq-card tq-form">
+      <div class="tq-form-head">
+        <span class="tq-form-ic"><i class="ti ti-fingerprint"></i></span>
+        <div><b>ยืนยันตัวตนก่อนเริ่มสอบ</b><span>เลือกชื่อจากรายชื่อผู้ลงทะเบียน หรือกรอกข้อมูลเอง</span></div>
+      </div>
+      <div class="tq-tabs">
+        <button class="tq-tab active" data-mode="reg" onclick="setMode('reg')"><i class="ti ti-user-search"></i>ผู้ลงทะเบียนอบรม</button>
+        <button class="tq-tab" data-mode="out" onclick="setMode('out')"><i class="ti ti-user-plus"></i>ไม่อยู่ในรายชื่อ</button>
+      </div>
+      <div id="tq-mode-reg">
+        <label class="tq-label">ค้นหาชื่อของคุณ</label>
+        <div class="tq-field"><i class="ti ti-search"></i><input class="tq-input" id="tq-search" placeholder="พิมพ์ชื่อหรือนามสกุล อย่างน้อย 2 ตัวอักษร" oninput="searchReg()" autocomplete="off"></div>
+        <div id="tq-results"></div>
+        <div class="tq-picked" id="tq-picked" style="display:none;">
+          <i class="ti ti-circle-check-filled"></i>
+          <div><b id="tq-picked-name"></b><span id="tq-picked-sub"></span></div>
+          <button class="tq-link" onclick="unpick()">เปลี่ยน</button>
+        </div>
+        <label class="tq-label">อีเมล (สำหรับรับใบประกาศ)</label>
+        <div class="tq-field"><i class="ti ti-mail"></i><input class="tq-input" id="tq-email" type="email" placeholder="name@example.com" autocomplete="email"></div>
+      </div>
+      <div id="tq-mode-out" style="display:none;">
+        <label class="tq-label">ชื่อ-นามสกุล</label>
+        <div class="tq-field"><i class="ti ti-user"></i><input class="tq-input" id="tq-o-name" placeholder="เช่น นางสาวสมใจ ใจดี" autocomplete="name"></div>
+        <div class="tq-row">
+          <div><label class="tq-label">หน่วยงาน</label><div class="tq-field"><i class="ti ti-building-hospital"></i><input class="tq-input" id="tq-o-dept" list="tq-depts" placeholder="หน่วยงาน/แผนก"></div><datalist id="tq-depts"></datalist></div>
+          <div><label class="tq-label">ตำแหน่ง</label><div class="tq-field"><i class="ti ti-briefcase"></i><input class="tq-input" id="tq-o-pos" placeholder="ตำแหน่ง"></div></div>
+        </div>
+        <label class="tq-label">อีเมล (สำหรับรับใบประกาศ)</label>
+        <div class="tq-field"><i class="ti ti-mail"></i><input class="tq-input" id="tq-o-email" type="email" placeholder="name@example.com" autocomplete="email"></div>
+      </div>
+      <button class="tq-btn tq-btn-go" id="tq-start" onclick="start()"><i class="ti ti-player-play"></i>เริ่มทำแบบทดสอบ</button>
+      <div class="tq-form-foot"><i class="ti ti-mail-check"></i>สอบผ่านแล้ว ใบประกาศจะส่งไปที่อีเมลที่กรอกไว้</div>
+    </section>
+   </div>
+  </div>
+
+  <!-- ทำข้อสอบ -->
+  <div class="tq-screen" id="sc-quiz">
+    <div class="tq-bar">
+      <div class="tq-hero-fx" aria-hidden="true"><i></i><i></i><i></i><b></b><b></b><b></b><b></b><b></b><b></b></div>
+      <div class="tq-bar-top">
+        <div class="tq-ring">
+          <svg viewBox="0 0 36 36"><defs><linearGradient id="tq-ring-grad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7c5cfc"/><stop offset="1" stop-color="#4361ee"/></linearGradient></defs>
+            <circle class="bg" cx="18" cy="18" r="15.9155"/><circle class="fg" id="tq-ring-fg" cx="18" cy="18" r="15.9155" stroke-dasharray="0 100"/></svg>
+          <span id="tq-ring-txt">0%</span>
+        </div>
+        <div class="tq-bar-info"><b id="tq-q-title"></b><div class="tq-prog-txt" id="tq-prog-txt"></div></div>
+        <span class="tq-timer" id="tq-timer"></span>
+      </div>
+      <div class="tq-dots" id="tq-dots"></div>
+      <div class="tq-prog"><span id="tq-prog-bar"></span></div>
+    </div>
+    <div id="tq-qs"></div>
+    <div class="tq-submit-wrap">
+      <button class="tq-btn" id="tq-submit" onclick="submit()"><i class="ti ti-send"></i>ส่งคำตอบ</button>
+      <div class="tq-submit-note"><i class="ti ti-shield-lock"></i>ตรวจคำตอบทันทีหลังส่ง · ผ่านเกณฑ์รับใบประกาศทางอีเมล</div>
+    </div>
+  </div>
+
+  <!-- ผลสอบ -->
+  <div class="tq-screen" id="sc-result">
+    <div class="tq-card tq-res" id="tq-res-card"><div id="tq-res-head"></div><div id="tq-res-mail"></div><div id="tq-res-actions"></div></div>
+    <div class="tq-card"><div class="tq-rv-head"><div class="tq-card-title"><i class="ti ti-list-check"></i>ผลรายข้อ</div><div class="tq-rf-wrap" id="tq-res-filter"></div></div><div id="tq-res-review"></div></div>
+  </div>
+
+  <!-- ใบประกาศ (ลิงก์ในอีเมล / QR) -->
+  <div class="tq-screen" id="sc-cert">
+    <div id="tq-cert-status"></div>
+    <div class="tq-cert-box" id="tq-cert-box"></div>
+    <button class="tq-btn" id="tq-cert-dl"><i class="ti ti-download"></i>ดาวน์โหลด PDF</button>
+  </div>
+
+</div>
+</template>
+
+
+<template id="trn-page-manual">
+<div class="layout">
+
+<!-- ══ SIDEBAR ══ -->
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="sidebar-logo-title">🏥 BMS Training</div>
+    <div class="sidebar-logo-sub">คู่มือการใช้งานระบบ</div>
+  </div>
+
+  <div class="nav-section">ภาพรวม</div>
+  <a href="#overview" class="nav-link"><span class="icon">📋</span>ภาพรวมระบบ</a>
+  <a href="#user-roles" class="nav-link"><span class="icon">👥</span>ประเภทผู้ใช้งาน</a>
+  <a href="#url-param" class="nav-link"><span class="icon">🔗</span>การเข้าใช้งานตามโครงการ</a>
+
+  <div class="nav-section">ผู้ใช้งานทั่วไป</div>
+  <a href="#register" class="nav-link"><span class="icon">📝</span>ลงทะเบียนอบรม</a>
+  <a href="#checkin" class="nav-link"><span class="icon">📲</span>เช็คชื่อเข้าอบรม</a>
+  <a href="#survey" class="nav-link"><span class="icon">📊</span>แบบประเมินความพึงพอใจ</a>
+  <a href="#quiz-user" class="nav-link"><span class="icon">✏️</span>ทำแบบทดสอบ</a>
+
+  <div class="nav-section">ผู้ดูแลระบบ</div>
+  <a href="#admin-login" class="nav-link"><span class="icon">🔐</span>เข้าสู่ระบบ Admin</a>
+  <a href="#admin-sessions" class="nav-link"><span class="icon">📅</span>จัดการรอบอบรม</a>
+  <a href="#admin-categories" class="nav-link"><span class="icon">🗂️</span>จัดการหลักสูตรอบรม</a>
+  <a href="#admin-masters" class="nav-link"><span class="icon">📌</span>ข้อมูลพื้นฐาน</a>
+  <a href="#admin-regs" class="nav-link"><span class="icon">👤</span>ผู้ลงทะเบียน</a>
+  <a href="#admin-keyentry" class="nav-link"><span class="icon">🗄️</span>ตรวจสอบคีย์ยอด</a>
+  <a href="#admin-locations" class="nav-link"><span class="icon">📍</span>จัดการโครงการ</a>
+  <a href="#admin-users" class="nav-link"><span class="icon">🛡️</span>จัดการผู้ใช้งาน Admin</a>
+  <a href="#admin-loginverify" class="nav-link"><span class="icon">✅</span>ตรวจสอบสิทธิ์</a>
+  <a href="#admin-survey" class="nav-link"><span class="icon">📈</span>Dashboard ผลประเมิน</a>
+  <a href="#admin-analytics" class="nav-link"><span class="icon">📊</span>Analytics และแจ้งเตือนไลน์</a>
+  <a href="#admin-quiz" class="nav-link"><span class="icon">🧩</span>ระบบแบบทดสอบ</a>
+  <a href="#admin-print" class="nav-link"><span class="icon">🖨️</span>พิมพ์เอกสาร</a>
+</nav>
+
+<!-- ══ CONTENT ══ -->
+<main class="content">
+
+  <!-- Hero -->
+  <div class="hero">
+    <h1>คู่มือการใช้งาน BMS Training</h1>
+    <p>ระบบบริหารจัดการการอบรม สำหรับสถานพยาบาลและหน่วยงาน</p>
+    <div class="hero-badges">
+      <span class="hero-badge">📋 ลงทะเบียนอบรม</span>
+      <span class="hero-badge">📲 เช็คชื่อ QR Code</span>
+      <span class="hero-badge">✏️ แบบทดสอบออนไลน์</span>
+      <span class="hero-badge">📊 ผลประเมินความพึงพอใจ</span>
+      <span class="hero-badge">🖨️ พิมพ์เอกสาร</span>
+      <span class="hero-badge">📲 ติดตั้งเป็นแอป (PWA)</span>
+    </div>
+  </div>
+
+  <!-- ═══ OVERVIEW ═══ -->
+  <section id="overview">
+    <h2>📋 ภาพรวมระบบ</h2>
+    <p>BMS Training เป็นระบบบริหารจัดการการอบรมสำหรับบุคลากรทางการแพทย์ ครอบคลุมตั้งแต่การลงทะเบียน เช็คชื่อ ทำแบบทดสอบ ประเมินความพึงพอใจ ไปจนถึงการพิมพ์เอกสาร</p>
+
+    <div class="feat-grid">
+      <div class="feat-card">
+        <div class="feat-icon">📝</div>
+        <div class="feat-title">ลงทะเบียนอบรม</div>
+        <div class="feat-desc">ผู้เข้าอบรมลงทะเบียนผ่านเว็บ เลือกหลักสูตรและรอบ กรอกข้อมูลส่วนตัว รับ QR Code ยืนยัน</div>
+      </div>
+      <div class="feat-card green">
+        <div class="feat-icon">📲</div>
+        <div class="feat-title">เช็คชื่อ QR Code</div>
+        <div class="feat-desc">เช็คชื่อด้วยการสแกน QR Code หรือค้นหาชื่อจากรายการ รองรับ Walk-in</div>
+      </div>
+      <div class="feat-card purple">
+        <div class="feat-icon">✏️</div>
+        <div class="feat-title">แบบทดสอบออนไลน์</div>
+        <div class="feat-desc">ทำแบบทดสอบออนไลน์ ดูผลทันที รับใบประกาศนียบัตรอัตโนมัติ</div>
+      </div>
+      <div class="feat-card amber">
+        <div class="feat-icon">📊</div>
+        <div class="feat-title">Dashboard ผลประเมิน</div>
+        <div class="feat-desc">วิเคราะห์ผลความพึงพอใจแบบ Real-time พร้อมกราฟ Radar, Heatmap, Trend</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ USER ROLES ═══ -->
+  <section id="user-roles">
+    <h2>👥 ประเภทผู้ใช้งาน</h2>
+    <table class="tbl">
+      <thead><tr><th>ประเภท</th><th>สิทธิ์</th><th>วิธีเข้าถึง</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>ผู้เข้าอบรม</strong> <span class="badge badge-green">Public</span></td>
+          <td>ลงทะเบียน, ทำแบบทดสอบ, แบบประเมิน</td>
+          <td>เปิดเว็บได้เลย ไม่ต้อง Login</td>
+        </tr>
+        <tr>
+          <td><strong>เจ้าหน้าที่ / Admin</strong> <span class="badge badge-blue">Admin</span></td>
+          <td>จัดการรอบ, ดูรายชื่อ, เช็คชื่อ, พิมพ์เอกสาร</td>
+          <td>กด <strong>Admin</strong> ที่มุมขวาบน → ใส่ Username / Password</td>
+        </tr>
+        <tr>
+          <td><strong>Super Admin</strong> <span class="badge badge-purple">Super</span></td>
+          <td>ทุกอย่าง รวมถึงจัดการโครงการ, ผู้ใช้งาน และ<strong>สลับดูข้อมูลข้ามโครงการได้ทุกโครงการ</strong></td>
+          <td>Login ด้วย account ระดับ Super Admin</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="callout info">
+      <span class="callout-icon">💡</span>
+      <div class="callout-body">
+        <div class="callout-title">สลับโครงการ</div>
+        เมื่อ Login แล้วจะมี dropdown เลือกโครงการที่แถบเมนูด้านบน (แทนที่ป้ายชื่อโครงการ) — Admin เห็นทุกโครงการ · PM/ทีมงานเห็นเฉพาะโครงการที่ตัวเองเป็น PM หรืออยู่ในทีม (ตามทีมของโครงการใน Backoffice — บัญชีต้องผูกกับพนักงาน) — ข้อมูลทุกส่วน (รอบอบรม, ผู้ลงทะเบียน, เช็คชื่อ, รายงาน) จะโหลดใหม่ตามโครงการที่เลือกทันที เมื่อออกจากระบบจะกลับไปที่โครงการตาม URL เดิมโดยอัตโนมัติ
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ URL PARAM ═══ -->
+  <section id="url-param">
+    <h2>🔗 การเข้าใช้งานตามโครงการ</h2>
+    <p><strong>ใน Backoffice:</strong> งานอบรมของแต่ละโครงการอยู่ที่ <strong>ติดตามสถานะโครงการ › แท็บ 🎓 อบรม</strong> (เลือกโครงการที่นั่นที่เดียว) · เมนู <strong>ระบบอบรม</strong> เป็นภาพรวมทุกโครงการ (กดแถวเพื่อไปที่โครงการ) และที่ตั้งค่าของ Admin</p>
+    <p>ระบบรองรับหลายโครงการในลิงก์เดียวกัน โดยใช้ parameter <code>?site=รหัสโครงการ</code> ใน URL — รหัสโครงการ = รหัส รพ.-ลำดับ (ระบบตั้งให้ตอนเปิดอบรม) รพ. เดียวมีได้หลายโครงการ ข้อมูลแยกกันทั้งหมด</p>
+
+    <div class="callout info">
+      <span class="callout-icon">💡</span>
+      <div class="callout-body">
+        <div class="callout-title">ตัวอย่าง URL ตามโครงการ</div>
+        <code>/training/?site=10700-01</code> → โครงการแรกของ รพ. รหัส 10700<br>
+        <code>/training/?site=10700-02</code> → โครงการที่ 2 ของ รพ. เดียวกัน<br>
+        <code>/training/?page=survey&amp;site=10700-01</code> → แบบประเมินของโครงการนั้น
+      </div>
+    </div>
+
+    <p>เมื่อกำหนด <code>?site=</code> ระบบจะกรองแสดงเฉพาะหลักสูตร รอบอบรม และผู้ลงทะเบียนของโครงการนั้นโดยอัตโนมัติ รวมถึงดึงชื่อสถานพยาบาลมากรอกในเอกสารอัตโนมัติ</p>
+  </section>
+
+  <!-- ═══ PWA INSTALL ═══ -->
+  <section id="register">
+    <h2>📝 ลงทะเบียนอบรม</h2>
+    <p>ผู้เข้าอบรมสามารถลงทะเบียนได้เองผ่านหน้าเว็บโดยไม่ต้อง Login</p>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">เลือกหลักสูตร</div>
+          <div class="step-desc">หน้าแรกจะแสดงการ์ดหลักสูตรทั้งหมด สามารถ <strong>ค้นหา</strong> หรือกรองตามสถานะ (มีที่ว่าง / ใกล้เต็ม / เต็มแล้ว) ได้</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">เลือกรอบอบรม</div>
+          <div class="step-desc">กดการ์ดหลักสูตรที่ต้องการ ระบบจะแสดงรอบอบรมที่มีอยู่ พร้อมวันที่ เวลา สถานที่ และจำนวนที่นั่งคงเหลือ</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">กรอกข้อมูลส่วนตัว</div>
+          <div class="step-desc">กรอก คำนำหน้า, ชื่อ-นามสกุล, ตำแหน่ง, แผนก, เบอร์โทร แล้วกด <strong>"ลงทะเบียน"</strong></div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <div class="step-title">รับ QR Code</div>
+          <div class="step-desc">เมื่อลงทะเบียนสำเร็จ ระบบแสดง QR Code ของผู้เข้าอบรม — บันทึกภาพหรือ screenshot ไว้ใช้เช็คชื่อในวันอบรม</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout warning">
+      <span class="callout-icon">⚠️</span>
+      <div class="callout-body">
+        <div class="callout-title">หมายเหตุ</div>
+        หากรอบอบรมเต็มแล้ว ปุ่ม "ลงทะเบียน" จะถูกปิด ไม่สามารถลงทะเบียนได้
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ CHECKIN ═══ -->
+  <section id="checkin">
+    <h2>📲 เช็คชื่อเข้าอบรม</h2>
+    <p>หน้าเช็คชื่อสำหรับเจ้าหน้าที่ Login แล้ว ใช้ได้ 3 วิธี</p>
+
+    <h3>วิธีที่ 1 — สแกน QR Code</h3>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">กด "เปิดกล้องสแกน"</div>
+          <div class="step-desc">ระบบจะขอสิทธิ์ใช้กล้อง กด "อนุญาต" ในป๊อปอัพของเบราว์เซอร์</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">ส่องกล้องที่ QR Code</div>
+          <div class="step-desc">นำ QR Code ของผู้เข้าอบรมเข้าในกรอบสแกน ระบบจะบันทึกเช็คชื่อทันที</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">ดูผลการเช็คชื่อ</div>
+          <div class="step-desc">แสดงชื่อ-นามสกุล หลักสูตร รอบอบรม และสถานะ "เช็คชื่อแล้ว" หรือ "ไม่พบ"</div>
+        </div>
+      </div>
+    </div>
+
+    <h3>วิธีที่ 2 — พิมพ์ชื่อด้วยมือ</h3>
+    <p>กดปุ่ม <strong>"พิมพ์ชื่อ"</strong> → ค้นหาชื่อผู้เข้าอบรม → กดเลือกเพื่อบันทึกเช็คชื่อ</p>
+
+    <h3>วิธีที่ 3 — รายชื่อ (List)</h3>
+    <p>กดแท็บ <strong>"รายชื่อ"</strong> → เลือกรอบอบรม → ติ๊กถูกหน้าชื่อผู้ที่มาอบรม</p>
+
+    <h3>Walk-in</h3>
+    <p>กดปุ่ม <strong>"Walk-in"</strong> (สีม่วง) สำหรับผู้ที่ยังไม่ได้ลงทะเบียนล่วงหน้า — กรอกข้อมูลแล้วกด "บันทึก" ระบบจะเพิ่มรายชื่อและเช็คชื่อพร้อมกัน</p>
+  </section>
+
+  <!-- ═══ SURVEY ═══ -->
+  <section id="survey">
+    <h2>📊 แบบประเมินความพึงพอใจ</h2>
+    <p>ผู้เข้าอบรมกรอกแบบประเมินหลังจบการอบรมผ่านหน้า <code>?page=survey&amp;site=รหัส รพ.</code></p>
+    <ul>
+      <li>ประเมิน 6 ด้าน ได้แก่ หลักสูตร, วิทยากร, สื่อการสอน, สถานที่, การจัดการ และประโยชน์ที่ได้รับ</li>
+      <li>คะแนนแต่ละด้าน 1–5 คะแนน</li>
+      <li>มีช่องข้อเสนอแนะเพิ่มเติม</li>
+      <li>ผู้ Admin ดูสรุปผลได้ที่แท็บ <strong>ผลประเมิน</strong></li>
+    </ul>
+  </section>
+
+  <!-- ═══ QUIZ USER ═══ -->
+  <section id="quiz-user">
+    <h2>✏️ ทำแบบทดสอบหลังอบรม (ผู้เข้าอบรม)</h2>
+    <p>เปิดจากปุ่ม <strong>"ทำแบบทดสอบ"</strong> ในหน้าลงทะเบียน หรือลิงก์ที่ผู้ดูแลการอบรมส่งให้ — ไม่ต้องเข้าสู่ระบบ</p>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">ยืนยันตัวตน</div>
+          <div class="step-desc"><strong>ผู้ลงทะเบียน</strong>: พิมพ์ชื่อแล้วเลือกจากรายชื่อ · <strong>ไม่อยู่ในรายชื่อ</strong>: กรอกชื่อ หน่วยงาน ตำแหน่งเอง — ทั้งสองแบบต้องกรอกอีเมลสำหรับรับใบประกาศ</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">ทำแบบทดสอบ</div>
+          <div class="step-desc">ระบบสุ่มข้อสอบจากคลัง แสดงทุกข้อในหน้าเดียว มีแถบความคืบหน้า และนับถอยหลังถ้ากำหนดเวลา (หมดเวลาส่งอัตโนมัติ) · รีเฟรชหน้าแล้วกลับมาทำชุดเดิมต่อได้</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">ดูผลสอบ</div>
+          <div class="step-desc">แสดงคะแนน ผ่าน/ไม่ผ่าน และถูก/ผิดรายข้อ · ข้อที่ตอบผิดแสดงคำตอบที่ถูกพร้อมคำอธิบายจาก AI · ไม่ผ่านสอบใหม่ได้ตามจำนวนครั้งที่กำหนด</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <div class="step-title">รับใบประกาศทางอีเมล</div>
+          <div class="step-desc">สอบผ่าน → ระบบส่งใบประกาศไปที่อีเมลทันที กดลิงก์ในอีเมลเพื่อดูและดาวน์โหลด PDF</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout success">
+      <span class="callout-icon">🎓</span>
+      <div class="callout-body">
+        <div class="callout-title">ตรวจสอบใบประกาศ</div>
+        QR บนใบประกาศเปิดหน้าตรวจสอบ — แสดง "ใบประกาศถูกต้อง" หรือ "ถูกยกเลิก" ตามสถานะล่าสุด
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- ════════════════════════════════════
+       ██ ADMIN
+  ════════════════════════════════════ -->
+
+  <!-- ═══ ADMIN LOGIN ═══ -->
+  <section id="admin-login">
+    <h2>🔐 เข้าสู่ระบบ Admin</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">กดปุ่ม "Admin" มุมขวาบน</div>
+          <div class="step-desc">หน้า Login จะปรากฏขึ้น</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">กรอก Username และ Password</div>
+          <div class="step-desc">ใช้ account ที่ผู้ดูแลระบบสร้างให้ — ติ๊ก <strong>"จดจำการเข้าสู่ระบบ"</strong> เพื่อให้เบราว์เซอร์นี้จำ Username/Password ไว้ ไม่ต้องกรอกใหม่ครั้งหน้า</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">เข้าสู่หน้า Admin Panel</div>
+          <div class="step-desc">ระบบแสดง Tab ต่างๆ ด้านบน ได้แก่ รอบอบรม, หลักสูตร, ข้อมูลพื้นฐาน, ผู้ลงทะเบียน ฯลฯ</div>
+        </div>
+      </div>
+    </div>
+    <div class="callout warning">
+      <span class="callout-icon">⚠️</span>
+      <div class="callout-body">
+        <div class="callout-title">ออกจากระบบ</div>
+        กดปุ่ม <strong>"ออกจากระบบ"</strong> ทุกครั้งหลังใช้งานเสร็จ โดยเฉพาะบนคอมพิวเตอร์สาธารณะ (หากติ๊ก "จดจำการเข้าสู่ระบบ" ไว้ ควรระวังเป็นพิเศษบนเครื่องที่ใช้ร่วมกับผู้อื่น)
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ ADMIN SESSIONS ═══ -->
+  <section id="admin-sessions">
+    <h2>📅 จัดการรอบอบรม</h2>
+    <p>แท็บ <strong>รอบอบรม</strong> — จัดการกำหนดการอบรมทั้งหมด</p>
+
+    <h3>ดูรายการรอบอบรม</h3>
+    <p>ตารางแสดง หลักสูตร, รอบ, วันที่, เวลา, สถานที่, วิทยากร, จำนวนลงทะเบียน/ทั้งหมด, จำนวนเข้าอบรมจริง และสถานะ สามารถกรองตามหลักสูตรได้ที่ dropdown ด้านบน</p>
+
+    <h3>เพิ่มรอบอบรม</h3>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">กด "+ เพิ่มรอบ"</div>
+          <div class="step-desc">หน้าต่างเพิ่มรอบจะปรากฏ</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">กรอกข้อมูลรอบอบรม</div>
+          <div class="step-desc">เลือกหลักสูตรอบรม, กรอกชื่อรอบ, วันที่, เวลาเริ่ม-สิ้นสุด, สถานที่, วิทยากร, จำนวนที่นั่ง</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">กด "บันทึก"</div>
+          <div class="step-desc">รอบอบรมใหม่จะปรากฏในตารางและหน้าลงทะเบียนทันที</div>
+        </div>
+      </div>
+    </div>
+
+    <h3>แก้ไข / ลบรอบอบรม</h3>
+    <p>กดไอคอน ✏️ เพื่อแก้ไข หรือ 🗑️ เพื่อลบ ในคอลัมน์ <strong>จัดการ</strong></p>
+
+    <div class="callout danger">
+      <span class="callout-icon">🚫</span>
+      <div class="callout-body">
+        <div class="callout-title">ข้อควรระวัง</div>
+        การลบรอบอบรมที่มีผู้ลงทะเบียนแล้ว จะลบข้อมูลการลงทะเบียนทั้งหมดในรอบนั้นด้วย
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ ADMIN CATEGORIES ═══ -->
+  <section id="admin-categories">
+    <h2>🗂️ จัดการหลักสูตรอบรม</h2>
+    <p>แท็บ <strong>หลักสูตร</strong> — จัดการหลักสูตรอบรม</p>
+    <p>ตารางแสดงชื่อหลักสูตร, คำอธิบาย, จำนวนรอบ, จำนวนผู้ลงทะเบียน และว่ามีแบบทดสอบผูกอยู่หรือไม่</p>
+
+    <h3>เพิ่มหลักสูตรอบรม</h3>
+    <p>กด <strong>"+ เพิ่มหลักสูตร"</strong> → กรอกชื่อหลักสูตรและคำอธิบาย → เลือกแบบทดสอบที่ผูกกัน (ถ้ามี) → กด "บันทึก"</p>
+
+    <div class="callout info">
+      <span class="callout-icon">💡</span>
+      <div class="callout-body">
+        <div class="callout-title">ผูกหลักสูตรกับแบบทดสอบ</div>
+        สามารถเลือกแบบทดสอบ (Quiz) ที่ผูกกับหลักสูตรอบรมนี้ได้ เมื่อผู้เข้าอบรมผ่านการเช็คชื่อ ระบบจะส่งลิงก์แบบทดสอบให้อัตโนมัติ
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ ADMIN MASTERS ═══ -->
+  <section id="admin-masters">
+    <h2>📌 ข้อมูลพื้นฐาน</h2>
+    <p>แท็บ <strong>ข้อมูลพื้นฐาน</strong> — จัดการรายการ Dropdown ที่ใช้ในระบบ</p>
+
+    <table class="tbl">
+      <thead><tr><th>รายการ</th><th>ใช้ที่</th></tr></thead>
+      <tbody>
+        <tr><td>🎤 <strong>วิทยากร</strong></td><td>Dropdown ในฟอร์มเพิ่มรอบอบรม</td></tr>
+        <tr><td>📍 <strong>สถานที่</strong></td><td>Dropdown ในฟอร์มเพิ่มรอบอบรม</td></tr>
+        <tr><td>🏢 <strong>แผนก</strong></td><td>Dropdown ในฟอร์มลงทะเบียน และ Walk-in</td></tr>
+        <tr><td>🪪 <strong>คำนำหน้าชื่อ</strong></td><td>Dropdown ในฟอร์มลงทะเบียน</td></tr>
+      </tbody>
+    </table>
+
+    <p>วิธีเพิ่ม: พิมพ์ในช่องด้านล่างของแต่ละรายการ แล้วกด <strong>+</strong> หรือกด Enter</p>
+    <p>วิธีลบ: กดไอคอน 🗑️ ที่หน้าแต่ละรายการ</p>
+  </section>
+
+  <!-- ═══ ADMIN REGS ═══ -->
+  <section id="admin-regs">
+    <h2>👤 ผู้ลงทะเบียน</h2>
+    <p>แท็บ <strong>ผู้ลงทะเบียน</strong> — ดูและจัดการรายชื่อผู้ที่ลงทะเบียนทั้งหมด</p>
+
+    <h3>ค้นหาและกรอง</h3>
+    <ul>
+      <li>ช่องค้นหา: ค้นหาชื่อ, นามสกุล, แผนก</li>
+      <li>Dropdown หลักสูตร: กรองตามหลักสูตรอบรม</li>
+      <li>Dropdown รอบ: กรองตามรอบอบรม</li>
+    </ul>
+
+    <h3>เพิ่มรายการด้วยมือ</h3>
+    <p>กด <strong>"+ เพิ่มรายการ"</strong> → กรอกข้อมูลผู้เข้าอบรม → เลือกหลักสูตรและรอบ → กด "บันทึก"</p>
+
+    <h3>Import จาก Excel</h3>
+    <p>กดไอคอน Import → ดาวน์โหลด Template → กรอกข้อมูล → อัปโหลดไฟล์ Excel ระบบจะ Import รายชื่อทั้งหมด</p>
+
+    <h3>พิมพ์แบบฟอร์มเซ็นชื่อ</h3>
+    <p>กดปุ่ม <strong>"พิมพ์แบบฟอร์ม"</strong> → กรอกข้อมูลหัวข้อเอกสารและผู้ลงนาม (ชื่อสถานพยาบาลจะดึงจากโครงการอัตโนมัติ) → กด "พิมพ์"</p>
+
+    <h3>ดู QR Code</h3>
+    <p>กดไอคอน QR ในคอลัมน์ QR เพื่อดู QR Code ของผู้ลงทะเบียนแต่ละคน</p>
+
+    <div class="callout danger">
+      <span class="callout-icon">⚠️</span>
+      <div class="callout-body">
+        <div class="callout-title">เคียร์ตามโครงการ</div>
+        ปุ่ม <strong>"เคียร์ตามโครงการ"</strong> จะลบข้อมูลการลงทะเบียนทั้งหมดของโครงการที่เลือก — ใช้ด้วยความระมัดระวัง
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ ADMIN KEY ENTRY ═══ -->
+  <section id="admin-keyentry">
+    <h2>🗄️ ตรวจสอบคีย์ยอดตั้งต้น</h2>
+    <p>แท็บ <strong>ตรวจสอบคีย์ยอด</strong> — ติดตามความคืบหน้าการคีย์ยอดสต๊อกตั้งต้นในระบบ BMS-INVENTORY แยกรายแผนกของโครงการที่ Login อยู่</p>
+
+    <h3>สรุปความคืบหน้า</h3>
+    <p>การ์ดสถิติด้านบนแสดง <strong>แผนกทั้งหมด</strong>, <strong>คีย์ยอดแล้ว</strong>, <strong>ยังไม่คีย์</strong> และ <strong>% ความคืบหน้า</strong> พร้อมแถบความคืบหน้า (Progress bar)</p>
+
+    <h3>อัปเดตสถานะแผนก</h3>
+    <p>ในตาราง ปรับ Dropdown สถานะของแต่ละแผนกเป็น <strong>"คีย์ยอดแล้ว"</strong> หรือ <strong>"ยังไม่คีย์"</strong> — ระบบจะบันทึกวันที่/เวลาให้อัตโนมัติ หากแผนกใดมีเหตุผลที่ยังไม่คีย์ (เช่น ปิดหน่วยงานชั่วคราว) สามารถกรอกในช่อง <strong>"สาเหตุที่ยังไม่คีย์"</strong> ได้</p>
+
+    <h3>ค้นหาและสรุปเป็นภาพ</h3>
+    <ul>
+      <li>ใช้ช่องค้นหาด้านบนเพื่อกรองรายชื่อแผนก</li>
+      <li>กด <strong>"รีโหลด"</strong> เพื่อดึงข้อมูลล่าสุด</li>
+      <li>กด <strong>"สรุปเป็นภาพ"</strong> เพื่อบันทึกสรุปความคืบหน้าเป็นรูปภาพ ส่งต่อให้ทีมงานได้สะดวก</li>
+    </ul>
+  </section>
+
+  <!-- ═══ ADMIN LOCATIONS ═══ -->
+  <section id="admin-locations">
+    <h2>📍 จัดการโครงการ</h2>
+    <p>ทำในแท็บ <strong>🎓 อบรม</strong> ของแต่ละโครงการ (เมนูติดตามสถานะโครงการ) · 1 โครงการ = 1 การอบรม</p>
+
+    <h3>เปิดอบรมให้โครงการ</h3>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">เปิดแท็บ "🎓 อบรม" ของโครงการ</div>
+          <div class="step-desc">โครงการที่ยังไม่เปิดอบรมจะแสดงปุ่ม "เปิดอบรม" (Admin หรือ PM/ทีมที่มีสิทธิ์ "เพิ่ม" ของอบรม)</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">ตรวจ "รพ. ของโครงการ"</div>
+          <div class="step-desc">ใช้ รพ. ที่เลือกไว้ตอนเพิ่ม/แก้ไขโครงการ (เมนูโครงการ › 🏥 โรงพยาบาล) — ยังไม่ได้เลือก ระบบจะบอกให้ไปเลือกก่อน</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">กด "เปิดอบรม"</div>
+          <div class="step-desc">ระบบตั้งรหัสโครงการให้ เช่น <code>10700-01</code> · URL สำหรับโครงการนี้คือ <code>?site=รหัสโครงการ</code></div>
+        </div>
+      </div>
+    </div>
+
+    <h3>ตั้งค่าโครงการ</h3>
+    <p>เมนูซ้าย › ตั้งค่า › <strong>⚙️ ตั้งค่าโครงการ</strong> — บังคับกรอกอีเมล, แจ้งเตือนเมื่อมีคนลงทะเบียน (ค่าเริ่มต้น = ใช้ Token กลางที่ตั้งใน Backoffice › Admin Panel › 🔔 ตั้งค่าการแจ้งเตือน · เลือก "ใช้ Token เฉพาะโครงการนี้" เพื่อแยกกลุ่ม หรือ "ไม่แจ้งเตือน" ได้ · กด "ทดสอบ" ก่อนบันทึกได้) และ <strong>ปิดอบรม</strong> (เฉพาะ Admin หรือผู้มีสิทธิ์ "ลบ" — ข้อมูลเดิมไม่ถูกลบ)</p>
+  </section>
+
+  <!-- ═══ ADMIN USERS ═══ -->
+  <section id="admin-users">
+    <h2>🛡️ จัดการผู้ใช้งาน Admin</h2>
+    <p>แท็บ <strong>ผู้ใช้งาน</strong> — เพิ่ม / ลบ บัญชี Admin</p>
+
+    <h3>เพิ่มผู้ใช้ Admin ใหม่</h3>
+    <p>กรอก <strong>ชื่อผู้ใช้ (Username)</strong> และ <strong>รหัสผ่าน</strong> แล้วกด <strong>"+ เพิ่มผู้ใช้"</strong></p>
+
+    <h3>ลบผู้ใช้</h3>
+    <p>กดไอคอน 🗑️ ที่หน้าชื่อผู้ใช้ที่ต้องการลบ</p>
+
+    <div class="callout warning">
+      <span class="callout-icon">🔒</span>
+      <div class="callout-body">
+        <div class="callout-title">ความปลอดภัย</div>
+        ควรตั้งรหัสผ่านที่แข็งแรง (ตัวอักษร + ตัวเลข + อักขระพิเศษ) และเปลี่ยนรหัสผ่านเป็นประจำ
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ ADMIN LOGIN VERIFY ═══ -->
+  <section id="admin-loginverify">
+    <h2>✅ ตรวจสอบสิทธิ์ (Login Verify)</h2>
+    <p>แท็บ <strong>ตรวจสอบสิทธิ์</strong> — กำหนดว่าผู้ลงทะเบียนคนไหนสามารถ Login เข้าระบบแบบทดสอบได้</p>
+
+    <table class="tbl">
+      <thead><tr><th>สถานะ</th><th>ความหมาย</th></tr></thead>
+      <tbody>
+        <tr><td><span class="badge badge-green">มี Login</span></td><td>อนุญาตให้เข้าระบบแบบทดสอบได้</td></tr>
+        <tr><td><span class="badge badge-red">ไม่มี Login</span></td><td>ไม่อนุญาตให้เข้าระบบแบบทดสอบ</td></tr>
+        <tr><td><span class="badge badge-amber">ปิดใช้งาน</span></td><td>บัญชีถูกปิดชั่วคราว</td></tr>
+      </tbody>
+    </table>
+
+    <p>ค้นหาด้วยชื่อหรือหน่วยงาน → ปรับสถานะแต่ละคน → กด <strong>"บันทึกสถานะ"</strong></p>
+  </section>
+
+  <!-- ═══ ADMIN SURVEY ═══ -->
+  <section id="admin-survey">
+    <h2>📈 Dashboard ผลการประเมิน</h2>
+    <p>แท็บ <strong>ผลประเมิน</strong> — วิเคราะห์ผลความพึงพอใจจากผู้เข้าอบรม</p>
+
+    <h3>ตัวกรอง</h3>
+    <ul>
+      <li><strong>โครงการ</strong> — เลือกดูผลของโครงการใดโครงการหนึ่ง</li>
+      <li><strong>รอบอบรม</strong> — กรองตามรอบที่ต้องการ หรือดูทุกรอบ</li>
+      <li><strong>ช่วงเวลา</strong> — 7 / 30 / 90 วันล่าสุด หรือทั้งหมด</li>
+    </ul>
+
+    <h3>กราฟและข้อมูลที่แสดง</h3>
+    <table class="tbl">
+      <thead><tr><th>ส่วน</th><th>รายละเอียด</th></tr></thead>
+      <tbody>
+        <tr><td>KPI Cards</td><td>จำนวนผู้ประเมิน, คะแนนเฉลี่ย, % ผู้ที่ต้องการอบรมเพิ่ม</td></tr>
+        <tr><td>Radar Chart</td><td>ภาพรวม 6 ด้านในรูปแบบแผนภูมิใยแมงมุม</td></tr>
+        <tr><td>Bar Chart</td><td>คะแนนเฉลี่ยแต่ละด้าน (เต็ม 5.00)</td></tr>
+        <tr><td>Distribution Chart</td><td>การกระจายระดับคะแนน (%)</td></tr>
+        <tr><td>Heatmap</td><td>คะแนนรายข้อทุกด้าน (สีแสดงระดับ)</td></tr>
+        <tr><td>Trend Chart</td><td>แนวโน้มคะแนนแต่ละด้านตามรอบอบรม</td></tr>
+        <tr><td>ข้อเสนอแนะ</td><td>รายการ Comment จากผู้ประเมิน</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Export</h3>
+    <ul>
+      <li><strong>Export Excel</strong> — ส่งออกข้อมูลดิบเป็นไฟล์ .xlsx</li>
+      <li><strong>บันทึกเป็นภาพ</strong> — บันทึก Dashboard เป็นรูปภาพ PNG</li>
+    </ul>
+  </section>
+
+  <!-- ═══ ADMIN ANALYTICS ═══ -->
+  <section id="admin-analytics">
+    <h2>📊 Analytics และแจ้งเตือนไลน์</h2>
+    <p>แท็บ <strong>Analytics</strong> — ภาพรวมสถิติการลงทะเบียนและการเข้าร่วมอบรมของโครงการปัจจุบัน</p>
+
+    <ul>
+      <li>กราฟสรุปจำนวนลงทะเบียน / เข้าร่วมจริง แยกตามหลักสูตรและรอบอบรม</li>
+      <li>อัตราการเข้าร่วมแต่ละรอบ</li>
+      <li>สถานะการลงทะเบียนตามหน่วยงาน — แสดงว่าหน่วยงาน/แผนกใดยังไม่มีผู้ลงทะเบียนเลย</li>
+    </ul>
+
+    <div class="callout success">
+      <span class="callout-icon"><i class="ti ti-brand-line"></i></span>
+      <div class="callout-body">
+        <div class="callout-title">Copy ข้อมูลส่งไลน์</div>
+        กดปุ่ม <strong>"Copy ข้อมูลส่งไลน์"</strong> ที่การ์ด "สถานะการลงทะเบียนตามหน่วยงาน" ระบบจะคัดลอกข้อความสรุป (จำนวนหน่วยงานที่ลงทะเบียนแล้ว/ยังไม่ลงทะเบียน พร้อมลิงก์ลงทะเบียน) ไว้ในคลิปบอร์ด นำไปวางส่งในไลน์กลุ่มได้ทันที
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ ADMIN QUIZ ═══ -->
+  <section id="admin-quiz">
+    <h2>🧩 แบบทดสอบหลังอบรม (ผู้ดูแล)</h2>
+    <p>เมนู <strong>แบบทดสอบ</strong> — แบบทดสอบอยู่ใน <strong>คลังกลาง</strong> ใช้ร่วมทุกโครงการ · หลักสูตรอบรมของแต่ละโครงการเลือกชุดที่ใช้ ข้อสอบสุ่มจากคลังของชุดนั้น</p>
+
+    <div class="tab-list">
+      <span class="tab-pill">📋 แบบทดสอบ</span>
+      <span class="tab-pill">📑 ผลสอบ &amp; ใบประกาศ</span>
+      <span class="tab-pill">⚙️ ตั้งค่าใบประกาศ &amp; อีเมล</span>
+    </div>
+
+    <h3>แบบทดสอบ</h3>
+    <ul>
+      <li><strong>ใช้ในโครงการนี้</strong> — เลือกแบบทดสอบจากคลังกลางให้แต่ละหลักสูตรอบรม · เปิด/ปิดสอบ (มีผลเฉพาะโครงการนี้) · คัดลอกลิงก์สอบส่งให้ผู้เข้าอบรม</li>
+      <li><strong>คลังแบบทดสอบกลาง</strong> — สร้างชุด · ตั้งจำนวนข้อที่สุ่ม เกณฑ์ผ่าน เวลา จำนวนครั้งที่สอบได้ · ดูว่าชุดไหนใช้อยู่กี่โครงการ · คัดลอกเป็นชุดใหม่เพื่อปรับเฉพาะบาง รพ.</li>
+      <li>คลังข้อสอบ: เพิ่ม/แก้ไข/ปิดใช้ทีละข้อ · <strong>AI ร่างข้อสอบ</strong> จากเนื้อหาที่วาง (ตรวจและเลือกก่อนเพิ่ม) · นำเข้า/ส่งออก Excel</li>
+      <li>แก้คลังกลางได้เฉพาะ Admin หรือผู้มีสิทธิ์ <strong>แก้ไข</strong> ของเมนูอบรม (แก้แล้วมีผลทุกโครงการที่ใช้ชุดนั้น)</li>
+      <li>ข้อที่มีผู้สอบแล้ว แก้คำถาม/ตัวเลือก/เฉลย = ระบบปิดข้อเดิมแล้วเพิ่มเป็นข้อใหม่ · ลบ = ปิดข้อ — ผลสอบเก่ายังตรงกับข้อที่สอบจริง</li>
+      <li>ชุดที่มีผู้สอบแล้วลบไม่ได้ ให้ปิดใช้งานแทน</li>
+    </ul>
+
+    <h3>ผลสอบ &amp; ใบประกาศ</h3>
+    <ul>
+      <li>ผลรายคนของโครงการนี้ กรองตามแบบทดสอบ/ผล/ส่งอีเมลไม่สำเร็จ · Export Excel (สิทธิ์สอบ/สอบผ่าน นับแยกตามโครงการ)</li>
+      <li>ส่งใบประกาศทางอีเมลอีกครั้ง (แก้อีเมลได้) · ยกเลิก/คืนสถานะใบประกาศ · ลบผลสอบ (คืนสิทธิ์สอบ 1 ครั้ง)</li>
+    </ul>
+
+    <h3>ตั้งค่าใบประกาศ &amp; อีเมล</h3>
+    <ul>
+      <li>ชื่อหน่วยงาน หัวข้อ สี ผู้ลงนาม รหัสนำหน้าเลขที่ — ดูตัวอย่างใบประกาศได้ทันที</li>
+      <li>บัญชีส่งอีเมล EmailJS (Service ID / Template ID / Public Key) พร้อมปุ่มทดสอบส่ง</li>
+    </ul>
+
+    <div class="callout info">
+      <span class="callout-icon">🔒</span>
+      <div class="callout-body">
+        <div class="callout-title">เฉลยปลอดภัย</div>
+        เฉลยไม่ถูกส่งไปที่หน้าผู้สอบ — ระบบตรวจคะแนนและออกเลขที่ใบประกาศในฐานข้อมูล
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ ADMIN PRINT ═══ -->
+  <section id="admin-print">
+    <h2>🖨️ พิมพ์เอกสาร</h2>
+    <p>เมนู <strong>🖨️ พิมพ์เอกสาร</strong> (เมนูซ้ายของแท็บอบรมของโครงการ กลุ่ม "งานอบรม") — สร้างและพิมพ์ใบเซ็นชื่อผู้เข้าอบรม</p>
+
+    <h3>ตั้งค่าเอกสาร</h3>
+
+    <h4>หัวข้อเอกสาร</h4>
+    <ul>
+      <li>เลือกจาก Dropdown รายการที่บันทึกไว้ หรือพิมพ์หัวข้อเองในช่อง Textarea</li>
+      <li>กด <strong>"จัดการหัวข้อ"</strong> เพื่อเพิ่ม/แก้ไข/ลบ รายการ Dropdown</li>
+    </ul>
+
+    <h4>ข้อมูลเอกสาร</h4>
+    <table class="tbl">
+      <thead><tr><th>ฟิลด์</th><th>หมายเหตุ</th></tr></thead>
+      <tbody>
+        <tr><td>สถานพยาบาล</td><td>เลือกโครงการ — ชื่อจะถูกดึงอัตโนมัติ</td></tr>
+        <tr><td>วันที่</td><td>วันที่ในเอกสาร</td></tr>
+        <tr><td>จำนวนแถว</td><td>เลือกจากตัวเลือก 25 / 50 / 75 / 100 แถว (แต่ละแถวคือ 1 ช่องเซ็นชื่อ)</td></tr>
+        <tr><td>แสดงช่องเจ้าหน้าที่</td><td>เพิ่มคอลัมน์ชื่อเจ้าหน้าที่ BMS</td></tr>
+      </tbody>
+    </table>
+
+    <h4>ผู้ลงนาม</h4>
+    <ul>
+      <li><strong>ซ้าย (BMS)</strong> — ชื่อ, ตำแหน่งของผู้แทน BMS</li>
+      <li><strong>ขวา (สถานพยาบาล)</strong> — ชื่อ, ตำแหน่ง, ชื่อโรงพยาบาล (ดึงจากโครงการอัตโนมัติ)</li>
+      <li>กด <strong>"บันทึกเป็นค่าเริ่มต้น"</strong> เพื่อจำค่าผู้ลงนามไว้ใช้ครั้งหน้า</li>
+    </ul>
+
+    <h3>พิมพ์</h3>
+    <p>ด้านขวาแสดง <strong>ตัวอย่างเอกสาร</strong> แบบ Real-time กด <strong>"พิมพ์เอกสาร"</strong> มุมขวาบนเพื่อสั่งพิมพ์ออกเครื่องพิมพ์ รองรับกระดาษ A4</p>
+
+    <div class="callout info">
+      <span class="callout-icon">💡</span>
+      <div class="callout-body">
+        <div class="callout-title">หลายหน้า</div>
+        หากมีแถวมากกว่า 1 หน้ากระดาษ ระบบจะแสดงหมายเลขหน้า <strong>หน้า 1/2</strong>, <strong>หน้า 2/2</strong> โดยอัตโนมัติ หากมีเพียง 1 หน้า จะไม่แสดงหมายเลขหน้า
+      </div>
+    </div>
+
+    <h3>พิมพ์แบบฟอร์มจาก Tab ผู้ลงทะเบียน</h3>
+    <p>ใน Tab <strong>ผู้ลงทะเบียน</strong> → กดปุ่ม <strong>"พิมพ์แบบฟอร์ม"</strong> → กรอกข้อมูลในหน้าต่างที่เปิดขึ้น ชื่อสถานพยาบาลจะถูกดึงจากโครงการปัจจุบันอัตโนมัติ</p>
+    <p>สามารถกด <strong>"จำค่าเริ่มต้นผู้ลงนาม"</strong> เพื่อบันทึกชื่อ/ตำแหน่งผู้ลงนามฝั่ง BMS และฝั่งโรงพยาบาลไว้ใช้ครั้งถัดไป โดยจำแยกเป็นรายโครงการ</p>
+  </section>
+
+  <hr class="divider">
+
+  <!-- ═══ TIPS ═══ -->
+  <section id="tips">
+    <h2>💡 เคล็ดลับการใช้งาน</h2>
+
+    <div class="callout success">
+      <span class="callout-icon">⌨️</span>
+      <div class="callout-body">
+        <div class="callout-title">Keyboard Shortcuts ในฟอร์ม</div>
+        กด <strong>Enter</strong> ในช่อง Input ของ ข้อมูลพื้นฐาน (วิทยากร/สถานที่/แผนก/คำนำหน้า) เพื่อเพิ่มรายการได้ทันที ไม่ต้องคลิกปุ่ม +
+      </div>
+    </div>
+
+    <div class="callout info">
+      <span class="callout-icon">📱</span>
+      <div class="callout-body">
+        <div class="callout-title">การสแกน QR บนมือถือ</div>
+        หน้าเช็คชื่อรองรับมือถือได้เต็มรูปแบบ ใช้งานได้ทั้งกล้องหน้าและกล้องหลัง กดปุ่ม "สลับกล้อง" ได้ระหว่างสแกน
+      </div>
+    </div>
+
+    <div class="callout success">
+      <span class="callout-icon">🔄</span>
+      <div class="callout-body">
+        <div class="callout-title">รีเฟรชข้อมูล</div>
+        ข้อมูลในระบบ sync แบบ Real-time — หากไม่เห็นข้อมูลล่าสุด ให้ reload หน้าเว็บหรือกดปุ่ม "รีเฟรช" ในหน้า Dashboard ผลประเมิน
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ FOOTER ═══ -->
+  <hr class="divider">
+  <div style="text-align:center;color:var(--gray-400);font-size:12px;padding-bottom:40px;">
+    คู่มือการใช้งาน BMS Training &nbsp;·&nbsp; Bangkok Medical Software Co., Ltd.<br>
+    อัปเดตล่าสุด: กรกฎาคม 2569
+  </div>
+
+</main>
+</div>
+</template>
+
+</body>
+</html>

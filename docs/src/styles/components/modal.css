@@ -41,7 +41,7 @@
 
 /* ── Modal Sections ── */
 .m-head {
-  padding: 18px 24px;
+  padding: 14px 20px;
   border-bottom: 1px solid var(--border);
   display: flex; align-items: center; gap: 12px; flex-shrink: 0;
 }
@@ -55,9 +55,9 @@
 }
 .m-x:hover { background: rgba(255,107,107,.1); color: var(--coral); }
 
-.m-body { overflow-y: auto; padding: 24px; flex: 1; }
+.m-body { overflow-y: auto; padding: 18px 20px; flex: 1; }
 .m-foot {
-  padding: 16px 24px;
+  padding: 12px 20px;
   border-top: 1px solid var(--border);
   display: flex; justify-content: flex-end; gap: 10px;
   flex-shrink: 0;

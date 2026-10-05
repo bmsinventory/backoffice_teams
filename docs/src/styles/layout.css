@@ -43,6 +43,40 @@
 .view#view-holidays.on  { display: block; overflow-y: auto; }
 .view#view-advance.on   { display: block; overflow-y: auto; }
 .view#view-leave.on     { display: flex; flex-direction: column; overflow: hidden; }
+/* อบรม / แบบทดสอบ — iframe เต็มพื้นที่ (หน้าใน iframe เลื่อนเอง) */
+.view#view-training.on  { display: flex; flex-direction: column; overflow: hidden; }
+/* ติดตามสถานะโครงการ › แท็บ "🎓 อบรม" — เมนูซ้าย (จัดกลุ่ม) + iframe เต็มพื้นที่ที่เหลือ (src/modules/training.js renderSide) */
+.imt-trn { flex: 1; display: flex; min-height: 0; } /* สูงไม่เกินพื้นที่ที่เห็น — popup ใน iframe จัดกลางจอได้ ไม่ตกขอบล่าง */
+.trn-side { width: 210px; flex-shrink: 0; background: var(--surface); border-right: 1px solid var(--border); overflow-y: auto; padding: 10px 10px 16px; }
+.imt-trn.no-side .trn-side { display: none; }
+.trn-side-toggle { display: none; }
+.trn-side-g { font-size: 10.5px; font-weight: 700; color: var(--txt3); text-transform: uppercase; letter-spacing: .4px; padding: 14px 10px 6px; }
+.trn-side-g:first-child { padding-top: 4px; }
+.trn-side-item { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 9px; font-size: 13px; font-weight: 600; color: var(--txt2); cursor: pointer; text-decoration: none; transition: background .15s, color .15s; }
+.trn-side-item:hover { background: var(--surface2); color: var(--txt); }
+.trn-side-item.on { background: linear-gradient(135deg, var(--violet), var(--coral)); color: #fff; }
+.trn-side-ic { width: 20px; text-align: center; flex-shrink: 0; }
+.trn-side-hint { margin-left: auto; font-size: 10.5px; font-weight: 600; color: var(--txt3); }
+.trn-side-item.on .trn-side-hint { color: #fff; }
+/* popup แชร์ลิงก์ผู้เข้าอบรม (#m-trn-share) */
+.trn-share-desc { font-size: 12.5px; color: var(--txt2); margin: 0 0 12px; line-height: 1.6; }
+.trn-share-qr { display: flex; justify-content: center; margin: 0 auto 4px; padding: 10px; background: #fff; border-radius: 12px; width: max-content; }
+.trn-share-qrdl { background: none; border: 0; font: inherit; font-size: 12px; font-weight: 600; color: var(--violet); cursor: pointer; padding: 4px 8px; margin-bottom: 12px; }
+.trn-share-qrdl:hover { text-decoration: underline; }
+.trn-share-urlbox { display: flex; align-items: stretch; border: 1px solid var(--border); border-radius: 10px; background: var(--surface2); overflow: hidden; }
+.trn-share-url { flex: 1; min-width: 0; border: 0; background: none; color: var(--txt); font: inherit; font-size: 12px; padding: 9px 12px; outline: none; }
+.trn-share-urlbox button, .trn-share-urlbox a { flex-shrink: 0; width: 40px; display: flex; align-items: center; justify-content: center; border: 0; border-left: 1px solid var(--border); background: var(--surface); color: var(--txt); font-size: 14px; cursor: pointer; text-decoration: none; }
+.trn-share-urlbox button:hover, .trn-share-urlbox a:hover { background: var(--surface3); }@media (max-width: 768px) {
+  /* มือถือ: เมนูพับเป็นปุ่ม ☰ (แสดงหน้าปัจจุบัน) เหนือ iframe — กดแล้วรายการเลื่อนลงมาทับ */
+  .imt-trn { flex-direction: column; min-height: calc(100dvh - 190px); position: relative; }
+  .trn-side { width: auto; border-right: 0; border-bottom: 1px solid var(--border); padding: 8px 12px; overflow: visible; position: relative; z-index: 5; }
+  .trn-side-toggle { display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface2); color: var(--txt); font: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer; }
+  .trn-side-caret { margin-left: auto; font-size: 10px; color: var(--txt3); }
+  .trn-side-list { display: none; position: absolute; left: 12px; right: 12px; top: calc(100% - 2px); max-height: 65vh; overflow-y: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 12px 32px rgba(0,0,0,.18); padding: 6px; }
+  .trn-side.open .trn-side-list { display: block; }
+  .trn-side-item { padding: 11px 12px; font-size: 14px; }
+}
+.trn-frame { flex: 1; width: 100%; min-height: 0; border: 0; background: var(--bg); }
 
 /* ── Mobile Sidebar Overlay (backdrop) ── */
 #mob-sb-overlay {

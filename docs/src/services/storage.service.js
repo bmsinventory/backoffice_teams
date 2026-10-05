@@ -34,19 +34,10 @@
     // ไม่ติ๊ก "จดจำ" → sessionStorage (อยู่รอด Refresh · ปิดแท็บ/เบราว์เซอร์แล้วต้องล็อกอินใหม่)
     // ติ๊ก "จดจำ" → localStorage (อยู่ต่อแม้ปิดเบราว์เซอร์) · เก็บแค่ { uid, sig } — sig คำนวณจากรหัสผ่าน
     // เปลี่ยนรหัสผ่าน/ปิดบัญชีแล้ว session เดิมใช้ไม่ได้ทันที (ตรวจตอนกู้คืนใน auth.service) ──
-    getSession: function () {
-      try { var raw = sessionStorage.getItem('_bms_sess') || localStorage.getItem('_bms_sess'); return raw ? JSON.parse(raw) : null; } catch { return null; }
-    },
-    setSession: function (sess, persist) {
-      try {
-        var raw = JSON.stringify(sess);
-        sessionStorage.setItem('_bms_sess', raw);
-        if (persist) localStorage.setItem('_bms_sess', raw); else localStorage.removeItem('_bms_sess');
-      } catch {}
-    },
-    clearSession: function () {
-      try { sessionStorage.removeItem('_bms_sess'); localStorage.removeItem('_bms_sess'); } catch {}
-    },
+    // ตัวจริงอยู่ที่ src/utils/session.util.js (ใช้ร่วมกับระบบอบรม/ระบบสอบ) — ที่นี่คงชื่อเดิมให้โค้ดเดิมเรียกได้
+    getSession:   function () { return window.BmsSession.get(); },
+    setSession:   function (sess, persist) { window.BmsSession.set(sess, persist); },
+    clearSession: function () { window.BmsSession.clear(); },
 
     // ── Dark Mode ──
     getTheme: function () {

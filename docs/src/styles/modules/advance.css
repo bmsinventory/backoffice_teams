@@ -20,6 +20,27 @@
 .af-cnt         { padding: 1px 6px; border-radius: 10px; font-size: 10px; background: rgba(255,255,255,.25); }
 .af-tab:not(.on) .af-cnt { background: var(--surface3); color: var(--txt3); }
 
+/* ── แท็บย่อยเมนู Advance (รายการ Advance | เอกสารประกอบ) — อยู่บนสุดของ view-advance และ view-expense-form ── */
+/* หัว view-advance: แถบแท็บ + toolbar ติดด้านบนเป็นก้อนเดียว */
+.adv-head { position: sticky; top: 0; z-index: 11; background: var(--surface); }
+.adv-head .af-tabs, #view-expense-form > .af-tabs { align-items: center; }
+.adv-status-tabs { display: flex; gap: 8px; }
+/* แท็บสถานะใส่สีแบบ inline (advance.js) ทับ :hover ของ .af-tab — ใช้ filter ให้ยังมี feedback ตอนชี้ */
+.adv-status-tabs .af-tab:not(.on):hover { filter: brightness(.93) saturate(1.2); }
+.adv-seg-sep { width: 1px; align-self: stretch; margin: 4px 4px; background: var(--border); flex-shrink: 0; }
+/* สวิตช์แบบ segmented ขนาดเท่าแท็บสถานะ — กล่องเทาครอบ, ตัวที่เลือกเป็นการ์ดขาวตัวอักษรม่วง */
+.adv-seg {
+  display: inline-flex; gap: 2px; padding: 3px; border-radius: 10px;
+  background: var(--surface2); border: 1px solid var(--border); flex-shrink: 0;
+}
+.adv-subtab {
+  padding: 5px 12px; border-radius: 8px; font-size: 12px; font-weight: 700;
+  color: var(--txt3); cursor: pointer; white-space: nowrap; user-select: none;
+  transition: color .15s, background .15s;
+}
+.adv-subtab:hover { color: var(--violet); }
+.adv-subtab.on { background: var(--surface); color: var(--violet); box-shadow: var(--sh-sm); cursor: default; }
+
 /* ── Advance Stepper ── */
 .adv-stepper { display: flex; align-items: flex-start; gap: 0; margin-bottom: 20px; }
 .adv-s { flex: 1; display: flex; flex-direction: column; align-items: center; position: relative; cursor: default; }

@@ -1,47 +1,9 @@
 /* ================================================================
    THEME.CSS — Dark Mode & Theme System
-   System dark, manual [data-theme="dark"], manual [data-theme="light"]
+   ปรับหน้าตาชิ้นส่วน Backoffice ตอนโหมดมืด (ตัวแปรสีอยู่ใน variables.css)
 ================================================================ */
 
-/* ── System Dark Mode ── */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg:      #0d1117;
-    --surface: #161b27;
-    --surface2:#1c2333;
-    --surface3:#21283a;
-    --border:  #2a3244;
-    --border2: #374256;
-    --txt:     #e6eaf4;
-    --txt2:    #8d96b0;
-    --txt3:    #586278;
-    --sh-sm: 0 1px 3px rgba(0,0,0,.4), 0 1px 2px rgba(0,0,0,.3);
-    --sh-md: 0 4px 16px rgba(0,0,0,.4), 0 2px 6px rgba(0,0,0,.3);
-    --sh-lg: 0 12px 40px rgba(0,0,0,.5), 0 4px 12px rgba(0,0,0,.4);
-  }
-}
-
-/* ── Manual Dark Mode ── */
-[data-theme="dark"] {
-  --bg:      #0d1117;
-  --surface: #161b27;
-  --surface2:#1c2333;
-  --surface3:#21283a;
-  --border:  #2a3244;
-  --border2: #374256;
-  --txt:     #e6eaf4;
-  --txt2:    #8d96b0;
-  --txt3:    #586278;
-  --sh-sm: 0 1px 3px rgba(0,0,0,.4), 0 1px 2px rgba(0,0,0,.3);
-  --sh-md: 0 4px 16px rgba(0,0,0,.4), 0 2px 6px rgba(0,0,0,.3);
-  --sh-lg: 0 12px 40px rgba(0,0,0,.5), 0 4px 12px rgba(0,0,0,.4);
-}
-
-/* ── Manual Light Mode ── */
-[data-theme="light"] {
-  --bg:#f4f5f7; --surface:#fff; --surface2:#f8f9fb; --surface3:#eef0f4;
-  --border:#e4e7ed; --border2:#d0d5e0; --txt:#1a1d2e; --txt2:#5a6075; --txt3:#9ba3b8;
-}
+/* ตัวแปรสีโหมดมืด/สว่าง อยู่ที่ variables.css (ใช้ร่วมกับระบบอบรม /training/) — ไฟล์นี้เหลือเฉพาะการปรับหน้าตาชิ้นส่วนของ Backoffice */
 
 /* ── Dark: Image Dim ── */
 [data-theme="dark"] img:not([data-no-dim]) { filter: brightness(.88); }

@@ -30,6 +30,7 @@
   window.NOTIFY_ADVANCE_TOKEN  = '';
   window.NOTIFY_PROJECT_TOKEN  = '';
   window.NOTIFY_HELPDESK_TOKEN = '';
+  window.NOTIFY_TRAINING_TOKEN = '';
   window.NOTIFY_PROXY_URL      = '';
   window.YEAR_TARGETS          = [];
   window.TARGET_TYPE_GROUPS    = [];

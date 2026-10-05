@@ -4,16 +4,6 @@
    .dtable-*, .btn, .kb-* pattern) ให้มากที่สุด เพิ่มเฉพาะ layout ใหม่จริง ๆ
 ================================================================ */
 
-/* ── Dashboard Stat Cards: เดิมใช้ .stat-c/.stat-row generic (แนวตั้ง ไอคอน/label/value เรียงซ้อน) กิน
-   พื้นที่สูงเกินไปเมื่อมีการ์ดพร้อมกันถึง 8 ใบ — เพิ่ม class .imt-stat-* ทับเฉพาะจุดนี้ (ไม่แก้ .stat-c/.stat-row
-   เดิมตรง ๆ กันกระทบหน้าอื่นที่ใช้ชุด stat การ์ดเดียวกัน) ปรับเป็นแนวนอน (ไอคอนซ้าย ข้อความขวา) + ลด padding/ฟอนต์ ── */
-.imt-stat-row { gap: 10px; padding: 14px 20px; }
-.imt-stat-c   { display: flex; align-items: center; gap: 10px; padding: 12px 14px; }
-.imt-stat-c .stat-icon  { width: 32px; height: 32px; font-size: 14px; margin-bottom: 0; flex-shrink: 0; }
-.imt-stat-text          { min-width: 0; }
-.imt-stat-text .stat-k  { font-size: 10px; margin-bottom: 2px; white-space: nowrap; }
-.imt-stat-text .stat-v  { font-size: 17px; margin-bottom: 0; }
-
 /* ── Internal Tab Bar (แทนที่จะเพิ่ม sidebar หลายปุ่ม) ── */
 .imt-tabs {
   display: flex; flex-direction: column;
@@ -21,64 +11,47 @@
   position: sticky; top: 0; z-index: 11; flex-shrink: 0;
 }
 /* แท็บเลื่อนซ้าย-ขวาได้อิสระ ส่วนปุ่ม "+ เพิ่มโครงการ" ปักไว้ที่มุมขวาสุดเสมอ ไม่เลื่อนหายไปกับแท็บ */
-.imt-tabs-row { display: flex; align-items: center; gap: 8px; padding: 0 20px; }
-.imt-tabs-scroll { display: flex; gap: 4px; overflow-x: auto; flex: 1; min-width: 0; }
+.imt-tabs-row { display: flex; align-items: center; gap: 8px; padding: 10px 20px; }
+.imt-tabs-scroll { display: flex; gap: 8px; overflow-x: auto; flex: 1; min-width: 0; }
 /* บาง browser (เช่น Chrome Android) ใส่ focus outline สีเหลือง/ส้ม default ให้ container ที่เลื่อนได้
    โดยอัตโนมัติเวลาถูกโฟกัส — ปิด default แล้วแทนที่ด้วยสไตล์ของแอปเองเฉพาะตอน keyboard focus จริง ๆ */
 .imt-tabs-scroll:focus { outline: none; }
 .imt-tabs-scroll:focus-visible { outline: 2px solid var(--violet); outline-offset: -2px; border-radius: 6px; }
 .imt-tabs-addbtn { flex-shrink: 0; white-space: nowrap; }
-.imt-tab {
-  display: flex; align-items: center; gap: 6px; padding: 12px 14px;
-  font-size: 12.5px; font-weight: 600; color: var(--txt2);
-  cursor: pointer; border-bottom: 2.5px solid transparent; white-space: nowrap;
-  transition: all .15s;
-}
-.imt-tab:hover { color: var(--txt); background: var(--surface2); }
-.imt-tab.on    { color: var(--violet); border-bottom-color: var(--violet); }
 
-/* ── Project Switcher: สลับโครงการได้จากทุกแท็บ (ยกเว้น Dashboard) ── */
-.imt-switcher {
-  display: flex; align-items: center; gap: 10px; padding: 8px 20px;
-  background: var(--surface2); border-top: 1px solid var(--border);
-  flex-wrap: wrap;
-}
-.imt-switcher-back {
-  font-size: 11.5px; font-weight: 600; color: var(--txt2); cursor: pointer;
-  padding: 4px 10px; border-radius: 8px; transition: all .15s; white-space: nowrap;
-}
-.imt-switcher-back:hover { background: var(--surface3); color: var(--violet); }
-.imt-switcher-lbl { font-size: 11.5px; color: var(--txt3); white-space: nowrap; }
+/* ── หัวโครงการ: ชื่อโครงการ (สลับได้) + ความคืบหน้า + สถานะ อยู่แถวบนสุดต่อจากแท็บหลัก (.imt-tabs-row.has-proj)
+   ส่วนแถวแท็บของโครงการ (.imt-phead) อยู่ถัดลงมา (ทุกแท็บยกเว้น ทุกโครงการ/Template) ── */
+.imt-tabs-row.has-proj { flex-wrap: wrap; row-gap: 8px; }
+.imt-tabs-row.has-proj .imt-tabs-scroll { flex: 0 0 auto; }
+.imt-tabs-row .imt-phead-top { flex: 1 1 560px; min-width: 0; margin-left: 6px; flex-wrap: nowrap; }
+.imt-tabs-row .imt-phead-pick { flex: 1 1 420px; max-width: 420px; min-width: 180px; }
+.imt-tabs-row .imt-phead-meta { flex: 1 0 auto; flex-wrap: nowrap; }
+.imt-tabs-row .imt-phead-meta > * { flex-shrink: 0; } /* ไม่บีบข้อความจนล้นทับปุ่ม — ให้ช่องชื่อโครงการหดแทน */
+.imt-tabs-row .imt-switcher-pbar { width: 80px; }
+.imt-phead { background: var(--surface2); border-top: 1px solid var(--border); padding: 8px 20px; }
+.imt-phead-top { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.imt-phead-pick { flex: 0 1 420px; min-width: 0; }
+.imt-phead-pick input { font-weight: 700; font-size: 14px; }
+.imt-phead-meta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; flex: 1; min-width: 0; }
+.imt-phead-pct { font-size: 12px; font-weight: 800; }
+.imt-phead-badge { font-size: 11.5px; font-weight: 700; padding: 3px 10px; border-radius: 20px; border: 1px solid; white-space: nowrap; }
+.imt-ph-chk { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--txt2); white-space: nowrap; cursor: pointer; margin-left: auto; }
+/* แท็บของโครงการ — สวิตช์ segmented (.adv-seg/.adv-subtab) แบบเดียวกับเมนู งบประมาณ & ค่าใช้จ่าย */
+.imt-ptabs-row { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; }
+.imt-ptabs { display: flex; overflow-x: auto; min-width: 0; max-width: 100%; scrollbar-width: none; }
+/* ท้ายแถวแท็บ: ความคืบหน้า/ปุ่ม action ของแท็บที่เปิดอยู่ (window.imtSetPtabExtra) */
+.imt-ptab-extra { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+.imt-ptab-extra:empty { display: none; }
+.imt-ptabs::-webkit-scrollbar { display: none; }
+.imt-ptabs .adv-seg { background: var(--surface3); }
 .imt-switcher-progress { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .imt-switcher-pbar { width: 110px; }
 
-/* ── View Toggle (Phase / List / Kanban) ── */
-.imt-viewtab {
-  padding: 6px 12px; font-size: 11.5px; font-weight: 600; color: var(--txt2);
-  border-radius: 8px; cursor: pointer; white-space: nowrap; transition: all .15s;
-}
-.imt-viewtab:hover { color: var(--txt); }
-.imt-viewtab.on    { background: var(--surface); color: var(--violet); box-shadow: var(--sh-sm); }
+/* ── แท็บ "งาน": เมนูซ้าย (.trn-side* ใน layout.css — มุมมอง Phase/List/Kanban + จัดการโครงการ) + เนื้อหาด้านขวา ── */
+.imt-ws-main { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.trn-side-item.imt-ws-danger { color: var(--coral); }
+.trn-side-item.imt-ws-danger:hover { background: rgba(255,107,107,.1); color: var(--coral); }
 
-/* ── Workspace Header (แท็บ "งาน" เมื่อเลือกโครงการแล้ว) — แถวเดียว กะทัดรัด ── */
-.imt-ws-header {
-  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-  padding: 10px 24px; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0;
-}
-.imt-ws-title-block { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 160px; }
-.imt-ws-title {
-  font-size: 14.5px; font-weight: 700; letter-spacing: -.2px; color: var(--txt);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.imt-ws-progress-ring {
-  width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; position: relative;
-  background: conic-gradient(var(--violet) calc(var(--pct, 0) * 1%), var(--surface3) 0);
-  display: flex; align-items: center; justify-content: center;
-  transition: background .4s ease;
-}
-.imt-ws-progress-ring::before { content: ''; position: absolute; inset: 3px; border-radius: 50%; background: var(--surface); }
-.imt-ws-progress-ring span { position: relative; z-index: 1; font-size: 8.5px; font-weight: 800; color: var(--txt); }
-.imt-viewswitch { display: flex; gap: 4px; background: var(--surface2); border-radius: 10px; padding: 3px; flex-shrink: 0; }
 .imt-ws-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
 .imt-ws-danger  { color: var(--coral); }
 .imt-ws-danger:hover { background: rgba(255,107,107,.1); }
@@ -118,13 +91,19 @@
 .imt-health-chip b { font-size: 13px; }
 .imt-health-chip:hover { border-color: var(--border2); color: var(--txt); }
 .imt-health-chip.on   { background: var(--surface); color: var(--violet); border-color: var(--violet); box-shadow: var(--sh-sm); }
-/* ปุ่ม 🤖 AI สรุปภาพรวม ในแถบเดียวกับชิป — ไม่ยืดตามความสูงแถว (flex stretch) ให้สูงเท่าชิป */
-.imt-health-strip .imt-ai-btn { align-self: center; padding: 6px 12px; font-size: 12px; line-height: 1.2; white-space: nowrap; flex: 0 0 auto; }
 
 /* ── Project Health Card (ต่อยอดจาก .imt-pcard เดิม) ── */
 .imt-hcard-top   { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .imt-hcard-badge { font-size: 10.5px; font-weight: 800; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
 .imt-hcard-flag  { font-size: 10.5px; font-weight: 700; white-space: nowrap; }
+.imt-hcard-top-r { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.imt-hcard-score {
+  min-width: 30px; height: 22px; padding: 0 6px; border: 1.5px solid; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center; font-size: 11.5px; font-weight: 800;
+}
+.imt-hcard-foot   { display: flex; justify-content: space-between; gap: 8px; font-size: 10.5px; color: var(--txt3); padding-top: 8px; border-top: 1px dashed var(--border); }
+.imt-hcard-foot > span:last-child { white-space: nowrap; flex-shrink: 0; }
+.imt-hcard-reason { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--coral); font-weight: 600; }
 .imt-hcard-pbar-wrap { position: relative; }
 .imt-hcard-expected {
   position: absolute; top: -3px; width: 2px; height: 14px; background: var(--txt);
@@ -158,6 +137,142 @@
 .imt-dash-row-sub   { font-size: 11px; color: var(--txt3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .imt-dash-row-badge { font-size: 11.5px; font-weight: 700; white-space: nowrap; flex-shrink: 0; }
 .imt-dash-more      { font-size: 11px; color: var(--txt3); text-align: center; padding-top: 8px; }
+.imt-dash-note      { font-size: 11px; color: var(--amber); margin-bottom: 6px; }
+.imt-dash-empty     { font-size: 12px; color: var(--txt3); padding: 14px 0; text-align: center; }
+
+/* ── KPI แถวบน (Dashboard) — แถบบาง ๆ ตัวเลขเด่น ไม่มีไอคอนกล่องใหญ่ ── */
+.imt-kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; padding: 16px 24px 0; }
+.imt-kpi  {
+  background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--c);
+  border-radius: 10px; padding: 9px 14px; min-width: 0;
+}
+.imt-kpi-k { font-size: 10.5px; color: var(--txt3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.imt-kpi-v { font-size: 19px; font-weight: 800; color: var(--c); line-height: 1.25; }
+.imt-kpi-v small { font-size: 10.5px; font-weight: 600; color: var(--txt3); }
+@media (max-width: 1100px) { .imt-kpis { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 640px)  { .imt-kpis { grid-template-columns: repeat(2, 1fr); padding: 12px 14px 0; gap: 8px; } }
+
+/* ── ตารางโครงการ (แถวละโครงการ แทนการ์ดใหญ่) ── */
+.imt-dash-wrap { padding: 12px 24px 16px; }
+.imt-ptable { padding: 4px 0; overflow: hidden; }
+.imt-pt-row {
+  display: grid; align-items: center; gap: 14px; padding: 9px 16px;
+  grid-template-columns: 44px minmax(180px, 1.5fr) minmax(130px, 1fr) minmax(150px, 1.2fr) minmax(160px, 1.3fr) 90px 90px;
+  border-bottom: 1px solid var(--border); cursor: pointer; transition: background .15s;
+}
+.imt-pt-row:last-child { border-bottom: none; }
+.imt-pt-row:not(.imt-pt-head):hover { background: var(--surface2); }
+.imt-pt-row > div { min-width: 0; }
+.imt-pt-head { cursor: default; padding-top: 8px; padding-bottom: 8px; font-size: 10.5px; font-weight: 700; color: var(--txt3); text-transform: uppercase; }
+.imt-pt-score {
+  display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 26px;
+  border: 1.5px solid; border-radius: 8px; font-size: 13px; font-weight: 800;
+}
+.imt-pt-name  { font-size: 12.5px; font-weight: 700; color: var(--txt); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.imt-pt-small { font-size: 10.5px; color: var(--txt3); margin-top: 3px; }
+.imt-pt-ell   { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.imt-pt-reason { font-size: 11.5px; font-weight: 600; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.35; }
+.imt-pt-c-e, .imt-pt-c-u { font-size: 11.5px; color: var(--txt2); white-space: nowrap; }
+.imt-pt-mlabel { display: none; }
+.imt-pt-segs { display: flex; gap: 2px; height: 8px; }
+.imt-pt-segs i { flex: 1 1 0; position: relative; background: var(--surface3); border-radius: 2px; overflow: hidden; }
+.imt-pt-segs u { position: absolute; inset: 0 auto 0 0; background: var(--c); }
+.imt-pt-segs i[style*="coral"] { background: color-mix(in srgb, var(--coral) 30%, transparent); }
+
+/* ── กล่องแท็บ (ต้องจัดการ / ภาระงาน / วิเคราะห์เพิ่มเติม) — รายการเลื่อนในกล่อง ไม่ยืดหน้า ── */
+.imt-dpanel { padding: 14px 18px 10px; min-width: 0; }
+.imt-dpanel-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.imt-dpanel-head .sec-label { margin: 0; }
+.imt-dpanel-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+.imt-dtab {
+  border: none; background: transparent; color: var(--txt2); font: inherit; font-size: 11.5px; font-weight: 600;
+  padding: 5px 10px; border-radius: 999px; cursor: pointer; white-space: nowrap;
+}
+.imt-dtab b { font-weight: 800; }
+.imt-dtab:hover { background: var(--surface2); }
+.imt-dtab.on { background: var(--violet); color: #fff; }
+.imt-dpanel-body { display: none; max-height: 320px; overflow-y: auto; padding: 0 8px; margin: 0 -8px; }
+.imt-dpanel-body.on { display: block; }
+/* ── วิเคราะห์เพิ่มเติม: การ์ดกราฟเล็ก (HTML/CSS ล้วน) ── */
+.imt-cgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 1200px) { .imt-cgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 760px)  { .imt-cgrid { grid-template-columns: 1fr; } }
+.imt-ccard   { padding: 14px 16px; min-width: 0; }
+.imt-ccard-h { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 12.5px; font-weight: 700; color: var(--txt); margin-bottom: 12px; }
+.imt-ccard-h span { font-size: 10.5px; font-weight: 500; color: var(--txt3); white-space: nowrap; }
+.imt-csec + .imt-csec { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--border); }
+.imt-csec-h { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; font-weight: 700; color: var(--txt3); margin-bottom: 8px; }
+.imt-csec-h span { font-weight: 500; }
+.imt-chero   { font-size: 11.5px; color: var(--txt3); margin-bottom: 8px; }
+.imt-chero b { font-size: 26px; font-weight: 800; color: var(--txt); margin-right: 4px; }
+.imt-stack   { display: flex; gap: 2px; height: 14px; border-radius: 4px; overflow: hidden; margin-bottom: 12px; }
+.imt-stack > div { min-width: 3px; }
+.imt-clegend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 10.5px; color: var(--txt2); margin-bottom: 8px; }
+.imt-clegend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.imt-clegend-col { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; margin: 0; }
+.imt-clegend-col span { display: flex; align-items: center; }
+.imt-clegend-col b { margin-left: auto; color: var(--txt); }
+.imt-hb      { display: flex; flex-direction: column; gap: 7px; }
+.imt-hb-row  { display: grid; grid-template-columns: minmax(70px, 34%) minmax(0, 1fr) auto; align-items: center; gap: 8px; font-size: 11px; }
+.imt-hb-lbl  { color: var(--txt2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.imt-hb-track { display: flex; gap: 2px; height: 10px; }
+.imt-hb-track > div { height: 100%; }
+.imt-hb-track > div:last-child { border-radius: 0 4px 4px 0; }
+.imt-hb-val  { font-weight: 700; color: var(--txt); white-space: nowrap; min-width: 44px; text-align: right; }
+.imt-hb-val small { font-weight: 500; color: var(--txt3); }
+.imt-hb-stacked { gap: 9px; }
+.imt-hb-stacked .imt-hb-row { grid-template-columns: minmax(0, 1fr) auto; gap: 3px 8px; }
+.imt-hb-stacked .imt-hb-lbl { grid-column: 1; grid-row: 1; color: var(--txt); }
+.imt-hb-stacked .imt-hb-val { grid-column: 2; grid-row: 1; }
+.imt-hb-stacked .imt-hb-track { grid-column: 1 / -1; grid-row: 2; height: 8px; }
+/* กราฟแท่งรายวัน — ชื่อ class .imt-dcol* (ห้ามใช้ .imt-col ซึ่งเป็นคอลัมน์ Kanban อยู่แล้ว) */
+.imt-dcols { display: flex; align-items: stretch; gap: 3px; height: 120px; padding: 14px 0 18px; border-bottom: 1px solid var(--border); }
+.imt-dcol  { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; position: relative; cursor: default; }
+.imt-dcol-bar { position: relative; background: var(--violet); border-radius: 3px 3px 0 0; opacity: .8; }
+.imt-dcol.today .imt-dcol-bar { opacity: 1; }
+.imt-dcol.idle .imt-dcol-bar  { background: var(--border2); opacity: 1; }
+.imt-dcol:hover .imt-dcol-bar { opacity: 1; filter: brightness(1.1); }
+.imt-dcol-bar em { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 2px; font-style: normal; font-size: 10px; font-weight: 700; color: var(--txt); white-space: nowrap; }
+.imt-dcol span { position: absolute; top: 100%; left: 0; right: 0; margin-top: 3px; text-align: center; font-size: 9.5px; color: var(--txt3); }
+.imt-dcol.today span { color: var(--violet); font-weight: 800; }
+.imt-ccard-sub { font-size: 10.5px; font-weight: 700; color: var(--txt3); margin: 12px 0 6px; }
+/* Waffle: จุดละ 1 โครงการ */
+.imt-waffle-list { display: flex; flex-direction: column; gap: 12px; }
+.imt-waffle-h { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px; margin-bottom: 5px; }
+.imt-waffle-h > b { color: var(--txt); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.imt-waffle-h > span { color: var(--txt3); white-space: nowrap; }
+.imt-waffle { display: flex; flex-wrap: wrap; gap: 4px; }
+.imt-waffle i { width: 14px; height: 14px; border-radius: 4px; background: var(--surface3); border: 1px solid var(--border); cursor: pointer; }
+.imt-waffle i.bad { background: var(--coral); border-color: var(--coral); }
+.imt-waffle i:hover { transform: scale(1.2); }
+.imt-clegend i { border: 1px solid var(--border); }
+.imt-cfoot   { font-size: 10.5px; color: var(--txt3); margin-top: 22px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.imt-cfoot b { color: var(--txt); }
+.imt-dash-more-sec { margin: 0 24px 24px; }
+.imt-dash-more-sec > summary {
+  cursor: pointer; font-size: 12.5px; font-weight: 700; color: var(--txt2); padding: 10px 14px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px; list-style-position: inside;
+}
+.imt-dash-more-sec[open] > summary { margin-bottom: 10px; }
+
+@media (max-width: 1100px) {
+  .imt-pt-row { grid-template-columns: 44px minmax(160px, 1.4fr) minmax(120px, 1fr) minmax(140px, 1.2fr) 86px; }
+  .imt-pt-c-r, .imt-pt-c-u, .imt-pt-head > div:nth-child(5), .imt-pt-head > div:nth-child(7) { display: none; }
+}
+@media (max-width: 760px) {
+  .imt-dash-wrap { padding: 10px 12px 12px; }
+  .imt-pt-head { display: none; }
+  .imt-pt-row {
+    grid-template-columns: 40px minmax(0, 1fr) auto; gap: 6px 10px; padding: 10px 12px;
+    grid-template-areas: "s n e" "s p p" "s ph ph" "s r u";
+  }
+  .imt-pt-c-s { grid-area: s; align-self: start; } .imt-pt-c-n { grid-area: n; } .imt-pt-c-e { grid-area: e; align-self: start; }
+  .imt-pt-c-p { grid-area: p; } .imt-pt-c-ph { grid-area: ph; }
+  .imt-pt-c-r { grid-area: r; display: block; } .imt-pt-c-u { grid-area: u; display: block; align-self: end; font-size: 10.5px; }
+  .imt-pt-mlabel { display: inline; color: var(--txt3); }
+  .imt-pt-c-e .imt-pt-mlabel { display: none; }
+  .imt-dash-more-sec { margin: 0 12px 16px; }
+}
 
 /* ── Phase Accordion (พับ/ขยายได้) ── */
 .imt-phase        { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r2); margin-bottom: 12px; overflow: hidden; box-shadow: var(--sh-sm); transition: box-shadow .2s; }
@@ -244,17 +359,18 @@
 
 /* ── Attachment rows (ใช้ .m-row ร่วมกับ modal เดิม แต่บังคับขนาดฟอนต์ในโมดูลนี้ให้เท่ากับส่วนอื่น) ── */
 #m-imt-task-body .m-row { font-size: 12.5px; }
-.imt-activity-item { display: flex; gap: 8px; font-size: 11.5px; color: var(--txt2); padding: 6px 0; }
-.imt-activity-dot  { width: 6px; height: 6px; border-radius: 50%; background: var(--violet); margin-top: 5px; flex-shrink: 0; }
 
 /* ── Dashboard ── */
 .imt-dash-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; padding: 0 24px 24px; }
 @media (max-width: 900px) { .imt-dash-grid { grid-template-columns: 1fr; } }
 
 /* ── Calendar (Month Grid) ── */
-.imt-cal-grid   { display: grid; grid-template-columns: repeat(7,1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; margin: 0 24px 24px; }
+/* ทั้งเดือนอยู่ในจอ: 7 คอลัมน์กว้างเท่ากันเสมอ (minmax(0,1fr) — ชื่องานยาวไม่ดันคอลัมน์จนล้นขวา)
+   · กริดยืดเต็มพื้นที่ที่เหลือ (flex:1 0 auto — ไม่ถูกบีบจนงานในช่องถูกตัด) แถวสัปดาห์แบ่งความสูงเท่ากัน
+   และสูงขึ้นตามจำนวนงานในวันนั้น (เกินจอก็เลื่อนลงดูได้ งานไม่หาย) */
+.imt-cal-grid   { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-template-rows: auto; grid-auto-rows: minmax(90px, auto); align-content: stretch; flex: 1 0 auto; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; margin: 16px 24px 24px; }
 .imt-cal-dow    { background: var(--surface2); text-align: center; font-size: 11px; font-weight: 700; color: var(--txt3); padding: 8px 0; }
-.imt-cal-cell   { background: var(--surface); min-height: 90px; padding: 6px; font-size: 11px; }
+.imt-cal-cell   { background: var(--surface); min-width: 0; padding: 6px; font-size: 11px; }
 .imt-cal-cell.other-month { background: var(--surface2); color: var(--txt3); }
 .imt-cal-daynum { font-weight: 700; margin-bottom: 4px; }
 .imt-cal-item   { font-size: 10px; padding: 2px 5px; border-radius: 5px; margin-bottom: 2px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -284,6 +400,12 @@
 .imt-print-checklist .ppc-chart-bar-wrap { flex: 1; height: 10px; background: #e9e9ee; border-radius: 5px; overflow: hidden; }
 .imt-print-checklist .ppc-chart-bar { height: 100%; border-radius: 5px; }
 .imt-print-checklist .ppc-chart-val { flex-shrink: 0; width: 68px; text-align: right; font-weight: 700; }
+
+/* สรุป 3 ช่อง: ปัญหา / แบบฟอร์ม / งานเกินกำหนด */
+.imt-print-checklist .ppc-summary { display: flex; gap: 10px; margin: 0 0 14px; font-size: 11px; line-height: 1.6; }
+.imt-print-checklist .ppc-sum-box { flex: 1; min-width: 0; padding: 8px 10px; background: #f6f6f9; border: 1px solid #e6e6ee; border-radius: 8px; }
+.imt-print-checklist .ppc-sum-box > div:not(.ppc-sum-h) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.imt-print-checklist .ppc-sum-h { font-weight: 800; font-size: 12px; margin-bottom: 4px; }
 
 /* รายการ Checklist จัดกลุ่มตาม Phase — แบ่ง 2 คอลัมน์ด้วย flex ธรรมดา (ไม่ใช้ CSS column-count เพราะ
    multi-column ผสมกับ overflow:hidden ตอนพิมพ์ ทำให้เบราว์เซอร์บางตัวยังดันเนื้อหาล้นไปหน้า 2 อยู่ดี) */
@@ -388,7 +510,7 @@
 /* ── Report Tab: Hero (ring ความคืบหน้ารวม + สถิติเด่น) ── */
 .imt-report-hero {
   display: flex; align-items: center; gap: 28px; flex-wrap: wrap;
-  margin: 0 24px 20px; padding: 22px 26px; border-radius: var(--r3);
+  margin: 16px 24px 20px; padding: 22px 26px; border-radius: var(--r3);
   background: linear-gradient(135deg, var(--violet)12, var(--indigo)08 60%, transparent);
   border: 1px solid var(--border); box-shadow: var(--sh-sm);
 }
@@ -398,21 +520,30 @@
 }
 .imt-report-hero-ring::before { content: ''; position: absolute; inset: 8px; border-radius: 50%; background: var(--surface); }
 .imt-report-hero-ring span { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 21px; font-weight: 800; color: var(--txt); }
+.imt-report-hero-body  { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
 .imt-report-hero-stats { display: flex; gap: 28px; flex-wrap: wrap; }
-.imt-report-hero-stat  { display: flex; flex-direction: column; gap: 2px; }
+.imt-report-hero-stat  { display: flex; flex-direction: column; gap: 2px; cursor: pointer; }
+.imt-report-hero-stat:hover span { color: var(--violet); }
 .imt-report-hero-stat b    { font-size: 24px; font-weight: 800; line-height: 1.1; }
+.imt-report-hero-stat small { font-size: 14px; font-weight: 700; color: var(--txt3); }
+.imt-report-hero-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .imt-report-hero-stat span { font-size: 11.5px; color: var(--txt3); font-weight: 600; }
 
-/* ── Report Tab: Charts (สรุปสถานะงาน / ความคืบหน้าตาม Phase) ── */
-.imt-report-chartsgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 0 24px 20px; }
-@media (max-width: 900px) { .imt-report-chartsgrid { grid-template-columns: 1fr; } }
-.imt-report-chartcard {
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r2);
-  padding: 16px 18px; box-shadow: var(--sh-sm); min-width: 0;
-}
-.imt-report-chartcard-title { font-size: 12.5px; font-weight: 700; color: var(--txt); margin-bottom: 12px; }
-.imt-report-chartcard-canvaswrap { position: relative; width: 100%; }
-.imt-report-chartcard-empty { text-align: center; color: var(--txt3); font-size: 12px; padding: 30px 10px; }
+/* ── Report Tab: สรุปรวมของโครงการ (งานเกินกำหนด / 14 วันข้างหน้า / ปัญหา / แบบฟอร์มรายคลัง) — 2 คอลัมน์ ── */
+.imt-report-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 0 24px 20px; }
+@media (max-width: 900px) { .imt-report-grid { grid-template-columns: 1fr; } }
+.imt-report-card { padding: 16px 18px; min-width: 0; }
+.imt-report-card .sec-label { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.imt-report-link  { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--violet); cursor: pointer; text-transform: none; letter-spacing: 0; }
+.imt-report-link:hover { text-decoration: underline; }
+.imt-report-empty { color: var(--txt3); font-size: 12px; padding: 6px 0; }
+.imt-report-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.imt-report-sub   { font-size: 11px; font-weight: 700; color: var(--txt3); margin: 14px 0 8px; }
+.imt-report-bar   { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
+.imt-report-bar-lbl   { width: 150px; flex-shrink: 0; font-size: 11.5px; color: var(--txt2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.imt-report-bar-track { flex: 1; height: 10px; background: var(--surface3); border-radius: 6px; overflow: hidden; }
+.imt-report-bar-track span { display: block; height: 100%; border-radius: 6px; }
+.imt-report-bar-val   { min-width: 36px; text-align: right; font-size: 12px; font-weight: 700; flex-shrink: 0; }
 
 /* ── Report Tab: Phase Cards (แทนตาราง Phase เดิม) ── */
 .imt-report-phasegrid {
@@ -485,32 +616,28 @@
 /* ── มือถือ: ≤ 768px (ครอบคลุม iPad mini พอร์เทรตที่ 768px พอดีด้วย) ── */
 @media (max-width: 768px) {
   /* Tab bar */
-  .imt-tabs-row { padding: 0 10px; gap: 6px; }
-  .imt-tabs-scroll { gap: 2px; }
-  .imt-tab { padding: 10px 10px; font-size: 11.5px; }
+  .imt-tabs-row { padding: 8px 10px; gap: 6px; }
+  .imt-tabs-scroll { gap: 6px; }
   .imt-tabs-addbtn { font-size: 11px; padding: 6px 10px; }
 
-  /* Project switcher — บาร์ progress ย้ายลงแถวของตัวเอง ป้องกันล้นขอบจอ (ความกว้าง 110px คงที่เดิม
-     บวก select บวกปุ่มย้อนกลับ รวมกันเกินความกว้างจอเล็กเสมอ) */
-  .imt-switcher { padding: 8px 12px; gap: 8px; }
-  .imt-switcher-lbl { display: none; }
-  /* เดิม progress เต็มแถวแยกต่างหาก (order:3) + checkbox "แสดงเฉพาะ..." ลอยอีกแถว รวมเป็น 3 แถว —
-     ย่อ progress ให้กว้างเท่าที่จำเป็นแล้วแชร์แถวเดียวกับ checkbox (ทั้งคู่ order:2) เหลือ 2 แถวรวม
-     (แถวบน: ย้อนกลับ+เลือกโครงการ / แถวล่าง: progress+checkbox) ── */
-  .imt-switcher-progress { flex: 0 1 auto; order: 2; }
+  /* หัวโครงการ — 2 แถว: ชื่อโครงการเต็มกว้าง / ความคืบหน้า+สถานะ+ตัวกรอง · แท็บของโครงการเลื่อนซ้าย-ขวาได้ */
+  .imt-phead { padding: 8px 12px; }
+  .imt-phead-top { gap: 8px; }
+  .imt-phead-pick { flex: 1 1 100%; }
+  .imt-phead-meta { gap: 8px; }
   .imt-switcher-pbar { width: 60px; }
-  /* .imt-hidedone-chk ใช้ซ้ำอีก 3 จุดในไฟล์นี้ (dashboard/phase accordion/project picker) — scope ด้วย
-     .imt-switcher ครอบไว้ กันไปกระทบจุดอื่นที่ไม่เกี่ยวกับแถบสลับโครงการนี้ ── */
-  .imt-switcher .imt-hidedone-chk { order: 2; margin-left: 0 !important; font-size: 10.5px !important; gap: 4px !important; }
+  .imt-ph-chk { font-size: 10.5px; gap: 4px; }
+  .imt-ptabs-row { gap: 8px; }
+  /* แถวบน: แท็บหลัก + ปุ่มเพิ่มโครงการ · ตัวเลือกโครงการขึ้นบรรทัดใหม่เต็มกว้าง */
+  .imt-tabs-row.has-proj .imt-tabs-scroll { flex: 1 1 auto; }
+  .imt-tabs-row .imt-phead-top { order: 3; flex: 1 1 100%; margin-left: 0; flex-wrap: wrap; }
+  .imt-tabs-row .imt-phead-pick { max-width: none; }
+  .imt-tabs-row .imt-phead-meta { flex: 1 1 100%; flex-wrap: wrap; margin-left: 0; }
+  .imt-tabs-row .imt-ph-chk { margin-left: auto; }
+  .imt-tabs-addbtn .btn-label { display: none; }
 
-  /* Workspace header — ยุบเป็น 2 แถว: ชื่อโครงการเต็มแถวบน / ปุ่มมุมมอง+action แถวล่าง */
-  .imt-ws-header { padding: 10px 12px; gap: 8px; }
-  .imt-ws-title-block { flex: 1 1 100%; }
-  .imt-ws-title { font-size: 13.5px; }
-  .imt-viewswitch { order: 2; flex: 1 1 auto; }
-  .imt-viewtab { flex: 1; text-align: center; padding: 6px 8px; font-size: 10.5px; }
   /* ปุ่ม action บนมือถือ: ซ่อนข้อความ เหลือแค่ไอคอน ให้ทุกปุ่มอยู่แถวเดียวกัน ไม่กินพื้นที่แนวตั้ง 2 บรรทัด */
-  .imt-ws-actions { order: 3; width: 100%; justify-content: flex-end; }
+  .imt-ws-actions { flex-wrap: wrap; justify-content: flex-end; }
   .imt-ws-actions .btn { padding: 7px 10px; }
   .imt-ws-actions .btn-label { display: none; }
 
@@ -533,10 +660,6 @@
     padding-bottom: 2px; border-bottom: none; margin-bottom: 0;
   }
   .imt-issues-tbl.m-card-table td:first-child::before { display: inline; }
-  /* หัวข้อ "🩹 ปัญหาการใช้งาน — [ชื่อโครงการ]" ซ้ำกับชื่อโครงการที่เลือกไว้ในแถบ "กำลังดู" ด้านบนอยู่แล้ว
-     ซ่อนบนมือถือกันเสียพื้นที่จอเปล่า ๆ ก่อนถึงเนื้อหาจริง (แท็บอื่นที่ใช้ .imt-ws-title ฐานเดียวกันไม่ได้ผล
-     เพราะ scope เฉพาะ .imt-issue-ws-title เท่านั้น) ── */
-  .imt-issue-ws-title { display: none; }
 
   /* Empty state hero */
   .imt-empty-hero { padding: 32px 14px 20px; }
@@ -546,12 +669,12 @@
   .imt-pgrid, .imt-tgrid, .imt-report-phasegrid { grid-template-columns: 1fr; padding: 14px; gap: 10px; }
 
   /* Report hero — ring มาก่อน สถิติต่อแถวด้านล่าง แทนเรียงข้างกันซึ่งจะแคบเกินไป */
-  .imt-report-hero { margin: 0 12px 14px; padding: 16px 18px; gap: 16px; }
+  .imt-report-hero { margin: 12px 12px 14px; padding: 16px 18px; gap: 16px; }
   .imt-report-hero-ring { width: 76px; height: 76px; }
   .imt-report-hero-ring span { font-size: 17px; }
   .imt-report-hero-stats { gap: 16px 22px; }
   .imt-report-hero-stat b { font-size: 19px; }
-  .imt-report-chartsgrid { padding: 0 12px 14px; }
+  .imt-report-grid { grid-template-columns: 1fr; padding: 0 12px 14px; }
 
   /* Inline task list ในการ์ดโครงการ (หน้าเลือกโครงการ) */
   .imt-picker-tasklist { max-height: 220px; }
@@ -580,8 +703,8 @@
   .imt-col { min-width: 82vw; width: 82vw; scroll-snap-align: center; }
 
   /* Calendar — ย่อขนาดช่องให้พอดีจอแคบ */
-  .imt-cal-grid { margin: 0 10px 16px; }
-  .imt-cal-cell { min-height: 56px; padding: 4px; font-size: 9.5px; }
+  .imt-cal-grid { margin: 10px 10px 16px; grid-auto-rows: minmax(56px, auto); }
+  .imt-cal-cell { padding: 4px; font-size: 9.5px; }
   .imt-cal-dow  { font-size: 9.5px; padding: 6px 0; }
   .imt-cal-item { font-size: 9px; padding: 1px 4px; }
 
@@ -593,7 +716,7 @@
    บนมือถือ/iPad (≤1024px) ตามคำขอ — งานเหล่านี้ทำผ่านเดสก์ท็อปแทน scope เฉพาะ class นี้ ไม่กระทบปุ่มอื่น
    (เช่น + Task ต่อ Phase หรือ 🗑️ ลบ Phase ซึ่งอยู่คนละ class) ── */
 @media (max-width: 1024px) {
-  .imt-ws-actions { display: none !important; }
+  .imt-ws-actions, .imt-ws-actions-grp { display: none !important; }
 }
 
 /* ── แท็บ "ปัญหา": รายการแบบการ์ด (renderImtIssues) — ❓ ปัญหา แล้ว 💡 วิธีการแก้ไข เรียงบน-ล่างทุกขนาดจอ ── */
@@ -631,7 +754,7 @@
   .imt-iss-chip .lbl { display: none; }
 }
 
-/* ── AI แนะนำปัญหา: ข้อเสนอที่ให้เลือก ใช้ (แทนที่ทั้งหมด) / ไม่ใช้ — imtAiChoicesHtml ใน js/impl-tracker.js ── */
+/* ── AI แนะนำปัญหา: ข้อเสนอที่ให้เลือก ใช้ (แทนที่ทั้งหมด) / ไม่ใช้ — imtAiChoicesHtml ใน src/modules/impl-tracker.js ── */
 .imt-ai-choice { margin-top: 6px; border: 1px solid var(--violet); border-radius: 8px; background: rgba(124,92,252,.06); padding: 8px 10px; font-size: 12px; }
 .imt-ai-choice-l { font-weight: 700; color: var(--violet); margin-bottom: 4px; }
 .imt-ai-choice-t { white-space: pre-wrap; color: var(--txt); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; line-height: 1.55; }

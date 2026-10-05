@@ -13,7 +13,7 @@
  *   8. src/services/realtime.service.js
  *   9. src/services/auth.service.js
  *  10. src/router.js
- *  11. js/*.js (feature modules)
+ *  11. src/modules/*.js (feature modules)
  *  12. src/app.js  ← this file
  */
 (function () {
@@ -59,26 +59,32 @@
     var btnImport = document.getElementById('btn-import-top');
     if (btnImport) btnImport.style.display = isAdm ? '' : 'none';
 
-    // Admin sub-tab visibility (Users + Roles tabs are admin-only)
-    var atUsers = document.getElementById('at-users');
-    var atRoles = document.getElementById('at-roles');
-    if (atUsers) atUsers.style.display = isAdm ? '' : 'none';
-    if (atRoles) atRoles.style.display = isAdm ? '' : 'none';
-
     // Nav button visibility per permission
     var navModules = [
       'overview','kanban','projects','advance','lodging',
       'workload','availability','calendar','leave','timesheet',
       'cost','budget','targets','hospital','contract','worklog','holiday',
-      'impl_tracker','all_issues','helpdesk',
+      'impl_tracker','all_issues','helpdesk','training',
     ];
     navModules.forEach(function (m) {
       var btn = document.querySelector('.nav-btn[onclick*="\'' + m + '\'"]');
       if (!btn) return;
       var canSee = window.canView ? window.canView(m) : true;
+      // ปุ่ม Advance รวมแท็บเอกสารประกอบไว้ด้วย — มีสิทธิ์อย่างใดอย่างหนึ่งก็แสดง
+      if (m === 'advance' && window.canView && window.canView('expense_form')) canSee = true;
+      // ปุ่ม งบประมาณ & ค่าใช้จ่าย รวมแท็บรายการค่าใช้จ่าย (cost) ไว้ด้วย
+      if (m === 'budget' && window.canView && window.canView('cost')) canSee = true;
+      // ปุ่ม ภาระงานทีม รวมแท็บทีมว่าง (availability) ไว้ด้วย
+      if (m === 'workload' && window.canView && window.canView('availability')) canSee = true;
+      // ปุ่ม จัดการวันหยุด (หมวดระบบ) — เฉพาะผู้เพิ่ม/แก้วันหยุดได้ · ทีมดูรายการวันหยุดจากปุ่มในปฏิทินทีม
+      if (m === 'holiday') canSee = isAdm || !!(window.canAdd && window.canAdd('holiday')) || !!(window.canEdit && window.canEdit('holiday'));
       btn.style.display = canSee ? '' : 'none';
       if (!canSee) btn.classList.remove('on');
     });
+    // หัวข้อหมวด "ระบบ" — แสดงเมื่อมีเมนูในหมวดให้เห็นอย่างน้อยหนึ่งปุ่ม
+    var sysSec = document.getElementById('sb-sec-system');
+    var holBtn = document.querySelector('.nav-btn[onclick*="\'holiday\'"]');
+    if (sysSec) sysSec.style.display = (isAdm || canAdm || (holBtn && holBtn.style.display !== 'none')) ? '' : 'none';
 
 
     // Bottom nav (mobile) — hide items user can't access
@@ -168,7 +174,7 @@
       if (!b) return;
       var mod = b.getAttribute('data-mod');
       _closeNotiMenu();
-      if (mod === 'pwreset') { window.openAdminModal(); window.admTab('users'); return; }
+      if (mod === 'pwreset') { window.admCur = 'users'; mod = 'admin'; } // คำขอรีเซ็ตรหัสผ่าน → Admin Panel › ผู้ใช้งานระบบ
       window.goView(mod, document.querySelector('.nav-btn[onclick*="\'' + mod + '\'"]'));
     });
   };
@@ -304,6 +310,9 @@
 
   // ── DOM Ready: restore remembered login + bind login form ──
   document.addEventListener('DOMContentLoaded', function () {
+    // ฟอนต์กราฟทุกหน้าให้ตรงกับฟอนต์ของแอป (Chart.js โหลดแบบ defer → พร้อมก่อน DOMContentLoaded)
+    if (window.Chart) window.Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+
     var remUser = window.StorageService && window.StorageService.getRememberedUser();
     var remPass = window.StorageService && window.StorageService.getRememberedPassword();
     var uEl  = document.getElementById('lu');

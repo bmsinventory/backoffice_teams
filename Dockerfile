@@ -14,6 +14,9 @@ RUN sed -i 's/\r$//' /docker-entrypoint.sh && chmod +x /docker-entrypoint.sh
 
 ENV SUPABASE_URL=""
 ENV SUPABASE_ANON_KEY=""
+# คำขอข้อมูลผ่าน nginx นี้ (บีบอัด gzip) → API_UPSTREAM · ว่าง = ใช้ SUPABASE_URL · API_PROXY=0 = ปิด (ดู docker-entrypoint.sh)
+ENV API_UPSTREAM=""
+ENV API_PROXY="1"
 ENV FACEHUB_URL="https://facehub.bmscloud.in.th"
 ENV FACEHUB_API_KEY=""
 ENV FACEHUB_HCODE="99999"

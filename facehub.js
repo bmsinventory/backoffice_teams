@@ -177,13 +177,16 @@ async function register(r) {
     if (!u) return fail(r, 401, 'รหัสผ่านไม่ถูกต้อง');
     if (isDemo(c) && u.role === 'admin') return fail(r, 403, ADMIN_BLOCKED);
     var userId = u.id;
-    await removeSubjects(c, await mySubjects(c, userId));
+    // ลงทะเบียนใหม่ให้สำเร็จก่อน แล้วค่อยลบของเดิม — รูปใหม่ไม่ผ่าน ใบหน้าเดิมยังใช้ได้อยู่
+    var old = await mySubjects(c, userId);
     var reg = await facehub(c, 'POST', '/register', {
       hcode: c.hcode, images: imgs, save_image: false,
       metadata: { app: APP, user_id: userId, username: String(b.username) },
     });
     if (reg.status === 422 || reg.status === 400) return fail(r, 422, 'ตรวจไม่พบใบหน้าในรูป ลองถ่ายใหม่ให้เห็นหน้าชัด ๆ');
     if (reg.status !== 200) return upstreamError(r, 'register ' + reg.status);
+    var newId = reg.data && reg.data.subject_id;
+    await removeSubjects(c, old.filter(function (s) { return s.subject_id !== newId; }));
     send(r, 200, { ok: true, faces: ((reg.data && reg.data.face_ids) || []).length });
   } catch (e) { upstreamError(r, e); }
 }

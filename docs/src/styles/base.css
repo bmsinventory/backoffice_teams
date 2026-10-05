@@ -38,6 +38,9 @@ body {
 /* ── Remove tap highlight ── */
 * { -webkit-tap-highlight-color: transparent; }
 
+/* ── ปุ่ม/ช่องกรอก/dropdown ใช้ฟอนต์เดียวกับหน้า (เบราว์เซอร์ไม่สืบทอดให้เอง → ไม่งั้นได้ฟอนต์ระบบ) ── */
+button, input, select, textarea { font-family: inherit; }
+
 /* ── Focus ring (accessible) ── */
 button:focus-visible, input:focus-visible, select:focus-visible {
   outline: 2px solid var(--violet);

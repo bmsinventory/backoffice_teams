@@ -1,7 +1,7 @@
 /**
  * helpdesk.config.js — Helpdesk (ศูนย์ช่วยเหลือ): Constants & Global Stores
  * โมดูล 'helpdesk' — เก็บเฉพาะปัญหาลูกค้า (โรงพยาบาล)
- * ต้องโหลดก่อน helpdesk.service.js และ js/helpdesk.js
+ * ต้องโหลดก่อน helpdesk.service.js และ src/modules/helpdesk.js
  *
  * ชื่อ global store ตัวพิมพ์ใหญ่ = ชื่อ table lowercase อัตโนมัติ (ดู _sbName ใน db.service.js)
  *   HELPDESK_TICKETS  → helpdesk_tickets

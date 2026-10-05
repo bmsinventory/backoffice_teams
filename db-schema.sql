@@ -119,9 +119,11 @@ CREATE TABLE IF NOT EXISTS projects (
   contract_id        TEXT DEFAULT '',
   no_revisit         BOOLEAN DEFAULT false,
   visits             JSONB DEFAULT '[]',
+  hospital_id        TEXT DEFAULT '',          -- โรงพยาบาลของโครงการ (hospitals.id) — ติดตามสถานะโครงการ/ระบบอบรมอ่านจากที่นี่
   created_at         TIMESTAMPTZ DEFAULT NOW()
 );
 -- ALTER TABLE projects ADD COLUMN IF NOT EXISTS no_revisit BOOLEAN DEFAULT false;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS hospital_id TEXT DEFAULT '';
 
 -- ── ADVANCES ────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS advances (
@@ -356,6 +358,7 @@ CREATE TABLE IF NOT EXISTS settings (
   notify_advance_token       TEXT DEFAULT '',
   notify_project_token       TEXT DEFAULT '',
   notify_helpdesk_token      TEXT DEFAULT '',
+  notify_training_token      TEXT DEFAULT '',
   year_targets               JSONB DEFAULT '[]',
   tgt_grouped                BOOLEAN DEFAULT false,
   allowance_weekday_normal   NUMERIC DEFAULT 350,
@@ -1109,6 +1112,10 @@ ALTER TABLE helpdesk_tickets ADD COLUMN IF NOT EXISTS call_joined_at TIMESTAMPTZ
 -- หมายเหตุ: RLS ของตารางนี้เปิดกว้าง (FOR ALL TO anon) เหมือน 3 token เดิม — anon key รู้ค่านี้ได้
 -- ถ้า query ตรง (ความเสี่ยงเดิมของโปรเจกต์ ไม่ใช่สิ่งใหม่ที่ token นี้เพิ่มขึ้นมา) ──
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS notify_helpdesk_token TEXT DEFAULT '';
+
+-- ── Migration: token กลาง แจ้งเตือนเมื่อมีคนลงทะเบียนอบรม (ใช้กับทุกโครงการ) — ตั้งค่าที่ Admin Panel → 🔔 ตั้งค่าการแจ้งเตือน
+-- โครงการที่ต้องการแยกกลุ่ม/ปิดแจ้งเตือน ตั้งทับได้ที่ ⚙️ ตั้งค่าโครงการ (trn_settings.site_notify_tokens) ──
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS notify_training_token TEXT DEFAULT '';
 
 -- ── Storage bucket สำหรับไฟล์แนบ HelpDesk (รูปหน้าจอ / ไฟล์ error) ──
 -- ต้องมี schema `storage` ของ Storage service อยู่แล้ว (self-hosted Supabase stack)

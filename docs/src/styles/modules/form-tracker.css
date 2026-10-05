@@ -4,14 +4,9 @@
  * ftk-* สำหรับส่วนตาราง Group/Item ของตัวเอง ใช้ component ทั่วไปร่วมกับทั้งระบบตามปกติ:
  * .btn / .f-input / .tag / .pbar / .dtable-inner / .t-sel / .toolbar
  */
-
-/* ── Header: แถบความคืบหน้ารวมของแบบฟอร์มในโครงการ ── */
-.ftk-header {
-  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-  padding: 14px 24px; border-bottom: 1px solid var(--border); background: var(--surface2);
-}
-.ftk-header-title { font-size: 14.5px; font-weight: 700; }
-.ftk-header-pbar  { display: flex; align-items: center; gap: 8px; width: 130px; flex-shrink: 0; }
+/* ── ความคืบหน้ารวม + ปุ่ม — อยู่ท้ายแถวแท็บของโครงการ (#imt-ptab-extra) ── */
+.ftk-header { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ftk-header-pbar  { display: flex; align-items: center; gap: 8px; width: 130px; flex-shrink: 0; margin-right: 6px; }
 .ftk-header-pbar .pbar { flex: 1; }
 .ftk-header-pbar span  { font-size: 11.5px; font-weight: 700; flex-shrink: 0; }
 
@@ -187,8 +182,6 @@
    มุมขวาบนของการ์ดแทนการกินพื้นที่เต็มแถวแยกต่างหาก
    ================================================================ */
 @media (max-width: 768px) {
-  .ftk-header { padding: 10px 14px; gap: 8px; }
-  .ftk-header-title { font-size: 13px; }
   .ftk-btn-desktop { display: none !important; }
   .ftk-filterbar { padding: 8px 12px; }
   .ftk-scroll { padding: 12px 14px; }

@@ -1,0 +1,51 @@
+/* ================================================================
+   SELECT-UI — แผงตัวเลือกแทน popup ของระบบสำหรับ <select> (src/utils/select-ui.util.js)
+   จอกว้าง = แผงลอยใต้/เหนือช่อง · มือถือ ≤ 640px = แผ่นเลื่อนขึ้นจากล่าง (.sheet)
+   สีจาก ../variables.css (โหมดมืดตามอัตโนมัติ)
+================================================================ */
+select.sui-open{border-color:var(--violet)!important;box-shadow:0 0 0 4px rgba(124,92,252,.16)!important}
+.sui{position:fixed;inset:0;z-index:10000;pointer-events:none;font-family:'Plus Jakarta Sans','Noto Sans Thai',sans-serif}
+.sui-panel{pointer-events:auto;position:fixed;display:flex;flex-direction:column;overflow:hidden;background:var(--surface);color:var(--txt);
+  border:1px solid var(--border);border-radius:16px;box-shadow:0 24px 50px -16px rgba(15,23,42,.35),0 6px 14px -6px rgba(15,23,42,.12);
+  transform-origin:top center;animation:suiIn .18s cubic-bezier(.2,.9,.3,1.2)}
+.sui-panel.up{transform-origin:bottom center}
+@keyframes suiIn{from{opacity:0;transform:translateY(-6px) scale(.97)}to{opacity:1;transform:none}}
+.sui.closing .sui-panel{animation:suiOut .15s ease forwards}
+@keyframes suiOut{to{opacity:0;transform:translateY(-4px) scale(.98)}}
+/* ค้นหา */
+.sui-search{position:relative;flex:none;padding:10px 10px 6px}
+.sui-search i{position:absolute;left:22px;top:50%;margin-top:2px;transform:translateY(-50%);font-size:16px;color:var(--txt3);pointer-events:none}
+.sui-search input{width:100%;height:40px;padding:0 12px 0 36px;border-radius:11px;border:1.5px solid var(--border);background:var(--surface2);color:var(--txt);font-family:inherit;font-size:14px;font-weight:500;outline:none;transition:border-color .15s,box-shadow .15s}
+.sui-search input:focus{border-color:var(--violet);background:var(--surface);box-shadow:0 0 0 3px rgba(124,92,252,.15)}
+/* รายการ */
+.sui-list{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:6px;-webkit-overflow-scrolling:touch}
+.sui-grp+.sui-grp,.sui-opt+.sui-grp{margin-top:4px;padding-top:4px;border-top:1px solid var(--border)}
+.sui-grp-h{padding:8px 12px 4px;font-size:11px;font-weight:700;letter-spacing:.4px;color:var(--txt3)}
+.sui-opt{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:40px;padding:8px 12px;border:none;border-radius:10px;background:transparent;
+  color:var(--txt);font-family:inherit;font-size:14px;font-weight:500;text-align:left;cursor:pointer;transition:background .12s,color .12s}
+.sui-opt span{flex:1;min-width:0;line-height:1.4;overflow-wrap:anywhere}
+.sui-opt:hover,.sui-opt.kb{background:rgba(124,92,252,.08);color:var(--violet)}
+.sui-opt.on{background:linear-gradient(135deg,rgba(124,92,252,.14),rgba(192,38,211,.1));color:var(--violet);font-weight:700}
+.sui-opt.on i{flex:none;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff;background:linear-gradient(135deg,#7c5cfc,#c026d3)}
+.sui-opt.off{opacity:.4;cursor:not-allowed}
+.sui-opt[hidden],.sui-grp[hidden]{display:none}
+.sui-empty{padding:22px 12px;text-align:center;font-size:13px;color:var(--txt3)}
+/* มือถือ: แผ่นล่าง */
+.sui.sheet{pointer-events:auto}
+.sui-bd{position:absolute;inset:0;background:rgba(15,23,42,.5);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);animation:suiFade .2s ease}
+@keyframes suiFade{from{opacity:0}}
+.sui.sheet .sui-panel{left:0;right:0;bottom:0;top:auto;width:auto;max-height:78vh;max-height:78dvh;border-radius:24px 24px 0 0;border-bottom:none;
+  padding-bottom:env(safe-area-inset-bottom);transform-origin:bottom;animation:suiUp .28s cubic-bezier(.2,.9,.3,1)}
+@keyframes suiUp{from{transform:translateY(100%)}to{transform:none}}
+.sui.sheet.closing .sui-panel{animation:suiDown .16s ease forwards}
+.sui.sheet.closing .sui-bd{opacity:0;transition:opacity .16s}
+@keyframes suiDown{to{transform:translateY(100%)}}
+.sui-grab{flex:none;width:44px;height:5px;border-radius:99px;background:var(--border2);margin:10px auto 2px}
+.sui-title{flex:none;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 16px 8px 20px;font-size:16px;font-weight:800}
+.sui-x{flex:none;width:34px;height:34px;border-radius:11px;border:1px solid var(--border);background:var(--surface2);color:var(--txt2);font-size:17px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.sui.sheet .sui-search{padding:4px 14px 8px}
+.sui.sheet .sui-search i{left:26px;margin-top:-2px}
+.sui.sheet .sui-search input{height:46px;font-size:16px}
+.sui.sheet .sui-list{padding:4px 10px 14px}
+.sui.sheet .sui-opt{min-height:52px;padding:12px 14px;font-size:15.5px;border-radius:14px}
+@media(prefers-reduced-motion:reduce){.sui-panel,.sui-bd,.sui.closing .sui-panel{animation:none}}

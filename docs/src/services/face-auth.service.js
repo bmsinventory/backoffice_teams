@@ -26,7 +26,11 @@
     { text: '➡️ หันหน้าไปทางขวาเล็กน้อย', label: 'ขวา', ok: function (y) { return y <= -TH.yaw; } },
   ];
 
-  var S = { landmarker: null, stream: null, raf: 0, timer: 0, run: null };
+  // gen = รุ่นของหน้าต่างกล้อง (เพิ่มทุกครั้งที่เปิด/ปิด) — งานที่ค้างรอโหลด/รอ API จากหน้าต่างที่ปิดไปแล้ว
+  // ต้องหยุดเอง ไม่เขียนทับหน้าต่างใหม่ (ตรวจด้วย alive(gen) หลัง await ทุกจุด)
+  var S = { landmarker: null, stream: null, raf: 0, timer: 0, run: null, gen: 0 };
+  var STALE = {};
+  function alive(gen) { return gen === S.gen && !!$('face-modal'); }
   var esc = function (s) { return window.esc ? window.esc(s) : String(s == null ? '' : s); };
   var $ = function (id) { return document.getElementById(id); };
 
@@ -52,6 +56,7 @@
   // ── หน้าต่างกล้อง ──
   function openModal(title) {
     closeModal();
+    S.gen++;
     var m = document.createElement('div');
     m.id = 'face-modal';
     m.innerHTML = '<div class="face-box" role="dialog" aria-modal="true" aria-labelledby="face-title">'
@@ -62,6 +67,7 @@
     return $('face-body');
   }
   function closeModal() {
+    S.gen++;
     stopCamera();
     var m = $('face-modal');
     if (m) m.remove();
@@ -103,12 +109,16 @@
     if (n === 'NotReadableError') return 'กล้องถูกโปรแกรมอื่นใช้อยู่ ปิดโปรแกรมนั้นแล้วลองใหม่';
     return 'เปิดกล้องไม่ได้: ' + ((e && e.message) || n || '');
   }
-  async function startCamera() {
+  async function startCamera(gen) {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error(camError({}));
-    try { S.stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: 'user' }, audio: false }); }
+    var stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: 'user' }, audio: false }); }
     catch (e) { throw new Error(camError(e)); }
+    // หน้าต่างถูกปิดระหว่างรออนุญาตกล้อง → ปิดกล้องของตัวเอง ไม่แตะกล้องของหน้าต่างใหม่
+    if (!alive(gen)) { stream.getTracks().forEach(function (t) { t.stop(); }); throw STALE; }
+    S.stream = stream;
     var v = $('face-video');
-    v.srcObject = S.stream;
+    v.srcObject = stream;
     try { await v.play(); } catch (e) {}
     return v;
   }
@@ -169,15 +179,19 @@
     S.raf = requestAnimationFrame(loop);
   }
 
+  // คืน video ที่พร้อมใช้ · null = ใช้กล้องไม่ได้ (แสดงสาเหตุแล้ว) · STALE = หน้าต่างถูกปิด/เปิดใหม่ไปแล้ว (ห้ามแตะ UI)
   async function prepareCamera(body) {
+    var gen = S.gen;
     body.innerHTML = camHtml();
     setInstr('กำลังเตรียมกล้อง...');
     try {
-      var lm = loadLandmarker(), v = await startCamera();
+      var lm = loadLandmarker(), v = await startCamera(gen);
       setInstr('กำลังโหลดตัวตรวจใบหน้า...');
       await lm;
+      if (!alive(gen)) return STALE;
       return v;
     } catch (e) {
+      if (e === STALE || !alive(gen)) return STALE;
       stopCamera();
       setInstr('ใช้กล้องไม่ได้');
       setMsg(String(e.message || e), 'err');
@@ -196,6 +210,7 @@
       else closeModal();
     };
     var v = await prepareCamera(body);
+    if (v === STALE) return;
     if (!v) { setFoot('<button type="button" class="btn btn-ghost" data-face="close">ใช้รหัสผ่านแทน</button>'); return; }
 
     // สุ่มลำดับท่า: กระพริบตา + ยิ้ม + หันซ้ายหรือขวา แล้วจบด้วยถ่ายหน้าตรง
@@ -241,12 +256,14 @@
   window.openFaceLogin = function () { livenessCapture('🙂 เข้าสู่ระบบด้วยใบหน้า', window.openFaceLogin, matchAndLogin); };
 
   async function matchAndLogin(img) {
+    var gen = S.gen;
     setInstr('⏳ กำลังตรวจสอบใบหน้า...');
     setFoot('');
     var retry = '<button type="button" class="btn btn-ghost" data-face="close">ใช้รหัสผ่านแทน</button>'
       + '<button type="button" class="btn btn-pri" data-face="retry">ลองใหม่</button>';
     try {
       var r = await api('match', { image: img });
+      if (!alive(gen)) return; // ปิดหน้าต่างระหว่างรอผล → ไม่เข้าระบบ
       if (!r.matched) {
         setInstr('ไม่พบใบหน้านี้ในระบบ');
         setMsg('ถ้ายังไม่เคยลงทะเบียนใบหน้า ให้เข้าสู่ระบบด้วยรหัสผ่าน แล้วกดชื่อผู้ใช้ → ลงทะเบียนใบหน้า', 'err');
@@ -254,9 +271,11 @@
         return;
       }
       var err = await window.loginWithUserId(r.user_id);
+      if (!alive(gen)) return;
       if (err) { setInstr('เข้าสู่ระบบไม่ได้'); setMsg(err, 'err'); setFoot(retry); return; }
       closeModal();
     } catch (e) {
+      if (!alive(gen)) return;
       setInstr('ตรวจสอบใบหน้าไม่สำเร็จ');
       setMsg(String(e.message || e), 'err');
       setFoot(retry);
@@ -284,13 +303,16 @@
       var name = ($('fp-user').value || '').trim();
       if (!name) { setMsg('กรอกชื่อผู้ใช้ก่อน', 'err'); return; }
       this.disabled = true;
+      var gen = S.gen;
       try {
         await requestReset(name);
+        if (!alive(gen)) return;
         // ตอบเหมือนกันทุกกรณี — ไม่บอกว่ามีชื่อผู้ใช้นี้ในระบบหรือไม่
         setMsg('ส่งคำขอแล้ว ถ้ามีบัญชีนี้ในระบบ Admin จะตั้งรหัสผ่านใหม่ให้ แล้วแจ้งกลับ', 'ok');
       } catch (e) {
         // ส่วนใหญ่ = ยังไม่ได้รัน SQL เพิ่มคอลัมน์ users.pw_reset_requested_at (ดู db-schema.sql)
         console.warn('[forgot-password] บันทึกคำขอไม่สำเร็จ:', (e && (e.message || e.details)) || e);
+        if (!alive(gen)) return;
         setMsg('ส่งคำขอไม่สำเร็จ กรุณาติดต่อ Admin โดยตรง', 'err');
         this.disabled = false;
       }
@@ -320,8 +342,10 @@
         if (a !== b) { setMsg('รหัสผ่านใหม่ไม่ตรงกัน', 'err'); return; }
         this.disabled = true;
         setMsg('⏳ กำลังบันทึก...');
+        var gen = S.gen;
         try {
           var r = await api('reset', { image: img, password: a });
+          if (!alive(gen)) return;
           $('fp-fields').remove();
           setInstr('✅ ตั้งรหัสผ่านใหม่เรียบร้อย');
           setMsg('เข้าสู่ระบบด้วยชื่อผู้ใช้ ' + r.username + ' และรหัสผ่านใหม่ได้เลย', 'ok');
@@ -330,6 +354,7 @@
           if (uEl) uEl.value = r.username;
           if (pEl) pEl.value = '';
         } catch (e) {
+          if (!alive(gen)) return;
           setMsg(String(e.message || e), 'err');
           setFoot('<button type="button" class="btn btn-ghost" data-face="close">ปิด</button><button type="button" class="btn btn-pri" data-face="retry">สแกนใหม่</button>');
         }
@@ -351,12 +376,13 @@
       + '<button type="button" class="btn btn-pri" id="face-start">เริ่มถ่ายใบหน้า</button></div>';
     setTimeout(function () { var p = $('face-pw'); if (p) p.focus(); }, 50);
 
+    var gen = S.gen;
     api('status', { user_id: cu.id }).then(function (r) {
-      var st = $('face-status'); if (!st) return;
+      var st = $('face-status'); if (!st || !alive(gen)) return;
       st.textContent = r.registered ? '✓ ลงทะเบียนใบหน้าไว้แล้ว — ถ่ายใหม่จะแทนที่ของเดิม' : 'ยังไม่ได้ลงทะเบียนใบหน้า';
       st.className = 'face-status' + (r.registered ? ' ok' : '');
       if (r.registered && $('face-remove')) $('face-remove').style.display = '';
-    }).catch(function (e) { var st = $('face-status'); if (st) st.textContent = String(e.message || e); });
+    }).catch(function (e) { var st = $('face-status'); if (st && alive(gen)) st.textContent = String(e.message || e); });
 
     var pwOk = function () {
       var pw = ($('face-pw') || {}).value || '';
@@ -371,11 +397,12 @@
       this.disabled = true;
       try {
         await api('remove', { username: cu.username, password: pw });
+        if (!alive(gen)) return;
         $('face-status').textContent = 'ลบใบหน้าออกจากระบบแล้ว';
         $('face-status').className = 'face-status';
         this.style.display = 'none';
         setMsg('');
-      } catch (e) { setMsg(String(e.message || e), 'err'); this.disabled = false; }
+      } catch (e) { if (alive(gen)) { setMsg(String(e.message || e), 'err'); this.disabled = false; } }
     };
   };
 
@@ -387,6 +414,7 @@
       else closeModal();
     };
     var v = await prepareCamera(body);
+    if (v === STALE) return;
     if (!v) { setFoot('<button type="button" class="btn btn-ghost" data-face="close">ปิด</button>'); return; }
     var labels = POSES.map(function (p) { return p.label; }), idx = 0, hold = 0, shots = [];
     setSteps(labels, 0);
@@ -411,14 +439,17 @@
   }
 
   async function submitEnroll(cu, pw, shots) {
+    var gen = S.gen;
     setInstr('⏳ กำลังลงทะเบียนใบหน้า...');
     setFoot('');
     try {
       await api('register', { username: cu.username, password: pw, images: shots });
+      if (!alive(gen)) return;
       setInstr('✅ ลงทะเบียนใบหน้าเรียบร้อย');
       setMsg('ครั้งต่อไปกด "เข้าสู่ระบบด้วยใบหน้า" ที่หน้า Login ได้เลย', 'ok');
       setFoot('<button type="button" class="btn btn-pri" data-face="close">เสร็จสิ้น</button>');
     } catch (e) {
+      if (!alive(gen)) return;
       setInstr('ลงทะเบียนไม่สำเร็จ');
       setMsg(String(e.message || e), 'err');
       setFoot('<button type="button" class="btn btn-ghost" data-face="close">ปิด</button><button type="button" class="btn btn-pri" data-face="retry">ถ่ายใหม่</button>');

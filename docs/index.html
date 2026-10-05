@@ -18,14 +18,15 @@
 <link rel="apple-touch-startup-image" href="img/BMS_T.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+Thai:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<!-- defer: ดาวน์โหลดคู่ขนาน ไม่บล็อกการวาดหน้า · ใช้ภายในฟังก์ชันหลังเปิดหน้าเท่านั้น (รันก่อน DOMContentLoaded)
+     Excel (xlsx) / สร้างรูป (html2canvas) โหลดเมื่อจะใช้ — src/utils/lib-loader.util.js -->
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
 <!-- ══ New Modular CSS (replaces css/style.css + css/responsive.css) ══ -->
+<script src="src/utils/theme.util.js"></script>
 <link rel="stylesheet" href="src/styles/main.css">
-<script src="js/mobile.js"></script>
+<script src="src/modules/mobile.js"></script>
 </head>
 <body>
 
@@ -194,9 +195,6 @@
         <span class="ni">💳</span><span class="nl">Advance</span>
         <span class="nb" id="adv-nb" style="display:none">0</span>
       </div>
-      <div class="nav-btn" onclick="window.goView('expense_form',this)">
-        <span class="ni">🧾</span><span class="nl">เอกสารประกอบ Adv.</span>
-      </div>
       <div class="nav-btn" onclick="window.goView('lodging',this)">
         <span class="ni">🏨</span><span class="nl">จัดหาที่พัก</span>
       </div>
@@ -204,30 +202,24 @@
         <span class="ni">🛠️</span><span class="nl">ติดตามสถานะโครงการ</span>
       </div>
       <div class="nav-btn" onclick="window.goView('all_issues',this)">
-        <span class="ni">🩹</span><span class="nl">ปัญหาทุกโครงการ</span>
+        <span class="ni">🩹</span><span class="nl">ภาพรวมปัญหาการใช้งาน</span>
+      </div>
+      <div class="nav-btn" onclick="window.goView('training',this)">
+        <span class="ni">🎓</span><span class="nl">ระบบอบรม</span>
       </div>
       <div class="sb-sec">ต้นทุน</div>
       <div class="nav-btn" onclick="window.goView('timesheet',this)">
         <span class="ni">⏱</span><span class="nl">Timesheet</span>
       </div>
-      <div class="nav-btn" onclick="window.goView('cost',this)">
-        <span class="ni">💰</span><span class="nl">Cost Tracking</span>
-      </div>
       <div class="nav-btn" onclick="window.goView('budget',this)">
-        <span class="ni">📊</span><span class="nl">สรุปงบประมาณ</span>
+        <span class="ni">💰</span><span class="nl">งบประมาณ &amp; ค่าใช้จ่าย</span>
       </div>
       <div class="sb-sec">ทีม</div>
       <div class="nav-btn" onclick="window.goView('workload',this)">
-        <span class="ni">🏢</span><span class="nl">สรุปภาระงาน</span>
-      </div>
-      <div class="nav-btn" onclick="window.goView('availability',this)">
-        <span class="ni">🟢</span><span class="nl">ทีมว่าง</span>
+        <span class="ni">🏢</span><span class="nl">ภาระงานทีม</span>
       </div>
       <div class="nav-btn" onclick="window.goView('calendar',this)">
         <span class="ni">📅</span><span class="nl">ปฏิทินทีม</span>
-      </div>
-      <div class="nav-btn holiday-only" style="display:none" onclick="window.goView('holiday',this)">
-        <span class="ni">🎌</span><span class="nl">วันหยุด</span>
       </div>
       <div class="nav-btn" onclick="window.goView('leave',this)">
         <span class="ni">🏖</span><span class="nl">การลางาน</span>
@@ -254,9 +246,13 @@
         <span class="ni">📄</span><span class="nl">ข้อมูลสัญญา</span>
       </div>
 
-      <div class="sb-sec admin-only" style="display:none">ระบบ</div>
-      <div class="nav-btn admin-only" style="display:none" onclick="window.openAdminModal()">
+      <div class="sb-sec" id="sb-sec-system" style="display:none">ระบบ</div>
+      <div class="nav-btn admin-only" style="display:none" onclick="window.goView('admin',this)">
         <span class="ni">⚙️</span><span class="nl">Admin Panel</span>
+      </div>
+      <!-- จัดการวันหยุด (เพิ่ม/แก้/นำเข้า) — เฉพาะผู้มีสิทธิ์เพิ่ม/แก้วันหยุด · ทีมดูรายการได้จากปุ่ม 🎌 วันหยุด ในปฏิทินทีม -->
+      <div class="nav-btn" style="display:none" onclick="window.goView('holiday',this)">
+        <span class="ni">🎌</span><span class="nl">จัดการวันหยุด</span>
       </div>
     </div>
     <div class="sb-foot">
@@ -390,6 +386,7 @@
             <div style="overflow-x:auto;">
               <table class="t-table" style="min-width:820px;">
                 <thead><tr>
+                  <th style="width:44px;text-align:center">#</th>
                   <th style="width:220px">โครงการ</th>
                   <th>ประเภท / กลุ่ม</th>
                   <th>Stage</th>
@@ -402,6 +399,7 @@
                 <tbody id="ov-tbl-rows"></tbody>
               </table>
             </div>
+            <div id="ov-tbl-pager" style="padding:12px 20px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap;"></div>
           </div>
         </div>
       </div>
@@ -457,8 +455,14 @@
 
       <!-- ADVANCE -->
       <div class="view" id="view-advance" style="overflow-y:auto;">
-        <div class="af-tabs" id="af-tabs" style="position:sticky;top:0;z-index:11;background:var(--surface);border-bottom:1px solid var(--border);padding:0 20px;"></div>
-        <div class="toolbar" style="position:sticky;top:44px;z-index:10;background:var(--surface);">
+        <!-- หัวหน้า (sticky ก้อนเดียว — กันการ์ดโผล่ลอดช่องระหว่างแถบแท็บกับ toolbar) -->
+        <div class="adv-head">
+        <div class="af-tabs">
+          <div class="adv-seg" data-adv-subnav></div>
+          <span class="adv-seg-sep"></span>
+          <div class="adv-status-tabs" id="af-tabs"></div>
+        </div>
+        <div class="toolbar">
           <div class="t-search"><input id="adv-q" placeholder="ค้นหา..." oninput="window.renderAdvance()"></div>
           <div class="ms-filter" id="adv-grp"></div>
           <div class="ms-filter" id="adv-type"></div>
@@ -472,6 +476,7 @@
           <button class="btn btn-xls btn-sm" onclick="window.exportAdvances()" title="Export Excel">📥 Excel</button>
           <button class="btn btn-teal btn-sm" id="btn-add-adv" onclick="window.openAdvModal(null)">+ New Advance</button>
         </div>
+        </div>
         <!-- Summary bar -->
         <div id="adv-summary-bar" style="display:flex;gap:12px;padding:12px 24px;background:var(--bg);flex-wrap:wrap;"></div>
         <!-- Cards grid -->
@@ -480,6 +485,7 @@
 
       <!-- EXPENSE CLEARING FORM (expense_form) -->
       <div class="view" id="view-expense-form">
+        <div class="af-tabs no-print"><div class="adv-seg" data-adv-subnav></div></div>
         <div id="ecf-root"></div>
       </div>
 
@@ -514,10 +520,7 @@
       <!-- WORKLOAD -->
       <div class="view" id="view-workload">
         <div class="toolbar" style="justify-content: space-between; flex-wrap: wrap;">
-          <div style="font-size:16px; font-weight:800; color:var(--violet); display:flex; align-items:center; gap:8px;">
-            <span style="background:var(--violet); color:#fff; padding:4px 8px; border-radius:8px; font-size:12px;">📊</span>
-            สรุปภาระงานประจำเดือน (Monthly Workload)
-          </div>
+          <div class="adv-seg" data-team-subnav></div>
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
             <select id="wl-dept-filter" onchange="window.renderWorkload()" style="height:34px;border:1px solid var(--border);border-radius:8px;padding:0 10px;font-size:12px;background:var(--surface);color:var(--txt);cursor:pointer;">
               <option value="">ทุกแผนก</option>
@@ -539,10 +542,7 @@
       <!-- AVAILABILITY -->
       <div class="view" id="view-availability" style="overflow-y:auto;">
         <div class="toolbar" style="flex-wrap:wrap;gap:10px;position:sticky;top:0;z-index:10;background:var(--surface);">
-          <div style="font-size:15px;font-weight:800;color:var(--txt);display:flex;align-items:center;gap:8px;">
-            <span style="background:linear-gradient(135deg,#06d6a0,#4361ee);color:#fff;padding:4px 9px;border-radius:8px;font-size:12px;">🟢</span>
-            ตรวจสอบความว่างของทีม
-          </div>
+          <div class="adv-seg" data-team-subnav></div>
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
             <div style="display:flex;align-items:center;gap:4px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:4px 10px;">
               <span style="font-size:11px;color:var(--txt3);">จาก</span>
@@ -594,8 +594,8 @@
           <label id="cal-only-active-wrap" style="display:none;align-items:center;gap:5px;font-size:12px;color:var(--txt2);cursor:pointer;white-space:nowrap;">
             <input type="checkbox" id="cal-only-active" checked onchange="window.renderCalendar()"> แสดงเฉพาะคนที่มีงาน
           </label>
+          <button class="btn btn-ghost btn-sm" onclick="window.openHolView()" style="margin-left:4px;padding:5px 10px;font-size:12px;" title="ดูรายการวันหยุดทั้งปี">🎌 วันหยุด</button>
           <button class="btn btn-ghost btn-sm" id="cal-fs-btn" onclick="window.toggleCalFullscreen()" style="margin-left:4px;padding:5px 10px;font-size:12px;" title="ขยายเต็มจอ">⛶ เต็มจอ</button>
-          <button class="btn btn-pri btn-sm ce-only" id="cal-add-proj-btn" style="margin-left:auto;" onclick="window.openProjModal(null)">+ เพิ่มโครงการ</button>
         </div>
         <div class="tl-wrap" id="cal-grid"></div>
         <div class="cal-agenda-wrap" id="cal-agenda"></div>
@@ -723,15 +723,18 @@
           <div style="flex:1"></div>
           <button class="btn btn-xls btn-sm" onclick="window.exportTimesheet()" title="Export Excel">📥 Excel</button>
         </div>
-        <div id="ts-summary-bar" style="display:flex;gap:12px;padding:12px 24px;background:var(--bg);flex-wrap:wrap;"></div>
-        <div style="padding:0 24px 28px;">
+        <div id="ts-summary-bar" class="ts-kpis"></div>
+        <div id="ts-viewbar" class="ts-viewbar"></div>
+        <div class="ts-body">
           <div id="ts-cards" class="ts-cards-wrap"></div>
         </div>
       </div>
 
       <!-- COST TRACKING -->
       <div class="view" id="view-cost" style="overflow-y:auto;">
-        <div class="toolbar" style="position:sticky;top:0;z-index:10;background:var(--surface);">
+        <div class="adv-head">
+        <div class="af-tabs"><div class="adv-seg" data-bud-subnav></div></div>
+        <div class="toolbar">
           <div class="t-search"><input id="cost-q" placeholder="ค้นหาโครงการ/รายละเอียด..." oninput="window.renderCost()"></div>
           <select class="t-sel" id="cost-yr" onchange="window.renderCost()"><option value="">ทุกปี พ.ศ.</option></select>
           <select class="t-sel" id="cost-mon" onchange="window.renderCost()">
@@ -760,6 +763,7 @@
           </select>
           <div style="flex:1"></div>
           <button class="btn btn-xls btn-sm" onclick="window.exportCosts()" title="Export Excel">📥 Excel</button>
+        </div>
         </div>
         <div id="cost-summary-bar" style="display:flex;gap:12px;padding:12px 24px;background:var(--bg);flex-wrap:wrap;"></div>
         <div id="cost-project-list" style="padding:0 24px 28px;"></div>
@@ -844,19 +848,25 @@
 
       <!-- BUDGET SUMMARY -->
       <div class="view" id="view-budget" style="overflow-y:auto;">
-        <div class="toolbar" style="position:sticky;top:0;z-index:10;background:var(--surface);">
+        <div class="adv-head">
+        <div class="af-tabs"><div class="adv-seg" data-bud-subnav></div></div>
+        <div class="toolbar" id="bud-toolbar">
           <div class="t-search"><input id="bud-q" placeholder="ค้นหาโครงการ..." oninput="window.renderBudget()"></div>
           <select class="t-sel" id="bud-yr" onchange="window.renderBudget()"><option value="">ทุกปี พ.ศ.</option></select>
           <select class="t-sel" id="bud-grp" onchange="window.renderBudget()"><option value="">ทุกกลุ่ม</option></select>
+          <div class="ms-filter" id="bud-type"></div>
           <select class="t-sel" id="bud-status" onchange="window.renderBudget()">
             <option value="">ทุกสถานะงบ</option>
             <option value="over">🔴 เกินงบ</option>
             <option value="warn">🟡 ใกล้เกิน (≥80%)</option>
             <option value="ok">🟢 ปกติ (&lt;80%)</option>
+            <option value="nobudget">⚪ ไม่ได้ตั้งงบ</option>
+            <option value="burn">🔥 ใช้เงินนำหน้างาน</option>
           </select>
           <select class="t-sel" id="bud-sort" onchange="window.renderBudget()">
             <option value="pct_desc">% ใช้ (มาก→น้อย)</option>
             <option value="pct_asc">% ใช้ (น้อย→มาก)</option>
+            <option value="gap_desc">ใช้เงินนำหน้างาน (มาก→น้อย)</option>
             <option value="budget_desc">งบประมาณ (มาก→น้อย)</option>
             <option value="remain_asc">คงเหลือ (น้อย→มาก)</option>
             <option value="name_asc">ชื่อโครงการ A-Z</option>
@@ -864,33 +874,25 @@
           <div style="flex:1"></div>
           <button class="btn btn-xls btn-sm" onclick="window.exportBudget()" title="Export Excel">📥 Excel</button>
         </div>
-        <!-- Budget Sub-Tabs -->
-        <div style="display:flex;border-bottom:1px solid var(--border);padding:0 24px;background:var(--surface);position:sticky;top:52px;z-index:9;">
-          <button class="bud-tab-btn" data-tab="budget" onclick="window._budSwitchTab('budget')" style="padding:10px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid #4361ee;color:#4361ee;margin-bottom:-1px;">📊 งบโครงการ</button>
-          <button class="bud-tab-btn" data-tab="owner" onclick="window._budSwitchTab('owner')" style="padding:10px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--txt3);margin-bottom:-1px;">🏢 เจ้าของไซต์</button>
         </div>
         <!-- Tab: Budget -->
         <div id="bud-pane-budget">
-          <div id="bud-kpi" style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;padding:16px 24px;"></div>
-          <div style="padding:0 24px 16px;">
-            <div class="ov-card">
-              <div class="ov-card-title">📊 งบประมาณ vs การใช้จ่าย (Top 15)</div>
-              <div style="position:relative"><canvas id="bud-chart"></canvas></div>
-            </div>
-          </div>
-          <div style="padding:0 24px 28px;">
+          <div id="bud-kpi" style="display:flex;gap:12px;padding:12px 24px;background:var(--bg);flex-wrap:wrap;"></div>
+          <div id="bud-body" style="padding:4px 24px 0;"></div>
+          <div style="padding:0 24px 28px;" id="bud-table-card">
             <div class="ov-card" style="padding:0;overflow:hidden;">
+              <div class="ov-card-title" style="padding:16px 16px 4px;">📋 รายโครงการ <span id="bud-table-cnt" style="font-weight:500;color:var(--txt3);"></span></div>
               <div style="overflow-x:auto;">
-                <table class="t-table" style="min-width:860px;">
+                <table class="t-table" style="min-width:960px;">
                   <thead><tr>
                     <th>ชื่อโครงการ</th>
                     <th style="text-align:right">งบประมาณ (฿)</th>
-                    <th style="text-align:right">เบิกล่วงหน้า (฿)</th>
-                    <th style="text-align:right">ค่าใช้จ่าย (฿)</th>
-                    <th style="text-align:right">ใช้แล้วรวม (฿)</th>
+                    <th style="text-align:right">ใช้จริง (฿)</th>
+                    <th style="text-align:right">ผูกพัน (฿)</th>
                     <th style="text-align:right">คงเหลือ (฿)</th>
                     <th>% ใช้งบ</th>
-                    <th>วันเริ่มต้น</th>
+                    <th style="text-align:right">คืบหน้า</th>
+                    <th>สถานะงบ</th>
                   </tr></thead>
                   <tbody id="bud-rows"></tbody>
                 </table>
@@ -902,6 +904,7 @@
         <div id="bud-pane-owner" style="display:none;">
           <div style="display:flex;gap:10px;align-items:center;padding:12px 24px;flex-wrap:wrap;border-bottom:1px solid var(--border);">
             <div class="t-search" style="min-width:180px;flex:1;"><input id="so-q" placeholder="ค้นหาเจ้าของไซต์..." oninput="window.renderSiteOwner()"></div>
+            <select class="t-sel" id="so-yr" onchange="window.renderSiteOwner()"><option value="">ทุกปี พ.ศ.</option></select>
             <div class="ms-filter" id="so-type"></div>
             <select class="t-sel" id="so-stage" onchange="window.renderSiteOwner()"><option value="">ทุก Stage</option></select>
             <select class="t-sel" id="so-sort" onchange="window.renderSiteOwner()">
@@ -911,7 +914,7 @@
               <option value="name_asc">ชื่อ A-Z</option>
             </select>
           </div>
-          <div id="so-kpi" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:16px 24px;"></div>
+          <div id="so-kpi" style="display:flex;gap:12px;padding:12px 24px;background:var(--bg);flex-wrap:wrap;"></div>
           <div id="so-body" style="padding:0 24px 28px;"></div>
         </div>
       </div>
@@ -944,15 +947,35 @@
           <button class="btn btn-xls btn-sm" onclick="window.exportContracts()" title="Export Excel">📥 Excel</button>
           <button class="btn btn-pri btn-sm ce-only" onclick="window.openContractModal(null)">+ เพิ่มสัญญา</button>
         </div>
-        <div id="ct-summary-bar" style="display:flex;gap:12px;padding:12px 24px;background:var(--bg);flex-wrap:wrap;"></div>
+        <div id="ct-summary-bar"></div>
         <div id="ct-rows" style="padding:12px 24px 32px;"></div>
       </div>
 
-      <!-- HELPDESK (ศูนย์ช่วยเหลือ) — เนื้อหา render โดย js/helpdesk.js -->
+      <!-- HELPDESK (ศูนย์ช่วยเหลือ) — เนื้อหา render โดย src/modules/helpdesk.js -->
       <div class="view" id="view-helpdesk"></div>
 
-      <!-- ปัญหาทุกโครงการ (all_issues) — สิทธิ์ตามระบบสิทธิ์ปกติ (canView) เนื้อหา render โดย js/all-issues.js -->
+      <!-- ปัญหาทุกโครงการ (all_issues) — สิทธิ์ตามระบบสิทธิ์ปกติ (canView) เนื้อหา render โดย src/modules/all-issues.js -->
       <div class="view" id="view-all-issues"></div>
+
+      <!-- ระบบอบรม — ภาพรวมการอบรมทุกโครงการ + ตั้งค่ากลาง (หลักสูตรอบรม/คลังแบบทดสอบ/ใบประกาศ) จากระบบอบรม (/training/?view=overview) (src/modules/training.js)
+           งานอบรมของแต่ละโครงการอยู่ที่ติดตามสถานะโครงการ › แท็บ "🎓 อบรม" · หน้าใน iframe ซ่อนแถบเมนูของตัวเอง -->
+      <div class="view" id="view-training">
+        <iframe id="trn-frame" class="trn-frame" title="ระบบอบรม" allow="camera; clipboard-write"></iframe>
+      </div>
+
+      <!-- Admin Panel — เมนูซ้ายจัดกลุ่ม (.trn-side* แบบเดียวกับแท็บอบรม) + เนื้อหาด้านขวา (src/modules/admin.js renderAdminPage) -->
+      <div class="view" id="view-admin">
+        <div class="imt-trn adm-page">
+          <nav class="trn-side" id="adm-side"></nav>
+          <div class="adm-main">
+            <div class="adm-main-head">
+              <div class="adm-head-title" id="adm-head-title"></div>
+              <div class="adm-head-actions" id="adm-head-actions"></div>
+            </div>
+            <div class="adm-main-body" id="adm-body"></div>
+          </div>
+        </div>
+      </div>
 
     </div>
   </div>
@@ -997,6 +1020,19 @@
     <div class="m-foot" id="m-hd-assign-foot" style="display:flex;align-items:center;"></div>
   </div>
 </div>
+<!-- รายการวันหยุด (ดูอย่างเดียว) — ปุ่ม 🎌 วันหยุด ในปฏิทินทีม · src/modules/leave.js openHolView -->
+<div class="overlay" id="m-hol-view">
+  <div class="modal md">
+    <div class="m-head">
+      <div class="m-icon" style="background:rgba(239,71,111,.12)">🎌</div>
+      <div class="m-title">วันหยุด</div>
+      <select class="t-sel" id="hol-view-yr" onchange="window.renderHolView()" style="margin-left:auto;margin-right:8px;"></select>
+      <button class="m-x" onclick="window.closeM('m-hol-view')">✕</button>
+    </div>
+    <div class="m-body" id="m-hol-view-body"></div>
+    <div class="m-foot" id="m-hol-view-foot"></div>
+  </div>
+</div>
 <div class="overlay" id="m-hd-kb">
   <div class="modal md">
     <div class="m-head">
@@ -1011,6 +1047,18 @@
     </div>
   </div>
 </div>
+<!-- แชร์ลิงก์ผู้เข้าอบรม (ติดตามสถานะโครงการ › 🎓 อบรม › แชร์ให้ผู้เข้าอบรม) — src/modules/training.js trnShare -->
+<div class="overlay" id="m-trn-share">
+  <div class="modal md" style="max-width:460px">
+    <div class="m-head">
+      <div class="m-icon" style="background:rgba(124,92,252,.12)">📤</div>
+      <div class="m-title" id="m-trn-share-title">แชร์ลิงก์</div>
+      <button class="m-x" onclick="window.closeM('m-trn-share')">✕</button>
+    </div>
+    <div class="m-body" id="m-trn-share-body" style="text-align:center"></div>
+  </div>
+</div>
+
 <div class="overlay" id="m-hd-link">
   <div class="modal md" style="max-width:440px">
     <div class="m-head">
@@ -1085,41 +1133,6 @@
     </div>
     <div class="m-body" id="m-ld-body" style="padding: 20px;"></div>
     <div class="m-foot" id="m-ld-foot"></div>
-  </div>
-</div>
-
-<!-- ADMIN MODAL -->
-<div class="overlay" id="m-admin">
-  <div class="modal xl" style="max-width: 1100px; padding: 0; background: transparent; border: none; box-shadow: none;">
-    <div class="adm-layout">
-      <div class="adm-sidebar">
-        <div class="adm-sidebar-head">
-          <div class="m-icon" style="background:rgba(124,92,252,.12); color:var(--violet); width:32px; height:32px; font-size:16px; margin:0;">⚙️</div>
-          Admin Panel
-        </div>
-        <div class="adm-nav" id="adm-tabs">
-          <div class="adm-nav-item on" id="at-staff" onclick="window.admTab('staff')"><span class="adm-nav-icon">👥</span> พนักงาน</div>
-          <div class="adm-nav-item" id="at-dept" onclick="window.admTab('dept')"><span class="adm-nav-icon">🏢</span> แผนก</div>
-          <div class="adm-nav-item" id="at-groups" onclick="window.admTab('groups')"><span class="adm-nav-icon">📂</span> กลุ่มโครงการ</div>
-          <div class="adm-nav-item" id="at-types" onclick="window.admTab('types')"><span class="adm-nav-icon">🏷️</span> ประเภทงาน</div>
-          <div class="adm-nav-item" id="at-positions" onclick="window.admTab('positions')"><span class="adm-nav-icon">💼</span> ตำแหน่ง</div>
-          <div class="adm-nav-item" id="at-stages" onclick="window.admTab('stages')"><span class="adm-nav-icon">⚡</span> PM Stages</div>
-          <div class="adm-nav-item" id="at-rates" onclick="window.admTab('rates')"><span class="adm-nav-icon">💵</span> อัตราค่าใช้จ่าย</div>
-          <div class="adm-nav-item" id="at-hsp_products" onclick="window.admTab('hsp_products')"><span class="adm-nav-icon">📦</span> Product</div>
-          <div class="adm-nav-item" id="at-hd_options" onclick="window.admTab('hd_options')"><span class="adm-nav-icon">🎧</span> ตัวเลือกแจ้งปัญหา</div>
-          <div class="adm-nav-item" id="at-notify" onclick="window.admTab('notify')" style="margin-top:auto; border-top:1px dashed var(--border); border-radius:0; padding-top:16px;"><span class="adm-nav-icon">🔔</span> การแจ้งเตือน</div>
-          <div class="adm-nav-item admin-only" id="at-users" onclick="window.admTab('users')" style="display:none;"><span class="adm-nav-icon">🔑</span> ผู้ใช้งานระบบ</div>
-          <div class="adm-nav-item admin-only" id="at-roles" onclick="window.admTab('roles')" style="display:none;"><span class="adm-nav-icon">🔐</span> สิทธิ์การใช้งาน</div>
-        </div>
-      </div>
-      <div class="adm-main">
-        <div class="adm-main-head">
-          <div id="adm-head-title" style="font-size: 18px; font-weight: 800; display:flex; align-items:center; color:var(--txt);">Admin Settings</div>
-          <button class="m-x" onclick="window.closeM('m-admin')" style="background:var(--surface2);">✕</button>
-        </div>
-        <div class="adm-main-body" id="adm-body"></div>
-      </div>
-    </div>
   </div>
 </div>
 
@@ -2417,11 +2430,15 @@
 <script src="src/utils/date.util.js"></script>
 <script src="src/utils/number.util.js"></script>
 <script src="src/utils/string.util.js"></script>
+<script src="src/utils/lib-loader.util.js"></script>
 <script src="src/utils/permission.util.js"></script>
+<script src="src/utils/project-team.util.js"></script>
+<script src="src/utils/hospital-match.util.js"></script>
 <script src="src/utils/labor.util.js"></script>
-<script src="js/ms-select.js"></script>
+<script src="src/modules/ms-select.js"></script>
 
 <!-- 3. Services Layer (ต้องโหลดหลัง utils) -->
+<script src="src/utils/session.util.js"></script>
 <script src="src/services/storage.service.js"></script>
 <!-- LOCAL TEST MODE: ถ้าเปิดผ่าน localhost (หรือ window.LOCAL_TEST_MODE=true) จะใช้ localStorage แทน backend
      ต้องโหลดก่อน db.service.js — ตัวนั้นมี guard เช็ค window.__LOCAL_DB_ACTIVE__ แล้วข้ามตัวเอง -->
@@ -2442,32 +2459,33 @@
 <script src="src/router.js"></script>
 
 <!-- ══ Feature Modules (unchanged — ยังใช้ window.* globals เหมือนเดิม) ══ -->
-<script type="module" src="js/overview.js"></script>
-<script type="module" src="js/kanban.js"></script>
-<script type="module" src="js/projects.js"></script>
-<script type="module" src="js/advance.js"></script>
-<script type="module" src="js/expense-form.js"></script>
-<script type="module" src="js/site-deploy-form.js"></script>
-<script type="module" src="js/site-notice-form.js"></script>
-<script type="module" src="js/lodging.js"></script>
-<script type="module" src="js/workload.js"></script>
-<script type="module" src="js/availability.js"></script>
-<script type="module" src="js/calendar.js"></script>
-<script type="module" src="js/leave.js"></script>
-<script type="module" src="js/admin.js"></script>
-<script type="module" src="js/notify.js"></script>
-<script type="module" src="js/timesheet.js"></script>
-<script type="module" src="js/cost.js"></script>
-<script type="module" src="js/modals.js"></script>
-<script type="module" src="js/hospital.js"></script>
-<script type="module" src="js/contract.js"></script>
-<script type="module" src="js/worklog.js"></script>
-<script type="module" src="js/form-tracker.js"></script>
-<script type="module" src="js/impl-tracker.js"></script>
-<script type="module" src="js/helpdesk.js"></script>
-<script src="js/all-issues.js"></script>
-<script src="js/budget.js"></script>
-<script src="js/export.js"></script>
+<script type="module" src="src/modules/overview.js"></script>
+<script type="module" src="src/modules/kanban.js"></script>
+<script type="module" src="src/modules/projects.js"></script>
+<script type="module" src="src/modules/advance.js"></script>
+<script type="module" src="src/modules/expense-form.js"></script>
+<script type="module" src="src/modules/site-deploy-form.js"></script>
+<script type="module" src="src/modules/site-notice-form.js"></script>
+<script type="module" src="src/modules/lodging.js"></script>
+<script type="module" src="src/modules/workload.js"></script>
+<script type="module" src="src/modules/availability.js"></script>
+<script type="module" src="src/modules/calendar.js"></script>
+<script type="module" src="src/modules/leave.js"></script>
+<script type="module" src="src/modules/admin.js"></script>
+<script type="module" src="src/modules/notify.js"></script>
+<script type="module" src="src/modules/timesheet.js"></script>
+<script type="module" src="src/modules/cost.js"></script>
+<script type="module" src="src/modules/modals.js"></script>
+<script type="module" src="src/modules/hospital.js"></script>
+<script type="module" src="src/modules/contract.js"></script>
+<script type="module" src="src/modules/worklog.js"></script>
+<script type="module" src="src/modules/form-tracker.js"></script>
+<script type="module" src="src/modules/impl-tracker.js"></script>
+<script type="module" src="src/modules/helpdesk.js"></script>
+<script src="src/modules/all-issues.js"></script>
+<script src="src/modules/training.js"></script>
+<script src="src/modules/budget.js"></script>
+<script src="src/modules/export.js"></script>
 
 <!-- 5. App Entry Point (โหลดสุดท้าย หลัง feature modules ทั้งหมด) -->
 <script src="src/app.js"></script>

@@ -29,10 +29,11 @@
     // so one view's print CSS never hides/blanks another view's print output)
     document.body.setAttribute('data-view', moduleId);
 
-    // Activate nav button
-    var navBtn = document.querySelector('.nav-btn[onclick*="\'' + moduleId + '\'"]');
+    // Activate nav button (expense_form เป็นแท็บย่อยในเมนู Advance — ไฮไลต์ปุ่ม Advance แทน)
+    var navId = window.NAV_PARENT && window.NAV_PARENT[moduleId] || moduleId;
+    var navBtn = document.querySelector('.nav-btn[onclick*="\'' + navId + '\'"]');
     if (navBtn) navBtn.classList.add('on');
-    var bottomBtn = document.querySelector('.bottom-nav-item[data-view="' + moduleId + '"]');
+    var bottomBtn = document.querySelector('.bottom-nav-item[data-view="' + navId + '"]');
     if (bottomBtn) bottomBtn.classList.add('active');
 
     // Update topbar title
@@ -52,6 +53,12 @@
   // ── goView: main navigation called by HTML nav buttons ──
   // Wraps goTo + triggers the render function for the target view
   window.goView = function (id, el) {
+    // เมนู Advance: ถ้าดูรายการ Advance ไม่ได้แต่ดูเอกสารประกอบได้ ให้เปิดแท็บเอกสารประกอบแทน
+    if (id === 'advance' && window.canView && !window.canView('advance') && window.canView('expense_form')) id = 'expense_form';
+    // เมนู งบประมาณ & ค่าใช้จ่าย: ถ้าดูภาพรวมงบไม่ได้แต่ดูรายการค่าใช้จ่ายได้ ให้เปิดแท็บรายการค่าใช้จ่ายแทน
+    if (id === 'budget' && window.canView && !window.canView('budget') && window.canView('cost')) id = 'cost';
+    // เมนู ภาระงานทีม: ถ้าดูสรุปภาระงานไม่ได้แต่ดูทีมว่างได้ ให้เปิดแท็บทีมว่างแทน
+    if (id === 'workload' && window.canView && !window.canView('workload') && window.canView('availability')) id = 'availability';
     // Permission check with user-visible alert
     var _canSee = !window.canView || window.canView(id);
     if (!_canSee) {
@@ -95,6 +102,8 @@
         impl_tracker: 'renderImplTracker',
         helpdesk:   'renderHelpdesk',
         all_issues: 'renderAllIssuesOverview',
+        training:   'renderTraining',
+        admin:      'renderAdminPage',
       };
       if (id === 'overview' || id === 'kanban' || id === 'projects') {
         window.runAutoStage && window.runAutoStage(true);

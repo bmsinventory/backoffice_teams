@@ -525,7 +525,7 @@
 
   // ความเร่งด่วน — ดึงจาก default array เดียวกับหน้า "+ แจ้งแทน" ในแอปหลัก (window.HD_URGENCY_DEFAULTS
   // จาก helpdesk.config.js) แล้ว merge กับ override ที่ Admin ตั้งไว้ (settings.app.helpdesk_urgency_overrides)
-  // เรียงจาก Priority ต่ำสุดมาก่อนเหมือนกัน — ตรงกับ hdOpenModal ใน js/helpdesk.js
+  // เรียงจาก Priority ต่ำสุดมาก่อนเหมือนกัน — ตรงกับ hdOpenModal ใน src/modules/helpdesk.js
   async function loadUrgencyOptions() {
     var overrides = {};
     try {

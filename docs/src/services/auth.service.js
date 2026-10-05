@@ -97,12 +97,8 @@
     _enterApp(usr, false);
   }
 
-  // ── ลายเซ็น session จาก id + รหัสผ่านปัจจุบัน — เปลี่ยนรหัสผ่านแล้ว session เก่าใช้ไม่ได้ (ไม่เก็บรหัสผ่านเอง) ──
-  function _sessSig(u) {
-    var s = String(u.id) + '|' + String(u.password || ''), h = 5381;
-    for (var i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
-    return (h >>> 0).toString(36);
-  }
+  // ── ลายเซ็น session (ตัวจริง src/utils/session.util.js — ใช้ร่วมกับระบบอบรม/ระบบสอบ) ──
+  function _sessSig(u) { return window.BmsSession.sig(u); }
 
   // ── เข้าสู่หน้าแอป (หลังตรวจรหัสผ่าน หรือกู้ session หลัง Refresh) ──
   // restore = true → กลับไปหน้าที่เปิดค้างไว้ก่อน Refresh (#ชื่อหน้า ใน URL) แทนหน้าเริ่มต้นตามสิทธิ์

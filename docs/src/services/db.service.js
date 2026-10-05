@@ -121,19 +121,67 @@
       if (sig === _lastSig) return false;
       _lastSig = sig; return true;
     }
+    // collection: เก็บแถวล่าสุดไว้ (_records) เพื่ออัปเดตเฉพาะแถวที่เปลี่ยนตอน realtime แจ้ง
+    // ส่งสำเนาให้ callback — หน้าจอแก้ object ได้โดยไม่กระทบ _records ที่ใช้รวมรอบถัดไป
+    var _records = null;
+    function _emitCol(records) {
+      _records = records;
+      var json = JSON.stringify(records), sig = (_writeGen[ref._fs] || 0) + '|' + json;
+      if (sig === _lastSig) return;
+      _lastSig = sig;
+      callback(_makeColSnap(ref._fs, JSON.parse(json)));
+    }
     async function _fetch() {
+      _dirty = {}; _needFull = false; // ดึงทั้งตาราง = ครอบคลุมทุกแถวที่รออัปเดตอยู่แล้ว
       try {
         if (isDoc) {
           var res = await _sb.from(sbTable).select('*').eq('id', docId).maybeSingle();
           if (res.error) throw res.error;
           if (_changed(res.data)) callback(_makeDocSnap(res.data));
         } else {
-          var records = await _fullList(sbTable);
-          if (_changed(records)) callback(_makeColSnap(ref._fs, records));
+          _emitCol(await _fullList(sbTable));
         }
       } catch (e) {
         if (onError) onError(e);
         else console.error('[db.service] onSnapshot error [' + sbTable + ']:', e);
+      }
+    }
+
+    // ── realtime แจ้งว่าแถวไหนเปลี่ยน → ดึงเฉพาะแถวนั้น (เดิมดึงทั้งตารางใหม่ทุกครั้ง เช่นแก้ รพ. 1 แห่ง = ทุกเครื่องโหลด ~680 KB)
+    // ดึงผ่าน API ตามปกติ (ไม่ใช้ข้อมูลใน event ตรง ๆ — รูปแบบวันที่/ตัวเลขอาจต่างจากที่ API ส่ง และ event ของแถวใหญ่ถูกตัดข้อมูลได้)
+    // _dirty[id] = 'del' | 'up' · ไม่รู้ id / ยังไม่เคยโหลด / เปลี่ยนเยอะ → ดึงทั้งตารางเหมือนเดิม ──
+    var _dirty = {}, _needFull = false;
+    var MAX_PARTIAL = 100;
+    function _onRealtime(p) {
+      var row = p && (p.eventType === 'DELETE' ? p.old : p.new);
+      if (isDoc || !row || row.id == null || (p.errors && p.errors.length)) _needFull = true;
+      else _dirty[String(row.id)] = p.eventType === 'DELETE' ? 'del' : 'up';
+      _debouncedFetch();
+    }
+    async function _sync() {
+      var ids = Object.keys(_dirty);
+      if (_needFull || !_records || ids.length > MAX_PARTIAL) return _fetch();
+      var dirty = _dirty; _dirty = {};
+      var up = ids.filter(function (k) { return dirty[k] === 'up'; });
+      try {
+        var byId = {};
+        if (up.length) {
+          var res = await _sb.from(sbTable).select('*').in('id', up);
+          if (res.error) throw res.error;
+          (res.data || []).forEach(function (r) { byId[String(r.id)] = r; });
+        }
+        // แถวที่ถูกลบ หรือขอแล้วไม่พบ (ลบไปแล้ว/ไม่มีสิทธิ์เห็น) → เอาออก · แถวที่มีอยู่ → แทนที่ตำแหน่งเดิม · แถวใหม่ → ต่อท้าย
+        var seen = {}, next = [];
+        _records.forEach(function (r) {
+          var k = String(r.id);
+          if (!dirty[k]) { next.push(r); return; }
+          if (byId[k]) { next.push(byId[k]); seen[k] = true; }
+        });
+        Object.keys(byId).forEach(function (k) { if (!seen[k]) next.push(byId[k]); });
+        _emitCol(next);
+      } catch (e) {
+        console.warn('[db.service] partial sync failed [' + sbTable + '] — ดึงทั้งตาราง', e);
+        _fetch();
       }
     }
 
@@ -143,7 +191,7 @@
     var _debTimer = null;
     function _debouncedFetch() {
       clearTimeout(_debTimer);
-      _debTimer = setTimeout(_fetch, DEBOUNCE_MS);
+      _debTimer = setTimeout(_sync, DEBOUNCE_MS);
     }
 
     // ── ตั้ง subscribe ใหม่ทุกครั้งที่ channel หลุด (network blip / proxy ตัด connection ที่ค้างไว้นาน /
@@ -161,7 +209,7 @@
       var myChannel;
       var channelName = 'snap-' + sbTable + (isDoc ? '-' + docId : '') + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
       myChannel = _sb.channel(channelName)
-        .on('postgres_changes', { event:'*', schema:'public', table:sbTable }, function () { _debouncedFetch(); })
+        .on('postgres_changes', { event:'*', schema:'public', table:sbTable }, _onRealtime)
         .subscribe(function (status) {
           if (_removed || myChannel !== _channel) return; // channel เก่าที่ถูกแทนที่ไปแล้ว — เมิน event สาย
           if (status === 'SUBSCRIBED') { _retryDelay = 2000; _reconnectPending = false; return; }
@@ -194,9 +242,14 @@
   };
 
   // ── กลับมาที่แท็บหลังพักไว้ (สลับแท็บ/สลับแอพมือถือ) — บาง browser suspend WebSocket ตอน background
-  // ทำให้พลาด event ระหว่างนั้น รีเฟรชข้อมูลทุก collection ที่ subscribe อยู่ทันทีกันตกหล่น ──
+  // ทำให้พลาด event ระหว่างนั้น รีเฟรชข้อมูลทุก collection ที่ subscribe อยู่ทันทีกันตกหล่น
+  // เฉพาะเมื่อพักไว้นานพอ (≥ 60 วินาที) — สลับแท็บแป๊บเดียว WebSocket ยังไม่หลุด แต่เดิมดึงใหม่ทั้ง ~20 ตาราง (~1.3 MB) ทุกครั้ง ──
+  var REFETCH_AFTER_HIDDEN_MS = 60000;
+  var _hiddenAt = 0;
   document.addEventListener('visibilitychange', function () {
-    if (document.visibilityState !== 'visible') return;
+    if (document.visibilityState !== 'visible') { _hiddenAt = Date.now(); return; }
+    if (!_hiddenAt || Date.now() - _hiddenAt < REFETCH_AFTER_HIDDEN_MS) return;
+    _hiddenAt = 0;
     _liveFetchers.slice().forEach(function (fn) { fn(); });
   });
 
