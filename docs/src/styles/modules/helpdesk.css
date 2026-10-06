@@ -108,10 +108,14 @@
 }
 
 /* ── Dashboard: KPI stat tiles ── */
+/* KPI มี 8 ใบ — ล็อกจำนวนคอลัมน์ให้หาร 8 ลงตัว (8 / 4 / 2) กันใบสุดท้ายหล่นไปอยู่แถวใหม่ใบเดียว
+   (auto-fit เดิมวางได้ 7 ใบบนจอกว้าง แล้ว CSAT โดดลงแถวสอง) */
 #view-helpdesk .hd-kpi-grid {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  display: grid; grid-template-columns: repeat(8, minmax(0, 1fr));
   gap: 12px; padding: 4px 24px 22px;
 }
+@media (max-width: 1440px) { #view-helpdesk .hd-kpi-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 640px)  { #view-helpdesk .hd-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 4px 16px 18px; } }
 #view-helpdesk .hd-kpi {
   background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--border2);
   border-radius: var(--r2); padding: 13px 15px; box-shadow: var(--sh-sm);
@@ -236,3 +240,193 @@
 .hd-locked { margin-top: 10px; padding: 10px 12px; border-radius: 10px; font-size: 12.5px; color: var(--txt2); background: var(--bg); border: 1px dashed var(--border); }
 .hd-card-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
 .hd-card-acts { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* ── แท็บ "สรุปรายสัปดาห์ (AI)" ── */
+#view-helpdesk .hd-wk-bar-top { padding: 14px 24px 4px; flex-wrap: wrap; gap: 8px; }
+#view-helpdesk .hd-wk-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 24px 14px; }
+#view-helpdesk .hd-wk-head > div:first-child { flex: 1; min-width: 240px; }
+#view-helpdesk .hd-wk-title { font-size: 17px; font-weight: 800; color: var(--txt); }
+#view-helpdesk .hd-wk-sub { font-size: 12px; color: var(--txt3); margin-top: 3px; }
+#view-helpdesk .hd-wk-tag { font-size: 11px; font-weight: 700; color: var(--amber); background: rgba(255, 166, 43, .14); padding: 2px 8px; border-radius: 999px; vertical-align: middle; }
+#view-helpdesk .hd-wk-health { font-size: 13px; font-weight: 700; padding: 8px 14px; border-radius: 10px; border: 1px solid; }
+#view-helpdesk .hd-wk-health.hd-wk-good { color: var(--teal); border-color: rgba(6, 214, 160, .4); background: rgba(6, 214, 160, .08); }
+#view-helpdesk .hd-wk-health.hd-wk-warn { color: var(--amber); border-color: rgba(255, 166, 43, .4); background: rgba(255, 166, 43, .08); }
+#view-helpdesk .hd-wk-health.hd-wk-bad  { color: var(--coral); border-color: rgba(229, 72, 77, .4); background: rgba(229, 72, 77, .08); }
+#view-helpdesk .hd-wk-pad { padding: 0 24px 18px; }
+#view-helpdesk .hd-wk-card { margin-bottom: 14px; }
+#view-helpdesk .hd-wk-card .ov-card-title { margin-bottom: 10px; }
+#view-helpdesk .hd-wk-grid { display: grid; grid-template-columns: 3fr 2fr; gap: 16px; }
+#view-helpdesk .hd-wk-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+#view-helpdesk .hd-wk-grid > .ov-card, #view-helpdesk .hd-wk-grid2 > .ov-card { margin-bottom: 0; }
+#view-helpdesk .hd-wk-good { color: var(--teal); }
+#view-helpdesk .hd-wk-warn { color: var(--amber); }
+#view-helpdesk .hd-wk-bad  { color: var(--coral); }
+#view-helpdesk .hd-wk-ok   { color: var(--teal); }
+#view-helpdesk .hd-wk-wait { color: var(--amber); font-weight: 600; }
+#view-helpdesk .hd-wk-muted { color: var(--txt3); font-size: 11.5px; }
+#view-helpdesk .hd-wk-ell { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#view-helpdesk .hd-wk-empty { text-align: center; color: var(--txt3); padding: 20px; font-size: 12.5px; }
+
+/* ภาพรวม: 3 การ์ดจัดกลุ่มตัวเลข */
+#view-helpdesk .hd-wk-ov { display: grid; grid-template-columns: 1fr 1.25fr 1.25fr; gap: 16px; padding: 0 24px 16px; }
+#view-helpdesk .hd-wk-stats { display: flex; gap: 6px; flex-wrap: wrap; }
+#view-helpdesk .hd-wk-stat { flex: 1; min-width: 72px; }
+#view-helpdesk .hd-wk-stat .k { font-size: 11px; color: var(--txt3); font-weight: 600; }
+#view-helpdesk .hd-wk-stat .v { font-size: 24px; font-weight: 800; color: var(--txt); line-height: 1.2; }
+#view-helpdesk .hd-wk-stat .v.hd-wk-good { color: var(--teal); }
+#view-helpdesk .hd-wk-stat .v.hd-wk-warn { color: var(--amber); }
+#view-helpdesk .hd-wk-stat .v.hd-wk-bad  { color: var(--coral); }
+#view-helpdesk .hd-wk-stat .s { font-size: 10.5px; color: var(--txt3); }
+#view-helpdesk .hd-wk-prog { height: 6px; border-radius: 4px; background: var(--surface3, var(--border)); overflow: hidden; margin: 10px 0 4px; }
+#view-helpdesk .hd-wk-prog > div { height: 100%; border-radius: 4px; background: var(--teal); }
+
+/* รายวัน: คอลัมน์แท่งเล็ก */
+#view-helpdesk .hd-wk-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-bottom: 8px; }
+#view-helpdesk .hd-wk-day { text-align: center; }
+#view-helpdesk .hd-wk-day .col { height: 90px; display: flex; align-items: flex-end; justify-content: center; border-bottom: 1px solid var(--border); }
+#view-helpdesk .hd-wk-day .col > div { width: 60%; max-width: 26px; min-height: 2px; background: #4361ee; border-radius: 4px 4px 0 0; }
+#view-helpdesk .hd-wk-day .v { font-size: 14px; font-weight: 800; color: var(--txt); margin-top: 4px; }
+#view-helpdesk .hd-wk-day .k { font-size: 10.5px; color: var(--txt3); }
+
+/* กลุ่ม LINE: การ์ดต่อกลุ่ม */
+#view-helpdesk .hd-wk-gcs { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+#view-helpdesk .hd-wk-gc { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--teal); border-radius: var(--r2); padding: 12px 14px; box-shadow: var(--sh-sm); cursor: pointer; display: flex; flex-direction: column; gap: 5px; min-width: 0; transition: box-shadow .15s, transform .15s; }
+#view-helpdesk .hd-wk-gc:hover { box-shadow: var(--sh-md); transform: translateY(-1px); }
+#view-helpdesk .hd-wk-gc.on { outline: 2px solid var(--violet); }
+#view-helpdesk .hd-wk-gc-warn { border-left-color: var(--amber); }
+#view-helpdesk .hd-wk-gc-bad  { border-left-color: var(--coral); }
+#view-helpdesk .hd-wk-gc-h { display: flex; gap: 8px; align-items: baseline; }
+#view-helpdesk .hd-wk-gc-h b { flex: 1; min-width: 0; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#view-helpdesk .hd-wk-gc-tr { font-size: 11px; color: var(--txt3); white-space: nowrap; }
+#view-helpdesk .hd-wk-gc-n { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--txt2); }
+#view-helpdesk .hd-wk-gc-n b { font-size: 16px; }
+#view-helpdesk .hd-wk-gc .hd-wk-prog { margin: 2px 0; }
+
+/* ติดตามรายเรื่อง */
+#view-helpdesk .hd-wk-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+#view-helpdesk .hd-wk-fchip { border: 1px solid var(--border); background: var(--surface); color: var(--txt2); border-radius: 999px; padding: 4px 12px; font-size: 12px; cursor: pointer; font-family: inherit; }
+#view-helpdesk .hd-wk-fchip.on { background: var(--violet); border-color: var(--violet); color: #fff; }
+#view-helpdesk .hd-wk-scroll { overflow-x: auto; }
+#view-helpdesk .hd-wk-tbl { font-size: 12.5px; }
+#view-helpdesk .hd-wk-tbl td { vertical-align: top; }
+#view-helpdesk .hd-wk-tbl .num { text-align: right; white-space: nowrap; }
+#view-helpdesk .hd-wk-tbl .mono { font-family: var(--mono); font-size: 12px; white-space: nowrap; font-weight: 600; }
+#view-helpdesk .hd-wk-row { cursor: pointer; }
+#view-helpdesk .hd-wk-row.open td:first-child { box-shadow: inset 3px 0 0 var(--amber); }
+#view-helpdesk .hd-wk-prob { min-width: 200px; }
+#view-helpdesk .hd-wk-fix { min-width: 240px; white-space: pre-wrap; }
+#view-helpdesk .hd-wk-pri { display: inline-block; border: 1px solid; border-radius: 6px; padding: 0 6px; font-size: 11px; font-weight: 800; }
+#view-helpdesk .hd-wk-st { display: inline-block; border-radius: 999px; padding: 2px 9px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+#view-helpdesk .hd-wk-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+#view-helpdesk .hd-wk-tags .hd-pill { font-size: 10.5px; padding: 0 7px; }
+
+/* แท่งแนวนอน (ภาพรวมปัญหา) — magnitude ข้ามหมวด ใช้ hue เดียว */
+#view-helpdesk .hd-wk-bar { display: grid; grid-template-columns: minmax(90px, 38%) 1fr auto; gap: 10px; align-items: center; padding: 5px 0; font-size: 12.5px; }
+#view-helpdesk .hd-wk-bar-l { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--txt); }
+#view-helpdesk .hd-wk-bar-t { height: 10px; }
+#view-helpdesk .hd-wk-bar-f { height: 100%; background: #4361ee; border-radius: 0 4px 4px 0; }
+#view-helpdesk .hd-wk-bar-n { white-space: nowrap; font-size: 12px; min-width: 64px; text-align: right; }
+
+@media (max-width: 1100px) { #view-helpdesk .hd-wk-ov { grid-template-columns: 1fr; } }
+@media (max-width: 900px) { #view-helpdesk .hd-wk-grid, #view-helpdesk .hd-wk-grid2 { grid-template-columns: 1fr; } }
+@media (max-width: 480px) {
+  #view-helpdesk .hd-wk-pad, #view-helpdesk .hd-wk-head, #view-helpdesk .hd-wk-ov, #view-helpdesk .hd-wk-bar-top { padding-left: 16px; padding-right: 16px; }
+  #view-helpdesk .hd-wk-gcs { grid-template-columns: 1fr; }
+}
+
+/* พิมพ์ / PDF: แสดงเฉพาะ #hd-wk-doc (scope ด้วย data-view กันไปซ่อนเนื้อหาพิมพ์ของ view อื่น) */
+@media print {
+  body[data-view="helpdesk"] .modal { display: none !important; }
+  body[data-view="helpdesk"] * { visibility: hidden; }
+  body[data-view="helpdesk"] #hd-wk-doc, body[data-view="helpdesk"] #hd-wk-doc * { visibility: visible; }
+  body[data-view="helpdesk"] #hd-wk-doc { position: absolute; top: 0; left: 0; width: 100%; }
+  body[data-view="helpdesk"] .hd-wk-noprint { display: none !important; }
+  body[data-view="helpdesk"] #hd-wk-doc .ov-card, body[data-view="helpdesk"] #hd-wk-doc .ai-card, body[data-view="helpdesk"] .hd-wk-gc { break-inside: avoid; box-shadow: none; }
+}
+
+/* ── คิวงาน: แถบมุมมอง + ตารางแถวกระชับ (hdQueueHtml ใน helpdesk.js) ──
+   แถบสีซ้ายของแถว = สถานะ SLA: เกิน (แดง) / ใกล้เกิน (ส้ม) / ปกติ (เขียว) / หยุดนับ (เทา) / จบแล้ว (ไม่มี) */
+#view-helpdesk .hd-views {
+  display: flex; gap: 6px; padding: 12px 24px 0; overflow-x: auto; scrollbar-width: thin;
+}
+#view-helpdesk .hd-view {
+  flex: none; display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface); color: var(--txt2);
+  border-radius: 10px; padding: 6px 11px; font-size: 12.5px; font-weight: 600; font-family: inherit;
+}
+#view-helpdesk .hd-view:hover { border-color: var(--border2); }
+#view-helpdesk .hd-view .n {
+  font-family: var(--mono); font-size: 11px; min-width: 20px; text-align: center;
+  border-radius: 6px; padding: 0 5px; background: var(--surface3); color: var(--txt2);
+}
+#view-helpdesk .hd-view.hot .n { background: rgba(229, 72, 77, .14); color: var(--coral); }
+#view-helpdesk .hd-view.on { border-color: var(--violet); background: rgba(124, 92, 252, .1); color: var(--violet); }
+#view-helpdesk .hd-view.on .n { background: var(--violet); color: #fff; }
+#view-helpdesk .hd-view-sep { flex: none; width: 1px; background: var(--border); margin: 4px 2px; }
+
+#view-helpdesk .hd-q-count {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 10px 24px 8px; font-size: 12.5px; color: var(--txt2);
+}
+#view-helpdesk .hd-q-count b { font-size: 15px; color: var(--txt); font-variant-numeric: tabular-nums; }
+#view-helpdesk .hd-q-count .bits { font-weight: 600; }
+#view-helpdesk .hd-q-count .bad { color: var(--coral); }
+#view-helpdesk .hd-q-count .warn { color: var(--amber); }
+#view-helpdesk .hd-q-count .sort { margin-left: auto; font-size: 11.5px; color: var(--txt3); }
+
+#view-helpdesk .hd-q-wrap {
+  margin: 0 12px 24px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r2); box-shadow: var(--sh-sm); overflow-x: auto;
+}
+#view-helpdesk table.hd-q { width: 100%; min-width: 1100px; border-collapse: collapse; }
+#view-helpdesk .hd-q td { padding: 8px 12px; font-size: 12.5px; }
+#view-helpdesk .hd-q tr.hd-q-row td:first-child { box-shadow: inset 4px 0 0 var(--hd-stripe, transparent); }
+#view-helpdesk .hd-q tr.s-breach { --hd-stripe: var(--coral); }
+#view-helpdesk .hd-q tr.s-warn   { --hd-stripe: var(--amber); }
+#view-helpdesk .hd-q tr.s-ok     { --hd-stripe: var(--teal); }
+#view-helpdesk .hd-q tr.s-paused { --hd-stripe: var(--txt3); }
+#view-helpdesk .hd-q tr.s-done td { color: var(--txt2); }
+#view-helpdesk .hd-q tr.hd-q-row:focus-visible { outline: 2px solid var(--violet); outline-offset: -2px; }
+#view-helpdesk .hd-q tr.hd-q-g { cursor: default; }
+#view-helpdesk .hd-q tr.hd-q-g td { background: var(--surface3); font-weight: 700; color: var(--txt2); padding: 6px 16px; }
+#view-helpdesk .hd-q tr.hd-q-g span { font-family: var(--mono); color: var(--txt3); margin-left: 8px; font-weight: 600; }
+#view-helpdesk .hd-q-empty { text-align: center; color: var(--txt3); padding: 40px !important; }
+
+#view-helpdesk .hd-q-no { color: var(--txt3); font-size: 11.5px !important; width: 36px; }
+#view-helpdesk .hd-q-tk { font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--txt); white-space: nowrap; }
+#view-helpdesk .hd-q-sub { font-size: 11.5px; color: var(--txt3); white-space: nowrap; margin-top: 2px; }
+#view-helpdesk .hd-q-sub.old { color: var(--coral); font-weight: 600; }
+#view-helpdesk .hd-q-subj { width: 36%; max-width: 0; }
+#view-helpdesk .hd-q-title { font-weight: 600; color: var(--txt); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#view-helpdesk .hd-q tr.s-done .hd-q-title { font-weight: 500; color: var(--txt2); }
+#view-helpdesk .hd-q-line2 { display: flex; align-items: center; gap: 6px; margin-top: 3px; font-size: 11.5px; color: var(--txt3); min-width: 0; }
+#view-helpdesk .hd-q-line2.reply .hd-q-msg { color: var(--violet); font-weight: 600; }
+#view-helpdesk .hd-q-cat { flex: none; background: var(--surface3); color: var(--txt2); border-radius: 5px; padding: 0 6px; }
+#view-helpdesk .hd-q-msg { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+#view-helpdesk .hd-q-flag { flex: none; background: rgba(255, 166, 43, .16); color: var(--amber); border-radius: 5px; padding: 0 6px; font-weight: 600; }
+#view-helpdesk .hd-q-hosp { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+#view-helpdesk .hd-q-wait { font-size: 11.5px; font-weight: 600; margin-top: 3px; white-space: nowrap; }
+#view-helpdesk .hd-q-wait.w-team  { color: var(--indigo); }
+#view-helpdesk .hd-q-wait.w-user  { color: var(--amber); }
+#view-helpdesk .hd-q-wait.w-reply { color: var(--violet); }
+#view-helpdesk .hd-q-owner { white-space: nowrap; }
+#view-helpdesk .hd-q-take { padding: 2px 10px; font-size: 11.5px; min-height: 0; }
+
+#view-helpdesk .hd-q-sla { font-size: 12px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+#view-helpdesk .hd-q-bar { display: block; width: 110px; height: 4px; border-radius: 3px; background: var(--surface3); overflow: hidden; margin-top: 4px; }
+#view-helpdesk .hd-q-bar i { display: block; height: 100%; background: var(--hd-stripe); }
+#view-helpdesk .hd-q tr.s-breach .hd-q-sla { color: var(--coral); }
+#view-helpdesk .hd-q tr.s-warn   .hd-q-sla { color: var(--amber); }
+#view-helpdesk .hd-q tr.s-ok     .hd-q-sla { color: var(--teal); }
+#view-helpdesk .hd-q tr.s-paused .hd-q-sla { color: var(--txt3); }
+#view-helpdesk .hd-q-done { font-size: 12px; font-weight: 600; white-space: nowrap; }
+#view-helpdesk .hd-q-done .ok { color: var(--teal); }
+#view-helpdesk .hd-q-done .bad { color: var(--coral); }
+#view-helpdesk .hd-q-upd { font-size: 11.5px !important; color: var(--txt3); white-space: nowrap; }
+#view-helpdesk .hd-q-upd b { display: block; color: var(--txt2); font-weight: 500; }
+
+@media (max-width: 640px) {
+  #view-helpdesk .hd-views, #view-helpdesk .hd-q-count { padding-left: 16px; padding-right: 16px; }
+  #view-helpdesk .hd-q-count .sort { margin-left: 0; }
+}

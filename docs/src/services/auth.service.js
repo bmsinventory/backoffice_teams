@@ -197,18 +197,45 @@
     }
   };
 
-  // ── เข้าสู่ระบบหลังสแกนใบหน้าเจอ (face-auth.service.js) — บัญชีต้องยังเปิดใช้งาน · session/จดจำ เหมือน Login ปกติ
-  // คืนข้อความ error (string) ถ้าเข้าไม่ได้ · null = เข้าสำเร็จ ──
-  window.loginWithUserId = async function (uid) {
-    for (var i = 0; i < 30 && !window.isDbLoaded; i++) await new Promise(function (r) { setTimeout(r, 500); });
-    if (!window.isDbLoaded) return 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาลองใหม่';
-    var usr = (window.USERS || []).find(function (x) { return String(x.id) === String(uid); });
-    if (!usr) return 'ไม่พบบัญชีผู้ใช้ของใบหน้านี้';
-    if (usr.active === false) return 'บัญชีนี้ถูกปิดการใช้งาน ติดต่อ Admin';
-    var remEl = document.getElementById('l-rem');
-    window.StorageService.setSession({ uid: usr.id, sig: _sessSig(usr) }, !!(remEl && remEl.checked));
-    _enterApp(usr, false);
-    return null;
+  // ── "ลืมรหัสผ่าน?" หน้า Login → กรอก Username ส่งคำขอถึง Admin (users.pw_reset_requested_at → กระดิ่งของ Admin)
+  // Admin ตั้งรหัสใหม่ใน Admin Panel › ผู้ใช้งานระบบ แล้วคำขอจะหายเอง ──
+  function _closeForgot() { var m = document.getElementById('pw-forgot'); if (m) m.remove(); }
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') _closeForgot(); });
+  window.openForgotPassword = function () {
+    _closeForgot();
+    var uEl = document.getElementById('lu');
+    var m = document.createElement('div');
+    m.id = 'pw-forgot';
+    m.innerHTML = '<div class="pwf-box" role="dialog" aria-modal="true" aria-labelledby="pwf-title">'
+      + '<div class="pwf-head"><b id="pwf-title">🔑 ลืมรหัสผ่าน</b><button type="button" class="pwf-x" aria-label="ปิด">✕</button></div>'
+      + '<p class="pwf-p">กรอกชื่อผู้ใช้ Admin จะเห็นคำขอที่กระดิ่งแจ้งเตือน แล้วตั้งรหัสผ่านใหม่ให้</p>'
+      + '<label class="f-label" for="pwf-user">Username</label>'
+      + '<input class="f-input" id="pwf-user" autocomplete="username" value="' + window.esc(uEl ? uEl.value.trim() : '') + '">'
+      + '<div class="pwf-msg" id="pwf-msg"></div>'
+      + '<div class="pwf-foot"><button type="button" class="btn btn-pri" id="pwf-send">ส่งคำขอ</button></div></div>';
+    document.body.appendChild(m);
+    m.querySelector('.pwf-x').onclick = _closeForgot;
+    var inp = document.getElementById('pwf-user'), btn = document.getElementById('pwf-send'), msg = document.getElementById('pwf-msg');
+    var setMsg = function (t, kind) { msg.textContent = t; msg.className = 'pwf-msg' + (kind ? ' ' + kind : ''); };
+    inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') btn.click(); });
+    setTimeout(function () { inp.focus(); }, 50);
+    btn.onclick = async function () {
+      var name = (inp.value || '').trim();
+      if (!name) { setMsg('กรอกชื่อผู้ใช้ก่อน', 'err'); return; }
+      btn.disabled = true;
+      try {
+        for (var i = 0; i < 30 && !window.isDbLoaded; i++) await new Promise(function (r) { setTimeout(r, 500); });
+        var u = (window.USERS || []).find(function (x) { return x.username === name && x.active !== false; });
+        if (u) await window.updateDoc(window.getDocRef('USERS', u.id), { pw_reset_requested_at: new Date().toISOString() });
+        // ตอบเหมือนกันทุกกรณี — ไม่บอกว่ามีชื่อผู้ใช้นี้ในระบบหรือไม่
+        setMsg('ส่งคำขอแล้ว ถ้ามีบัญชีนี้ในระบบ Admin จะตั้งรหัสผ่านใหม่ให้ แล้วแจ้งกลับ', 'ok');
+      } catch (e) {
+        // ส่วนใหญ่ = ยังไม่ได้รัน SQL เพิ่มคอลัมน์ users.pw_reset_requested_at (ดู db-schema.sql)
+        console.warn('[forgot-password] บันทึกคำขอไม่สำเร็จ:', (e && (e.message || e.details)) || e);
+        setMsg('ส่งคำขอไม่สำเร็จ กรุณาติดต่อ Admin โดยตรง', 'err');
+        btn.disabled = false;
+      }
+    };
   };
 
   // ── Logout ──

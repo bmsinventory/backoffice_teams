@@ -16,9 +16,5 @@ services:
       # คำขอข้อมูลของหน้าเว็บวิ่งผ่าน container นี้ (บีบอัด gzip) แล้วต่อ Supabase (Kong) ในเครื่องตรง ๆ
       # ต่อไม่ได้ หน้าเว็บสลับไปต่อ SUPABASE_URL ตรงเอง · ไม่ใส่บรรทัดนี้ = ผ่าน SUPABASE_URL · API_PROXY: "0" = ปิด
       API_UPSTREAM: "http://10.95.10.108:8000"
-      # เข้าสู่ระบบด้วยใบหน้า (FaceHub) — ได้คีย์จริงแล้วใส่ในไฟล์ .env ข้างไฟล์นี้บนเซิร์ฟเวอร์ (บรรทัด FACEHUB_API_KEY=...)
-      # ไม่อยู่ใน git · ยังไม่มี .env = ใช้คีย์ทดลองของหน้า demo (เปิดเผย → Role admin ใช้ใบหน้าไม่ได้) · hcode ค่าเริ่มต้น 99999
-      FACEHUB_API_KEY: "${FACEHUB_API_KEY:-demo-key-123}"
-      FACEHUB_HCODE: "${FACEHUB_HCODE:-99999}"
     ports:
       - "8089:80"

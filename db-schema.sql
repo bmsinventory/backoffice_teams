@@ -1136,5 +1136,38 @@ END $$;
 ALTER TABLE settings DROP COLUMN IF EXISTS imt_ai_key;
 
 -- ── "ลืมรหัสผ่าน?" หน้า Login → ส่งคำขอถึง Admin (กระดิ่งแจ้งเตือน + ป้ายในรายชื่อผู้ใช้)
--- ล้างเป็น NULL เมื่อ Admin ตั้งรหัสใหม่ให้ หรือผู้ใช้ตั้งเองผ่านการสแกนใบหน้า ──
+-- ล้างเป็น NULL เมื่อ Admin ตั้งรหัสใหม่ให้ ──
 ALTER TABLE users ADD COLUMN IF NOT EXISTS pw_reset_requested_at TIMESTAMPTZ;
+
+-- ================================================================
+-- ผู้ช่วยทีม (โมดูล 'assist') — คลังข้อความ/โค้ดที่ทีมเก็บไว้ พิมพ์ถามในหน้าแชทแล้วได้คำตอบกลับ
+-- AI แค่ "เลือก" รายการที่ตรงคำถาม เนื้อหาที่แสดงดึงจากตารางนี้ตรงตัว (AI ไม่แก้โค้ด) · idempotent รันซ้ำได้
+-- ================================================================
+CREATE TABLE IF NOT EXISTS assist_replies (
+  id          TEXT PRIMARY KEY,
+  title       TEXT DEFAULT '',
+  command     TEXT DEFAULT '',       -- คำสั่งลัด เช่น /update-hosxp (ไม่บังคับ)
+  keywords    TEXT DEFAULT '',       -- คำที่ใช้เรียก คั่นด้วย , เช่น "อัปเดต hosxp, เปลี่ยนเวอร์ชัน"
+  category    TEXT DEFAULT '',
+  content     TEXT DEFAULT '',       -- ข้อความ — โค้ดครอบด้วย ``` จะแสดงเป็นกล่องโค้ดพร้อมปุ่มคัดลอก
+  note        TEXT DEFAULT '',       -- คำเตือนก่อนใช้ เช่น "สำรองฐานข้อมูลก่อนรัน"
+  active      BOOLEAN DEFAULT true,
+  created_by  TEXT DEFAULT '',
+  updated_by  TEXT DEFAULT '',
+  created_at  TIMESTAMPTZ DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE assist_replies ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "anon_all_assist_replies" ON assist_replies;
+CREATE POLICY "anon_all_assist_replies" ON assist_replies FOR ALL TO anon USING (true) WITH CHECK (true);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'assist_replies'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE assist_replies;
+  END IF;
+END $$;

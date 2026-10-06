@@ -101,6 +101,7 @@
         worklog:    'renderWorkLog',
         impl_tracker: 'renderImplTracker',
         helpdesk:   'renderHelpdesk',
+        assist:     'renderAssist',
         all_issues: 'renderAllIssuesOverview',
         training:   'renderTraining',
         admin:      'renderAdminPage',

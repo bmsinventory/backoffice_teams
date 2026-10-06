@@ -134,6 +134,7 @@ function ecfBuildHtml() {
     <button class="btn btn-ghost btn-sm ecf-edit-btn" onclick="window.ecfDispatchNew()">+ ฟอร์มใหม่</button>
     <button class="btn btn-teal btn-sm ecf-edit-btn" onclick="window.ecfDispatchSave()">💾 บันทึก</button>
     <button class="btn btn-red btn-sm ecf-del-btn" id="ecf-del-btn" onclick="window.ecfDispatchDelete()" style="display:none;" title="ลบฟอร์มที่เลือกอยู่">🗑 ลบ</button>
+    <button class="btn btn-ghost btn-sm" onclick="window.ecfSaveWord()" title="ดาวน์โหลดเป็นไฟล์ Word (.doc)">📝 Word</button>
     <button class="btn btn-pri btn-sm" onclick="window.ecfPrint()">🖨️ พิมพ์</button>
   </div>
 
@@ -590,3 +591,203 @@ window.ecfRefreshSavedList = function () {
 
 // ── Print ──
 window.ecfPrint = function () { window.print(); };
+
+// ── Save เป็น Word (.doc) — ใช้ร่วมทั้ง 3 ประเภท ──
+// Word ไม่รู้จัก flex/grid ของพรีวิว จึงไม่แปลงจาก DOM แต่ประกอบเอกสารใหม่จากค่าที่กรอก ด้วยตารางความกว้างตายตัว (pt)
+// ที่ Word จัดได้ตรงเสมอ — แต่ละฟอร์มมีตัวสร้างของตัวเอง (ecfWordBody / sdfWordBody / snlWordBody) ใช้ตัวช่วยชุดเดียวกัน
+// window.ecfWord ด้านล่าง: ค่าที่กรอก = ตัวหนาสีแดง (เหมือนพรีวิว), ช่องว่าง = เส้นจุดไว้เขียนมือ, ช่องติ๊ก = ☑ / ☐
+window.ecfWord = (function () {
+  var W = 493;              // ความกว้างพื้นที่พิมพ์ A4 (210mm − ขอบซ้ายขวา 18mm) หน่วย pt
+  var RED = '#C0392B';
+  function p(html, st) { return '<p class=MsoNormal style="margin:0;' + (st || '') + '">' + (html || '&nbsp;') + '</p>'; }
+  function fill(v, dots) {
+    v = v == null ? '' : String(v).trim();
+    return v ? '<b style="color:' + RED + '">' + esc(v) + '</b>' : '<span style="color:#808080">' + new Array((dots || 20) + 1).join('.') + '</span>';
+  }
+  function date(v, dots) { return fill(v ? fd(v) : '', dots || 16); }
+  function cb(on) {
+    return '<span style="font-family:\'Segoe UI Symbol\';font-size:12pt;' + (on ? 'color:' + RED + ';' : '') + '">' + (on ? '&#9745;' : '&#9744;') + '</span>';
+  }
+  // บรรทัดช่องติ๊ก — hanging indent ให้ข้อความที่ขึ้นบรรทัดใหม่ตรงกับข้อความบรรทัดแรก ไม่ไปอยู่ใต้ช่องติ๊ก
+  function cbP(on, html, st) { return p(cb(on) + '&nbsp;' + html, 'margin-left:17pt;text-indent:-17pt;' + (st || '')); }
+  // rows: [[cell, ...], ...] — cell เป็น string หรือ { h, span, st }; widths เป็น pt ต่อคอลัมน์
+  function table(rows, widths) {
+    var total = widths.reduce(function (a, b) { return a + b; }, 0);
+    return '<table border=0 cellspacing=0 cellpadding=0 width=' + Math.round(total * 4 / 3) + ' style="width:' + total + 'pt;border-collapse:collapse;">'
+      + rows.map(function (r) {
+        var col = 0;
+        return '<tr>' + r.map(function (c) {
+          if (typeof c === 'string') c = { h: p(c) };
+          var span = c.span || 1, w = widths.slice(col, col + span).reduce(function (a, b) { return a + b; }, 0);
+          col += span;
+          return '<td' + (span > 1 ? ' colspan=' + span : '') + ' width=' + Math.round(w * 4 / 3) + ' valign=top style="width:' + w + 'pt;padding:1pt 4pt 1pt 0;' + (c.st || '') + '">' + c.h + '</td>';
+        }).join('') + '</tr>';
+      }).join('') + '</table>';
+  }
+  // จัดรายการเป็นตารางหลายคอลัมน์ความกว้างเท่ากัน (แทน CSS grid) — รายการ { h, span } กินหลายคอลัมน์ได้
+  function grid(items, cols, width) {
+    var widths = [], rows = [], cur = [], used = 0;
+    for (var i = 0; i < cols; i++) widths.push(width / cols);
+    items.forEach(function (it) {
+      var span = (typeof it === 'object' && it.span) || 1;
+      if (used + span > cols) { rows.push(cur); cur = []; used = 0; }
+      cur.push(typeof it === 'object' ? it : { h: it });
+      used += span;
+      if (used >= cols) { rows.push(cur); cur = []; used = 0; }
+    });
+    if (cur.length) rows.push(cur);
+    return table(rows, widths);
+  }
+  function gap() { return p('', 'font-size:4pt;line-height:4pt;'); }  // line-height ต้อง exactly (ตั้งใน save) ไม่งั้น Word ขยายบรรทัดว่างตามฟอนต์
+  // กรอบหัวข้อ (แทน .xxx-box-section) — ตารางช่องเดียวมีเส้นขอบ ตามด้วยช่องว่างเล็ก ๆ
+  function box(inner) {
+    return table([[{ h: inner, st: 'border:solid #808080 .75pt;padding:3pt 6pt 4pt 6pt;' }]], [W]) + gap();
+  }
+  function title(t) { return p('<b>' + t + '</b>', 'margin-bottom:1pt;'); }
+  // หัวกระดาษบริษัท: ซ้าย = ชื่อ/ที่อยู่, ขวา = ข้อความ (No./ชื่อแบบฟอร์ม) — เส้นหนาใต้หัว
+  function head(lines, right) {
+    var line = 'border-bottom:solid black 1.5pt;padding-bottom:4pt;';
+    var left = p('<b>' + lines[0] + '</b>', 'font-size:16pt;')
+      + lines.slice(1).map(function (l) { return p(l, 'font-size:12pt;color:#555555;line-height:15pt;'); }).join('');
+    var cells = [{ h: left, st: line }];
+    if (right) cells.push({ h: p(right, 'text-align:right;'), st: line + 'padding-right:0;' });
+    return table([cells], right ? [W - 150, 150] : [W]) + gap();
+  }
+  // ── บังคับ 1 หน้า A4 แนวตั้ง: ถ้าเนื้อหายาวเกิน (รายชื่อหลายคน, รายละเอียดสัญญา, ข้อความยาว ฯลฯ) ย่อขนาดตัวอักษร
+  // + ระยะบรรทัด/ช่องไฟทั้งเอกสารตามสัดส่วนจนพอดีหน้า — ความกว้างตาราง/ขอบกระดาษไม่ย่อ เพื่อให้คอลัมน์ยังตรงกันเหมือนเดิม ──
+  var PAGE_H = 841.9 - 36 - 36;   // ความสูงพื้นที่พิมพ์ A4 (หักขอบบน-ล่าง) หน่วย pt
+  var FIT_H = PAGE_H * 0.97;      // เผื่อ 3% — วัดด้วย browser ได้ใกล้เคียง Word (ทดสอบแล้วต่างกัน ~1pt) เผื่อฟอนต์/ตัดคำต่างเครื่อง
+  function scalePt(html, s) {
+    if (s >= 1) return html;
+    return html.replace(/(font-size|line-height|margin(?:-[a-z]+)?|padding(?:-[a-z]+)?|text-indent)\s*:\s*([^;"}]+)/g, function (m, prop, val) {
+      return prop + ':' + val.replace(/(-?\d*\.?\d+)pt/g, function (x, n) { return (Math.round(n * s * 10) / 10) + 'pt'; });
+    });
+  }
+  // เนื้อหา + สไตล์พื้นฐานของเอกสาร (ส่วนที่ย่อตาม s ได้) — line-height แบบ exactly ไม่งั้น Word ขยายบรรทัดตาม metric ของฟอนต์
+  function baseStyle(s) {
+    return scalePt('<style>p.MsoNormal,td,body{font-family:"TH Sarabun New";font-size:14pt;mso-line-height-rule:exactly;line-height:19pt;color:black;}'
+      + ' table{mso-table-lspace:0;mso-table-rspace:0;}</style>', s);
+  }
+  function section(body, s) {
+    // ย่อหน้าท้ายเล็กจิ๋ว — Word ต้องมีย่อหน้าปิดท้ายเสมอ ถ้าเอกสารจบด้วยตาราง จะเพิ่มบรรทัดขนาดปกติเองจนล้นไปหน้า 2
+    return '<div class=Section1>' + scalePt(body, s) + p('', 'font-size:1pt;line-height:1pt;') + '</div>';
+  }
+  function content(body, s) { return baseStyle(s) + section(body, s); }
+  // วัดความสูงเอกสาร (pt) ด้วย iframe ที่ซ่อนไว้ กว้างเท่าพื้นที่พิมพ์ — line-height เป็นค่าตายตัว จึงใกล้เคียงกับใน Word
+  function measure(html) {
+    var f = document.createElement('iframe');
+    f.style.cssText = 'position:fixed;left:-10000px;top:0;width:' + Math.ceil(W * 4 / 3 + 20) + 'px;height:200px;border:0;visibility:hidden;';
+    document.body.appendChild(f);
+    try {
+      var d = f.contentDocument;
+      // <!doctype html> = standards mode — quirks mode ไม่นับความสูงบรรทัดของย่อหน้าที่มีแต่ตัวหนา (<b>) เลย วัดได้ต่ำเกินจริง
+      // span/b ภายในบรรทัด line-height:0 — กันฟอนต์อื่น (เช่น ☑ ใช้ Segoe UI Symbol) ขยายบรรทัด ให้ทุกบรรทัดสูงเท่า
+      // line-height ของย่อหน้าพอดี เหมือน "exactly" ของ Word
+      d.open(); d.write('<!doctype html><html><head><meta charset="utf-8"><style>p span,p b{line-height:0}</style></head><body style="margin:0">' + html + '</body></html>'); d.close();
+      var sec = d.querySelector('.Section1');
+      sec.style.width = W + 'pt';
+      return sec.getBoundingClientRect().height * 0.75;
+    } finally { f.remove(); }
+  }
+  function fitScale(body) {
+    var s = 1;
+    for (var i = 0; i < 6; i++) {
+      var h = measure(content(body, s));
+      if (h <= FIT_H) return s;
+      s = Math.max(0.5, s * FIT_H / h * 0.98);
+      if (s === 0.5) return s;
+    }
+    return s;
+  }
+  function save(name, docNo, body) {
+    var s = fitScale(body);
+    var html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">'
+      + '<head><meta charset="utf-8"><title>' + esc(name) + '</title>'
+      + '<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom><w:DoNotOptimizeForBrowser/></w:WordDocument></xml><![endif]-->'
+      + '<style>@page Section1{size:595.3pt 841.9pt;mso-page-orientation:portrait;margin:36pt 51pt 36pt 51pt;} div.Section1{page:Section1;}</style>'
+      + baseStyle(s) + '</head><body>' + section(body, s) + '</body></html>';
+    var fname = (name + (docNo ? '_' + docNo : '') + '_' + new Date().toISOString().slice(0, 10)).replace(/[\\/:*?"<>|]+/g, '-') + '.doc';
+    var blob = new Blob(['﻿', html], { type: 'application/msword' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = fname;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  }
+  return { W: W, RED: RED, p: p, fill: fill, date: date, cb: cb, cbP: cbP, table: table, grid: grid, gap: gap, box: box, title: title, head: head, save: save };
+})();
+
+window.ecfSaveWord = function () {
+  if (window.ecfActiveType === 'ac02') window.ecfWord.save('FM-AC-02 แบบฟอร์มการออกปฏิบัติงาน', '', window.sdfWordBody());
+  else if (window.ecfActiveType === 'ac03') window.ecfWord.save('หนังสือแจ้งออกไซต์', ecfV('snl-doc-no').trim(), window.snlWordBody());
+  else window.ecfWord.save('FM-AC-01 Expense Clearing', ecfV('ecf-form-no').trim(), ecfWordBody());
+};
+
+// ── FM-AC-01 ในรูปแบบ Word — โครงเดียวกับ ecfRenderPreview ──
+function ecfWordBody() {
+  var X = window.ecfWord, W = X.W;
+  var catEl = document.querySelector('input[name="ecf-cat"]:checked');
+  var catKey = catEl ? catEl.value : 'other';
+  var travelTotal  = ecfNum('ecf-travel-fuel-toll') + ecfNum('ecf-travel-transport') + ecfNum('ecf-travel-other');
+  var lodgingTotal = ecfInt('ecf-lodging-nights') * ecfInt('ecf-lodging-rooms') * ecfNum('ecf-lodging-rate');
+  var grandTotal   = travelTotal + lodgingTotal + ecfOthersTotal();
+  var workerNames = Array.from(document.querySelectorAll('.ecf-worker-inp')).map(function (el) { return el.value.trim(); });
+  while (workerNames.length < 12) workerNames.push('');
+  var othersItems = Array.from(document.querySelectorAll('.ecf-other-row')).map(function (row) {
+    var noteEl = row.querySelector('.ecf-other-note-inp'), amtEl = row.querySelector('.ecf-other-amount-inp');
+    var note = noteEl ? noteEl.value.trim() : '';
+    var amt  = amtEl ? (parseFloat((amtEl.value || '').replace(/,/g, '')) || 0) : 0;
+    return (note || amt) ? { note: note, amt: amt } : null;
+  }).filter(Boolean);
+
+  var cats = window.ECF_CATEGORIES.map(function (c) {
+    var on = c.key === catKey;
+    var note = (c.key === 'other' && on && ecfV('ecf-cat-other-note').trim()) ? ' ' + X.fill(ecfV('ecf-cat-other-note')) : '';
+    return X.cbP(on, esc(c.label) + note);
+  });
+  var amt = function (n) { return n ? '<b style="color:' + X.RED + '">' + esc(fca(n)) + '</b>' : '—'; };
+  var B = 'border:solid #808080 .75pt;padding:0 5pt;';
+  var AW = 100;
+  var tr = function (label, n, st) { return [{ h: X.p(label), st: B + (st || '') }, { h: X.p(n, 'text-align:right;'), st: B + (st || '') }]; };
+  var workerGrid = X.grid(workerNames.map(function (n, i) { return X.p('<span style="color:#555555">' + (i + 1) + ')</span> ' + (n ? X.fill(n) : '')); }), 3, W - AW - 12);
+  var head = 'background:#F0F0F0;';
+  var rows = [
+    tr('<b>รายละเอียดการประมาณการเบิกเงินทดรองจ่าย</b>', '<b>จำนวนเงิน</b>', head),
+    tr('ค่าน้ำมัน และ ทางด่วน', amt(ecfNum('ecf-travel-fuel-toll'))),
+    tr('ค่าโดยสารประจำทาง (แนบเอกสาร **) รถตู้ / รถทัวร์ / เครื่องบิน / Taxi', amt(ecfNum('ecf-travel-transport'))),
+    tr('ค่าเดินทางระหว่างปฏิบัติงานและอื่นๆ', amt(ecfNum('ecf-travel-other'))),
+    tr('ค่าที่พัก : จำนวนวันที่พัก ' + X.fill(ecfV('ecf-lodging-nights') || '0') + ' วัน / จำนวนห้อง ' + X.fill(ecfV('ecf-lodging-rooms') || '0')
+      + ' ห้อง / ราคาต่อห้อง ' + X.fill(ecfV('ecf-lodging-rate') ? ecfFmt2(ecfNum('ecf-lodging-rate')) : '0.00') + ' บาท', amt(lodgingTotal)),
+    [{ h: X.p('รายชื่อผู้ปฏิบัติงาน:') + workerGrid, st: B }, { h: X.p(''), st: B }],
+  ];
+  if (othersItems.length) {
+    rows.push(tr('อื่นๆ :', ''));
+    othersItems.forEach(function (o) { rows.push(tr('&nbsp;&nbsp;&nbsp;- ' + (o.note ? X.fill(o.note) : ''), amt(o.amt))); });
+  } else rows.push(tr('อื่นๆ :', '—'));
+  rows.push(tr('<b>รวม เงินทดรองจ่ายทั้งหมด</b>', '<b style="color:' + X.RED + '">' + esc(fca(grandTotal)) + '</b>'));
+  rows.push(tr('ค่าใช้จ่ายใช้จริง (FM-AC-05)', ''));
+  rows.push(tr('คงเหลือคืน - บริษัทฯ(+), พนักงาน (-)', ''));
+
+  var signs = ['ผู้ขอเบิก', 'PM / PM (แทน)', 'ผู้อนุมัติ', 'แผนกการเงิน', 'ผู้เคลียร์เงินทดรองจ่าย', 'ผู้รับคืนเงินทดรองจ่าย', 'ผู้จัดการทั่วไป'].map(function (s) {
+    return X.p('...............................', 'text-align:center;margin-top:8pt;')
+      + X.p(s, 'text-align:center;font-size:12pt;') + X.p('____/____/____', 'text-align:center;font-size:12pt;color:#555555;');
+  });
+
+  return X.head([
+      'บริษัท บางกอก เมดิคอล ซอฟต์แวร์ จำกัด (สำนักงานใหญ่)',
+      'เลขที่ 2 ชั้น 2 ซ.สุขสวัสดิ์ 33 แขวงราษฎร์บูรณะ เขตราษฎร์บูรณะ กรุงเทพมหานคร'
+    ], '<b style="font-size:16pt">EXPENSE CLEARING</b>')
+    + X.p('เลขที่ ' + X.fill(ecfV('ecf-form-no')), 'text-align:right;')
+    + X.table([['ชื่อ-สกุล ผู้ปฏิบัติงาน ' + X.fill(ecfV('ecf-staff-name'), 40), 'เบอร์โทรศัพท์ ' + X.fill(ecfV('ecf-staff-phone'))]], [W - 170, 170])
+    + X.table([['วันที่ปฏิบัติงาน ' + X.date(ecfV('ecf-work-start')) + ' ถึงวันที่ ' + X.date(ecfV('ecf-work-end')), 'สถานที่ปฏิบัติงาน ' + X.fill(ecfV('ecf-work-location'), 30)]], [250, W - 250])
+    + X.p('งานที่ได้รับมอบหมาย ' + X.fill(ecfV('ecf-assigned-task'), 60), 'margin-bottom:4pt;')
+    + X.box(X.title('โครงการ') + X.grid(cats, 4, W - 12))
+    + X.p('ขอเบิกเงินทดรองจ่ายเป็นจำนวนเงิน ' + X.fill(ecfFmt2(grandTotal)) + ' บาท &nbsp;&nbsp;จำนวนคน ' + X.fill(ecfV('ecf-people-count'), 6) + ' คน', 'margin-bottom:4pt;')
+    + X.table(rows, [W - AW, AW])
+    + X.gap()
+    + X.cbP(ecfChecked('ecf-note-schedule'), 'ลงตารางปฏิบัติงานเรียบร้อย')
+    + X.cbP(ecfChecked('ecf-note-letter'), 'ทำหนังสือแจ้งเข้าปฏิบัติงานเรียบร้อย', 'margin-bottom:6pt;')
+    + X.grid(signs, 4, W);
+}
+

@@ -28,6 +28,8 @@
     { id:'impl_tracker', label:'ติดตามสถานะโครงการ', icon:'🛠️' },
     { id:'all_issues',   label:'ภาพรวมปัญหาการใช้งาน', icon:'🩹' },
     { id:'helpdesk',     label:'ศูนย์ช่วยเหลือ',   icon:'🎧' },
+    // ผู้ช่วยทีม — แชทถามคำตอบ/โค้ดที่ทีมเก็บไว้ (src/modules/assist.js) · เพิ่ม/แก้/ลบ = จัดการคลังคำตอบ
+    { id:'assist',       label:'ผู้ช่วยทีม',      icon:'💬' },
     // ระบบอบรม + ระบบสอบ (/training/) — view-training ฝังหน้า /training/?embed=1 (src/modules/training.js) ใช้ session เดียวกัน
     { id:'training',     label:'ระบบอบรม', icon:'🎓' },
   ];
@@ -61,6 +63,7 @@
     budget:       'view-budget',
     impl_tracker: 'view-impl-tracker',
     helpdesk:     'view-helpdesk',
+    assist:       'view-assist',
     all_issues:   'view-all-issues',
     training:     'view-training',
     admin:        'view-admin',

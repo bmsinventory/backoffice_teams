@@ -103,7 +103,7 @@
 
   // ── UI State ──
   window.hdTab      = 'queue';   // queue | mine | dashboard
-  window.hdFilter   = { q:'', status:'', priority:'', assignee:'', category:'' };
+  window.hdFilter   = { q:'', view:'now', priority:'', assignee:'', category:'', group:'' }; // view = มุมมองในคิวงาน (ดู HD_VIEWS)
   window.hdOpenId   = null;      // ticket id ที่เปิดหน้ารายละเอียดอยู่ (null = แสดงตาราง)
   window.hdEditId   = null;      // ticket id ที่กำลังแก้ใน modal (null = สร้างใหม่)
   window.hdPage     = 1;         // หน้าปัจจุบันของตารางทะเบียน

@@ -64,7 +64,7 @@
       'overview','kanban','projects','advance','lodging',
       'workload','availability','calendar','leave','timesheet',
       'cost','budget','targets','hospital','contract','worklog','holiday',
-      'impl_tracker','all_issues','helpdesk','training',
+      'impl_tracker','all_issues','helpdesk','assist','training',
     ];
     navModules.forEach(function (m) {
       var btn = document.querySelector('.nav-btn[onclick*="\'' + m + '\'"]');
@@ -230,7 +230,7 @@
     window.updateBadge && window.updateBadge();
   };
 
-  // ── เมนูบัญชีผู้ใช้: กดชื่อผู้ใช้ท้าย sidebar → ลงทะเบียนใบหน้า (เมื่อเปิดใช้ FaceHub) / เปลี่ยนรหัสผ่าน / ออกจากระบบ
+  // ── เมนูบัญชีผู้ใช้: กดชื่อผู้ใช้ท้าย sidebar → เปลี่ยนรหัสผ่าน / ออกจากระบบ
   // วางเหนือแถวผู้ใช้ · sidebar แบบย่อ (เหลือแค่อวาตาร์) → วางด้านขวาแทน · ปิดเมื่อกดที่อื่น/Esc ──
   function _closeUserMenu() { var m = document.getElementById('user-menu'); if (m) m.remove(); }
   window.toggleUserMenu = function (e) {
@@ -241,7 +241,6 @@
     m.id = 'user-menu';
     m.innerHTML = '<div class="um-head"><b>' + window.esc(cu.name || cu.username || '') + '</b><span>'
       + window.esc(window.roleLabel ? window.roleLabel(cu.role) : (cu.role || '')) + '</span></div>'
-      + (window.FACE_LOGIN && !(window.FACE_DEMO && cu.role === 'admin') ? '<button type="button" data-act="face">🙂 ลงทะเบียนใบหน้า</button>' : '')
       + '<button type="button" data-act="pw">🔒 เปลี่ยนรหัสผ่าน</button>'
       + '<button type="button" data-act="out" class="danger">🚪 ออกจากระบบ</button>';
     document.body.appendChild(m);
@@ -254,7 +253,6 @@
       _closeUserMenu();
       window.closeMobSidebar && window.closeMobSidebar();
       if (act === 'pw') window.openChangePassword && window.openChangePassword();
-      else if (act === 'face') window.openFaceEnroll && window.openFaceEnroll();
       else window.doLogout && window.doLogout();
     });
   };

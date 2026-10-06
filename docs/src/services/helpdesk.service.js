@@ -202,6 +202,7 @@
     };
     if (ev.createdAt) row.created_at = ev.createdAt;   // ระบุเวลาย้อนหลัง (ใช้ตอนนำเข้าข้อมูลเก่า)
     await window.setDoc(window.getDocRef('HELPDESK_TICKET_EVENTS', row.id), row);
+    window.hdLastForget && window.hdLastForget(ticketId); // คิวงานดึง "ข้อความล่าสุด" ของ Ticket นี้ใหม่
     return row;
   };
 

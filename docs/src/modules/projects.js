@@ -360,7 +360,10 @@ window.openProjModal=function(id){
   document.getElementById('m-proj-body').innerHTML=tabBar+infoPane+teamPane+visitsPane;
   // Inject member rows into right panel (mem-list inside pickerHtml)
   if(ce){var ml=document.getElementById('mem-list');if(ml){ml.innerHTML=memberRows;ml.setAttribute('data-proj-s',p?p.start||'':'');ml.setAttribute('data-proj-e',p?p.end||'':'');}}
-  document.getElementById('m-proj-foot').style.display=window.canEdit('projects')?'':'none';
+  // ร่าง Email ขออนุมัติตาราง — เฉพาะโครงการที่บันทึกแล้ว และเปิดได้แม้ไม่มีสิทธิ์แก้ไข (ซ่อนเฉพาะปุ่มบันทึก)
+  document.getElementById('m-proj-foot').style.display=(window.canEdit('projects')||p)?'':'none';
+  document.getElementById('pf-save-btn').style.display=window.canEdit('projects')?'':'none';
+  document.getElementById('pf-sem-btn').style.display=p?'':'none';
   window.openM('m-proj');
   if(ce)window.pfHospGuess(); // โครงการเดิมที่ยังไม่ระบุ รพ. — เดาให้ กดบันทึกก็ผูกเลย
   window.updateProjFormByGroup(p?p.parentProjectId:'');

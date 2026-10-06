@@ -1,6 +1,6 @@
 /**
  * helpdesk.js — Helpdesk (ศูนย์ช่วยเหลือ) UI
- * โมดูล 'helpdesk' — คิวงาน / ของฉัน / แดชบอร์ด + หน้ารายละเอียด Ticket + modal "+ แจ้งแทน"
+ * โมดูล 'helpdesk' — คิวงาน / ของฉัน / แดชบอร์ด / สรุปรายสัปดาห์ (AI) + หน้ารายละเอียด Ticket + modal "+ แจ้งแทน"
  * เก็บเฉพาะปัญหาลูกค้า (โรงพยาบาล) · หน้า public = docs/help.html
  */
 const { esc, fd, fca, pd, gSt } = window;
@@ -130,6 +130,7 @@ function hdRenderList(root) {
     { id: 'queue', label: 'คิวงาน' },
     { id: 'mine', label: 'ของฉัน' },
     { id: 'dashboard', label: 'แดชบอร์ด' },
+    { id: 'weekly', label: '🤖 สรุปรายสัปดาห์' },
     { id: 'kb', label: '📚 คลังความรู้' },
   ];
   var tabsHtml = tabs.map(function (x) {
@@ -138,6 +139,7 @@ function hdRenderList(root) {
 
   var body = '';
   if (tab === 'dashboard') body = hdDashboardHtml();
+  else if (tab === 'weekly') body = hdWkHtml();
   else if (tab === 'kb') body = '<div id="hd-kb-wrap" style="padding:16px 20px 28px;"><div style="color:var(--txt3);font-size:13px;">⏳ กำลังโหลดคลังความรู้...</div></div>';
   else body = hdQueueHtml(tab === 'mine');
 
@@ -152,17 +154,121 @@ function hdRenderList(root) {
     + '<div id="hd-body">' + body + '</div>';
 
   if (tab === 'dashboard') hdRenderCharts();
+  if (tab === 'weekly') hdWkAfterRender();
   if (tab === 'kb') hdKbLoad();
 }
 
+// ── QUEUE (คิวงาน / ของฉัน) ─────────────────────────────────────────────
+// แถบ "มุมมอง" แทนตัวกรองสถานะ — ค่าเริ่มต้น "ต้องทำตอนนี้" (เกิน/ใกล้ SLA, ยังไม่มอบหมาย, ลูกค้าตอบรอเราตอบ)
+// x = ข้อมูลคำนวณของแถว { open, sla, wait } จาก hdQInfo()
+var HD_VIEWS = [
+  { id: 'now', label: '🔴 ต้องทำตอนนี้', hot: true, fn: function (t, x) {
+    return x.open && (x.sla.state === 'breach' || x.sla.state === 'warn' || !t.assigneeId || x.wait === 'reply' || t.status === 'reopened');
+  } },
+  { id: 'reply', label: '💬 ลูกค้าตอบกลับ', hot: true, fn: function (t, x) { return x.wait === 'reply'; } },
+  { id: 'unassigned', label: '👤 ยังไม่มอบหมาย', hot: true, fn: function (t, x) { return x.open && !t.assigneeId; } },
+  { sep: true },
+  { id: 'doing', label: '🛠 กำลังทำ', fn: function (t) { return ['new', 'triage', 'assigned', 'in_progress', 'reopened'].indexOf(t.status) >= 0; } },
+  { id: 'pending', label: '⏸ รอผู้แจ้ง', fn: function (t) { return t.status === 'pending_user'; } },
+  { id: 'resolved', label: '✅ แก้แล้ว รอปิด', fn: function (t) { return t.status === 'resolved'; } },
+  { id: 'closed', label: '📦 ปิด / ยกเลิก', fn: function (t) { return t.status === 'closed' || t.status === 'cancelled'; } },
+  { id: 'all', label: 'ทั้งหมด', fn: function () { return true; } },
+];
+var HD_CH_ICON = { line: '💬', web: '🌐', phone: '📞', import: '📥' };
+var HD_WAIT = { team: '⏳ รอทีม', user: '⏸ รอผู้แจ้ง', reply: '💬 ลูกค้าตอบ รอเราตอบ' };
+
+// ระยะเวลาแบบอ่านง่าย: 25 นาที / 3 ชม. 10 น. / 1 วัน 5 ชม.
+function hdDur(ms) {
+  var mins = Math.max(0, Math.round(ms / 60000));
+  if (mins < 60) return mins + ' นาที';
+  var h = Math.floor(mins / 60), m = mins % 60;
+  if (h < 24) return h + ' ชม.' + (m ? ' ' + m + ' น.' : '');
+  return Math.floor(h / 24) + ' วัน' + (h % 24 ? ' ' + (h % 24) + ' ชม.' : '');
+}
+function hdAgo(iso) {
+  var ms = Date.now() - new Date(iso);
+  if (!iso || isNaN(ms)) return '-';
+  return ms < 60000 ? 'เมื่อสักครู่' : hdDur(ms) + 'ก่อน';
+}
+
+// สถานะ SLA ของแถว: breach | warn | ok | paused | done (+ ข้อความ/เปอร์เซ็นต์เวลาที่ใช้ไป)
+function hdSlaInfo(t) {
+  var st = hdStatus(t.status), now = Date.now();
+  if (!st.open) {
+    var end = t.resolvedAt || t.closedAt;
+    if (t.status === 'cancelled' || !end) return { state: 'done' };
+    var met = !t.resolutionBreached && (!t.resolutionDue || new Date(end) <= new Date(t.resolutionDue));
+    return { state: 'done', used: hdDur(new Date(end) - new Date(t.createdAt || end)), met: met,
+      over: met || !t.resolutionDue ? '' : hdDur(new Date(end) - new Date(t.resolutionDue)) };
+  }
+  var due = t.resolutionDue ? new Date(t.resolutionDue) : null;
+  var start = new Date(t.createdAt || now), total = due ? due - start : 0;
+  var pctAt = function (ts) { return total > 0 ? Math.min(100, Math.max(0, (ts - start) / total * 100)) : 100; };
+  if (st.pauseSla) {
+    var since = new Date(t.pendingSince || t.updatedAt || now);
+    return { state: 'paused', txt: 'หยุดนับ · รอ ' + hdDur(now - since), pct: due ? pctAt(since) : 0 };
+  }
+  if (!due) return { state: 'ok', txt: 'ไม่มี SLA', pct: 0 };
+  var left = due - now;
+  if (left < 0) return { state: 'breach', txt: 'เกิน ' + hdDur(-left), pct: 100 };
+  return { state: left < 0.2 * total ? 'warn' : 'ok', txt: 'เหลือ ' + hdDur(left), pct: pctAt(now) };
+}
+var HD_SLA_RANK = { breach: 0, warn: 1, ok: 2, paused: 3, done: 4 };
+
+// ── ความเคลื่อนไหวล่าสุดของแต่ละ Ticket (comment ล่าสุด) — ใช้บอก "รอใคร" + บรรทัดข้อความใต้หัวข้อ
+// cache ผูกกับ updatedAt: ลูกค้าตอบ (help.html อัปเดต updated_at) → ดึงใหม่เอง · ทีมงานตอบ → hdAddEvent เรียก hdLastForget
+var _hdLast = {}, _hdLastBusy = false;
+window.hdLastForget = function (id) { delete _hdLast[id]; };
+function hdLastOk(t) { var c = _hdLast[t.id]; return c && c.key === (t.updatedAt || t.createdAt); }
+async function hdLastEnsure(list) {
+  if (_hdLastBusy) return; // รอบที่กำลังดึงอยู่ จะวาดใหม่แล้วเรียกซ้ำเองตอนเสร็จ
+  var need = list.filter(function (t) { return !hdLastOk(t); });
+  var db = window.getDb && window.getDb();
+  if (!need.length || !db) return;
+  _hdLastBusy = true;
+  try {
+    for (var i = 0; i < need.length; i += 100) {
+      var part = need.slice(i, i + 100);
+      var r = await db.from('helpdesk_ticket_events').select('ticket_id,actor_type,actor_id,body,is_internal,created_at')
+        .eq('type', 'comment').in('ticket_id', part.map(function (t) { return t.id; })).order('created_at', { ascending: false });
+      if (r.error) console.warn('[helpdesk] last events:', r.error);
+      var got = {};
+      (r.data || []).forEach(function (e) {
+        var g = got[e.ticket_id] || (got[e.ticket_id] = { last: null, pub: null });
+        if (!g.last) g.last = e;
+        if (!g.pub && !e.is_internal) g.pub = e;
+      });
+      // ทุกตัวที่ขอ (รวมที่ไม่มี comment / ดึงพลาด) จด key ไว้ กันดึงซ้ำวนไม่จบ
+      part.forEach(function (t) { _hdLast[t.id] = Object.assign({ key: t.updatedAt || t.createdAt, last: null, pub: null }, got[t.id]); });
+    }
+  } finally { _hdLastBusy = false; }
+  var tab = window.hdTab || 'queue';
+  if (!window.hdOpenId && (tab === 'queue' || tab === 'mine')) hdQueueRedraw();
+}
+
+function hdWait(t, open) {
+  if (!open) return '';
+  if (t.status === 'pending_user') return 'user';
+  var c = _hdLast[t.id];
+  return c && c.pub && c.pub.actor_type === 'reporter' ? 'reply' : 'team';
+}
+function hdQInfo(t) {
+  var open = hdStatus(t.status).open;
+  return { open: open, sla: hdSlaInfo(t), wait: hdWait(t, open) };
+}
+function hdEvWho(e) {
+  if (e.actor_type === 'reporter') return 'ผู้แจ้ง';
+  return hdStaffName(e.actor_id) || 'ทีมงาน';
+}
+
+// ตัวกรองทั้งหมดยกเว้น "มุมมอง" (แถบมุมมองใช้นับตัวเลขของแต่ละปุ่มจากชุดนี้)
 function hdFiltered(mineOnly) {
   var f = window.hdFilter || {};
   var meId = (window.cu && (window.cu.staffId || window.cu.staff_id)) || '';
   return (window.HELPDESK_TICKETS || []).filter(function (t) {
     if (mineOnly) { if (!meId || t.assigneeId !== meId) return false; }
-    if (f.status && t.status !== f.status) return false;
     if (f.priority && t.priority !== f.priority) return false;
-    if (f.assignee && t.assigneeId !== f.assignee) return false;
+    if (f.assignee === '-' ? t.assigneeId : (f.assignee && t.assigneeId !== f.assignee)) return false;
     if (f.category && t.categoryId !== f.category) return false;
     if (f.q) {
       var q = f.q.toLowerCase();
@@ -174,51 +280,103 @@ function hdFiltered(mineOnly) {
   });
 }
 
+function hdQRow(t, x, no, meId, canEditHd) {
+  var st = hdStatus(t.status), pr = hdPri(t.priority), h = hdHosp(t.hospitalId), cat = hdCat(t.categoryId);
+  var c = _hdLast[t.id] || {}, L = c.last;
+  var title = t.subject || t.description || '(ไม่มีรายละเอียด)';
+  var age = x.open
+    ? '<div class="hd-q-sub' + (Date.now() - new Date(t.createdAt) > 2 * 864e5 ? ' old' : '') + '">' + (HD_CH_ICON[t.channel] || '') + ' ค้าง ' + hdDur(Date.now() - new Date(t.createdAt)) + '</div>'
+    : '<div class="hd-q-sub">' + (HD_CH_ICON[t.channel] || '') + ' ' + hdDT(t.createdAt).slice(0, 10) + '</div>';
+  var line2 = (cat ? '<span class="hd-q-cat">' + esc(cat.name) + '</span>' : '')
+    + (L ? '<span class="hd-q-msg">' + (L.is_internal ? '🔒 ' : '') + esc(hdEvWho(L)) + ': ' + esc(String(L.body || '').split('\n')[0]) + '</span>' : '')
+    + (t.reopenedCount ? '<span class="hd-q-flag">♻️ เปิดซ้ำ ' + t.reopenedCount + '</span>' : '');
+  var sla = x.sla, slaHtml;
+  if (sla.state === 'done') {
+    slaHtml = sla.used
+      ? '<div class="hd-q-done">ใช้ ' + sla.used + ' ' + (sla.met ? '<span class="ok">✓</span>' : '<span class="bad">✗ เกิน ' + sla.over + '</span>') + '</div>'
+        + '<div class="hd-q-sub">' + (t.csatScore != null ? '⭐ ' + t.csatScore + '/5' : t.status === 'resolved' ? 'รอประเมิน' : '') + '</div>'
+      : '<span class="hd-q-sub">—</span>';
+  } else {
+    slaHtml = '<div class="hd-q-sla">' + esc(sla.txt) + '</div><span class="hd-q-bar"><i style="width:' + Math.round(sla.pct) + '%"></i></span>';
+  }
+  var owner = hdStaffName(t.assigneeId);
+  var ownerHtml = owner ? esc(owner)
+    : (x.open && canEditHd && meId
+      ? '<button class="btn btn-pri btn-sm hd-q-take" onclick="event.stopPropagation();window.hdSetField(\'' + t.id + '\',\'assigneeId\',\'' + meId + '\')">รับงาน</button>'
+      : '<span class="hd-q-sub">—</span>');
+  return '<tr class="hd-q-row s-' + sla.state + '" tabindex="0" onclick="window.hdOpen(\'' + t.id + '\')" onkeydown="if(event.key===\'Enter\')window.hdOpen(\'' + t.id + '\')">'
+    + '<td class="hd-q-no">' + no + '</td>'
+    + '<td><div class="hd-q-tk">' + esc(t.ticketNo) + '</div>' + age + '</td>'
+    + '<td class="hd-q-subj"><div class="hd-q-title" title="' + esc(t.description || title) + '">' + esc(title) + '</div>'
+    + (line2 ? '<div class="hd-q-line2' + (x.wait === 'reply' ? ' reply' : '') + '">' + line2 + '</div>' : '') + '</td>'
+    + '<td><div class="hd-q-hosp">' + esc((h && h.name) || '-') + '</div>' + (t.reporterName ? '<div class="hd-q-sub">' + esc(t.reporterName) + '</div>' : '') + '</td>'
+    + '<td><span class="hd-pill" style="color:' + pr.color + ';background:' + pr.color + '1e;">' + esc(pr.short) + '</span></td>'
+    + '<td><span class="hd-pill" style="color:' + st.color + ';background:' + st.color + '1e;">' + st.icon + ' ' + esc(st.label) + '</span>'
+    + (x.wait ? '<div class="hd-q-wait w-' + x.wait + '">' + HD_WAIT[x.wait] + '</div>' : '') + '</td>'
+    + '<td class="hd-q-owner">' + ownerHtml + '</td>'
+    + '<td>' + slaHtml + '</td>'
+    + '<td class="hd-q-upd"><b>' + hdAgo(t.updatedAt || t.createdAt) + '</b>' + (L ? esc(hdEvWho(L)) : '') + '</td>'
+    + '</tr>';
+}
+
 function hdQueueHtml(mineOnly) {
   var f = window.hdFilter || {};
-  var rows = hdFiltered(mineOnly);
-  // เรียงตามเลขที่แจ้ง (ticketNo) จากมากไปน้อย — ล่าสุดขึ้นก่อน
-  rows.sort(function (a, b) { return (b.ticketNo || '').localeCompare(a.ticketNo || ''); });
-
-  var all = window.HELPDESK_TICKETS || [];
-  var openCnt = all.filter(function (t) { return hdStatus(t.status).open; }).length;
-  var todayStr = new Date().toISOString().slice(0, 10);
-  var newToday = all.filter(function (t) { return (t.createdAt || '').slice(0, 10) === todayStr; }).length;
-  var breach = all.filter(hdOverdue).length;
-  var pending = all.filter(function (t) { return t.status === 'pending_user'; }).length;
-  var unassigned = all.filter(function (t) { return hdStatus(t.status).open && !t.assigneeId; }).length;
+  var meId = (window.cu && (window.cu.staffId || window.cu.staff_id)) || '';
   var canEditHd = window.canEdit && window.canEdit('helpdesk');
+  var base = hdFiltered(mineOnly).map(function (t) { return { t: t, x: hdQInfo(t) }; });
 
-  var staffOpts = '<option value="">ผู้รับผิดชอบ: ทั้งหมด</option>' + (window.STAFF || []).filter(function (s) { return s.active; })
-    .map(function (s) { return '<option value="' + s.id + '"' + (f.assignee === s.id ? ' selected' : '') + '>' + esc(s.name) + '</option>'; }).join('');
+  var viewId = f.view || 'now';
+  var view = HD_VIEWS.find(function (v) { return v.id === viewId; }) || HD_VIEWS[0];
+  var viewsHtml = HD_VIEWS.map(function (v) {
+    if (v.sep) return '<span class="hd-view-sep"></span>';
+    var n = base.filter(function (r) { return v.fn(r.t, r.x); }).length;
+    return '<button class="hd-view' + (v.id === view.id ? ' on' : '') + (v.hot && n ? ' hot' : '') + '" onclick="window.hdSetFilter(\'view\',\'' + v.id + '\')">'
+      + v.label + '<span class="n">' + n + '</span></button>';
+  }).join('');
+
+  // เรียง: ด่วนตาม SLA ก่อน (เกิน → ใกล้เกิน → ปกติ → หยุดนับ → จบแล้ว) · งานเปิดเรียงตาม due · งานจบเรียงใหม่ → เก่า
+  var rows = base.filter(function (r) { return view.fn(r.t, r.x); }).sort(function (a, b) {
+    var d = HD_SLA_RANK[a.x.sla.state] - HD_SLA_RANK[b.x.sla.state];
+    if (d) return d;
+    if (a.x.open) return (a.t.resolutionDue || '9').localeCompare(b.t.resolutionDue || '9');
+    return (b.t.resolvedAt || b.t.updatedAt || '').localeCompare(a.t.resolvedAt || a.t.updatedAt || '');
+  });
+
+  var staffOpts = '<option value="">ผู้รับผิดชอบ: ทั้งหมด</option><option value="-"' + (f.assignee === '-' ? ' selected' : '') + '>— ยังไม่มอบหมาย —</option>'
+    + (window.STAFF || []).filter(function (s) { return s.active; })
+      .map(function (s) { return '<option value="' + s.id + '"' + (f.assignee === s.id ? ' selected' : '') + '>' + esc(s.name) + '</option>'; }).join('');
   var catOpts = '<option value="">หมวด: ทั้งหมด</option>' + (window.HELPDESK_CATEGORIES || [])
     .map(function (c) { return '<option value="' + c.id + '"' + (f.category === c.id ? ' selected' : '') + '>' + esc(c.name) + '</option>'; }).join('');
-  var stOpts = '<option value="">สถานะ: ทั้งหมด</option>' + (window.HD_STATUS || [])
-    .map(function (s) { return '<option value="' + s.id + '"' + (f.status === s.id ? ' selected' : '') + '>' + s.icon + ' ' + s.label + '</option>'; }).join('');
   var prOpts = '<option value="">Priority: ทั้งหมด</option>' + (window.HD_PRIORITY || [])
     .map(function (p) { return '<option value="' + p.id + '"' + (f.priority === p.id ? ' selected' : '') + '>' + esc(p.label) + '</option>'; }).join('');
+  var groupOpts = [['', 'จัดกลุ่ม: ไม่จัด'], ['hosp', 'จัดกลุ่ม: ตาม รพ.'], ['owner', 'จัดกลุ่ม: ตามผู้รับผิดชอบ'], ['wait', 'จัดกลุ่ม: ตามรอใคร']]
+    .map(function (g) { return '<option value="' + g[0] + '"' + ((f.group || '') === g[0] ? ' selected' : '') + '>' + g[1] + '</option>'; }).join('');
   var pageSize = window.hdPageSize || 50;
   var pageSizeOpts = [50, 100, 500, 1000].map(function (n) { return '<option value="' + n + '"' + (pageSize === n ? ' selected' : '') + '>' + n + ' แถว/หน้า</option>'; }).join('');
 
   var toolbar =
     '<div class="toolbar" style="position:sticky;top:0;z-index:10;background:var(--surface);flex-wrap:wrap;">'
     + '<div class="t-search"><input id="hd-q" placeholder="ค้นหา เลขที่ / หัวข้อ / ผู้แจ้ง / รพ." value="' + esc(f.q || '') + '" oninput="window.hdSetFilter(\'q\',this.value)"></div>'
-    + '<select class="t-sel" onchange="window.hdSetFilter(\'status\',this.value)">' + stOpts + '</select>'
     + '<select class="t-sel" onchange="window.hdSetFilter(\'priority\',this.value)">' + prOpts + '</select>'
     + '<select class="t-sel" onchange="window.hdSetFilter(\'assignee\',this.value)">' + staffOpts + '</select>'
     + '<select class="t-sel" onchange="window.hdSetFilter(\'category\',this.value)">' + catOpts + '</select>'
+    + '<select class="t-sel" onchange="window.hdSetFilter(\'group\',this.value)">' + groupOpts + '</select>'
     + '<div style="flex:1"></div>'
     + '<select class="t-sel" onchange="window.hdSetPageSize(this.value)">' + pageSizeOpts + '</select>'
-    + '</div>';
+    + '</div>'
+    + '<div class="hd-views">' + viewsHtml + '</div>';
 
-  var summary =
-    '<div style="display:flex;gap:12px;padding:12px 24px;background:var(--bg);flex-wrap:wrap;align-items:center;font-size:12px;">'
-    + '<span>เข้าใหม่วันนี้ <b>' + newToday + '</b></span>'
-    + '<span>เปิดค้าง <b>' + openCnt + '</b></span>'
-    + '<span style="color:var(--coral);">เกิน SLA <b>' + breach + '</b></span>'
-    + '<span style="color:var(--amber);">รอผู้แจ้ง <b>' + pending + '</b></span>'
-    + (unassigned ? '<span>ยังไม่มอบหมาย <b>' + unassigned + '</b></span>' : '')
-    + (unassigned && canEditHd ? '<button class="btn btn-ghost btn-sm" style="margin-left:auto;" onclick="window.hdAiAssignBulk()" title="ให้ AI แนะนำผู้รับผิดชอบจากประสบการณ์และงานค้างของแต่ละคน">🤖 AI จัดคนให้ (' + unassigned + ')</button>' : '')
+  var cnt = function (s) { return rows.filter(function (r) { return r.x.sla.state === s; }).length; };
+  var unassigned = base.filter(function (r) { return r.x.open && !r.t.assigneeId; }).length;
+  var bits = [];
+  if (cnt('breach')) bits.push('<span class="bad">เกิน SLA ' + cnt('breach') + '</span>');
+  if (cnt('warn')) bits.push('<span class="warn">ใกล้เกิน ' + cnt('warn') + '</span>');
+  var unInView = rows.filter(function (r) { return r.x.open && !r.t.assigneeId; }).length;
+  if (unInView) bits.push('ยังไม่มอบหมาย ' + unInView);
+  var summary = '<div class="hd-q-count"><span><b>' + rows.length + '</b> เรื่อง' + (rows.length < base.length ? ' จาก ' + base.length : '') + '</span>'
+    + (bits.length ? '<span class="bits">' + bits.join(' · ') + '</span>' : '')
+    + '<span class="sort">เรียงตาม: ใกล้หมด SLA ก่อน</span>'
+    + (unassigned && canEditHd ? '<button class="btn btn-ghost btn-sm" onclick="window.hdAiAssignBulk()" title="ให้ AI แนะนำผู้รับผิดชอบจากประสบการณ์และงานค้างของแต่ละคน">🤖 AI จัดคนให้ (' + unassigned + ')</button>' : '')
     + '</div>';
 
   var totalRows = rows.length;
@@ -227,28 +385,27 @@ function hdQueueHtml(mineOnly) {
   var page = window.hdPage;
   var pageRows = rows.slice((page - 1) * pageSize, page * pageSize);
 
-  var trs = pageRows.map(function (t, i) {
-    var st = hdStatus(t.status), pr = hdPri(t.priority), sla = hdSlaCell(t);
-    var h = hdHosp(t.hospitalId);
-    var rowBg = sla.cls === 'bad' ? 'background:rgba(229,72,77,.06);' : sla.cls === 'warn' ? 'background:rgba(201,130,12,.06);' : '';
-    return '<tr style="cursor:pointer;' + rowBg + '" onclick="window.hdOpen(\'' + t.id + '\')">'
-      + '<td style="font-size:12px;color:var(--txt3);">' + ((page - 1) * pageSize + i + 1) + '</td>'
-      + '<td style="white-space:nowrap;font-family:var(--mono);font-size:12px;">' + esc(t.ticketNo) + '</td>'
-      + '<td style="max-width:360px;white-space:normal;">' + esc(t.description || '(ไม่มีรายละเอียด)') + '</td>'
-      + '<td style="font-size:12px;">' + esc((h && h.name) || '-') + (t.reporterName ? '<br><span style="color:var(--txt3)">' + esc(t.reporterName) + '</span>' : '') + '</td>'
-      + '<td><span class="hd-pill" style="color:' + pr.color + ';background:' + pr.color + '1e;">' + esc(pr.short) + '</span></td>'
-      + '<td><span class="hd-pill" style="color:' + st.color + ';background:' + st.color + '1e;">' + st.icon + ' ' + esc(st.label) + '</span></td>'
-      + '<td style="font-size:12px;">' + esc(hdStaffName(t.assigneeId)) + '</td>'
-      + '<td><span class="hd-pill hd-' + sla.cls + '">' + esc(sla.txt) + '</span></td>'
-      + '<td style="font-size:11px;color:var(--txt3);white-space:nowrap;">' + hdDT(t.updatedAt || t.createdAt) + '</td>'
-      + '</tr>';
+  var keyFn = {
+    hosp: function (r) { return '🏥 ' + ((hdHosp(r.t.hospitalId) || {}).name || 'ไม่ระบุ รพ.'); },
+    owner: function (r) { return '👤 ' + (hdStaffName(r.t.assigneeId) || 'ยังไม่มอบหมาย'); },
+    wait: function (r) { return HD_WAIT[r.x.wait] || '✅ จบแล้ว'; },
+  }[f.group];
+  var groups = [], gIdx = {};
+  pageRows.forEach(function (r, i) {
+    r.no = (page - 1) * pageSize + i + 1;
+    var k = keyFn ? keyFn(r) : '';
+    if (!(k in gIdx)) { gIdx[k] = groups.length; groups.push({ k: k, items: [] }); }
+    groups[gIdx[k]].items.push(r);
+  });
+  var trs = groups.map(function (g) {
+    return (g.k ? '<tr class="hd-q-g"><td colspan="9">' + esc(g.k) + '<span>' + g.items.length + '</span></td></tr>' : '')
+      + g.items.map(function (r) { return hdQRow(r.t, r.x, r.no, meId, canEditHd); }).join('');
   }).join('');
 
   var table =
-    '<div class="dtable-wrap" style="padding:0 12px 28px;"><div class="dtable-inner"><table style="min-width:900px;">'
-    + '<thead><tr>'
-    + '<th>ลำดับ</th><th>เลขที่</th><th>รายละเอียด</th><th>รพ. / ผู้แจ้ง</th><th>Priority</th><th>สถานะ</th><th>ผู้รับผิดชอบ</th><th>SLA คงเหลือ</th><th>อัปเดตล่าสุด</th>'
-    + '</tr></thead><tbody>' + (trs || '<tr><td colspan="9" style="text-align:center;color:var(--txt3);padding:40px;">ไม่มี Ticket</td></tr>') + '</tbody></table></div></div>';
+    '<div class="hd-q-wrap"><table class="hd-q">'
+    + '<thead><tr><th>#</th><th>เลขที่ / อายุ</th><th>เรื่อง · ข้อความล่าสุด</th><th>รพ. / ผู้แจ้ง</th><th>P</th><th>สถานะ · รอใคร</th><th>ผู้รับผิดชอบ</th><th>SLA</th><th>ล่าสุด</th></tr></thead>'
+    + '<tbody>' + (trs || '<tr><td colspan="9" class="hd-q-empty">' + (view.id === 'now' ? 'ไม่มีเรื่องที่ต้องทำตอนนี้ 🎉' : 'ไม่มี Ticket') + '</td></tr>') + '</tbody></table></div>';
 
   var pager = totalPages > 1
     ? '<div style="display:flex;justify-content:flex-end;align-items:center;gap:10px;padding:0 24px 24px;">'
@@ -258,29 +415,38 @@ function hdQueueHtml(mineOnly) {
       + '</div>'
     : '';
 
+  // งานเปิดทั้งหมด (ใช้นับ "ลูกค้าตอบกลับ") + แถวในหน้านี้ → โหลดข้อความล่าสุดที่ยังไม่มี/เก่าแล้ว
+  var needLast = base.filter(function (r) { return r.x.open; }).map(function (r) { return r.t; })
+    .concat(pageRows.map(function (r) { return r.t; }));
+  setTimeout(function () { hdLastEnsure(needLast); }, 0);
+
   return toolbar + summary + table + pager;
+}
+
+// วาดคิวใหม่ — คงโฟกัส/ตำแหน่งเคอร์เซอร์ช่องค้นหาไว้ (พิมพ์ค้นหาอยู่จะได้ไม่หลุด)
+function hdQueueRedraw() {
+  var b = document.getElementById('hd-body'); if (!b) return;
+  var a = document.activeElement, sel = a && a.id === 'hd-q' ? [a.selectionStart, a.selectionEnd] : null;
+  b.innerHTML = hdQueueHtml((window.hdTab || 'queue') === 'mine');
+  if (sel) { var i = document.getElementById('hd-q'); if (i) { i.focus(); i.setSelectionRange(sel[0], sel[1]); } }
 }
 
 window.hdSetPageSize = function (val) {
   window.hdPageSize = parseInt(val, 10) || 50;
   window.hdPage = 1;
-  var b = document.getElementById('hd-body');
-  if (b) b.innerHTML = hdQueueHtml((window.hdTab || 'queue') === 'mine');
+  hdQueueRedraw();
 };
 
 window.hdGoPage = function (delta) {
   window.hdPage = (window.hdPage || 1) + delta;
-  var b = document.getElementById('hd-body');
-  if (b) b.innerHTML = hdQueueHtml((window.hdTab || 'queue') === 'mine');
+  hdQueueRedraw();
 };
 
 window.hdSetFilter = function (key, val) {
   window.hdFilter = window.hdFilter || {};
   window.hdFilter[key] = val;
   window.hdPage = 1;
-  var b = document.getElementById('hd-body');
-  if (b) b.innerHTML = hdQueueHtml((window.hdTab || 'queue') === 'mine');
-  if (key === 'q') { var i = document.getElementById('hd-q'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }
+  hdQueueRedraw();
 };
 
 // ── DETAIL ─────────────────────────────────────────────────────────────
@@ -1759,7 +1925,10 @@ function hdDashboardHtml() {
   var csatAccent = csatNum == null ? 'neu' : csatNum >= 4.5 ? 'good' : csatNum >= 3.5 ? 'warn' : 'bad';
   var kpis = '<div class="hd-kpi-grid">'
     + kpi('📥', 'เข้าใหม่ (7 วัน)', wk.length, wkSub, 'neu')
-    + kpi('📋', 'เปิดค้าง', open.length, '', 'neu')
+    + kpi('📋', 'เปิดค้าง', open.length, (function () {
+        var un = open.filter(function (t) { return !t.assigneeId; }).length;
+        return !open.length ? 'ไม่มีงานค้าง' : un ? 'ยังไม่มอบหมาย ' + un + ' เรื่อง' : 'มอบหมายครบแล้ว';
+      })(), 'neu')
     + kpi('🔥', 'เกิน SLA', breach, breach ? 'ต้องเร่งดำเนินการ' : 'ไม่มี — ดีมาก', breach ? 'bad' : 'good')
     + kpi('⚡', 'FRT เฉลี่ย', fmtDur(frt), 'เวลาตอบกลับครั้งแรก', 'neu')
     + kpi('🛠️', 'MTTR เฉลี่ย', fmtDur(mttr), 'เวลาแก้ไขเฉลี่ย (30 วัน)', 'neu')
@@ -1907,6 +2076,525 @@ function hdRenderCharts() {
     options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, grid: { color: grid }, ticks: Object.assign({ precision: 0 }, tickOpt) }, y: { grid: { display: false }, ticks: tickOpt } } },
   });
 }
+
+// ── สรุปรายสัปดาห์ (AI) ────────────────────────────────────────────────
+// ตัวเลข/ตารางทุกช่องคำนวณจากข้อมูลในระบบเอง (ไม่ให้ AI นับ กันตัวเลขแต่ง) แล้วค่อยส่ง "สถิติ + รายการ Ticket ย่อ"
+// ให้ AI เขียนบทสรุป · ถ้า Ticket เยอะเกินจะส่งรอบเดียว แบ่งเป็นชุดให้ AI สรุปย่อยก่อน แล้วรวมเป็นบทสรุปเดียว
+// ไม่บันทึกผลลง DB — สร้างใหม่ทุกครั้งที่กด (เก็บไว้ในหน่วยความจำ เปลี่ยนสัปดาห์/ตัวกรองแล้วกลับมายังเห็นอยู่)
+var HD_WK_DAY = ['จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.', 'อา.'];
+var HD_WK_MON = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+var _hdWkEv = {};      // ticketId → comment events (เก่า → ใหม่) ใช้ดึง "วิธีแก้ไข"
+var _hdWkAi = null;    // { key, loading, progress, text, error }
+
+function hdWkMonday(d) {
+  d = new Date(d); d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - (d.getDay() + 6) % 7);
+  return d;
+}
+function hdWkYmd(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function hdWkD(d, withYear) { return d.getDate() + ' ' + HD_WK_MON[d.getMonth()] + (withYear ? ' ' + (d.getFullYear() + 543) : ''); }
+function hdWkState() {
+  if (!window.hdWk) window.hdWk = { start: hdWkYmd(hdWkMonday(new Date())), group: '', hosp: '' };
+  return window.hdWk;
+}
+function hdWkKey() { var s = hdWkState(); return s.start + '|' + s.group + '|' + s.hosp; }
+// แหล่งที่มา: ชื่อกลุ่ม LINE ถ้ากรอกไว้ ไม่งั้นใช้ชื่อช่องทาง
+function hdWkSrc(t) {
+  var g = String(t.lineGroupRef || '').trim();
+  if (g) return g;
+  if (t.channel === 'line') return 'LINE (ไม่ระบุกลุ่ม)';
+  var ch = (window.HD_CHANNEL || []).find(function (c) { return c.id === t.channel; });
+  return ch ? ch.label.replace(/\s*\(.*\)$/, '') : (t.channel || 'ไม่ระบุ');
+}
+function hdWkHospName(id) { var h = hdHosp(id); return h ? h.name : 'ไม่ระบุ รพ.'; }
+function hdWkCatName(id) { var c = hdCat(id); return c ? c.name : '(ไม่ระบุหมวด)'; }
+function hdWkFmtDur(min) {
+  if (min == null) return '—';
+  if (min < 60) return Math.round(min) + ' นาที';
+  if (min < 1440) return (min / 60).toFixed(1) + ' ชม.';
+  return (min / 1440).toFixed(1) + ' วัน';
+}
+function hdWkAvg(list, fn) {
+  var v = list.map(fn).filter(function (n) { return n != null && n > 0 && isFinite(n); });
+  return v.length ? v.reduce(function (s, n) { return s + n; }, 0) / v.length : null;
+}
+function hdWkMins(a, b) { return a && b ? (new Date(b) - new Date(a)) / 60000 : null; }
+function hdWkMetSla(t) {
+  var frtOk = !t.firstResponseDue || (t.firstResponseAt && new Date(t.firstResponseAt) <= new Date(t.firstResponseDue));
+  var resOk = !t.resolutionDue || (t.resolvedAt && new Date(t.resolvedAt) <= new Date(t.resolutionDue));
+  return frtOk && resOk;
+}
+function hdWkCount(list, keyFn) {
+  var m = {};
+  list.forEach(function (t) { var k = keyFn(t); (m[k] = m[k] || []).push(t); });
+  return Object.keys(m).map(function (k) { return { key: k, list: m[k] }; }).sort(function (a, b) { return b.list.length - a.list.length; });
+}
+
+// ── คำนวณข้อมูลทั้งสัปดาห์ตามตัวกรองปัจจุบัน ──
+function hdWkData() {
+  var st = hdWkState();
+  var s = new Date(st.start + 'T00:00:00'), e = new Date(s), ps = new Date(s);
+  e.setDate(e.getDate() + 7); ps.setDate(ps.getDate() - 7);
+  var now = new Date(), cutoff = e < now ? e : now, isCurrent = e > now;
+  var inRange = function (iso, a, b) { if (!iso) return false; var d = new Date(iso); return d >= a && d < b; };
+  var all = (window.HELPDESK_TICKETS || []).filter(function (t) {
+    if (st.group && hdWkSrc(t) !== st.group) return false;
+    if (st.hosp && t.hospitalId !== st.hosp) return false;
+    return true;
+  });
+  var live = all.filter(function (t) { return t.status !== 'cancelled'; });
+  var inW = live.filter(function (t) { return inRange(t.createdAt, s, e); });
+  var prevW = live.filter(function (t) { return inRange(t.createdAt, ps, s); });
+  var resW = live.filter(function (t) { return inRange(t.resolvedAt, s, e); });
+  // งานค้าง ณ สิ้นสัปดาห์ — สัปดาห์ปัจจุบันใช้สถานะจริงตอนนี้ · สัปดาห์ที่ผ่านมาแล้วดูจากเวลาที่แก้เสร็จ
+  var openEnd = live.filter(function (t) {
+    if (new Date(t.createdAt || 0) >= e) return false;
+    if (isCurrent) return hdStatus(t.status).open;
+    return !t.resolvedAt ? hdStatus(t.status).open : new Date(t.resolvedAt) >= e;
+  });
+  var overdue = openEnd.filter(function (t) { return t.resolutionDue && new Date(t.resolutionDue) < cutoff; });
+  var rated = resW.filter(function (t) { return t.csatScore != null; });
+  return {
+    s: s, e: e, isCurrent: isCurrent, cutoff: cutoff, all: all,
+    inW: inW, prevW: prevW, resW: resW, openEnd: openEnd, overdue: overdue,
+    cancelled: all.filter(function (t) { return t.status === 'cancelled' && inRange(t.createdAt, s, e); }).length,
+    urgent: inW.filter(function (t) { return t.priority === 'p1' || t.priority === 'p2'; }),
+    reopened: live.filter(function (t) { return (t.reopenedCount || 0) > 0 && (inRange(t.createdAt, s, e) || inRange(t.resolvedAt, s, e)); }),
+    frt: hdWkAvg(inW, function (t) { return hdWkMins(t.createdAt, t.firstResponseAt); }),
+    mttr: hdWkAvg(resW, function (t) { return hdWkMins(t.createdAt, t.resolvedAt); }),
+    slaPct: resW.length ? Math.round(resW.filter(hdWkMetSla).length / resW.length * 100) : null,
+    csat: rated.length ? rated.reduce(function (a, t) { return a + t.csatScore; }, 0) / rated.length : null,
+    csatN: rated.length,
+  };
+}
+
+// ── วิธีแก้ไขของ Ticket: บันทึกคลังความรู้ "วิธีแก้ไข:" ก่อน ไม่มีก็ใช้ข้อความล่าสุดของทีมงาน ──
+function hdWkFix(id) {
+  var evs = _hdWkEv[id];
+  if (!evs) return null;
+  var kb = evs.filter(hdIsKbEvent).pop();
+  if (kb) return { src: 'kb', text: String(kb.body).replace(/^วิธีแก้ไข\s*[:：]\s*/, '').replace(/\nสาเหตุ\s*[:：][\s\S]*$/, '').trim() };
+  var last = evs.filter(function (e) { return e.actor_type === 'agent' && String(e.body || '').trim(); }).pop();
+  return last ? { src: 'reply', text: String(last.body).trim() } : { src: '', text: '' };
+}
+async function hdWkLoadEvents(ids) {
+  var need = ids.filter(function (id) { return !_hdWkEv[id]; });
+  var db = window.getDb && window.getDb();
+  if (!need.length || !db) return;
+  for (var i = 0; i < need.length; i += 150) {
+    var part = need.slice(i, i + 150);
+    var r = await db.from('helpdesk_ticket_events').select('ticket_id,type,body,actor_type,is_internal,created_at')
+      .eq('type', 'comment').in('ticket_id', part).order('created_at', { ascending: true });
+    if (r.error) { console.warn('[helpdesk] weekly events:', r.error); return; }
+    part.forEach(function (id) { _hdWkEv[id] = []; });
+    (r.data || []).forEach(function (ev) { _hdWkEv[ev.ticket_id].push(ev); });
+  }
+}
+
+window.hdWkShift = function (n) {
+  var st = hdWkState(), d = new Date(st.start + 'T00:00:00');
+  d.setDate(d.getDate() + n * 7);
+  if (d > new Date()) return;
+  st.start = hdWkYmd(d);
+  window.renderHelpdesk();
+};
+window.hdWkPick = function (v) { if (!v) return; hdWkState().start = hdWkYmd(hdWkMonday(new Date(v + 'T00:00:00'))); window.renderHelpdesk(); };
+window.hdWkSet = function (k, v) { hdWkState()[k] = v; window.renderHelpdesk(); };
+// กดการ์ดกลุ่ม LINE = กรองทั้งหน้าเป็นกลุ่มนั้น (กดซ้ำ = ยกเลิก)
+window.hdWkGroup = function (g) { var st = hdWkState(); st.group = st.group === g ? '' : g; window.renderHelpdesk(); };
+// ตัวกรองรายการติดตาม — เปลี่ยนเฉพาะตาราง ไม่ render ทั้งหน้า
+window.hdWkTrack = function (k) {
+  hdWkState().track = k;
+  var el = document.getElementById('hd-wk-track');
+  if (el) el.innerHTML = hdWkTrackHtml(hdWkData());
+};
+
+// เรื่องทั้งหมดที่ต้องติดตามในสัปดาห์: รับเข้า + ปิดในสัปดาห์ + ค้างยกมาจากสัปดาห์ก่อน
+function hdWkTracked(D) {
+  var seen = {}, out = [];
+  D.inW.concat(D.resW, D.openEnd).forEach(function (t) { if (!seen[t.id]) { seen[t.id] = 1; out.push(t); } });
+  return out;
+}
+function hdWkIsCarry(t, D) { return new Date(t.createdAt || 0) < D.s; }
+function hdWkIsDone(t, D) { return D.openEnd.indexOf(t) < 0; }
+
+var HD_WK_TRACK = [
+  { id: 'all', label: 'ทั้งหมด' },
+  { id: 'open', label: '⏳ ค้าง' },
+  { id: 'overdue', label: '🔥 เกิน SLA' },
+  { id: 'urgent', label: '🚨 ด่วน P1/P2' },
+  { id: 'carry', label: '↪ ยกมาจากสัปดาห์ก่อน' },
+  { id: 'done', label: '✅ แก้เสร็จ' },
+];
+function hdWkTrackFilter(id, D) {
+  return function (t) {
+    if (id === 'open') return !hdWkIsDone(t, D);
+    if (id === 'overdue') return D.overdue.indexOf(t) >= 0;
+    if (id === 'urgent') return t.priority === 'p1' || t.priority === 'p2';
+    if (id === 'carry') return hdWkIsCarry(t, D);
+    if (id === 'done') return hdWkIsDone(t, D);
+    return true;
+  };
+}
+
+function hdWkTrackHtml(D) {
+  var st = hdWkState(), cur = st.track || 'all', all = hdWkTracked(D);
+  var chips = '<div class="hd-wk-chips hd-wk-noprint">' + HD_WK_TRACK.map(function (f) {
+    var c = all.filter(hdWkTrackFilter(f.id, D)).length;
+    return '<button class="hd-wk-fchip' + (cur === f.id ? ' on' : '') + '" onclick="window.hdWkTrack(\'' + f.id + '\')">' + f.label + ' <b>' + c + '</b></button>';
+  }).join('') + '</div>';
+  // ค้างขึ้นก่อน (เกิน SLA → ด่วน → เก่าสุด) แล้วค่อยเรื่องที่แก้เสร็จ
+  var rank = function (t) { return hdWkIsDone(t, D) ? 3 : D.overdue.indexOf(t) >= 0 ? 0 : (t.priority === 'p1' || t.priority === 'p2') ? 1 : 2; };
+  var list = all.filter(hdWkTrackFilter(cur, D)).sort(function (a, b) {
+    return rank(a) - rank(b) || new Date(a.createdAt) - new Date(b.createdAt);
+  });
+  if (!list.length) return chips + '<div class="hd-wk-empty">ไม่มีรายการ</div>';
+  var rows = list.map(function (t) {
+    var s = hdStatus(t.status), p = hdPri(t.priority), f = hdWkFix(t.id), done = hdWkIsDone(t, D), c = new Date(t.createdAt);
+    var tags = (D.overdue.indexOf(t) >= 0 ? '<span class="hd-pill hd-bad">เกิน SLA</span>' : '')
+      + ((t.reopenedCount || 0) > 0 ? '<span class="hd-pill hd-warn">เปิดซ้ำ ' + t.reopenedCount + '</span>' : '')
+      + (hdWkIsCarry(t, D) ? '<span class="hd-pill hd-neu">ยกมา</span>' : '');
+    var dur = done && t.resolvedAt ? '<span class="hd-wk-ok">แก้ใน ' + hdWkFmtDur(hdWkMins(t.createdAt, t.resolvedAt)) + '</span>'
+      : '<span class="hd-wk-wait">ค้าง ' + hdWkFmtDur(hdWkMins(t.createdAt, D.cutoff)) + '</span>';
+    var fix = !f ? '<span class="hd-wk-muted">⏳</span>'
+      : !f.text ? '<span class="hd-wk-muted">' + (done ? '— ไม่มีบันทึกวิธีแก้ —' : '— ยังไม่มีการตอบ —') + '</span>'
+      : (f.src === 'kb' ? '<span title="จากคลังความรู้">📚 </span>' : done ? '' : '<span class="hd-wk-muted">ล่าสุด: </span>') + esc(f.text.slice(0, 200)) + (f.text.length > 200 ? '…' : '');
+    return '<tr class="hd-wk-row' + (done ? '' : ' open') + '" onclick="window.hdOpen(\'' + t.id + '\')">'
+      + '<td><div class="mono">' + esc(t.ticketNo) + '</div><div class="hd-wk-muted">' + HD_WK_DAY[(c.getDay() + 6) % 7] + ' ' + c.getDate() + '/' + (c.getMonth() + 1) + ' ' + String(c.getHours()).padStart(2, '0') + ':' + String(c.getMinutes()).padStart(2, '0') + '</div></td>'
+      + '<td><div>' + esc(hdWkSrc(t)) + '</div><div class="hd-wk-muted">' + esc(hdWkHospName(t.hospitalId)) + (t.reporterName ? ' · ' + esc(t.reporterName) : '') + '</div></td>'
+      + '<td class="hd-wk-prob"><div>' + esc(String(t.subject || t.description || '-').slice(0, 110)) + '</div><div class="hd-wk-muted">' + esc(hdWkCatName(t.categoryId)) + (t.sourceSystem ? ' · ' + esc(t.sourceSystem) : '') + '</div></td>'
+      + '<td><span class="hd-wk-pri" style="color:' + p.color + ';border-color:' + p.color + '">' + esc(p.short) + '</span></td>'
+      + '<td><span class="hd-wk-st" style="color:' + s.color + ';background:' + hdHexA(s.color, .13) + '">' + s.icon + ' ' + esc(s.label) + '</span><div class="hd-wk-tags">' + tags + '</div></td>'
+      + '<td>' + esc(hdStaffName(t.assigneeId) || 'ยังไม่มอบหมาย') + '<div class="hd-wk-muted">' + dur + '</div></td>'
+      + '<td class="hd-wk-fix">' + fix + '</td></tr>';
+  }).join('');
+  return chips + '<div class="hd-wk-scroll"><table class="t-table hd-wk-tbl"><thead><tr><th>เลขที่ / แจ้งเมื่อ</th><th>กลุ่ม LINE / รพ.</th><th>ปัญหา</th><th>P</th><th>สถานะ</th><th>ผู้รับผิดชอบ</th><th>การแก้ไข / ความคืบหน้าล่าสุด</th></tr></thead><tbody>'
+    + rows + '</tbody></table></div>';
+}
+
+// รายการแท่งแนวนอน (magnitude ข้ามหมวด → hue เดียว) · ตัวเลขเป็นสีตัวอักษรปกติ ไม่ใช่สีแท่ง
+function hdWkBars(title, groups, nameFn, opt) {
+  opt = opt || {};
+  var max = groups.reduce(function (m, g) { return Math.max(m, g.list.length); }, 0) || 1;
+  var rows = groups.slice(0, opt.limit || 8).map(function (g) {
+    var open = g.list.filter(function (t) { return hdStatus(t.status).open; }).length;
+    var name = nameFn(g.key);
+    return '<div class="hd-wk-bar" title="' + esc(name + ': ' + g.list.length + ' เรื่อง' + (open ? ' · ค้าง ' + open : '')) + '">'
+      + '<div class="hd-wk-bar-l">' + esc(name) + '</div>'
+      + '<div class="hd-wk-bar-t"><div class="hd-wk-bar-f" style="width:' + Math.max(3, g.list.length / max * 100) + '%"></div></div>'
+      + '<div class="hd-wk-bar-n"><b>' + g.list.length + '</b>' + (open ? ' <span class="hd-wk-wait">ค้าง ' + open + '</span>' : '') + '</div></div>';
+  }).join('');
+  var more = groups.length > (opt.limit || 8) ? '<div class="hd-wk-muted" style="margin-top:6px;">และอีก ' + (groups.length - (opt.limit || 8)) + ' รายการ</div>' : '';
+  return '<div class="ov-card hd-wk-card"><div class="ov-card-title">' + title + '</div>' + (rows ? rows + more : '<div class="hd-wk-empty">ไม่มีข้อมูล</div>') + '</div>';
+}
+
+function hdWkHtml() {
+  var st = hdWkState(), D = hdWkData();
+  var eLast = new Date(D.e); eLast.setDate(eLast.getDate() - 1);
+  var range = hdWkD(D.s) + ' – ' + hdWkD(eLast, true);
+  var tracked = hdWkTracked(D);
+
+  // ── ตัวกรอง ──
+  var srcs = {}, hosps = {};
+  (window.HELPDESK_TICKETS || []).forEach(function (t) { srcs[hdWkSrc(t)] = 1; if (t.hospitalId) hosps[t.hospitalId] = 1; });
+  var grpOpts = '<option value="">กลุ่ม LINE / ช่องทาง: ทั้งหมด</option>' + Object.keys(srcs).sort().map(function (g) {
+    return '<option value="' + esc(g) + '"' + (st.group === g ? ' selected' : '') + '>' + esc(g) + '</option>';
+  }).join('');
+  var hospOpts = '<option value="">รพ.: ทั้งหมด</option>' + Object.keys(hosps).map(function (id) { return { id: id, name: hdWkHospName(id) }; })
+    .sort(function (a, b) { return a.name.localeCompare(b.name, 'th'); }).map(function (h) {
+      return '<option value="' + esc(h.id) + '"' + (st.hosp === h.id ? ' selected' : '') + '>' + esc(h.name) + '</option>';
+    }).join('');
+  var toolbar = '<div class="toolbar hd-wk-noprint hd-wk-bar-top">'
+    + '<button class="btn btn-ghost btn-sm" onclick="window.hdWkShift(-1)" title="สัปดาห์ก่อน">◀</button>'
+    + '<input type="date" class="t-sel" value="' + st.start + '" max="' + hdWkYmd(new Date()) + '" onchange="window.hdWkPick(this.value)" title="เลือกวันใดก็ได้ในสัปดาห์">'
+    + '<button class="btn btn-ghost btn-sm" onclick="window.hdWkShift(1)" title="สัปดาห์ถัดไป"' + (D.isCurrent ? ' disabled' : '') + '>▶</button>'
+    + '<select class="t-sel" onchange="window.hdWkSet(\'group\',this.value)">' + grpOpts + '</select>'
+    + '<select class="t-sel" onchange="window.hdWkSet(\'hosp\',this.value)">' + hospOpts + '</select>'
+    + (st.group || st.hosp ? '<button class="btn btn-ghost btn-sm" onclick="window.hdWk.group=\'\';window.hdWk.hosp=\'\';window.renderHelpdesk()">✕ ล้างตัวกรอง</button>' : '')
+    + '<div style="flex:1"></div>'
+    + '<button class="btn btn-ghost btn-sm" onclick="window.print()">🖨️ พิมพ์ / PDF</button>'
+    + '<button class="btn btn-pri btn-sm" onclick="window.hdWkRunAi()"' + (_hdWkAi && _hdWkAi.loading ? ' disabled' : '') + '>🤖 สรุปด้วย AI</button>'
+    + '</div>';
+
+  // ── หัวรายงาน + สถานะรวม 1 บรรทัด ──
+  var health = D.overdue.length ? { cls: 'bad', txt: '🔴 มี ' + D.overdue.length + ' เรื่องเกิน SLA ต้องเร่งดำเนินการ' }
+    : D.openEnd.length ? { cls: 'warn', txt: '🟡 ค้าง ' + D.openEnd.length + ' เรื่อง (ยังไม่เกิน SLA)' }
+    : { cls: 'good', txt: '🟢 เคลียร์งานครบ ไม่มีเรื่องค้าง' };
+  var head = '<div class="hd-wk-head"><div>'
+    + '<div class="hd-wk-title">📊 สรุปงานศูนย์ช่วยเหลือ · ' + range + (D.isCurrent ? ' <span class="hd-wk-tag">สัปดาห์นี้ ยังไม่จบ</span>' : '') + '</div>'
+    + '<div class="hd-wk-sub">' + esc([st.group, st.hosp ? hdWkHospName(st.hosp) : ''].filter(Boolean).join(' · ') || 'ทุกกลุ่ม LINE / ทุกช่องทาง · ทุก รพ.') + '</div></div>'
+    + '<div class="hd-wk-health hd-wk-' + health.cls + '">' + health.txt + '</div></div>';
+
+  // ── ภาพรวม: 3 การ์ด (ปริมาณงาน / ความเร็ว & คุณภาพ / ความเสี่ยง) ──
+  var diff = D.prevW.length ? Math.round((D.inW.length - D.prevW.length) / D.prevW.length * 100) : null;
+  var closeRate = tracked.length ? Math.round((tracked.length - D.openEnd.length) / tracked.length * 100) : null;
+  var unassigned = D.openEnd.filter(function (t) { return !t.assigneeId; }).length;
+  var carry = tracked.filter(function (t) { return hdWkIsCarry(t, D); }).length;
+  function stat(label, val, sub, cls) {
+    return '<div class="hd-wk-stat"><div class="k">' + label + '</div><div class="v' + (cls ? ' hd-wk-' + cls : '') + '">' + val + '</div>' + (sub ? '<div class="s">' + sub + '</div>' : '') + '</div>';
+  }
+  var lvl = function (v, good, warn, higherBetter) {
+    if (v == null) return '';
+    return higherBetter ? (v >= good ? 'good' : v >= warn ? 'warn' : 'bad') : (v <= good ? 'good' : v <= warn ? 'warn' : 'bad');
+  };
+  var overview = '<div class="hd-wk-ov">'
+    + '<div class="ov-card hd-wk-ovc"><div class="ov-card-title">📦 ปริมาณงาน</div><div class="hd-wk-stats">'
+    +   stat('รับใหม่', D.inW.length, diff == null ? 'สัปดาห์ก่อน ' + D.prevW.length : (diff > 0 ? '▲ ' : diff < 0 ? '▼ ' : '') + Math.abs(diff) + '% จาก ' + D.prevW.length)
+    +   stat('แก้เสร็จ', D.resW.length, carry ? 'รวมยกมา ' + carry : '')
+    +   stat('ค้าง', D.openEnd.length, D.isCurrent ? 'ตอนนี้' : 'สิ้นสัปดาห์', D.openEnd.length ? 'warn' : 'good')
+    + '</div>' + (closeRate == null ? '' : '<div class="hd-wk-prog" title="ปิดแล้ว ' + closeRate + '% ของเรื่องที่ต้องดูแลในสัปดาห์"><div style="width:' + closeRate + '%"></div></div><div class="hd-wk-muted">ปิดแล้ว ' + closeRate + '% ของ ' + tracked.length + ' เรื่องที่ดูแลในสัปดาห์</div>') + '</div>'
+    + '<div class="ov-card hd-wk-ovc"><div class="ov-card-title">⏱️ ความเร็ว & คุณภาพ</div><div class="hd-wk-stats">'
+    +   stat('ตอบครั้งแรก', hdWkFmtDur(D.frt), 'เฉลี่ย')
+    +   stat('แก้เสร็จใน', hdWkFmtDur(D.mttr), 'เฉลี่ย')
+    +   stat('ตรง SLA', D.slaPct == null ? '—' : D.slaPct + '%', '', lvl(D.slaPct, 90, 70, true))
+    +   stat('พึงพอใจ', D.csat == null ? '—' : D.csat.toFixed(1), D.csatN ? D.csatN + ' รีวิว' : 'ยังไม่มีคะแนน', lvl(D.csat, 4.5, 3.5, true))
+    + '</div></div>'
+    + '<div class="ov-card hd-wk-ovc"><div class="ov-card-title">🚨 ความเสี่ยง</div><div class="hd-wk-stats">'
+    +   stat('เกิน SLA', D.overdue.length, 'ยังค้าง', D.overdue.length ? 'bad' : 'good')
+    +   stat('ด่วน P1/P2', D.urgent.length, 'รับเข้า', D.urgent.length ? 'warn' : '')
+    +   stat('เปิดซ้ำ', D.reopened.length, '', D.reopened.length ? 'warn' : '')
+    +   stat('ไม่มีผู้รับผิดชอบ', unassigned, 'ที่ค้าง', unassigned ? 'bad' : '')
+    + '</div></div></div>';
+
+  // ── แนวโน้ม 8 สัปดาห์ + รายวัน/รายชั่วโมง ──
+  var dayCnt = [0, 0, 0, 0, 0, 0, 0], hourCnt = {};
+  D.inW.forEach(function (t) { var d = new Date(t.createdAt); dayCnt[(d.getDay() + 6) % 7]++; hourCnt[d.getHours()] = (hourCnt[d.getHours()] || 0) + 1; });
+  var dMax = Math.max.apply(null, dayCnt) || 1;
+  var peakH = Object.keys(hourCnt).sort(function (a, b) { return hourCnt[b] - hourCnt[a]; }).slice(0, 3)
+    .map(function (h) { return String(h).padStart(2, '0') + ':00 น. (' + hourCnt[h] + ')'; });
+  var days = '<div class="hd-wk-days">' + HD_WK_DAY.map(function (d, i) {
+    var day = new Date(D.s); day.setDate(day.getDate() + i);
+    return '<div class="hd-wk-day" title="' + d + ' ' + day.getDate() + ': ' + dayCnt[i] + ' เรื่อง"><div class="col"><div style="height:' + (dayCnt[i] / dMax * 100) + '%"></div></div>'
+      + '<div class="v">' + dayCnt[i] + '</div><div class="k">' + d + ' ' + day.getDate() + '</div></div>';
+  }).join('') + '</div>' + (peakH.length ? '<div class="hd-wk-muted">⏰ แจ้งเข้ามามากช่วง ' + esc(peakH.join(' · ')) + '</div>' : '');
+  var timeRow = '<div class="hd-wk-grid">'
+    + '<div class="ov-card hd-wk-card"><div class="ov-card-title">📈 แนวโน้ม 8 สัปดาห์ (รับเข้า / แก้เสร็จ)</div><div style="height:190px;position:relative"><canvas id="hd-wk-c-trend"></canvas></div></div>'
+    + '<div class="ov-card hd-wk-card"><div class="ov-card-title">📅 รับเข้ารายวัน</div>' + days + '</div>'
+    + '</div>';
+
+  // ── 1) กลุ่ม LINE: การ์ดต่อกลุ่ม (กด = กรองทั้งหน้า) ──
+  var prevSrc = {}; D.prevW.forEach(function (t) { var k = hdWkSrc(t); prevSrc[k] = (prevSrc[k] || 0) + 1; });
+  var groups = hdWkCount(tracked, hdWkSrc).map(function (g) {
+    var inG = g.list.filter(function (t) { return D.inW.indexOf(t) >= 0; });
+    var openG = g.list.filter(function (t) { return !hdWkIsDone(t, D); });
+    var overG = g.list.filter(function (t) { return D.overdue.indexOf(t) >= 0; }).length;
+    var doneG = g.list.length - openG.length;
+    var hs = hdWkCount(g.list, function (t) { return t.hospitalId; }).map(function (h) { return hdWkHospName(h.key); });
+    var cats = hdWkCount(g.list, function (t) { return t.categoryId; }).slice(0, 2).map(function (c) { return hdWkCatName(c.key) + ' ' + c.list.length; });
+    var pv = prevSrc[g.key] || 0, d = inG.length - pv;
+    var cls = overG ? 'bad' : openG.length ? 'warn' : 'good';
+    return '<div class="hd-wk-gc hd-wk-gc-' + cls + (st.group === g.key ? ' on' : '') + '" onclick="window.hdWkGroup(' + esc(JSON.stringify(g.key)) + ')" title="กดเพื่อดูเฉพาะกลุ่มนี้">'
+      + '<div class="hd-wk-gc-h"><b>' + esc(g.key) + '</b><span class="hd-wk-gc-tr">' + (pv || inG.length ? (d > 0 ? '▲' + d : d < 0 ? '▼' + -d : '±0') + ' จากสัปดาห์ก่อน' : '') + '</span></div>'
+      + '<div class="hd-wk-muted hd-wk-ell">🏥 ' + esc(hs.slice(0, 3).join(', ') + (hs.length > 3 ? ' +' + (hs.length - 3) : '')) + '</div>'
+      + '<div class="hd-wk-gc-n"><span><b>' + inG.length + '</b> รับใหม่</span><span><b>' + doneG + '</b> ปิดแล้ว</span><span class="' + (openG.length ? 'hd-wk-wait' : '') + '"><b>' + openG.length + '</b> ค้าง</span>' + (overG ? '<span class="hd-wk-bad"><b>' + overG + '</b> เกิน SLA</span>' : '') + '</div>'
+      + '<div class="hd-wk-prog"><div style="width:' + Math.round(doneG / g.list.length * 100) + '%"></div></div>'
+      + (cats.length ? '<div class="hd-wk-muted hd-wk-ell">🗂️ ' + esc(cats.join(' · ')) + '</div>' : '')
+      + '</div>';
+  }).join('');
+  var sec1 = '<div class="hd-sec-title">📥 1. งานจากกลุ่ม LINE / ช่องทาง <span class="hd-wk-muted">— กดการ์ดเพื่อดูเฉพาะกลุ่มนั้น</span></div><div class="hd-wk-pad">'
+    + (groups ? '<div class="hd-wk-gcs">' + groups + '</div>' : '<div class="ov-card hd-wk-empty">ไม่มีเรื่องในสัปดาห์นี้</div>')
+    + (D.cancelled ? '<div class="hd-wk-muted" style="margin-top:8px;">🚫 ยกเลิก ' + D.cancelled + ' เรื่อง (ไม่นับรวม)</div>' : '') + '</div>';
+
+  // ── 2) ติดตามรายเรื่อง ──
+  var sec2 = '<div class="hd-sec-title">📋 2. ติดตามรายเรื่อง</div><div class="hd-wk-pad"><div class="ov-card hd-wk-card" id="hd-wk-track">' + hdWkTrackHtml(D) + '</div></div>';
+
+  // ── 3) ภาพรวมปัญหา ──
+  var priGroups = (window.HD_PRIORITY || []).map(function (p) { return { key: p.id, list: tracked.filter(function (t) { return t.priority === p.id; }) }; }).filter(function (g) { return g.list.length; });
+  var sec3 = '<div class="hd-sec-title">🧩 3. ภาพรวมปัญหา</div><div class="hd-wk-pad"><div class="hd-wk-grid2">'
+    + hdWkBars('🗂️ หมวดปัญหา', hdWkCount(tracked, function (t) { return t.categoryId; }), hdWkCatName)
+    + hdWkBars('💻 ระบบ', hdWkCount(tracked, function (t) { return t.sourceSystem || '(ไม่ระบุระบบ)'; }), function (k) { return k; })
+    + hdWkBars('🏥 รพ. ที่แจ้งมากที่สุด', hdWkCount(tracked, function (t) { return t.hospitalId; }), hdWkHospName)
+    + hdWkBars('🚦 ความเร่งด่วน', priGroups, function (k) { return hdPri(k).label; })
+    + '</div></div>';
+
+  // ── 4) การแก้ไข & ทีมงาน ──
+  var staffMap = {};
+  var sf = function (id) { return staffMap[id] = staffMap[id] || { id: id, got: 0, done: [], open: 0, over: 0 }; };
+  D.inW.forEach(function (t) { sf(t.assigneeId).got++; });
+  D.resW.forEach(function (t) { sf(t.assigneeId).done.push(t); });
+  D.openEnd.forEach(function (t) { var x = sf(t.assigneeId); x.open++; if (D.overdue.indexOf(t) >= 0) x.over++; });
+  var staffRows = Object.keys(staffMap).map(function (k) { return staffMap[k]; })
+    .sort(function (a, b) { return b.done.length - a.done.length || b.got - a.got; }).map(function (x) {
+      var r = x.done.filter(function (t) { return t.csatScore != null; });
+      return '<tr><td>' + esc(x.id ? (hdStaffName(x.id) || x.id) : '⚠️ ยังไม่มอบหมาย') + '</td><td class="num">' + x.got + '</td><td class="num"><b>' + x.done.length + '</b></td>'
+        + '<td class="num' + (x.open ? ' hd-wk-wait' : '') + '">' + x.open + (x.over ? ' <span class="hd-wk-bad">(' + x.over + ' เกิน)</span>' : '') + '</td>'
+        + '<td class="num">' + hdWkFmtDur(hdWkAvg(x.done, function (t) { return hdWkMins(t.createdAt, t.resolvedAt); })) + '</td>'
+        + '<td class="num">' + (r.length ? (r.reduce(function (a, t) { return a + t.csatScore; }, 0) / r.length).toFixed(1) : '—') + '</td></tr>';
+    }).join('');
+  var sec4 = '<div class="hd-sec-title">🛠️ 4. การแก้ไข & ทีมงาน</div><div class="hd-wk-pad"><div class="hd-wk-grid">'
+    + '<div class="ov-card hd-wk-card"><div class="ov-card-title">👤 ผลงานรายคน</div><div class="hd-wk-scroll"><table class="t-table hd-wk-tbl"><thead><tr><th>ผู้รับผิดชอบ</th><th class="num">รับเข้า</th><th class="num">แก้เสร็จ</th><th class="num">ค้าง</th><th class="num">เวลาแก้เฉลี่ย</th><th class="num">CSAT</th></tr></thead><tbody>'
+    +   (staffRows || '<tr><td colspan="6" class="hd-wk-empty">ไม่มีข้อมูล</td></tr>') + '</tbody></table></div></div>'
+    + '<div class="ov-card hd-wk-card" id="hd-wk-kb">' + hdWkKbHtml(D) + '</div>'
+    + '</div></div>';
+
+  return '<div id="hd-wk-doc">' + toolbar + head + '<div id="hd-wk-ai">' + hdWkAiHtml() + '</div>' + overview + '<div class="hd-wk-pad">' + timeRow + '</div>' + sec1 + sec2 + sec3 + sec4 + '</div>';
+}
+
+// การบันทึกวิธีแก้: เรื่องที่แก้เสร็จมีบันทึกเข้าคลังความรู้กี่เรื่อง (ช่วยให้ทีมแก้ปัญหาซ้ำได้เร็วขึ้น)
+function hdWkKbHtml(D) {
+  var done = D.resW, n = done.length;
+  var loaded = done.every(function (t) { return _hdWkEv[t.id]; });
+  var title = '<div class="ov-card-title">📚 การบันทึกวิธีแก้</div>';
+  if (!n) return title + '<div class="hd-wk-empty">ไม่มีเรื่องที่แก้เสร็จในสัปดาห์นี้</div>';
+  if (!loaded) return title + '<div class="hd-wk-muted">⏳ กำลังโหลด...</div>';
+  var kb = done.filter(function (t) { var f = hdWkFix(t.id); return f && f.src === 'kb'; });
+  var reply = done.filter(function (t) { var f = hdWkFix(t.id); return f && f.src === 'reply'; }).length;
+  var none = n - kb.length - reply, pct = Math.round(kb.length / n * 100);
+  var miss = done.filter(function (t) { return kb.indexOf(t) < 0; });
+  return title + '<div class="hd-wk-stats">'
+    + '<div class="hd-wk-stat"><div class="k">เข้าคลังความรู้</div><div class="v hd-wk-' + (pct >= 80 ? 'good' : pct >= 50 ? 'warn' : 'bad') + '">' + kb.length + '/' + n + '</div><div class="s">' + pct + '%</div></div>'
+    + '<div class="hd-wk-stat"><div class="k">มีแค่ข้อความตอบ</div><div class="v">' + reply + '</div></div>'
+    + '<div class="hd-wk-stat"><div class="k">ไม่มีบันทึกเลย</div><div class="v' + (none ? ' hd-wk-bad' : '') + '">' + none + '</div></div></div>'
+    + '<div class="hd-wk-prog"><div style="width:' + pct + '%"></div></div>'
+    + (miss.length ? '<div class="hd-wk-muted" style="margin-top:8px;">ยังไม่บันทึกเข้าคลังความรู้: ' + miss.slice(0, 8).map(function (t) {
+      return '<a href="javascript:void(0)" onclick="window.hdOpen(\'' + t.id + '\')">' + esc(t.ticketNo) + '</a>';
+    }).join(', ') + (miss.length > 8 ? ' …' : '') + '</div>' : '<div class="hd-wk-muted" style="margin-top:8px;">✅ บันทึกครบทุกเรื่อง</div>');
+}
+
+// กราฟแนวโน้ม 8 สัปดาห์ — 2 series (รับเข้า/แก้เสร็จ) ใช้คู่สีเดียวกับแดชบอร์ดที่ผ่าน validate_palette แล้ว
+function hdWkRenderChart() {
+  var cv = document.getElementById('hd-wk-c-trend');
+  window._hdCharts = window._hdCharts || {};
+  if (window._hdCharts.wk) { try { window._hdCharts.wk.destroy(); } catch (e) {} delete window._hdCharts.wk; }
+  if (!cv || !window.Chart) return;
+  var st = hdWkState(), D = hdWkData();
+  var labels = [], inN = [], outN = [];
+  for (var i = 7; i >= 0; i--) {
+    var a = new Date(D.s); a.setDate(a.getDate() - i * 7);
+    var b = new Date(a); b.setDate(b.getDate() + 7);
+    var inR = function (iso) { if (!iso) return false; var d = new Date(iso); return d >= a && d < b; };
+    labels.push(hdWkD(a));
+    inN.push(D.all.filter(function (t) { return t.status !== 'cancelled' && inR(t.createdAt); }).length);
+    outN.push(D.all.filter(function (t) { return t.status !== 'cancelled' && inR(t.resolvedAt); }).length);
+  }
+  var css = getComputedStyle(document.body), dark = hdIsDark();
+  var grid = (css.getPropertyValue('--border') || '#e2e5ec').trim(), ink2 = (css.getPropertyValue('--txt2') || '#5a6075').trim(), ink3 = (css.getPropertyValue('--txt3') || '#9ba3b8').trim();
+  var cIn = '#4361ee', cOut = dark ? '#199e70' : '#1baf7a';
+  var tick = { color: ink3, font: { size: 10.5 } };
+  window._hdCharts.wk = new Chart(cv, {
+    type: 'line',
+    data: { labels: labels, datasets: [
+      { label: 'รับเข้า', data: inN, borderColor: cIn, backgroundColor: cIn, borderWidth: 2, tension: .3, pointRadius: 4, pointHoverRadius: 6 },
+      { label: 'แก้เสร็จ', data: outN, borderColor: cOut, backgroundColor: cOut, borderWidth: 2, tension: .3, pointRadius: 4, pointHoverRadius: 6 },
+    ] },
+    options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'bottom', labels: { color: ink2, font: { size: 11 }, boxWidth: 10, usePointStyle: true } } },
+      scales: { x: { grid: { display: false }, ticks: tick }, y: { beginAtZero: true, grid: { color: grid }, ticks: Object.assign({ precision: 0 }, tick) } } },
+  });
+}
+
+// หลัง render: กราฟ + โหลดบทสนทนาของเรื่องที่ติดตาม แล้วเติมเฉพาะส่วนที่ใช้ (ไม่ render ทั้งหน้าซ้ำ)
+async function hdWkAfterRender() {
+  hdWkRenderChart();
+  var ids = hdWkTracked(hdWkData()).map(function (t) { return t.id; });
+  if (!ids.some(function (id) { return !_hdWkEv[id]; })) return;
+  await hdWkLoadEvents(ids);
+  if (window.hdTab !== 'weekly') return;
+  var D = hdWkData(), tr = document.getElementById('hd-wk-track'), kb = document.getElementById('hd-wk-kb');
+  if (tr) tr.innerHTML = hdWkTrackHtml(D);
+  if (kb) kb.innerHTML = hdWkKbHtml(D);
+}
+
+// ── AI ──
+function hdWkAiHtml() {
+  var a = _hdWkAi;
+  if (!a || a.key !== hdWkKey()) return '';
+  var body = a.loading ? '<div class="hd-wk-muted" id="hd-wk-ai-prog">⏳ ' + esc(a.progress || 'AI กำลังวิเคราะห์ข้อมูล…') + '</div>'
+    : a.error ? '<div style="color:var(--coral);font-size:12.5px;">' + esc(a.error) + '</div>'
+    : '<div class="ai-text">' + window.aiTextToHtml(a.text) + '</div>';
+  return '<div class="hd-wk-pad"><div class="ai-card"><div class="ai-card-head"><div class="sec-label" style="margin:0;">🤖 บทสรุปจาก AI</div><div style="flex:1"></div>'
+    + (a.text ? '<button class="btn btn-ghost btn-sm hd-wk-noprint" onclick="window.hdWkCopyAi()" title="คัดลอกไปวางในกลุ่ม LINE">📋 คัดลอกส่ง LINE</button>' : '')
+    + (a.loading ? '' : '<button class="btn btn-ghost btn-sm hd-wk-noprint" onclick="window.hdWkCloseAi()">✕</button>')
+    + '</div>' + body + (a.text ? '<div class="ai-card-note">* สรุปโดย AI จากข้อมูล Ticket ในระบบ — ตัวเลขในตารางด้านล่างคำนวณจากระบบโดยตรง ตรวจสอบก่อนนำไปใช้</div>' : '')
+    + '</div></div>';
+}
+function hdWkAiRefresh() { var el = document.getElementById('hd-wk-ai'); if (el && window.hdTab === 'weekly') el.innerHTML = hdWkAiHtml(); }
+window.hdWkCloseAi = function () { _hdWkAi = null; hdWkAiRefresh(); };
+
+function hdWkStatsText(D) {
+  var st = hdWkState(), eLast = new Date(D.e); eLast.setDate(eLast.getDate() - 1);
+  var top = function (list, keyFn, nameFn, k) {
+    return hdWkCount(list, keyFn).slice(0, k).map(function (g) { return nameFn(g.key) + ' ' + g.list.length; }).join(' · ') || '-';
+  };
+  var id = function (x) { return x; };
+  return [
+    'สัปดาห์: ' + hdWkD(D.s, true) + ' – ' + hdWkD(eLast, true) + (D.isCurrent ? ' (สัปดาห์ปัจจุบัน ยังไม่จบ)' : ''),
+    'ขอบเขต: ' + ([st.group, st.hosp ? hdWkHospName(st.hosp) : ''].filter(Boolean).join(' · ') || 'ทุกกลุ่ม LINE/ช่องทาง ทุก รพ.'),
+    'รับเรื่องใหม่ ' + D.inW.length + ' (สัปดาห์ก่อน ' + D.prevW.length + ') · แก้เสร็จ ' + D.resW.length + ' · ค้าง' + (D.isCurrent ? 'ตอนนี้ ' : 'สิ้นสัปดาห์ ') + D.openEnd.length
+      + ' · เกิน SLA ที่ยังค้าง ' + D.overdue.length + ' · ด่วน P1/P2 ' + D.urgent.length + ' · เปิดซ้ำ ' + D.reopened.length + (D.cancelled ? ' · ยกเลิก ' + D.cancelled : ''),
+    'เวลาตอบครั้งแรกเฉลี่ย ' + hdWkFmtDur(D.frt) + ' · เวลาแก้เฉลี่ย ' + hdWkFmtDur(D.mttr) + ' · ตรง SLA ' + (D.slaPct == null ? '-' : D.slaPct + '%')
+      + ' · ความพึงพอใจ ' + (D.csat == null ? '-' : D.csat.toFixed(1) + '/5 (' + D.csatN + ' รีวิว)'),
+    'แยกตามกลุ่ม LINE/ช่องทาง: ' + top(D.inW, hdWkSrc, id, 12),
+    'แยกตามหมวด: ' + top(D.inW, function (t) { return t.categoryId; }, hdWkCatName, 10),
+    'แยกตามระบบ: ' + top(D.inW, function (t) { return t.sourceSystem || '(ไม่ระบุระบบ)'; }, id, 8),
+    'รพ. ที่แจ้งมากสุด: ' + top(D.inW, function (t) { return t.hospitalId; }, hdWkHospName, 8),
+    'ผู้แก้เสร็จมากสุด: ' + top(D.resW, function (t) { return t.assigneeId; }, function (k) { return hdStaffName(k) || 'ยังไม่มอบหมาย'; }, 8),
+  ].join('\n');
+}
+function hdWkTicketLine(t, D) {
+  var f = hdWkFix(t.id), flags = [];
+  if (D.overdue.indexOf(t) >= 0) flags.push('เกิน SLA');
+  if ((t.reopenedCount || 0) > 0) flags.push('เปิดซ้ำ ' + t.reopenedCount);
+  var c = new Date(t.createdAt);
+  return '#' + t.ticketNo + ' | ' + c.getDate() + '/' + (c.getMonth() + 1) + ' | ' + hdWkHospName(t.hospitalId) + ' | ' + hdWkSrc(t) + ' | ' + hdWkCatName(t.categoryId)
+    + (t.sourceSystem ? ' | ' + t.sourceSystem : '') + ' | ' + hdPri(t.priority).short + ' | ' + hdStatus(t.status).label + (flags.length ? ' (' + flags.join(', ') + ')' : '')
+    + ' | ผู้รับผิดชอบ: ' + (hdStaffName(t.assigneeId) || '-')
+    + '\n  ปัญหา: ' + String(t.description || t.subject || '-').replace(/\s+/g, ' ').slice(0, 220)
+    + '\n  การแก้ไข: ' + (f && f.text ? f.text.replace(/\s+/g, ' ').slice(0, 220) : '-');
+}
+
+window.hdWkRunAi = async function () {
+  if (_hdWkAi && _hdWkAi.loading) return;
+  var D = hdWkData(), key = hdWkKey();
+  var tks = hdWkTracked(D);
+  if (!tks.length) { window.showAlert && window.showAlert('สัปดาห์นี้ยังไม่มีข้อมูลให้สรุป', 'warn'); return; }
+  _hdWkAi = { key: key, loading: true, progress: 'กำลังรวบรวมบทสนทนาและวิธีแก้ไข…' };
+  window.renderHelpdesk();
+  var prog = function (msg) { _hdWkAi.progress = msg; var el = document.getElementById('hd-wk-ai-prog'); if (el) el.textContent = '⏳ ' + msg; };
+  try {
+    await hdWkLoadEvents(tks.map(function (t) { return t.id; }));
+    tks.sort(function (a, b) { return new Date(a.createdAt) - new Date(b.createdAt); });
+    var lines = tks.map(function (t) { return hdWkTicketLine(t, D); });
+    // แบ่งชุดตามความยาว — โมเดลรับข้อความได้จำกัด
+    var chunks = [], cur = '';
+    lines.forEach(function (l) { if (cur && cur.length + l.length > 9000) { chunks.push(cur); cur = ''; } cur += l + '\n'; });
+    if (cur) chunks.push(cur);
+    var stats = hdWkStatsText(D), material;
+    if (chunks.length === 1) material = 'รายการ Ticket (' + tks.length + ' เรื่อง):\n' + chunks[0];
+    else {
+      var notes = [];
+      for (var i = 0; i < chunks.length; i++) {
+        prog('AI กำลังอ่าน Ticket ชุดที่ ' + (i + 1) + '/' + chunks.length + '…');
+        notes.push(await window.aiChat(
+          'คุณเป็นผู้ช่วยทีม Helpdesk ซอฟต์แวร์โรงพยาบาล อ่านรายการ Ticket แล้วจัดกลุ่มปัญหาที่คล้ายกัน เขียนเป็น bullet ภาษาไทยสั้น ๆ: '
+          + '"- <กลุ่มปัญหา> (<จำนวน> เรื่อง: <รพ.> ) — สาเหตุที่พบ: ... — วิธีแก้ที่ใช้: ..." และระบุเรื่องค้าง/เกิน SLA/เปิดซ้ำที่น่ากังวล '
+          + 'ใช้เฉพาะข้อมูลที่ให้ ห้ามแต่งวิธีแก้ที่ไม่มีในข้อมูล',
+          chunks[i], { maxTokens: 900, temperature: 0.2 }));
+      }
+      material = 'บันทึกสรุปย่อยจาก Ticket ทั้งหมด ' + tks.length + ' เรื่อง (แบ่งอ่านเป็น ' + chunks.length + ' ชุด):\n' + notes.join('\n');
+    }
+    prog('AI กำลังเขียนบทสรุปประจำสัปดาห์…');
+    var text = await window.aiChat(
+      'คุณเป็นหัวหน้าทีม Helpdesk ซอฟต์แวร์โรงพยาบาล (HOSxP ฯลฯ) เขียนรายงานสรุปงานประจำสัปดาห์ภาษาไทย ให้ผู้บริหารและทีมอ่าน '
+      + 'ใช้หัวข้อตามลำดับนี้: "## ภาพรวมสัปดาห์", "## งานที่ได้รับจากกลุ่ม LINE", "## ภาพรวมปัญหา", "## การแก้ไข", "## เรื่องที่ต้องติดตาม", "## ข้อเสนอแนะสัปดาห์หน้า" '
+      + '· ภาพรวมปัญหา: จัดกลุ่มปัญหาที่คล้ายกัน บอกจำนวน รพ. ที่เกี่ยวข้อง และปัญหาที่เกิดซ้ำ (อาจเป็นต้นเหตุเชิงระบบ) '
+      + '· การแก้ไข: สรุปวิธีแก้ของแต่ละกลุ่มปัญหา และวิธีที่ควรเก็บเข้าคลังความรู้ · เรื่องที่ต้องติดตาม: อ้างเลขที่ Ticket '
+      + '· ข้อเสนอแนะ 3–5 ข้อ เจาะจง ทำได้จริง (เช่น อบรมผู้ใช้ รพ. ใด, แก้ระบบ/ตั้งค่า, ทำคู่มือ, เพิ่มคน) '
+      + '· แต่ละหัวข้อเป็น bullet สั้น กระชับ อ้างตัวเลขจริงจากสถิติ ห้ามแต่งตัวเลขหรือข้อมูลที่ไม่มี ถ้าข้อมูลส่วนไหนไม่มีให้บอกว่าไม่มี',
+      'สถิติ (คำนวณจากระบบ ถูกต้องแล้ว):\n' + stats + '\n\n' + material, { maxTokens: 2200, temperature: 0.3 });
+    _hdWkAi = { key: key, text: text };
+  } catch (e) {
+    _hdWkAi = { key: key, error: 'AI สรุปไม่สำเร็จ: ' + (e.message || e) };
+  }
+  if (window.hdTab === 'weekly') window.renderHelpdesk();
+};
+window.hdWkCopyAi = function () {
+  if (!_hdWkAi || !_hdWkAi.text) return;
+  var D = hdWkData(), eLast = new Date(D.e); eLast.setDate(eLast.getDate() - 1);
+  var txt = '📊 สรุปงานศูนย์ช่วยเหลือ สัปดาห์ ' + hdWkD(D.s) + ' – ' + hdWkD(eLast, true) + '\n'
+    + _hdWkAi.text.replace(/\*\*(.+?)\*\*/g, '$1').replace(/^\s*#{1,4}\s+(.*)$/gm, '\n▶ $1').replace(/^\s*[-*]\s+/gm, '• ').replace(/\n{3,}/g, '\n\n').trim();
+  hdCopy(txt, 'คัดลอกบทสรุปแล้ว — วางในกลุ่ม LINE ได้เลย');
+};
 
 // ── นำเข้าปัญหาเก่า (bulk import จาก Excel/CSV) ─────────────────────────
 var HD_IMPORT_COLS = [

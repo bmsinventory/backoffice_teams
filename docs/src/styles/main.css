@@ -17,7 +17,6 @@
 @import './components/form.css';
 @import './components/buttons.css';
 @import './components/ai.css';
-@import './components/face.css';
 
 /* ── Feature Modules ── */
 @import './modules/login.css';
@@ -36,6 +35,7 @@
 @import './modules/helpdesk.css';
 @import './modules/all-issues.css';
 @import './modules/contract.css';
+@import './modules/assist.css';
 
 /* ── Utilities (last to allow overrides) ── */
 @import './utilities.css';

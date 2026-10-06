@@ -157,8 +157,6 @@
           กำลังเข้าสู่ระบบ...
         </span>
       </button>
-      <!-- แสดงเมื่อเซิร์ฟเวอร์ตั้งค่า FaceHub แล้ว (src/services/face-auth.service.js) -->
-      <button type="button" class="lbtn-face" id="face-login-btn" style="display:none" onclick="window.openFaceLogin()">🙂 เข้าสู่ระบบด้วยใบหน้า</button>
 
       <p class="lcard-foot">© 2026 Backoffice System · All rights reserved</p>
       <p class="lcard-ios-tip" id="ios-tip" style="display:none">
@@ -177,7 +175,7 @@
       <div>
         <div class="sb-title">Backoffice Teams</div>
         <!-- เลขเวอร์ชัน: +0.001 ทุกครั้งที่ปล่อยเวอร์ชัน (deploy) -->
-        <div class="sb-sub">V1.001</div>
+        <div class="sb-sub">V1.002</div>
       </div>
     </div>
     <div class="sb-nav">
@@ -236,6 +234,9 @@
       <div class="nav-btn" onclick="window.goView('helpdesk',this)">
         <span class="ni">🎧</span><span class="nl">ศูนย์ช่วยเหลือ</span>
         <span class="nb" id="hd-nb" style="display:none">0</span>
+      </div>
+      <div class="nav-btn" onclick="window.goView('assist',this)">
+        <span class="ni">💬</span><span class="nl">ผู้ช่วยทีม</span>
       </div>
 
       <div class="sb-sec">ข้อมูลอ้างอิง</div>
@@ -302,6 +303,7 @@
       <button id="mob-menu-btn" class="btn btn-ghost btn-sm" onclick="window.toggleMobSidebar()" style="display:none;" aria-label="เมนู">☰</button>
       <div class="tp-title" id="tp-title">Overview</div>
       <div id="tp-actions"></div>
+      <button class="btn btn-ghost btn-sm" id="btn-ask-ai" onclick="window.askAiOpen()" title="ถาม AI — ค้นข้อมูลด้วยภาษาคน (Ctrl+K)">🤖 <span class="btn-lbl">ถาม AI</span></button>
       <button class="btn btn-ghost btn-sm admin-only" id="btn-import-top" style="display:none" onclick="window.openImportModal()" title="นำเข้าข้อมูล">📥 <span class="btn-lbl">นำเข้า</span></button>
       <button id="dm-toggle" onclick="window.toggleDarkMode()" title="Dark/Light Mode" aria-label="สลับธีม">🌙</button>
       <button id="noti-bell" onclick="window.toggleNotiMenu(event)" title="ไม่มีการแจ้งเตือน" aria-label="การแจ้งเตือน">🔔<span id="noti-count" style="display:none">0</span></button>
@@ -957,6 +959,9 @@
       <!-- ปัญหาทุกโครงการ (all_issues) — สิทธิ์ตามระบบสิทธิ์ปกติ (canView) เนื้อหา render โดย src/modules/all-issues.js -->
       <div class="view" id="view-all-issues"></div>
 
+      <!-- ผู้ช่วยทีม — แชทถามข้อความ/โค้ดที่ทีมเก็บไว้ (ซ้าย) + คลังคำตอบ (ขวา) · src/modules/assist.js renderAssist -->
+      <div class="view" id="view-assist"></div>
+
       <!-- ระบบอบรม — ภาพรวมการอบรมทุกโครงการ + ตั้งค่ากลาง (หลักสูตรอบรม/คลังแบบทดสอบ/ใบประกาศ) จากระบบอบรม (/training/?view=overview) (src/modules/training.js)
            งานอบรมของแต่ละโครงการอยู่ที่ติดตามสถานะโครงการ › แท็บ "🎓 อบรม" · หน้าใน iframe ซ่อนแถบเมนูของตัวเอง -->
       <div class="view" id="view-training">
@@ -1101,8 +1106,9 @@
     </div>
     <div class="m-body" id="m-proj-body"></div>
     <div class="m-foot" id="m-proj-foot">
+      <button class="btn btn-ghost" id="pf-sem-btn" style="margin-right:auto;display:none;" onclick="window.openScheduleEmail(window.editPid)" title="สร้าง Subject + เนื้อหาอีเมลขออนุมัติตารางดำเนินงานจากข้อมูลโครงการนี้">✉️ ร่าง Email ขออนุมัติตาราง</button>
       <button class="btn btn-ghost" onclick="window.closeM('m-proj')">ยกเลิก</button>
-      <button class="btn btn-pri" onclick="window.saveProject()">💾 บันทึก</button>
+      <button class="btn btn-pri" id="pf-save-btn" onclick="window.saveProject()">💾 บันทึก</button>
     </div>
   </div>
 </div>
@@ -1916,6 +1922,18 @@
   </div>
 </div>
 
+<div class="overlay" id="m-sem">
+  <div class="modal lg">
+    <div class="m-head">
+      <div class="m-icon" style="background:rgba(6,214,160,.12)">✉️</div>
+      <div class="m-title">ร่าง Email ขออนุมัติตารางดำเนินงาน</div>
+      <button class="m-x" onclick="window.closeM('m-sem')">✕</button>
+    </div>
+    <div class="m-body" id="m-sem-body" style="font-size:13px;"></div>
+    <div class="m-foot" id="m-sem-foot"></div>
+  </div>
+</div>
+
 <div class="overlay" id="m-kb-ai">
   <div class="modal md">
     <div class="m-head">
@@ -2446,7 +2464,6 @@
 <script src="src/services/db.service.js"></script>
 <script src="src/services/realtime.service.js"></script>
 <script src="src/services/auth.service.js"></script>
-<script src="src/services/face-auth.service.js"></script>
 <script src="src/services/impl-tracker.service.js"></script>
 <script src="src/services/form-tracker.service.js"></script>
 <script src="src/services/expense-form.service.js"></script>
@@ -2483,6 +2500,9 @@
 <script type="module" src="src/modules/impl-tracker.js"></script>
 <script type="module" src="src/modules/helpdesk.js"></script>
 <script src="src/modules/all-issues.js"></script>
+<script src="src/modules/ask-ai.js"></script>
+<script src="src/modules/schedule-email.js"></script>
+<script src="src/modules/assist.js"></script>
 <script src="src/modules/training.js"></script>
 <script src="src/modules/budget.js"></script>
 <script src="src/modules/export.js"></script>

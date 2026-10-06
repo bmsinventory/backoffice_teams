@@ -315,6 +315,61 @@ window.sdfRenderPreview = function () {
   `;
 };
 
+// ── FM-AC-02 ในรูปแบบ Word (ปุ่ม "Word" ใน expense-form.js → ecfSaveWord) — โครงเดียวกับ sdfRenderPreview
+// แต่ใช้ตารางความกว้างตายตัวจาก window.ecfWord แทน flex/grid ที่ Word ไม่รู้จัก ──
+window.sdfWordBody = function () {
+  var X = window.ecfWord, W = X.W, IW = W - 12;   // IW = ความกว้างด้านในกรอบ (หักขอบใน 6pt สองข้าง)
+  var deptEl = document.querySelector('input[name="sdf-dept"]:checked');
+  var deptKey = deptEl ? deptEl.value : 'other';
+  var depts = window.SDF_DEPTS.map(function (c) {
+    var on = c.key === deptKey;
+    var note = (c.key === 'other' && on && sdfV('sdf-dept-other-note').trim()) ? ' ' + X.fill(sdfV('sdf-dept-other-note')) : '';
+    return X.cbP(on, esc(c.label) + note);
+  });
+  var revisit = sdfChecked('sdf-work-revisit') ? X.fill(sdfV('sdf-revisit-no'), 4) + ' / ' + X.fill(sdfV('sdf-revisit-total'), 4) : X.fill('', 4) + ' / ' + X.fill('', 4);
+  var works = [
+    X.cbP(sdfChecked('sdf-work-open'), 'เปิดไซต์ใหม่'),
+    X.p('สัญญาเลขที่ / ใบเสนอราคาเลขที่ ' + X.fill(sdfV('sdf-contract-no'))),
+    X.cbP(sdfChecked('sdf-work-percontract'), 'งานตามงวดสัญญา'),
+    X.cbP(sdfChecked('sdf-work-revisit'), 'Revisit ครั้งที่ ' + revisit),
+    X.cbP(sdfChecked('sdf-work-fixissue'), 'งานแก้ปัญหา ( ระบุปัญหาตามเอกสารแนบ )'),
+    X.cbP(sdfChecked('sdf-work-closecontract'), 'งานปิดงวดสัญญา'),
+    { h: X.cbP(sdfChecked('sdf-work-other'), 'อื่นๆ ' + X.fill(sdfV('sdf-work-other-note'), 60)), span: 2 },
+  ];
+  var prep = sdfV('sdf-preparation-notes').trim();
+  var prepHtml = prep ? prep.split('\n').map(function (l) { return X.p(l.trim() ? '<b style="color:' + X.RED + '">' + esc(l) + '</b>' : ''); }).join('') : X.p(X.fill('', 60));
+  var acc = function (label, id, unit) { return X.p(label + ' ' + X.fill(sdfV(id), 12) + ' ' + unit); };
+
+  return X.head([
+      'บริษัท บางกอก เมดิคอล ซอฟต์แวร์ จำกัด',
+      'เลขที่ 2 ชั้น 2 ซ.สุขสวัสดิ์ 33 แขวง/เขต ราษฎร์บูรณะ กรุงเทพมหานคร',
+      'โทรศัพท์ 0-2873-0291 โทรสาร 0-2873-0292',
+      'เลขที่ประจำตัวผู้เสียภาษี 0105548152334'
+    ])
+    + X.table([[{ h: X.p('<b>แบบฟอร์มการออกปฏิบัติงาน</b>', 'text-align:center;font-size:16pt;'), st: 'border:solid black 1pt;padding:3pt;' }]], [W]) + X.gap()
+    + X.box(X.table([[X.p('แผนก'), { h: X.grid(depts, 4, IW - 40) }]], [40, IW - 40]))
+    + X.box(X.table([['สถานที่ ' + X.fill(sdfV('sdf-site-cmb-input'), 40), 'จังหวัด ' + X.fill(sdfV('sdf-province'))]], [IW - 150, 150]))
+    + X.box(X.grid(works, 2, IW))
+    + X.box(X.title('การติดต่อลูกค้า') + X.table([
+        ['ลูกค้า ' + X.fill(sdfV('sdf-customer-name'), 30), 'แผนก ' + X.fill(sdfV('sdf-customer-dept'), 30)],
+        ['Email ' + X.fill(sdfV('sdf-customer-email'), 30), 'โทร ' + X.fill(sdfV('sdf-customer-phone'), 30)],
+      ], [IW / 2, IW / 2]))
+    + X.box(X.title('การเตรียมความพร้อม :') + prepHtml)
+    + X.box(X.title('บันทึกทางบัญชี ( แผนก บัญชี )') + X.grid([
+        acc('ทดรองจ่ายรวม', 'sdf-adv-slip-count', 'ใบ'),
+        acc('เก็บเงินได้แล้ว', 'sdf-adv-collected', 'บาท'),
+        acc('ทดรองจ่ายเป็นเงินรวม', 'sdf-adv-total', 'บาท'),
+        acc('คงเหลือ', 'sdf-adv-remaining', 'บาท'),
+        acc('ค่าใช้จ่ายที่ใช้ไปแล้ว', 'sdf-adv-used', 'บาท'),
+        acc('คงเหลือยังไม่เคลียร์ ADV.', 'sdf-adv-uncleared', 'ใบ'),
+      ], 2, IW))
+    + X.p('', 'line-height:12pt;')
+    + X.p('ผู้จัดทำ ......................................................', 'text-align:center;')
+    + X.p('( ' + X.fill(sdfV('sdf-preparer-name'), 40) + ' )', 'text-align:center;')
+    + X.p(sdfV('sdf-preparer-date') ? fd(sdfV('sdf-preparer-date')) : '..... / ..... / .....', 'text-align:center;color:#555555;')
+    + X.p('FM-AC-02', 'margin-top:12pt;font-size:11pt;color:#555555;');
+};
+
 // ── Department Change: toggle the "อื่นๆ" detail field ──
 window.sdfOnDeptChange = function () {
   var wrap = document.getElementById('sdf-dept-other-wrap');

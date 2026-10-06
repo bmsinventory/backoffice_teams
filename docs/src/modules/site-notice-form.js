@@ -216,7 +216,8 @@ window.snlBuildHtml = function () {
         <label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:6px;">
           <input type="checkbox" id="snl-deliver-email" checked onchange="window.snlRenderPreview()"> ทาง E-mail
         </label>
-        <div class="f-group"><label class="f-label">E-mail</label><input class="f-input" id="snl-email-to" oninput="window.snlRenderPreview()"></div>
+        <div id="snl-email-contacts" style="display:none;margin:0 0 8px 22px;"></div>
+        <div class="f-group"><label class="f-label">E-mail</label><input class="f-input" id="snl-email-to" oninput="window.snlSyncEmailContacts();window.snlRenderPreview()"></div>
         <div class="f-group"><label class="f-label">CC E-mail (คั่นด้วยจุลภาค)</label><input class="f-input" id="snl-email-cc" oninput="window.snlRenderPreview()"></div>
       </div>
     </div>
@@ -258,6 +259,100 @@ window.snlRefreshProjectCombobox = function () {
     function () { window.snlOnProjectPick(); }
   );
 };
+
+// ── หนังสือแจ้งออกไซต์ในรูปแบบ Word (ปุ่ม "Word" ใน expense-form.js → ecfSaveWord) — โครงเดียวกับ snlRenderPreview
+// แต่ใช้ตารางความกว้างตายตัวจาก window.ecfWord แทน flex/grid ที่ Word ไม่รู้จัก ──
+window.snlWordBody = function () {
+  var X = window.ecfWord, W = X.W, IW = W - 12;   // IW = ความกว้างด้านในกรอบ (หักขอบใน 6pt สองข้าง)
+  var picked = function (name, def) { var el = document.querySelector('input[name="' + name + '"]:checked'); return el ? el.value : def; };
+  var radios = function (list, key, noteId) {
+    return list.map(function (c) {
+      var on = c.key === key;
+      var note = (c.key === 'other' && on && snlV(noteId).trim()) ? ' ' + X.fill(snlV(noteId)) : '';
+      return X.cbP(on, esc(c.label) + note);
+    });
+  };
+  var nofm = function (noId, totalId) { return X.fill(snlV(noId), 4) + ' / ' + X.fill(snlV(totalId), 4); };
+  var present = snlV('snl-present-type') ? ' ' + X.fill(snlV('snl-present-type')) : ' เชิงรุก/เชิงรับ';
+  var copydata = snlV('snl-copydata-status') === 'signed' ? ' ' + X.fill('เซ็นสัญญาแล้ว')
+    : snlV('snl-copydata-status') === 'unsigned' ? ' ' + X.fill('ยังไม่เซ็นสัญญา') : ' เซ็นสัญญาแล้ว/ยังไม่เซ็นสัญญา';
+
+  var tasks = [
+    X.cbP(snlChecked('snl-task-install'), 'เข้าปฏิบัติงานติดตั้ง'),
+    X.cbP(snlChecked('snl-task-revisit'), 'Re-visit ครั้งที่ ' + nofm('snl-revisit-no', 'snl-revisit-total')),
+    X.cbP(snlChecked('snl-task-reply-lecturer'), 'ตอบกลับวิทยากร'),
+    X.cbP(snlChecked('snl-task-ma'), 'MA ครั้งที่ ' + nofm('snl-ma-no', 'snl-ma-total')),
+    X.cbP(snlChecked('snl-task-survey'), 'สำรวจระบบ'),
+    X.cbP(snlChecked('snl-task-delivery'), 'ส่งมอบงาน งวดที่ ' + nofm('snl-delivery-no', 'snl-delivery-total')),
+    X.cbP(snlChecked('snl-task-present'), 'นำเสนอโปรแกรม' + present),
+    X.cbP(snlChecked('snl-task-copydata'), 'ขอคัดลอกฐานข้อมูล' + copydata),
+    { h: X.cbP(snlChecked('snl-task-other'), 'อื่นๆ ' + X.fill(snlV('snl-task-other-note'), 60)), span: 2 },
+  ];
+
+  var dateRow = function (startId, endId, place) {
+    return ['วันที่ดำเนินงาน ' + X.date(snlV(startId)) + ' – ' + X.date(snlV(endId)), 'สถานที่ ' + X.fill(place, 40)];
+  };
+  var dateRows = [];
+  if (snlV('snl-office-work-start') || snlV('snl-office-work-end')) dateRows.push(dateRow('snl-office-work-start', 'snl-office-work-end', 'บริษัท บางกอก เมดิคอล ซอฟต์แวร์ จำกัด'));
+  dateRows.push(dateRow('snl-work-start', 'snl-work-end', snlSiteLocationText()));
+
+  var attendees = Array.from(document.querySelectorAll('.snl-attendee-row')).map(function (row) {
+    var nameEl = row.querySelector('.snl-att-name-inp'), posEl = row.querySelector('.snl-att-pos-inp');
+    return { name: nameEl ? nameEl.value.trim() : '', pos: posEl ? posEl.value.trim() : '' };
+  }).filter(function (a) { return a.name || a.pos; });
+  var attRows = (attendees.length ? attendees : [{ name: '', pos: '' }]).map(function (a, i) {
+    return [(i + 1) + '.', X.fill(a.name, 30), 'ตำแหน่ง ' + X.fill(a.pos, 30)];
+  });
+
+  var purposeKey = picked('snl-purpose', 'inform');
+  // รายละเอียดสัญญา — คอลัมน์แรกว่าง 17pt ให้ย่อหน้าตรงกับข้อความของช่องติ๊ก
+  var half = (IW - 17) / 2;
+  var committee = purposeKey !== 'committee' ? '' : X.table([
+    ['', 'สัญญาเลขที่ ' + X.fill(snlV('snl-contract-no')), 'จำนวน ' + X.fill(snlV('snl-contract-amount') ? snlFmt2(snlNumOrBlank('snl-contract-amount')) : '') + ' บาท'],
+    ['', 'ลงวันที่ ' + X.date(snlV('snl-contract-date')), 'ใบเสนอราคา เลขที่ ' + X.fill(snlV('snl-quote-no'))],
+  ], [17, half, half]);
+
+  return X.head([
+      'บริษัท บางกอก เมดิคอล ซอฟต์แวร์ จำกัด (สำนักงานใหญ่)',
+      'เลขที่ 2 ชั้น 2 ซ.สุขสวัสดิ์ 33 แขวง/เขต ราษฎร์บูรณะ กรุงเทพมหานคร',
+      'โทรศัพท์ 0-2427-9991 โทรสาร 0-2873-0292',
+      'เลขที่ประจำตัวผู้เสียภาษี 0105548152334'
+    ], 'No. ' + X.fill(snlV('snl-doc-no'), 12))
+    + X.p('วันที่ ' + X.date(snlV('snl-doc-date')))
+    + X.table([[
+        'ชื่อ-นามสกุล ' + X.fill(snlV('snl-requester-name'), 30),
+        'ตำแหน่ง ' + X.fill(snlV('snl-requester-position')),
+        'แผนก/ฝ่าย ' + X.fill(snlV('snl-requester-dept')),
+      ]], [200, 150, W - 350])
+    + X.p('ขอแจ้งความประสงค์ทำหนังสือแจ้งหน่วยงานภายนอก')
+    + X.p('สิ่งที่ส่งมาด้วย จำนวน ' + X.fill('1') + ' ฉบับ ' + X.fill('1') + ' แผ่น', 'margin-bottom:4pt;')
+    + X.box(X.grid(radios(window.SNL_SYSTEMS, picked('snl-system', 'other'), 'snl-system-other-note'), 2, IW))
+    + X.box(X.title('เรื่องที่ให้ดำเนินการ') + X.grid(tasks, 2, IW))
+    + X.table(dateRows, [230, W - 230]) + X.gap()
+    + X.box(X.title('รายชื่อผู้เข้าปฏิบัติงาน (ใส่ข้อมูลเฉพาะกรณีแจ้งออกหนังสือเพื่อเข้าปฏิบัติงาน)') + X.table(attRows, [18, 200, IW - 218]))
+    + X.box(X.title('หนังสือแจ้งถึง') + X.grid(radios(window.SNL_ADDRESSEES, picked('snl-addressee', 'hospital_director'), 'snl-addressee-other-note'), 2, IW))
+    + X.box(X.title('หนังสือแจ้งเพื่อ') + window.SNL_PURPOSES.map(function (c) { return X.cbP(c.key === purposeKey, esc(c.label)); }).join('') + committee)
+    + X.box(X.title('ช่องทางที่ต้องการให้จัดส่ง')
+        + X.cbP(snlChecked('snl-deliver-mail'), 'ทางไปรษณีย์ :: จ่าหน้าซองถึง ผู้อำนวยการโรงพยาบาล')
+        + X.cbP(snlChecked('snl-deliver-email'), 'ทาง E-mail :: ' + X.fill(snlV('snl-email-to'), 40))
+        + (snlV('snl-email-cc').trim() ? X.p('CC E-mail :: ' + X.fill(snlV('snl-email-cc')), 'margin-left:17pt;') : ''));
+};
+
+// แถว "วันที่ดำเนินงาน … สถานที่ …" — อยู่ใน grid .snl-work-dates ให้ทุกคอลัมน์ของ 2 แถวตรงกัน
+function snlWorkDateRow(startId, endId, place) {
+  var cell = function (id) { return '<span class="snl-fill">' + (snlV(id) ? fd(snlV(id)) : '&nbsp;') + '</span>'; };
+  return '<span>วันที่ดำเนินงาน</span>' + cell(startId) + '<span>–</span>' + cell(endId)
+    + '<span>สถานที่</span><span class="snl-fill">' + (place ? esc(place) : '&nbsp;') + '</span>';
+}
+
+// สถานที่ในหนังสือ = ชื่อ รพ. + จังหวัด (จาก HOSPITALS) — ชื่อที่พิมพ์เองไม่ตรง รพ. ไหนก็ใช้ตามที่พิมพ์
+function snlSiteLocationText() {
+  var name = snlV('snl-site-location').trim();
+  var h = name && (window.HOSPITALS || []).find(function (x) { return x.name === name; });
+  var prov = h ? String(h.province || '').trim().replace(/^(จ\.|จังหวัด)\s*/, '') : '';
+  if (!prov || name.indexOf(prov) !== -1) return name;
+  return name + ' ' + (/กรุงเทพ/.test(prov) ? prov : 'จ.' + prov);
+}
 
 // ── Preview Renderer (reads current DOM values, regenerates print sheet only) ──
 window.snlRenderPreview = function () {
@@ -353,12 +448,14 @@ window.snlRenderPreview = function () {
       </div>
     </div>
 
-    ${(snlV('snl-office-work-start') || snlV('snl-office-work-end')) ? '<div class="snl-row">วันที่ดำเนินงาน <span class="snl-fill">' + (snlV('snl-office-work-start') ? fd(snlV('snl-office-work-start')) : '&nbsp;') + '</span> – <span class="snl-fill">' + (snlV('snl-office-work-end') ? fd(snlV('snl-office-work-end')) : '&nbsp;') + '</span> สถานที่ <span class="snl-fill snl-grow">บริษัท บางกอก เมดิคอล ซอฟต์แวร์ จำกัด</span></div>' : ''}
-    <div class="snl-row">วันที่ดำเนินงาน <span class="snl-fill">${snlV('snl-work-start') ? fd(snlV('snl-work-start')) : '&nbsp;'}</span> – <span class="snl-fill">${snlV('snl-work-end') ? fd(snlV('snl-work-end')) : '&nbsp;'}</span> สถานที่ <span class="snl-fill snl-grow">${esc(snlV('snl-site-location')) || '&nbsp;'}</span></div>
+    <div class="snl-work-dates">
+      ${(snlV('snl-office-work-start') || snlV('snl-office-work-end')) ? snlWorkDateRow('snl-office-work-start', 'snl-office-work-end', 'บริษัท บางกอก เมดิคอล ซอฟต์แวร์ จำกัด') : ''}
+      ${snlWorkDateRow('snl-work-start', 'snl-work-end', snlSiteLocationText())}
+    </div>
 
     <div class="snl-box-section">
       <div class="snl-cat-lbl">รายชื่อผู้เข้าปฏิบัติงาน (ใส่ข้อมูลเฉพาะกรณีแจ้งออกหนังสือเพื่อเข้าปฏิบัติงาน)</div>
-      ${attendeeRows}
+      <div class="snl-att-grid">${attendeeRows}</div>
     </div>
 
     <div class="snl-box-section">
@@ -394,17 +491,65 @@ window.snlOnRequesterNameChange = function () {
   window.snlRenderPreview();
 };
 
-// ── Site Location Change: เลือกชื่อโรงพยาบาลจาก datalist แล้วดึง Email ผู้ติดต่อมาเติมอัตโนมัติ
+// ── Email ผู้ติดต่อของ รพ.: แสดงเป็น checkbox ให้เลือกส่งรายไหน (หรือหลายราย) — ติ๊กแล้วเติมช่อง E-mail
 // (มากกว่า 1 Email คั่นด้วยจุลภาค) ──
-window.snlOnSiteLocationChange = function () {
+function snlSplitEmails(s) {
+  return String(s || '').split(/[,;\s]+/).map(function (e) { return e.trim(); }).filter(Boolean);
+}
+function snlHospitalEmailContacts() {
   var name = snlV('snl-site-location').trim();
   var hsp = (window.HOSPITALS || []).find(function (h) { return h.name === name; });
-  if (hsp) {
-    var emails = (hsp.contacts || []).map(function (c) { return (c.email || '').trim(); }).filter(Boolean);
-    var uniqEmails = emails.filter(function (e, i) { return emails.indexOf(e) === i; });
-    var emailEl = document.getElementById('snl-email-to');
-    if (emailEl) emailEl.value = uniqEmails.join(',');
-  }
+  var seen = {};
+  return ((hsp && hsp.contacts) || []).filter(function (c) {
+    var e = (c.email || '').trim().toLowerCase();
+    if (!e || seen[e]) return false;
+    seen[e] = true;
+    return true;
+  });
+}
+// วาดรายการผู้ติดต่อ แล้วติ๊กตาม Email ที่อยู่ในช่อง E-mail ตอนนี้
+window.snlRenderEmailContacts = function () {
+  var box = document.getElementById('snl-email-contacts');
+  if (!box) return;
+  var cs = snlHospitalEmailContacts();
+  if (!cs.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  var cur = snlSplitEmails(snlV('snl-email-to')).map(function (e) { return e.toLowerCase(); });
+  box.style.display = '';
+  box.innerHTML = '<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">ผู้ติดต่อของโรงพยาบาล — เลือก Email ที่ต้องการส่ง</div>' +
+    cs.map(function (c) {
+      var email = c.email.trim();
+      var label = [c.name, c.nickname ? '(' + c.nickname + ')' : '', c.position ? '· ' + c.position : ''].filter(Boolean).join(' ');
+      return '<label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:4px;cursor:pointer;">' +
+        '<input type="checkbox" class="snl-email-contact" value="' + esc(email) + '"' +
+        (cur.indexOf(email.toLowerCase()) >= 0 ? ' checked' : '') + ' onchange="window.snlOnEmailContactToggle(this)">' +
+        '<span>' + (label ? esc(label) + ' — ' : '') + '<b>' + esc(email) + '</b></span></label>';
+    }).join('');
+};
+// ติ๊ก/เอาติ๊กออก → เพิ่ม/ลบ Email นั้นในช่อง E-mail (Email ที่พิมพ์เองนอกรายการยังคงอยู่)
+window.snlOnEmailContactToggle = function (cb) {
+  var el = document.getElementById('snl-email-to');
+  if (!el) return;
+  var key = cb.value.toLowerCase();
+  var list = snlSplitEmails(el.value).filter(function (e) { return e.toLowerCase() !== key; });
+  if (cb.checked) list.push(cb.value);
+  el.value = list.join(',');
+  window.snlRenderPreview();
+};
+// พิมพ์แก้ช่อง E-mail เอง → อัปเดตสถานะ checkbox ให้ตรง
+window.snlSyncEmailContacts = function () {
+  var cur = snlSplitEmails(snlV('snl-email-to')).map(function (e) { return e.toLowerCase(); });
+  document.querySelectorAll('#snl-email-contacts .snl-email-contact').forEach(function (cb) {
+    cb.checked = cur.indexOf(cb.value.toLowerCase()) >= 0;
+  });
+};
+
+// ── Site Location Change: เลือกชื่อโรงพยาบาลจาก datalist → ติ๊ก Email ผู้ติดต่อรายแรกไว้ให้ก่อน
+// (มีหลายรายให้เลือกเพิ่ม/เปลี่ยนเองจากรายการ) ──
+window.snlOnSiteLocationChange = function () {
+  var cs = snlHospitalEmailContacts();
+  var emailEl = document.getElementById('snl-email-to');
+  if (cs.length && emailEl) emailEl.value = cs[0].email.trim();
+  window.snlRenderEmailContacts();
   window.snlRenderPreview();
 };
 
@@ -463,6 +608,14 @@ window.snlOnProjectPick = function () {
   var startEl = document.getElementById('snl-work-start'); if (startEl) startEl.value = p.start || '';
   var endEl = document.getElementById('snl-work-end'); if (endEl) endEl.value = p.end || '';
   window.snlComputeOfficeWorkDates();
+
+  // 3.1) สถานที่ ← รพ. ของโครงการ (projects.hospital_id) — ไม่ได้ผูก รพ. ไว้ก็เดาจากชื่อโครงการ
+  // แล้วเติม Email ผู้ติดต่อของ รพ. ต่อผ่าน snlOnSiteLocationChange
+  var hosps = window.HOSPITALS || [];
+  var hsp = (p.hospitalId && hosps.find(function (h) { return h.id === p.hospitalId; }))
+    || (window.HospitalMatch && window.HospitalMatch.guess(p.name, hosps));
+  var siteEl = document.getElementById('snl-site-location');
+  if (hsp && siteEl) { siteEl.value = hsp.name; window.snlOnSiteLocationChange(); }
 
   // 4) รายชื่อผู้เข้าปฏิบัติงาน ← ทีมในโครงการ พร้อมตำแหน่ง
   var sids = (p.members && p.members.length ? p.members : (p.team || []).map(function (id) { return { sid: id }; }))
@@ -623,6 +776,7 @@ window.snlNewForm = function () {
   window.snlOnSystemChange();
   window.snlOnAddresseeChange();
   window.snlOnPurposeChange();
+  window.snlRenderEmailContacts();
   window.snlRefreshProjectCombobox();
 };
 
@@ -678,6 +832,7 @@ window.snlLoadForm = function (id) {
   setChk('snl-deliver-email', f.deliverEmail);
   set('snl-email-to', f.emailTo);
   set('snl-email-cc', f.emailCc);
+  window.snlRenderEmailContacts();
   window.snlRefreshProjectCombobox();
   window.snlRenderPreview();
 };
