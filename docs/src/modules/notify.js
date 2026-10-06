@@ -381,7 +381,7 @@ window.sendLeaveNotify=async function(eventType,lv){
     var noteText=lv.note||'';
     var statusKey=lv.status||'pending';
     var statusLabel=STATUS_LABEL[statusKey]||statusKey;
-    var approvedBy=lv.approvedBy||lv.approved_by||'';
+    var approvedBy=window.userNameById(lv.approvedById||lv.approved_by||''); // เก็บเป็นรหัสผู้ใช้
     var lvId=lv.leave_id||lv.id||'';
     var _appBase=(window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1')
       ?(window.location.origin+window.location.pathname)

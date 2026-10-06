@@ -22,7 +22,7 @@
     return {
       id: d.id, title: d.title || '', command: d.command || '', keywords: d.keywords || '',
       category: d.category || '', content: d.content || '', note: d.note || '', active: d.active !== false,
-      createdBy: d.created_by || '', updatedBy: d.updated_by || '', createdAt: d.created_at || '', updatedAt: d.updated_at || '',
+      createdById: d.created_by || '', updatedById: d.updated_by || '', createdAt: d.created_at || '', updatedAt: d.updated_at || '',
     };
   }
   window.onSnapshot(window.getColRef('ASSIST_REPLIES'), function (s) {
@@ -34,7 +34,6 @@
 
   function live() { return REPLIES.filter(function (r) { return r.active; }); }
   function byId(id) { return REPLIES.find(function (r) { return r.id === id; }); }
-  function meName() { var cu = window.cu || {}; return cu.name || cu.username || ''; }
 
   // ── จับคู่ข้อความแบบหลวม ๆ — ตัวพิมพ์เล็ก ตัดช่องว่าง/เครื่องหมายออก ──
   function norm(s) { return String(s || '').toLowerCase().replace(/[\s\p{P}\p{S}]+/gu, ''); }
@@ -112,7 +111,7 @@
   }
   function cardHtml(r) {
     var hasCode = r.content.indexOf('```') >= 0;
-    var who = r.updatedBy || r.createdBy;
+    var who = window.userNameById(r.updatedById || r.createdById); // เก็บเป็นรหัสผู้ใช้ (users.id)
     return '<div class="as-card">'
       + '<div class="as-card-h"><span class="as-card-t">' + esc(r.title) + '</span>'
       + (r.command ? '<span class="as-cmd">' + esc(normCmd(r.command)) + '</span>' : '')
@@ -388,7 +387,7 @@
     var data = {
       title: title, command: cmd, keywords: g('as-ed-k'), category: g('as-ed-g'), content: content,
       note: g('as-ed-n'), active: document.getElementById('as-ed-a').checked,
-      created_by: old ? old.createdBy : meName(), updated_by: meName(),
+      created_by: old ? old.createdById : window.meId(), updated_by: window.meId(),
       created_at: old && old.createdAt ? old.createdAt : now, updated_at: now,
     };
     var btn = document.getElementById('as-ed-save');

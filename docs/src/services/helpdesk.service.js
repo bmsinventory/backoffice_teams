@@ -29,7 +29,6 @@
       priority: d.priority || 'p3',
       status: d.status || 'new',
       assigneeId: d.assignee_id || '',
-      team: d.team || '',
       slaPolicyId: d.sla_policy_id || '',
       firstResponseAt: d.first_response_at || '',
       firstResponseDue: d.first_response_due || '',
@@ -55,7 +54,7 @@
     return {
       id: d.id, name: d.name || '', parentId: d.parent_id || '',
       defaultPriority: d.default_priority || 'p3', defaultAssigneeId: d.default_assignee_id || '',
-      defaultTeam: d.default_team || '', active: d.active !== false, sort: Number(d.sort) || 0,
+      active: d.active !== false, sort: Number(d.sort) || 0,
     };
   }
   function tSla(d) {

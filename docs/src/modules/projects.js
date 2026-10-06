@@ -244,16 +244,14 @@ window.openProjModal=function(id){
   var grpOpts='<option value="">-- ไม่ระบุกลุ่ม --</option>'+window.PGROUPS.map(function(g){return`<option value="${g.id}"${p&&p.groupId===g.id?' selected':''}>${esc(g.label)}</option>`;}).join('');
   var stgOpts=window.STAGES.map(function(s){return`<option value="${s.id}"${p&&p.stage===s.id?' selected':''}>${s.label}</option>`;}).join('');
   var typOpts='<option value="">-- เลือกประเภท --</option>'+window.PTYPES.map(function(t){return`<option value="${t.id}"${p&&p.typeId===t.id?' selected':''}>${t.label}</option>`;}).join('');
-  var staffSorted=window.STAFF.filter(function(s){return s.active!==false;}).slice().sort(function(a,b){var da=a.dept||'zzz',db=b.dept||'zzz';if(da!==db)return da.localeCompare(db,'th');return(a.role||'').localeCompare(b.role||'','th');});
-  function _ownerPri(r){if(!r)return 99;if(r.includes('ผู้จัดการ'))return 1;if(r.includes('หัวหน้า'))return 2;return 3;}
-  var ownerStaff=window.STAFF.filter(function(s){return s.active!==false&&s.role&&(s.role.includes('ผู้จัดการ')||s.role.includes('หัวหน้า'));}).slice().sort(function(a,b){var pa=_ownerPri(a.role),pb=_ownerPri(b.role);if(pa!==pb)return pa-pb;return(a.name||'').localeCompare(b.name||'','th');});
+  var staffSorted=window.STAFF.filter(function(s){return s.active!==false;}).sort(window.sortStaffByDeptRank);
+  var ownerStaff=window.STAFF.filter(function(s){return s.active!==false&&s.role&&(s.role.includes('ผู้จัดการ')||s.role.includes('หัวหน้า'));});
   // เก็บเป็นรหัสพนักงาน · คนที่บันทึกไว้เดิมแต่ตอนนี้ไม่อยู่ในรายการ (ลาออก/เปลี่ยนตำแหน่ง) ยังต้องแสดงให้เห็น ไม่ใช่ช่องว่าง
   var _curOwner=p&&window.staffByRef(p.siteOwnerId);if(_curOwner&&ownerStaff.indexOf(_curOwner)<0)ownerStaff.push(_curOwner);
-  var ownerOpts='<option value="">-- เลือกเจ้าของไซต์ --</option>'+ownerStaff.map(function(s){return`<option value="${esc(s.id)}"${p&&window.staffByRef(p.siteOwnerId)===s?' selected':''}>${esc(s.name)}${s.nickname?' ('+esc(s.nickname)+')':''}`;}).join('');
+  var ownerOpts='<option value="">-- เลือกเจ้าของไซต์ --</option>'+window.staffOptionsGrouped(ownerStaff,_curOwner&&_curOwner.id,true);
   var _instPosIds=['POS17733356564931','POS17733356564934','POS17733356564935','POS17733356564937','POS17733356564936'];
-  var _instPosLabels=window.POSITIONS.filter(function(pos){return _instPosIds.includes(pos.id);}).map(function(pos){return pos.label;});
   var _curInst=p&&window.staffByRef(p.installerId);
-  var installerOpts='<option value="">-- เลือกผู้ติดตั้ง --</option>'+window.STAFF.filter(function(s){return s===_curInst||(s.active!==false&&_instPosLabels.includes(s.role));}).slice().sort(function(a,b){return(a.name||'').localeCompare(b.name||'','th');}).map(function(s){return`<option value="${esc(s.id)}"${p&&window.staffByRef(p.installerId)===s?' selected':''}>${esc(s.name)}${s.nickname?' ('+esc(s.nickname)+')':''}`;}).join('');
+  var installerOpts='<option value="">-- เลือกผู้ติดตั้ง --</option>'+window.staffOptionsGrouped(window.STAFF.filter(function(s){return s===_curInst||(s.active!==false&&_instPosIds.includes(s.positionId));}),_curInst&&_curInst.id,true);
   var currentSids=mems.map(function(m){return m.sid;});
   var pickerHtml=(function(){
     var depts=[...new Set(staffSorted.map(function(s){return s.dept||'ไม่ระบุทีม';}))];
@@ -866,11 +864,10 @@ window.buildVisitsSection = function(p) {
     return html+'</div></div>';
   }
   // editable
-  var sOpts=window.STAFF.filter(function(s){return s.active!==false;}).map(function(s){return`<option value="${s.id}">${esc(s.name)}${s.nickname?' ('+esc(s.nickname)+')':''}</option>`;}).join('');
   var existingVisits=(p&&p.visits&&p.visits.length>0)?p.visits:[];
   var visitsHtml='';
   existingVisits.forEach(function(v,i){
-    visitsHtml+=window._buildVisitRow(v,i+1,sOpts);
+    visitsHtml+=window._buildVisitRow(v,i+1);
   });
   return `<div class="f-group" id="visits-section">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
@@ -889,7 +886,7 @@ window._buildVisitRow = function(v, no) {
   var preSel = window._vtMembers(v&&v.team||[], v&&v.start||'', v&&v.end||'');
   var preSelIds = preSel.map(function(m){ return m.sid; });
   // build available staff list
-  var staffSorted=window.STAFF.filter(function(s){return s.active!==false;}).slice().sort(function(a,b){var da=a.dept||'zzz',db=b.dept||'zzz';if(da!==db)return da.localeCompare(db,'th');return(a.name||'').localeCompare(b.name||'','th');});
+  var staffSorted=window.STAFF.filter(function(s){return s.active!==false;}).sort(window.sortStaffByDeptRank);
   var depts=[...new Set(staffSorted.map(function(s){return s.dept||'ไม่ระบุทีม';}))];
   var availHtml='';
   depts.forEach(function(dept){

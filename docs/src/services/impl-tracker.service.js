@@ -12,7 +12,8 @@
       return { id:d.id, name:d.template_name||'', description:d.description||'', structure:d.structure||{} };
     },
     IMPL_PROJECTS: function (d) {
-      return { id:d.id, name:d.project_name||'', hospitalName:d.hospital_name||'', start:d.start_date||'', end:d.end_date||'', pm:d.project_manager||'', status:d.status||'not_started', progress:Number(d.progress_percent)||0, templateId:d.template_id||'', sourceProjectId:d.source_project_id||'', dashboardToken:d.dashboard_token||'', createdAt:d.created_at||'', updatedAt:d.updated_at||'' };
+      // เจ้าของไซต์ (PM) / ผู้ติดตั้ง (ผู้ประสานงาน) อ่านจากโครงการต้นทางเสมอ (projects.site_owner / installer_name — รหัสพนักงาน)
+      return { id:d.id, name:d.project_name||'', get source(){ var sid = this.sourceProjectId; return sid ? (window.PROJECTS||[]).find(function (p) { return p.id === sid; }) || null : null; }, get siteOwner(){ var s = this.source; return s ? s.siteOwner : ''; }, get installer(){ var s = this.source; return s ? s.installer : ''; }, start:d.start_date||'', end:d.end_date||'', status:d.status||'not_started', progress:Number(d.progress_percent)||0, templateId:d.template_id||'', sourceProjectId:d.source_project_id||'', dashboardToken:d.dashboard_token||'', createdAt:d.created_at||'', updatedAt:d.updated_at||'' };
     },
     IMPL_PHASES: function (d) {
       return { id:d.id, projectId:d.project_id, name:d.phase_name||'', description:d.description||'', order:Number(d.sort_order)||99, status:d.status||'not_started', progress:Number(d.progress_percent)||0 };
@@ -21,31 +22,28 @@
       return { id:d.id, phaseId:d.phase_id, projectId:d.project_id, name:d.task_name||'', description:d.description||'', ownerId:d.owner||'', get owner(){ return window.staffNickByRef(this.ownerId); }, start:d.start_date||'', due:d.due_date||'', priority:d.priority||'medium', status:d.status||'not_started', progress:Number(d.progress_percent)||0, order:Number(d.sort_order)||99, createdAt:d.created_at||'', updatedAt:d.updated_at||'' };
     },
     IMPL_CHECKLIST_ITEMS: function (d) {
-      return { id:d.id, taskId:d.task_id, name:d.checklist_name||'', done:d.is_done===true, doneDate:d.done_date||'', doneBy:d.done_by||'', remark:d.remark||'', order:Number(d.sort_order)||99 };
+      return { id:d.id, taskId:d.task_id, name:d.checklist_name||'', done:d.is_done===true, doneDate:d.done_date||'', doneById:d.done_by||'', get doneBy(){ return window.userNameById(this.doneById); }, remark:d.remark||'', order:Number(d.sort_order)||99 };
     },
     // ── ปัญหาการใช้งานโปรแกรมรายโครงการ (แท็บ "ปัญหา") — createdAt = วันที่รับปัญหา, fixedDate = วันที่แก้ไขปัญหา
     // (คนละแนวคิดกับ IMPL_ISSUES เดิมที่ผูกกับ task/severity ล้วน ๆ — ตอนนี้ปรับให้ตรงกับรายงานสรุปปัญหารายโครงการ) ──
     IMPL_ISSUES: function (d) {
       return { id:d.id, projectId:d.project_id, taskId:d.task_id||'', department:d.department||'', reportedBy:d.reported_by||'', problem:d.problem||'', category:d.category||'', severity:d.severity||'medium', status:d.status||'open', solution:d.solution||'', receivedById:d.received_by||'', fixedById:d.fixed_by||'', get receivedBy(){ return window.staffNameByRef(this.receivedById); }, get fixedBy(){ return window.staffNickByRef(this.fixedById); }, fixedDate:d.fixed_date||'', createdAt:d.created_at||'', updatedAt:d.updated_at||'' };
     },
-    IMPL_RISKS: function (d) {
-      return { id:d.id, projectId:d.project_id, title:d.risk_title||'', detail:d.risk_detail||'', impact:d.impact_level||'medium', probability:d.probability||'medium', mitigation:d.mitigation_plan||'', owner:d.owner||'', status:d.status||'open' };
-    },
     IMPL_COMMENTS: function (d) {
-      return { id:d.id, taskId:d.task_id, author:d.author||'', text:d.comment_text||'', createdAt:d.created_at||'' };
+      return { id:d.id, taskId:d.task_id, authorId:d.author||'', get author(){ return window.userNameById(this.authorId); }, text:d.comment_text||'', createdAt:d.created_at||'' };
     },
     IMPL_ATTACHMENTS: function (d) {
-      return { id:d.id, taskId:d.task_id, fileName:d.file_name||'', fileUrl:d.file_url||'', fileSize:Number(d.file_size)||0, uploadedBy:d.uploaded_by||'', uploadedAt:d.uploaded_at||'' };
+      return { id:d.id, taskId:d.task_id, fileName:d.file_name||'', fileUrl:d.file_url||'', fileSize:Number(d.file_size)||0, uploadedById:d.uploaded_by||'', get uploadedBy(){ return window.userNameById(this.uploadedById); }, uploadedAt:d.uploaded_at||'' };
     },
     IMPL_ACTIVITY_LOG: function (d) {
-      return { id:d.id, projectId:d.project_id, entityType:d.entity_type||'', entityId:d.entity_id||'', action:d.action||'', detail:d.detail||'', actor:d.actor||'', createdAt:d.created_at||'' };
+      return { id:d.id, projectId:d.project_id, entityType:d.entity_type||'', entityId:d.entity_id||'', action:d.action||'', detail:d.detail||'', actorId:d.actor||'', get actor(){ return window.userNameById(this.actorId); }, createdAt:d.created_at||'' };
     },
   };
 
   // ── Collections นี้จะถูก subscribe แบบ background ทั้งหมด ──
   var IMPL_COLLECTIONS = [
     'IMPL_TEMPLATES', 'IMPL_PROJECTS', 'IMPL_PHASES', 'IMPL_TASKS', 'IMPL_CHECKLIST_ITEMS',
-    'IMPL_ISSUES', 'IMPL_RISKS', 'IMPL_COMMENTS', 'IMPL_ATTACHMENTS', 'IMPL_ACTIVITY_LOG',
+    'IMPL_ISSUES', 'IMPL_COMMENTS', 'IMPL_ATTACHMENTS', 'IMPL_ACTIVITY_LOG',
   ];
 
   // ── ID Generator (ตาม convention เดิม: prefix + Date.now()) ──
@@ -117,7 +115,7 @@
   // ── Activity Log Writer (optimistic + persist) ──
   window.imtLogActivity = function (projectId, entityType, entityId, action, detail) {
     var id = window.imtUid('IACT');
-    var actor = (window.cu && (window.cu.name || window.cu.username)) || '';
+    var actor = window.meId(); // รหัสผู้ใช้ (users.id)
     var row = { project_id:projectId, entity_type:entityType, entity_id:entityId, action:action, detail:detail||'', actor:actor };
     window.imtApplyLocal('IMPL_ACTIVITY_LOG', id, Object.assign({ created_at:new Date().toISOString() }, row));
     window.setDoc(window.getDocRef('IMPL_ACTIVITY_LOG', id), row).catch(function (e) { console.error('[impl-tracker] activity log error', e); });
@@ -131,7 +129,7 @@
       project_id: data.projectId, task_id: data.taskId || '',
       department: data.department || '', reported_by: data.reportedBy || '', problem: data.problem || '', category: data.category || '',
       severity: data.severity || 'medium', status: data.status || 'open', solution: data.solution || '',
-      received_by: window.staffIdByRef(data.receivedBy), fixed_by: window.staffIdByRef(data.fixedBy), // เก็บเป็นรหัสพนักงาน
+      received_by: data.receivedById || '', fixed_by: data.fixedById || '', // รหัสพนักงาน
       fixed_date: data.fixedDate || null,
     };
     // receivedDate ระบุเองได้ (ย้อนหลัง/นำเข้าข้อมูลเก่า) — ไม่ระบุ ปล่อยให้ DB default NOW() ทำงาน
@@ -145,7 +143,7 @@
     var row = {
       department: data.department || '', reported_by: data.reportedBy || '', problem: data.problem || '', category: data.category || '',
       severity: data.severity || 'medium', status: data.status || 'open', solution: data.solution || '',
-      received_by: window.staffIdByRef(data.receivedBy), fixed_by: window.staffIdByRef(data.fixedBy), // เก็บเป็นรหัสพนักงาน
+      received_by: data.receivedById || '', fixed_by: data.fixedById || '', // รหัสพนักงาน
       fixed_date: data.fixedDate || null, updated_at: new Date().toISOString(),
     };
     if (data.receivedDate) row.created_at = new Date(data.receivedDate).toISOString();
@@ -265,7 +263,7 @@
     if (up.error) throw up.error;
     var pub = sb.storage.from('impl-attachments').getPublicUrl(path);
     var id = window.imtUid('IATT');
-    var uploadedBy = (window.cu && (window.cu.name || window.cu.username)) || '';
+    var uploadedBy = window.meId(); // รหัสผู้ใช้ (users.id)
     var row = { task_id:taskId, file_name:file.name, file_url:pub.data.publicUrl, file_size:file.size, uploaded_by:uploadedBy };
     await window.setDoc(window.getDocRef('IMPL_ATTACHMENTS', id), row);
     window.imtApplyLocal('IMPL_ATTACHMENTS', id, Object.assign({ uploaded_at:new Date().toISOString() }, row));

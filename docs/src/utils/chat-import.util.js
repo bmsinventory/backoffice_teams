@@ -188,27 +188,42 @@
     } else chunks = [src.slice(0, 8000)];
     return { msgs: msgs, chunks: chunks, numbered: msgs.length > 0 };
   }
-  // ช่วงแชทที่เป็นที่มาของรายการ (จากเลขข้อความ first/last ที่ AI ตอบ) → เวลาแจ้ง/เวลาจบ/ข้อความต้นทาง
-  function excerpt(msgs, first, last) {
+  // แชทที่เป็นที่มาของรายการ → เวลาแจ้ง/เวลาจบ/ข้อความต้นทาง
+  // ids = เลขข้อความที่ AI บอกว่าเกี่ยวกับเรื่องนี้โดยตรง → แสดงเฉพาะข้อความเหล่านั้น (ข้ามช่วง = ⋯)
+  // ไม่มี ids → ใช้ช่วง first..last ทั้งช่วงเหมือนเดิม
+  function excerpt(msgs, first, last, ids) {
     if (!msgs || !msgs.length) return { createdAt: '', endAt: '', whenLabel: '', chat: '' };
-    var fi = Math.min(msgs.length - 1, Math.max(0, (parseInt(first, 10) || 1) - 1));
-    var li = Math.min(msgs.length - 1, Math.max(fi, (parseInt(last, 10) || 0) - 1));
-    var fm = msgs[fi], lm = msgs[li];
+    var pick = (Array.isArray(ids) ? ids : []).map(function (n) { return parseInt(n, 10) - 1; })
+      .filter(function (i, k, a) { return i >= 0 && i < msgs.length && a.indexOf(i) === k; })
+      .sort(function (a, b) { return a - b; }).slice(0, 25);
+    if (!pick.length) {
+      var fi = Math.min(msgs.length - 1, Math.max(0, (parseInt(first, 10) || 1) - 1));
+      var li = Math.min(msgs.length - 1, Math.max(fi, (parseInt(last, 10) || 0) - 1));
+      for (var i = fi; i <= li && pick.length < 40; i++) pick.push(i);
+    }
+    var fm = msgs[pick[0]], lm = msgs[pick[pick.length - 1]];
     return {
       createdAt: msgIso(fm), endAt: msgIso(lm) || msgIso(fm),
       whenLabel: fmt(fm).match(/^\[([^\]]+)\]/)[1],
-      chat: msgs.slice(fi, li + 1).slice(0, 40).map(fmt).join('\n').slice(0, 3000),
+      chat: pick.map(function (i, k) { return (k && i > pick[k - 1] + 1 ? '⋯\n' : '') + fmt(msgs[i]); }).join('\n').slice(0, 3000),
     };
   }
-  // ชื่อผู้ส่งในแชท (เช่น "เอก BMS") → คนในรายชื่อ: ตรงชื่อ/ชื่อเล่น หรือมีชื่อเล่นเป็นคำหนึ่งในชื่อที่แสดง
+  // ชื่อผู้ส่งในแชท (เช่น "เอก BMS", "พี่เอก") → คนในรายชื่อ: ตรงชื่อ/ชื่อเล่น หรือมีชื่อเล่นเป็นคำหนึ่งในชื่อที่แสดง
+  // (ตัดคำนำหน้า พี่/น้อง/คุณ ก่อนเทียบ) · ตรงหลายคน = ไม่แน่ใจ → null ไม่เดาเอาคนแรก
   function matchPerson(name, people) {
-    var q = String(name || '').trim().toLowerCase();
+    var strip = function (s) { return String(s || '').trim().toLowerCase().replace(/^(พี่|น้อง|คุณ|นาย|นางสาว|นาง|ป้า|ลุง|น้า|อา)\s*/, ''); };
+    var q = strip(name);
     if (!q) return null;
-    var words = q.split(/[\s()\[\]\-_.,|/]+/).filter(Boolean);
-    return (people || []).find(function (s) {
-      var nm = String(s.name || '').toLowerCase(), nk = String(s.nickname || '').toLowerCase().trim();
-      return nm === q || nk === q || (nm.length >= 3 && q.indexOf(nm) > -1) || (nk.length >= 2 && words.indexOf(nk) > -1);
-    }) || null;
+    var words = q.split(/[\s()\[\]\-_.,|/]+/).map(strip).filter(Boolean);
+    var ps = people || [];
+    var info = function (s) { return { nm: String(s.name || '').toLowerCase().trim(), nk: String(s.nickname || '').toLowerCase().trim() }; };
+    var exact = ps.filter(function (s) { var x = info(s); return x.nm === q || (x.nk && x.nk === q); });
+    if (exact.length) return exact.length === 1 ? exact[0] : null;
+    var part = ps.filter(function (s) {
+      var x = info(s);
+      return (x.nm.length >= 3 && q.indexOf(x.nm) > -1) || (x.nk.length >= 2 && words.indexOf(x.nk) > -1);
+    });
+    return part.length === 1 ? part[0] : null;
   }
 
   window.lineChat = {
@@ -230,6 +245,7 @@
   //      filters      — [[key, label, fn]] ตัวกรองเฉพาะโมดูล (มี ทั้งหมด / ข้อมูลไม่ครบ / อาจซ้ำ ให้เสมอ)
   //      statusKey, statuses [{v, label, cls:'open'|'done'|''}] — ปุ่มสลับสถานะ
   //      fields(x, i, h) — HTML ช่องแก้ไข (h = ตัวช่วยสร้างช่องที่ผูกค่ากับรายการแล้ว · h.fld(ชื่อ, html, 1) = ช่องต้องระบุ มี * แดง)
+  //      afterFields(x, i) — (ไม่บังคับ) เรียกหลังวาดช่องแก้ไขแล้ว เช่น ผูก combobox
   //      beforeSave() → false = ยังไม่บันทึก · saveOne(x) — บันทึกทีละรายการ · onDone(made, todo) — เสร็จแล้ว
   var R = null;
   function mount(cfg) {
@@ -322,24 +338,30 @@
       txt: function (k, req) { return (req ? ' data-req="1"' : '') + ' oninput="window.aiReview.set(' + i + ',\'' + k + '\',this.value,this)"'; },
       pick: function (k) { return ' onchange="window.aiReview.set(' + i + ',\'' + k + '\',this.value)"'; },
     };
+    // หัวแผง (ติดด้านบนตอนเลื่อน): ลำดับรายการ + ปุ่มเลื่อนก่อน/ถัดไป/ปิด · แถวล่าง: เลือกสร้าง + เวลาแจ้ง
     el.innerHTML = '<div class="air-d-head">'
-      +   '<b>✏️ แก้ไขรายการ ' + (i + 1) + ' / ' + n + '</b>'
-      +   (x.whenLabel ? '<span class="air-when">🕘 แจ้ง ' + esc(x.whenLabel) + '</span>' : '')
-      +   '<span style="flex:1"></span>'
-      +   (x.created ? '<b style="color:var(--teal);">✔ สร้างแล้ว</b>'
-            : '<label class="air-d-pick"><input type="checkbox"' + (x.sel ? ' checked' : '') + ' onchange="window.aiReview.pick(' + i + ',this.checked)"> สร้างรายการนี้</label>')
-      +   '<button type="button" class="btn btn-ghost btn-sm" onclick="window.aiReview.go(-1)"' + (i <= 0 ? ' disabled' : '') + '>‹ ก่อนหน้า</button>'
-      +   '<button type="button" class="btn btn-ghost btn-sm" onclick="window.aiReview.go(1)"' + (i >= n - 1 ? ' disabled' : '') + '>ถัดไป ›</button>'
-      +   '<button type="button" class="btn btn-ghost btn-sm" onclick="window.aiReview.closeDetail()" title="ปิดช่องแก้ไข">✕ ปิด</button>'
+      +   '<div class="air-d-row">'
+      +     '<b class="air-d-t">✏️ รายการที่ ' + (i + 1) + ' <span>/ ' + n + '</span></b>'
+      +     '<div class="air-d-nav">'
+      +       '<button type="button" class="btn btn-ghost btn-sm" onclick="window.aiReview.go(-1)" title="รายการก่อนหน้า"' + (i <= 0 ? ' disabled' : '') + '>‹</button>'
+      +       '<button type="button" class="btn btn-ghost btn-sm" onclick="window.aiReview.go(1)" title="รายการถัดไป"' + (i >= n - 1 ? ' disabled' : '') + '>›</button>'
+      +       '<button type="button" class="btn btn-ghost btn-sm" onclick="window.aiReview.closeDetail()" title="ปิดช่องแก้ไข">✕</button>'
+      +     '</div>'
+      +   '</div>'
+      +   '<div class="air-d-row">'
+      +     (x.created ? '<b class="air-made">✔ สร้างแล้ว</b>'
+              : '<label class="air-d-pick' + (x.sel ? ' on' : '') + '"><input type="checkbox"' + (x.sel ? ' checked' : '') + ' onchange="window.aiReview.pick(' + i + ',this.checked)"> สร้างรายการนี้</label>')
+      +     (x.whenLabel ? '<span class="air-when">🕘 แจ้ง ' + esc(x.whenLabel) + '</span>' : '')
+      +   '</div>'
       + '</div>'
-      + (x.created ? '' : '<div class="air-req-hint">ช่องที่มี <b class="air-req">*</b> ต้องระบุ</div>')
       + (x.dup ? '<div class="air-warn">⚠️ ' + esc(x.dup) + '</div>' : '')
       + '<div class="air-miss air-d-miss">' + (miss.length && !x.created ? '❗ ยังขาด: ' + miss.join(', ') : '') + '</div>'
-      + (R.statuses ? '<div class="air-seg">' + R.statuses.map(function (s, k) {
+      + (R.statuses ? '<div class="air-f"><span>สถานะ</span><div class="air-seg">' + R.statuses.map(function (s, k) {
           return '<button type="button" class="' + (x[R.statusKey] === s.v ? 'on ' + (s.cls || 'mid') : '') + '" onclick="window.aiReview.setStatus(' + i + ',' + k + ')">' + s.label + '</button>';
-        }).join('') + '</div>' : '')
+        }).join('') + '</div></div>' : '')
       + R.fields(x, i, h)
       + (x.chat ? '<div class="air-chat"><div class="air-chat-h">💬 ข้อความแชทต้นทาง</div><div class="air-chat-b">' + chatHtml(x.chat) + '</div></div>' : '');
+    if (R.afterFields) R.afterFields(x, i);
     if (x.created) el.querySelectorAll('.air-f input, .air-f select, .air-f textarea, .air-seg button').forEach(function (e) { e.disabled = true; });
   }
   function foot() {

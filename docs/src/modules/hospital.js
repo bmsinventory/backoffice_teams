@@ -3676,7 +3676,7 @@ window.importHospitalProductsFromFile = async function(file) {
     if (!Object.keys(prodCols).length) {
       window.showAlert(
         'ไม่พบคอลัมน์ชื่อ Product ที่ตรงกับระบบ\n'
-        + 'ใช้ปุ่ม "โหลดไฟล์ Template" เพื่อรับไฟล์ที่มีชื่อคอลัมน์ถูกต้อง', 'warn');
+        + 'ใช้ "ดาวน์โหลดไฟล์ตัวอย่าง" ในหน้านำเข้า เพื่อรับไฟล์ที่มีชื่อคอลัมน์ถูกต้อง', 'warn');
       return;
     }
 

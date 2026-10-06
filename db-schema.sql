@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS positions (
   label_th    TEXT DEFAULT '',
   label       TEXT DEFAULT '',
   daily_rate  NUMERIC DEFAULT 0,
+  rank        INTEGER DEFAULT 99,
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -66,8 +67,8 @@ CREATE TABLE IF NOT EXISTS staff (
   staff_id    TEXT,
   full_name   TEXT DEFAULT '',
   nickname    TEXT DEFAULT '',
-  department  TEXT DEFAULT '',
-  position    TEXT DEFAULT '',
+  department  TEXT DEFAULT '',          -- departments.id
+  position    TEXT DEFAULT '',          -- positions.id
   email       TEXT DEFAULT '',
   phone       TEXT DEFAULT '',
   is_active   BOOLEAN DEFAULT true,
@@ -98,8 +99,8 @@ CREATE TABLE IF NOT EXISTS projects (
   project_id         TEXT,
   project_name       TEXT DEFAULT '',
   group_id           TEXT DEFAULT '',
-  site_owner         TEXT DEFAULT '',
-  installer_name     TEXT DEFAULT '',
+  site_owner         TEXT DEFAULT '',          -- เจ้าของไซต์ (staff.id)
+  installer_name     TEXT DEFAULT '',          -- ผู้ติดตั้ง (staff.id)
   type_id            TEXT DEFAULT '',
   stage_id           TEXT DEFAULT 'pending',
   budget             NUMERIC DEFAULT 0,
@@ -205,15 +206,8 @@ CREATE TABLE IF NOT EXISTS lodgings (
   -- totals / approval
   grand_total      NUMERIC DEFAULT 0,
   note             TEXT DEFAULT '',
-  approved         TEXT DEFAULT '',
-  approved_at      TEXT DEFAULT '',
-  approved_by      TEXT DEFAULT '',
   approved_daily      TEXT DEFAULT '',
-  approved_daily_at   TEXT DEFAULT '',
-  approved_daily_by   TEXT DEFAULT '',
   approved_monthly    TEXT DEFAULT '',
-  approved_monthly_at TEXT DEFAULT '',
-  approved_monthly_by TEXT DEFAULT '',
   created_at          TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -238,7 +232,7 @@ CREATE TABLE IF NOT EXISTS leaves (
   substitute_id  TEXT DEFAULT '',
   note           TEXT DEFAULT '',
   status         TEXT DEFAULT 'pending',
-  approved_by    TEXT DEFAULT '',
+  approved_by    TEXT DEFAULT '',            -- users.id
   created_at     TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -475,14 +469,12 @@ CREATE TABLE IF NOT EXISTS impl_templates (
 CREATE TABLE IF NOT EXISTS impl_projects (
   id               TEXT PRIMARY KEY,
   project_name     TEXT DEFAULT '',
-  hospital_name    TEXT DEFAULT '',
   start_date       DATE,
   end_date         DATE,
-  project_manager  TEXT DEFAULT '',
   status           TEXT DEFAULT 'not_started',
   progress_percent NUMERIC DEFAULT 0,
   template_id      TEXT DEFAULT '',
-  source_project_id TEXT DEFAULT '',
+  source_project_id TEXT DEFAULT '',        -- โครงการต้นทาง (projects.id) — PM/ผู้ติดตั้ง/ทีม อ่านจากที่นี่
   dashboard_token  TEXT UNIQUE,              -- กุญแจลิงก์ Public Dashboard (impl-dashboard.html?t=<token>)
   created_at       TIMESTAMPTZ DEFAULT NOW(),
   updated_at       TIMESTAMPTZ DEFAULT NOW()
@@ -505,7 +497,7 @@ CREATE TABLE IF NOT EXISTS impl_tasks (
   project_id       TEXT NOT NULL,
   task_name        TEXT DEFAULT '',
   description      TEXT DEFAULT '',
-  owner            TEXT DEFAULT '',
+  owner            TEXT DEFAULT '',          -- ผู้รับผิดชอบ (staff.id)
   start_date       DATE,
   due_date         DATE,
   priority         TEXT DEFAULT 'medium',
@@ -522,7 +514,7 @@ CREATE TABLE IF NOT EXISTS impl_checklist_items (
   checklist_name TEXT DEFAULT '',
   is_done        BOOLEAN DEFAULT false,
   done_date      DATE,
-  done_by        TEXT DEFAULT '',
+  done_by        TEXT DEFAULT '',            -- users.id
   remark         TEXT DEFAULT '',
   sort_order     INTEGER DEFAULT 99,
   created_at     TIMESTAMPTZ DEFAULT NOW()
@@ -531,7 +523,7 @@ CREATE TABLE IF NOT EXISTS impl_checklist_items (
 CREATE TABLE IF NOT EXISTS impl_comments (
   id           TEXT PRIMARY KEY,
   task_id      TEXT NOT NULL,
-  author       TEXT DEFAULT '',
+  author       TEXT DEFAULT '',              -- users.id
   comment_text TEXT DEFAULT '',
   created_at   TIMESTAMPTZ DEFAULT NOW()
 );
@@ -542,7 +534,7 @@ CREATE TABLE IF NOT EXISTS impl_attachments (
   file_name   TEXT DEFAULT '',
   file_url    TEXT DEFAULT '',
   file_size   NUMERIC DEFAULT 0,
-  uploaded_by TEXT DEFAULT '',
+  uploaded_by TEXT DEFAULT '',               -- users.id
   uploaded_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -553,7 +545,7 @@ CREATE TABLE IF NOT EXISTS impl_activity_log (
   entity_id   TEXT DEFAULT '',
   action      TEXT DEFAULT '',
   detail      TEXT DEFAULT '',
-  actor       TEXT DEFAULT '',
+  actor       TEXT DEFAULT '',               -- users.id
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -571,8 +563,8 @@ CREATE TABLE IF NOT EXISTS impl_issues (
   severity      TEXT DEFAULT 'medium',
   status        TEXT DEFAULT 'open',   -- open | in_progress | closed (window.IMPL_ISSUE_STATUS)
   solution      TEXT DEFAULT '',       -- วิธีการแก้ไข
-  received_by   TEXT DEFAULT '',       -- ผู้รับปัญหา
-  fixed_by      TEXT DEFAULT '',       -- ผู้แก้ไข
+  received_by   TEXT DEFAULT '',       -- ผู้รับปัญหา (staff.id)
+  fixed_by      TEXT DEFAULT '',       -- ผู้แก้ไข (staff.id)
   fixed_date    DATE,                  -- วันที่แก้ไขปัญหา
   created_at    TIMESTAMPTZ DEFAULT NOW(),  -- วันที่รับปัญหา
   updated_at    TIMESTAMPTZ DEFAULT NOW()
@@ -683,7 +675,7 @@ CREATE TABLE IF NOT EXISTS form_items (
   form_name       TEXT DEFAULT '',
   form_type       TEXT DEFAULT '',
   status          TEXT DEFAULT 'not_started',
-  owner           TEXT DEFAULT '',
+  owner           TEXT DEFAULT '',          -- ผู้จัดทำ (staff.id)
   received_date   DATE,
   description     TEXT DEFAULT '',
   sort_order      INTEGER DEFAULT 99,
@@ -939,7 +931,6 @@ CREATE TABLE IF NOT EXISTS helpdesk_categories (
   parent_id            TEXT DEFAULT '',
   default_priority     TEXT DEFAULT 'p3',
   default_assignee_id  TEXT DEFAULT '',
-  default_team         TEXT DEFAULT '',
   active               BOOLEAN DEFAULT true,
   sort                 NUMERIC DEFAULT 0,
   created_at           TIMESTAMPTZ DEFAULT NOW(),
@@ -975,7 +966,6 @@ CREATE TABLE IF NOT EXISTS helpdesk_tickets (
   priority               TEXT DEFAULT 'p3',        -- p1 | p2 | p3 | p4
   status                 TEXT DEFAULT 'new',       -- new triage assigned in_progress pending_user resolved closed reopened cancelled
   assignee_id            TEXT DEFAULT '',          -- FK staff.id
-  team                   TEXT DEFAULT '',
   sla_policy_id          TEXT DEFAULT '',
   first_response_at      TIMESTAMPTZ,
   first_response_due     TIMESTAMPTZ,
@@ -1018,7 +1008,7 @@ CREATE TABLE IF NOT EXISTS helpdesk_attachments (
   file_url     TEXT DEFAULT '',
   mime         TEXT DEFAULT '',
   size_bytes   NUMERIC DEFAULT 0,
-  uploaded_by  TEXT DEFAULT '',
+  uploaded_by  TEXT DEFAULT '',             -- users.id
   created_at   TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -1139,6 +1129,9 @@ ALTER TABLE settings DROP COLUMN IF EXISTS imt_ai_key;
 -- ล้างเป็น NULL เมื่อ Admin ตั้งรหัสใหม่ให้ ──
 ALTER TABLE users ADD COLUMN IF NOT EXISTS pw_reset_requested_at TIMESTAMPTZ;
 
+-- ── ระดับตำแหน่ง (1 = สูงสุด, 99 = ไม่กำหนด) — เรียงรายชื่อพนักงานจากตำแหน่งสูงสุดก่อน ──
+ALTER TABLE positions ADD COLUMN IF NOT EXISTS rank INTEGER DEFAULT 99;
+
 -- ================================================================
 -- ผู้ช่วยทีม (โมดูล 'assist') — คลังข้อความ/โค้ดที่ทีมเก็บไว้ พิมพ์ถามในหน้าแชทแล้วได้คำตอบกลับ
 -- AI แค่ "เลือก" รายการที่ตรงคำถาม เนื้อหาที่แสดงดึงจากตารางนี้ตรงตัว (AI ไม่แก้โค้ด) · idempotent รันซ้ำได้
@@ -1152,8 +1145,8 @@ CREATE TABLE IF NOT EXISTS assist_replies (
   content     TEXT DEFAULT '',       -- ข้อความ — โค้ดครอบด้วย ``` จะแสดงเป็นกล่องโค้ดพร้อมปุ่มคัดลอก
   note        TEXT DEFAULT '',       -- คำเตือนก่อนใช้ เช่น "สำรองฐานข้อมูลก่อนรัน"
   active      BOOLEAN DEFAULT true,
-  created_by  TEXT DEFAULT '',
-  updated_by  TEXT DEFAULT '',
+  created_by  TEXT DEFAULT '',             -- users.id
+  updated_by  TEXT DEFAULT '',             -- users.id
   created_at  TIMESTAMPTZ DEFAULT NOW(),
   updated_at  TIMESTAMPTZ DEFAULT NOW()
 );

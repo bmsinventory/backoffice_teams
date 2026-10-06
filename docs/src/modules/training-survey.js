@@ -145,7 +145,7 @@ async function init() {
   try {
     const [cR, sR, lR, stR] = await Promise.all([
       _sb.from('trn_categories').select('id,name').order('id'), // หลักสูตรอบรมเป็นของกลาง
-      _sb.from('trn_sessions').select('id,cat_id,name,date,time_start,time_end,venue,trainer').eq('site', currentSite).order('date,time_start'),
+      _sb.from('trn_sessions').select('id,cat_id,name,date,time_start,time_end,trainer,vm:trn_master_items!trn_sessions_venue_id_fkey(value)').eq('site', currentSite).order('date,time_start'), // สถานที่ = รหัสรายการหลัก
       _sb.from('trn_locations').select('*').order('id'),
       _sb.from('staff').select('*'), // วิทยากร = พนักงาน (รอบอบรมเก็บรหัสพนักงาน)
     ]);
@@ -157,7 +157,7 @@ async function init() {
     const allSess = (sR.data || []).map(r => ({
       id: r.id, catId: r.cat_id, name: r.name, date: r.date,
       timeStart: r.time_start, timeEnd: r.time_end,
-      venue: r.venue || '', trainer: staffName[r.trainer] || r.trainer || ''
+      venue: r.vm?.value || '', trainer: staffName[r.trainer] || r.trainer || ''
     }));
     todaySessions = allSess.filter(s => isToday(s.date));
 

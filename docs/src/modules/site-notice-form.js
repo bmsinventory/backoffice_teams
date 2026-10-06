@@ -241,7 +241,7 @@ window.snlInitCombos = function () {
   });
   window.initSuggestCombobox({
     wrapId: 'snl-requester-name-wrap', inputId: 'snl-requester-name', dropId: 'snl-requester-name-drop', listId: 'snl-requester-name-list',
-    getItems: function () { return (window.STAFF || []).filter(function (s) { return s.active !== false; }).map(function (s) { return s.name; }); },
+    getItems: function () { return (window.STAFF || []).filter(function (s) { return s.active !== false; }).sort(window.sortStaffByDeptRank).map(function (s) { return s.name; }); },
     onSelect: function () { window.snlOnRequesterNameChange(); }
   });
 };
@@ -620,12 +620,13 @@ window.snlOnProjectPick = function () {
   // 4) รายชื่อผู้เข้าปฏิบัติงาน ← ทีมในโครงการ พร้อมตำแหน่ง
   var sids = (p.members && p.members.length ? p.members : (p.team || []).map(function (id) { return { sid: id }; }))
     .map(function (m) { return m.sid; });
+  // เรียงจากตำแหน่งสูงสุดก่อน (positions.rank)
   var attendees = sids.map(function (sid) {
-    var s = (window.STAFF || []).find(function (x) { return x.id === sid; });
-    if (!s) return null;
+    return (window.STAFF || []).find(function (x) { return x.id === sid; });
+  }).filter(Boolean).sort(window.sortStaffByRank).map(function (s) {
     var posDept = (s.role || '') + (s.dept || '');
     return { name: s.name, position: posDept };
-  }).filter(Boolean);
+  });
   window.snlSetAttendees(attendees);
 
   window.snlRenderPreview();

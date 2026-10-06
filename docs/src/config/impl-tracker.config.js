@@ -18,7 +18,6 @@
   window.IMPL_TASKS           = [];
   window.IMPL_CHECKLIST_ITEMS = [];
   window.IMPL_ISSUES          = [];
-  window.IMPL_RISKS           = [];
   window.IMPL_COMMENTS        = [];
   window.IMPL_ATTACHMENTS     = [];
   window.IMPL_ACTIVITY_LOG    = [];
@@ -54,14 +53,8 @@
     { id:'closed',      label:'ดำเนินการแล้ว',  color:'#06d6a0', icon:'✅' },
   ];
 
-  window.IMPL_IMPACT = [
-    { id:'low',    label:'ต่ำ',    color:'#9ba3b8' },
-    { id:'medium', label:'ปานกลาง', color:'#ffa62b' },
-    { id:'high',   label:'สูง',    color:'#ff6b6b' },
-  ];
-
   // ── UI State ──
-  window.imtTab            = 'dashboard';  // dashboard | projects | detail | calendar | issues | risks | report
+  window.imtTab            = 'dashboard';  // dashboard | projects | detail | calendar | issues | report
   window.imtBoardView       = 'card';       // card | list | kanban  (มุมมอง Task ภายในหน้ารายละเอียดโครงการ)
   window.imtCurrentProjectId = '';
   window.imtCalY            = new Date().getFullYear();

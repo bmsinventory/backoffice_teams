@@ -27,10 +27,10 @@
       return { id:d.group_id||d.id, label:d.label_th||d.label, color:d.color_hex||d.color };
     },
     POSITIONS: function (d) {
-      return { id:d.position_id||d.id, label:d.label_th||d.label, dailyRate:Number(d.daily_rate)||0 };
+      return { id:d.position_id||d.id, label:d.label_th||d.label, dailyRate:Number(d.daily_rate)||0, rank:Number(d.rank)||99 };
     },
     STAFF: function (d) {
-      return { id:d.staff_id||d.id, name:d.full_name||d.name||'', nickname:d.nickname||(d.full_name||d.name||'').split(' ')[0], dept:d.department||d.dept, role:d.position||d.role, email:d.email, phone:d.phone, active:d.is_active!==false&&d.is_active!=='FALSE', start_date:d.start_date, birth_date:d.birth_date, remark:d.remark, dailyRate:d.daily_rate!=null?Number(d.daily_rate):null };
+      return { id:d.staff_id||d.id, name:d.full_name||d.name||'', nickname:d.nickname||(d.full_name||d.name||'').split(' ')[0], deptId:d.department||'', positionId:d.position||'', get dept(){ return window.deptLabel(this.deptId); }, get role(){ return window.positionLabel(this.positionId); }, email:d.email, phone:d.phone, active:d.is_active!==false&&d.is_active!=='FALSE', start_date:d.start_date, birth_date:d.birth_date, remark:d.remark, dailyRate:d.daily_rate!=null?Number(d.daily_rate):null };
     },
     USERS: function (d) {
       return { id:d.user_id||d.id, username:d.username, password:d.password, name:d.name||d.display_name||'', role:d.role, active:d.is_active!==false&&d.is_active!=='FALSE', staffId:d.staff_id||'', resetRequestedAt:d.pw_reset_requested_at||'' };
@@ -42,13 +42,13 @@
       return { id:d.advance_id||d.id, pid:d.project_id||d.pid, purpose:d.purpose||'', amount:Number(d.amount_requested||d.amount)||0, cleared:Number(d.amount_cleared||d.cleared)||0, rdate:d.request_date||d.rdate||'', ddate:d.due_date||d.ddate||'', status:d.status||'draft', note:d.note||'', advno:d.advance_no||d.advno||'', expenseItems:d.expense_items||[], laborItems:d.labor_items||[] };
     },
     LODGINGS: function (d) {
-      return { id:d.lodging_id||d.id, pid:d.project_id||d.pid, name:d.lodging_name||d.name||'', mapUrl:d.map_url||'', phone:d.phone||'', checkIn:d.check_in||'', checkOut:d.check_out||'', dsQty:Number(d.ds_qty)||0, dsRate:Number(d.ds_rate)||0, ddQty:Number(d.dd_qty)||0, ddRate:Number(d.dd_rate)||0, dTotal:Number(d.d_total)||0, dWifi:_bv(d,'d_wifi'), dPillow:_bv(d,'d_pillow'), dBlanket:_bv(d,'d_blanket'), dApp:_bv(d,'d_appliance'), dPark:_bv(d,'d_parking'), dAc:_bv(d,'d_ac'), dFridge:_bv(d,'d_fridge'), dWasher:_bv(d,'d_washer'), dTv:_bv(d,'d_tv'), dShower:_bv(d,'d_shower'), dBreakfast:_bv(d,'d_breakfast'), dTowel:_bv(d,'d_towel'), dCustom:d.d_custom||'', dDeposit:Number(d.d_deposit)||0, dDepositNote:d.d_deposit_note||'', msQty:Number(d.ms_qty)||0, msRate:Number(d.ms_rate)||0, mdQty:Number(d.md_qty)||0, mdRate:Number(d.md_rate)||0, mTotal:Number(d.m_total)||0, mWifi:_bv(d,'m_wifi'), mPillow:_bv(d,'m_pillow'), mBlanket:_bv(d,'m_blanket'), mApp:_bv(d,'m_appliance'), mPark:_bv(d,'m_parking'), mAc:_bv(d,'m_ac'), mFridge:_bv(d,'m_fridge'), mWasher:_bv(d,'m_washer'), mTv:_bv(d,'m_tv'), mShower:_bv(d,'m_shower'), mBreakfast:_bv(d,'m_breakfast'), mBedsheet:_bv(d,'m_bedsheet'), mTowel:_bv(d,'m_towel'), mCustom:d.m_custom||'', mDeposit:Number(d.m_deposit)||0, mDepositNote:d.m_deposit_note||'', mWater:d.m_water||'', mElectric:d.m_electric||'', mExtras:d.m_extras||'', mInclUtil:_bv(d,'m_incl_util'), total:Number(d.grand_total||d.total)||0, note:d.note||'', approved:d.approved||'', approvedAt:d.approved_at||'', approvedBy:d.approved_by||'', approvedDaily:d.approved_daily||'', approvedMonthly:d.approved_monthly||'' };
+      return { id:d.lodging_id||d.id, pid:d.project_id||d.pid, name:d.lodging_name||d.name||'', mapUrl:d.map_url||'', phone:d.phone||'', checkIn:d.check_in||'', checkOut:d.check_out||'', dsQty:Number(d.ds_qty)||0, dsRate:Number(d.ds_rate)||0, ddQty:Number(d.dd_qty)||0, ddRate:Number(d.dd_rate)||0, dTotal:Number(d.d_total)||0, dWifi:_bv(d,'d_wifi'), dPillow:_bv(d,'d_pillow'), dBlanket:_bv(d,'d_blanket'), dApp:_bv(d,'d_appliance'), dPark:_bv(d,'d_parking'), dAc:_bv(d,'d_ac'), dFridge:_bv(d,'d_fridge'), dWasher:_bv(d,'d_washer'), dTv:_bv(d,'d_tv'), dShower:_bv(d,'d_shower'), dBreakfast:_bv(d,'d_breakfast'), dTowel:_bv(d,'d_towel'), dCustom:d.d_custom||'', dDeposit:Number(d.d_deposit)||0, dDepositNote:d.d_deposit_note||'', msQty:Number(d.ms_qty)||0, msRate:Number(d.ms_rate)||0, mdQty:Number(d.md_qty)||0, mdRate:Number(d.md_rate)||0, mTotal:Number(d.m_total)||0, mWifi:_bv(d,'m_wifi'), mPillow:_bv(d,'m_pillow'), mBlanket:_bv(d,'m_blanket'), mApp:_bv(d,'m_appliance'), mPark:_bv(d,'m_parking'), mAc:_bv(d,'m_ac'), mFridge:_bv(d,'m_fridge'), mWasher:_bv(d,'m_washer'), mTv:_bv(d,'m_tv'), mShower:_bv(d,'m_shower'), mBreakfast:_bv(d,'m_breakfast'), mBedsheet:_bv(d,'m_bedsheet'), mTowel:_bv(d,'m_towel'), mCustom:d.m_custom||'', mDeposit:Number(d.m_deposit)||0, mDepositNote:d.m_deposit_note||'', mWater:d.m_water||'', mElectric:d.m_electric||'', mExtras:d.m_extras||'', mInclUtil:_bv(d,'m_incl_util'), total:Number(d.grand_total||d.total)||0, note:d.note||'', approvedDaily:d.approved_daily||'', approvedMonthly:d.approved_monthly||'' };
     },
     HOLIDAYS: function (d) {
       return { id:d.holiday_id||d.id, name:d.name||'', date:_holNorm(d.date||''), type:d.type||'national' };
     },
     LEAVES: function (d) {
-      return { id:d.leave_id||d.id, staffId:d.staff_id||'', leaveType:d.leave_type||'other', startDate:d.start_date||'', endDate:d.end_date||'', substituteId:d.substitute_id||'', note:d.note||'', status:d.status||'pending', approvedBy:d.approved_by||'' };
+      return { id:d.leave_id||d.id, staffId:d.staff_id||'', leaveType:d.leave_type||'other', startDate:d.start_date||'', endDate:d.end_date||'', substituteId:d.substitute_id||'', note:d.note||'', status:d.status||'pending', approvedById:d.approved_by||'', get approvedBy(){ return window.userNameById(this.approvedById); } };
     },
     TIMESHEETS: function (d) {
       return { id:d.timesheet_id||d.id, pid:d.project_id||d.pid||'', staffId:d.staff_id||'', workDate:d.work_date||'', visitStart:d.visit_start||'', visitEnd:d.visit_end||'', hours:Number(d.hours)||0, category:d.category||'other', description:d.description||'', source:d.source||'' };
@@ -157,7 +157,7 @@
       }, window.showDbError);
 
       window.onSnapshot(window.getColRef('POSITIONS'), function (s) {
-        window.POSITIONS = s.docs.map(function (doc) { return transform.POSITIONS(doc.data()); });
+        window.POSITIONS = s.docs.map(function (doc) { return transform.POSITIONS(doc.data()); }).sort(window.sortPositionsByRank);
         checkLoaded();
         if (!_ownWrite('POSITIONS')) _deferRenderAll();
       }, window.showDbError);

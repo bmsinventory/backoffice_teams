@@ -129,11 +129,35 @@ function _prefetchLibs(){
 const _sb=window.supabase.createClient(window.SUPABASE_URL,window.SUPABASE_ANON_KEY);
 // parallel id arrays for master_items (index matches the string arrays)
 let masterIds={venue:[],dept:[],prefix:[]};
+// ── ข้อมูลพื้นฐาน (trn_master_items) — รอบอบรม/ผู้ลงทะเบียน/ตรวจสอบสิทธิ์/คีย์ยอด ผูกด้วยรหัส (venue_id/dept_id/prefix_id)
+// masterById = ทุกโครงการที่โหลดมา (หน้าผู้ดูแลเห็นผู้ลงทะเบียนหลายโครงการ) · ข้อความที่แสดง = value ของรายการนั้น ──
+let masterById={};
+const _mVal=id=>id!=null&&masterById[id]?masterById[id].value:'';
+// ช่องเลือกในฟอร์มแสดง/เก็บชื่อรายการหลักของโครงการ (ไม่ซ้ำกันตาม unique(type,value,site)) → แปลงเป็นรหัสตอนบันทึก
+const _mId=(type,val,site=currentSite)=>{
+  if(!val)return null;
+  const m=Object.values(masterById).find(x=>x.type===type&&x.site===site&&x.value===val);
+  return m?m.id:null;
+};
+// นำเข้าจากไฟล์: ค่าที่ยังไม่มีในรายการหลัก → เพิ่มเข้ารายการหลักของโครงการให้ แล้วคืนรหัส
+async function _ensureMasterId(type,val,site=currentSite){
+  if(!val)return null;
+  const id=_mId(type,val,site);if(id)return id;
+  const sort=Object.values(masterById).filter(x=>x.type===type&&x.site===site).length;
+  const {data,error}=await _sb.from('trn_master_items').upsert({type,value:val,sort_order:sort,site},{onConflict:'type,value,site'}).select().single();
+  if(error)throw new Error(error.message);
+  masterById[data.id]=data;
+  return data.id;
+}
+// ลบไม่ได้เพราะยังมีข้อมูลอ้างอยู่ — 23001 = foreign key แบบ on delete restrict · 23503 = แบบ no action
+const _isInUse=e=>e&&(e.code==='23001'||e.code==='23503');
 // row mappers: DB → app format
 // sc = แถว trn_site_categories ของโครงการนี้ (ไม่มี = ยังไม่เปิดหลักสูตรนี้ในโครงการ)
 const _mCat=(r,sc)=>({id:r.id,name:r.name,desc:r.description||'',icon:r.icon||'box',color:r.color||'blue',bannerUrl:r.banner_url||null,quizId:r.quiz_id||null,certCode:r.cert_code||'',enabled:!!sc,quizOpen:!!sc&&sc.quiz_open!==false});
-const _mSess=r=>({id:r.id,catId:r.cat_id,name:r.name,date:r.date,timeStart:r.time_start,timeEnd:r.time_end,venue:r.venue||'',trainerId:r.trainer||'',trainer:_staffName(r.trainer),capacity:r.capacity});
-const _mReg=r=>({id:r.id,sessionId:r.session_id,prefix:r.prefix||'',fname:r.fname,lname:r.lname,position:r.position||'',dept:r.dept||'',email:r.email||'',regDate:r.reg_date,attended:r.attended||false,attendedTime:r.attended_time||null,isWalkin:r.is_walkin||false});
+const _mSess=r=>({id:r.id,catId:r.cat_id,name:r.name,date:r.date,timeStart:r.time_start,timeEnd:r.time_end,venueId:r.venue_id??null,venue:_mVal(r.venue_id),trainerId:r.trainer||'',trainer:_staffName(r.trainer),capacity:r.capacity});
+const _mReg=r=>({id:r.id,sessionId:r.session_id,prefixId:r.prefix_id??null,prefix:_mVal(r.prefix_id),fname:r.fname,lname:r.lname,position:r.position||'',deptId:r.dept_id??null,dept:_mVal(r.dept_id),email:r.email||'',regDate:r.reg_date,attended:r.attended||false,attendedTime:r.attended_time||null,isWalkin:r.is_walkin||false});
+// ตรวจสอบสิทธิ์ Login / คีย์ยอดรายแผนก — เก็บ dept_id · dept = ชื่อแผนก (ใช้แสดง/จับคู่กับรายการแผนก)
+const _mDeptRow=r=>({...r,dept:_mVal(r.dept_id)});
 
 async function pushNotify(reg){
   const token=_siteNotifyToken(currentSite);
@@ -365,23 +389,26 @@ async function loadAllData(light=false){
   // หน้าผู้ดูแลแบบหลายโครงการ = ทุกโครงการที่เห็น · แท็บอบรมของโครงการ/ผู้เข้าอบรม = โครงการเดียว
   const regSites=isAdminLoggedIn&&!PROJECT_ID?locations.map(l=>l.code):[currentSite].filter(Boolean);
   const site=currentSite,none=!site,needRef=!_refReady; // ยังไม่มีโครงการ → ไม่ต้องถามข้อมูลของโครงการ
+  const mSites=[...new Set([site,...regSites].filter(Boolean))]; // ข้อมูลพื้นฐานของทุกโครงการที่โหลดผู้ลงทะเบียน (แปลงรหัส → ชื่อ)
   // รอบ 2 (พร้อมกัน): ข้อมูลของโครงการ (+ ข้อมูลอ้างอิงถ้ายังไม่มี)
-  const [cR,scR,sR,rR,mR,lvR,qzR,snR,stR,gnR]=await Promise.all([
+  const [cR,scR,sR,rR,mR,lvR,qzR,snR,stR,gnR,psR]=await Promise.all([
     none?_NONE:_sb.from('trn_categories').select('*').order('id'),
     none?_NONE:_sb.from('trn_site_categories').select('cat_id,quiz_open').eq('site',site),
     none?_NONE:_sb.from('trn_sessions').select('*').eq('site',site).order('id'),
     _regsOfSites(regSites),
-    none?_NONE:_sb.from('trn_master_items').select('*').eq('site',site).order('type,sort_order,id'),
+    mSites.length?_sb.from('trn_master_items').select('*').in('site',mSites).order('type,sort_order,id'):_NONE,
     none?_NONE:_sb.from('trn_login_verify').select('*').eq('site',site),
     none?_NONE:_sb.from('trn_quizzes').select('id,title').eq('is_active',true),
     needRef?_sb.from('trn_settings').select('value').eq('key','site_notify_tokens').maybeSingle():_NONE,
     needRef?_sb.from('staff').select('id,staff_id,full_name,nickname,position,is_active'):_NONE,
     needRef?_sb.from('settings').select('notify_training_token').eq('id','app').maybeSingle():_NONE,
+    needRef?_sb.from('positions').select('id,position_id,label_th,label'):_NONE, // staff.position = รหัสตำแหน่ง
   ]);
   if(cR.error||scR.error||sR.error||rR.error||mR.error)throw new Error('โหลดข้อมูลล้มเหลว');
   if(needRef){ // ก่อน map รอบอบรม (_mSess ใช้ชื่อวิทยากรจาก trainerStaff)
+    const posLabel=Object.fromEntries((psR.data||[]).map(p=>[p.position_id||p.id,p.label_th||p.label||'']));
     trainerStaff=(stR.data||[]).filter(d=>d.is_active!==false&&d.is_active!=='FALSE')
-      .map(d=>({id:String(d.staff_id||d.id),name:d.full_name||'',nickname:d.nickname||'',position:d.position||''}))
+      .map(d=>({id:String(d.staff_id||d.id),name:d.full_name||'',nickname:d.nickname||'',position:posLabel[d.position]||''}))
       .filter(t=>t.name).sort((a,b)=>a.name.localeCompare(b.name,'th'));
     try{siteNotifyTokens=JSON.parse(snR.data?.value||'{}');}catch(e){siteNotifyTokens={};}
     globalNotifyToken=gnR.data?.notify_training_token||'';
@@ -393,10 +420,12 @@ async function loadAllData(light=false){
   _liveQuizTitle=Object.fromEntries((qzR.data||[]).map(q=>[q.id,q.title]));
   const liveQz=new Set((qzR.data||[]).map(q=>q.id));
   _quizCatIds=new Set(categories.filter(c=>c.quizOpen&&liveQz.has(c.quizId)).map(c=>c.id));
+  // ข้อมูลพื้นฐานก่อน map รอบอบรม/ผู้ลงทะเบียน (_mSess/_mReg แปลงรหัส → ชื่อจาก masterById)
+  masterById=Object.fromEntries((mR.data||[]).map(m=>[m.id,m]));
+  const ms=(mR.data||[]).filter(m=>m.site===site);
   sessions=(sR.data||[]).map(_mSess);
   registrations=(rR.data||[]).map(_mReg);
-  loginVerifyData=(lvR.data||[]);
-  const ms=mR.data||[];
+  loginVerifyData=(lvR.data||[]).map(_mDeptRow);
   venues=ms.filter(m=>m.type==='venue').map(m=>m.value);
   departments=ms.filter(m=>m.type==='dept').map(m=>m.value);
   prefixes=ms.filter(m=>m.type==='prefix').map(m=>m.value);
@@ -415,7 +444,7 @@ function _mySiteCodes(locs,implRows,projRows){
   const a=currentAdminUser;
   if(!a.staffId)return new Set();
   const projects=_mapProjects(projRows);
-  const impl=Object.fromEntries((implRows||[]).map(d=>[d.id,{name:d.project_name||'',sourceProjectId:d.source_project_id||''}]));
+  const impl=Object.fromEntries((implRows||[]).map(d=>[d.id,{sourceProjectId:d.source_project_id||''}]));
   return new Set(locs.filter(l=>l.project_id&&ProjectTeam.isMember(a.staffId,impl[l.project_id],projects)).map(l=>l.code));
 }
 function _warnNoProjects(){
@@ -791,6 +820,7 @@ function _validateRows(rows,type){
         timeStart:(row[3]||'09:00').trim()||'09:00',timeEnd:(row[4]||'16:00').trim()||'16:00',
         venue:(row[5]||'').trim(),trainer:_staffIdByName((row[6]||'').trim()),capacity:parseInt(row[7])||20};
       if((row[6]||'').trim()&&!trainerStaff.some(t=>t.id===r.value.trainer))r.note=(r.note?r.note+' · ':'')+'ไม่พบวิทยากรในรายชื่อพนักงาน';
+      if(r.value.venue&&!venues.includes(r.value.venue))r.note=(r.note?r.note+' · ':'')+'สถานที่นี้ไม่มีในรายการหลัก (จะเพิ่มเข้ารายการหลักให้)';
     } else if(type==='registration'){
       // จับคู่รอบอบรมจากคอลัมน์ "หลักสูตร"+"ชื่อรอบ" ต่อแถว — 1 ไฟล์นำเข้าได้หลายรอบพร้อมกัน ไม่ต้องเลือกรอบล่วงหน้า
       const catName=(row[0]||'').trim(),sessName=(row[1]||'').trim();
@@ -825,9 +855,9 @@ function _validateRows(rows,type){
       if(r.status==='ok'){const near=findSimilarReg(fname,lname,cat.id);if(near)notes.push(`ชื่อใกล้เคียง "${near.fname} ${near.lname}" ลงทะเบียนหลักสูตรนี้แล้ว — ตรวจว่าเป็นคนเดียวกันหรือไม่`);}
       // แผนก/คำนำหน้าที่เขียนต่างจากรายการหลักเล็กน้อย (ช่องว่าง/ตัวพิมพ์/สะกด) → ใช้ชื่อในรายการหลัก ข้อมูลจะได้รวมกลุ่มถูก
       const mDept=_matchMaster(dept,departments),mPrefix=_matchMaster(prefix,prefixes);
-      if(dept&&!mDept)notes.push('แผนกนี้ไม่มีในรายการหลัก (จะบันทึกเป็นข้อความ)');
+      if(dept&&!mDept)notes.push('แผนกนี้ไม่มีในรายการหลัก (จะเพิ่มเข้ารายการหลักให้)');
       else if(mDept&&mDept!==dept)notes.push(`แผนก "${dept}" → ใช้ "${mDept}" ตามรายการหลัก`);
-      if(prefix&&!mPrefix)notes.push('คำนำหน้านี้ไม่มีในรายการหลัก');
+      if(prefix&&!mPrefix)notes.push('คำนำหน้านี้ไม่มีในรายการหลัก (จะเพิ่มเข้ารายการหลักให้)');
       else if(mPrefix&&mPrefix!==prefix)notes.push(`คำนำหน้า "${prefix}" → ใช้ "${mPrefix}"`);
       if(notes.length)r.note=[r.note,...notes].filter(Boolean).join(' · ');
       r.value={prefix:mPrefix||prefix,fname,lname,position:pos,dept:mDept||dept,email:email||null,sessionId:sess.id};
@@ -973,7 +1003,13 @@ async function _clearImportType(type){
   const MASTER=['venue','dept','prefix'];
   let err;
   if(MASTER.includes(type)){
-    ({error:err}=await _sb.from('trn_master_items').delete().eq('type',type).eq('site',currentSite));
+    // รายการที่ถูกใช้อยู่ (รอบอบรม/ผู้ลงทะเบียน/ตรวจสอบสิทธิ์/คีย์ยอด อ้างรหัสไว้) ลบไม่ได้ — คงไว้ ลบเฉพาะที่ไม่ได้ใช้
+    let kept=0;
+    for(const id of masterIds[type]||[]){
+      const {error:e}=await _sb.from('trn_master_items').delete().eq('id',id);
+      if(e){if(_isInUse(e)){kept++;continue;}throw new Error(e.message);}
+    }
+    if(kept)showToast(`คงไว้ ${kept} รายการที่ยังถูกใช้งานอยู่`,'warn');
   } else if(type==='session'){
     ({error:err}=await _sb.from('trn_sessions').delete().eq('site',currentSite));
   }
@@ -989,12 +1025,18 @@ async function _insertImportRows(type,rows){
       {onConflict:'type,value,site',ignoreDuplicates:true}
     ));
   } else if(type==='session'){
-    ({error}=await _sb.from('trn_sessions').insert(rows.map(r=>({cat_id:r.value.catId,name:r.value.name,date:r.value.date,time_start:r.value.timeStart,time_end:r.value.timeEnd,venue:r.value.venue,trainer:r.value.trainer,capacity:r.value.capacity,site:currentSite}))));
+    // สถานที่ → รหัสรายการหลัก (ไม่มี → เพิ่มให้) · ทำทีละค่าตามลำดับ กันเพิ่มค่าเดียวกันซ้ำพร้อมกัน
+    for(const r of rows)r.value.venueId=await _ensureMasterId('venue',r.value.venue);
+    ({error}=await _sb.from('trn_sessions').insert(rows.map(r=>({cat_id:r.value.catId,name:r.value.name,date:r.value.date,time_start:r.value.timeStart,time_end:r.value.timeEnd,venue_id:r.value.venueId,trainer:r.value.trainer,capacity:r.value.capacity,site:currentSite}))));
   } else if(type==='registration'){
+    for(const r of rows){
+      r.value.prefixId=await _ensureMasterId('prefix',r.value.prefix);
+      r.value.deptId=await _ensureMasterId('dept',r.value.dept);
+    }
     // ไม่ set is_walkin → ถือเป็นการลงทะเบียนล่วงหน้าปกติ (เหมือนกรอกฟอร์ม/แอดมินเพิ่มเอง) ไม่ใช่ walk-in
     ({error}=await _sb.from('trn_registrations').insert(rows.map(r=>({
-      session_id:r.value.sessionId,prefix:r.value.prefix,fname:r.value.fname,lname:r.value.lname,
-      position:r.value.position,dept:r.value.dept,email:r.value.email,
+      session_id:r.value.sessionId,prefix_id:r.value.prefixId,fname:r.value.fname,lname:r.value.lname,
+      position:r.value.position,dept_id:r.value.deptId,email:r.value.email,
       reg_date:new Date().toISOString().split('T')[0],attended:false,
     }))));
   }
@@ -2211,7 +2253,7 @@ async function submitReg(){
       'ถ้าเป็นคุณ (สะกดชื่อต่างกันเล็กน้อย) ไม่ต้องลงทะเบียนซ้ำ · ถ้าเป็นคนละคน กด "ลงทะเบียนต่อ"',{okLabel:'ลงทะเบียนต่อ',danger:false}))return;
   }
   const {data,error}=await _sb.from('trn_registrations').insert({
-    session_id:selectedSessId,prefix,fname,lname,position:pos,dept,email:reqEmail?email:null,
+    session_id:selectedSessId,prefix_id:_mId('prefix',prefix),fname,lname,position:pos,dept_id:_mId('dept',dept),email:reqEmail?email:null,
     reg_date:new Date().toISOString().split('T')[0],attended:false
   }).select().single();
   if(error){showToast('บันทึกไม่สำเร็จ','danger');return;}
@@ -2875,7 +2917,7 @@ async function submitWalkin(){
   }
   const time=nowTime();
   const {data,error}=await _sb.from('trn_registrations').insert({
-    session_id:sid,prefix,fname,lname,position:pos,dept,email:reqEmail?email:null,
+    session_id:sid,prefix_id:_mId('prefix',prefix),fname,lname,position:pos,dept_id:_mId('dept',dept),email:reqEmail?email:null,
     reg_date:new Date().toISOString().split('T')[0],
     attended:true,attended_time:time,is_walkin:true,
   }).select().single();
@@ -3188,7 +3230,7 @@ async function _analyticsExtra(){
   const [svR,qR,keR]=await Promise.all([
     _allRows(()=>_sb.from('trn_survey_responses').select('id,session_id,q6_6,'+keys.join(',')).eq('site',currentSite).order('id')),
     _allRows(()=>_sb.from('trn_quiz_attempts').select('id,quiz_id,email,full_name,dept,percent,status').eq('site',currentSite).neq('status','started').order('id')),
-    keyEntryData.length?Promise.resolve({data:keyEntryData}):_sb.from('trn_key_entry_status').select('dept,status').eq('site',currentSite),
+    keyEntryData.length?Promise.resolve({data:keyEntryData}):_sb.from('trn_key_entry_status').select('dept_id,status').eq('site',currentSite).then(r=>({...r,data:(r.data||[]).map(_mDeptRow)})),
   ]);
   const qa=qR.data||[];
   const qids=[...new Set(qa.map(a=>a.quiz_id))];
@@ -3658,33 +3700,13 @@ const MASTER_CFG={
   dept:   {list:()=>departments,setList:v=>{departments=v;},icon:'building',inputId:'new-dept-input',listId:'dept-list'},
   prefix: {list:()=>prefixes,setList:v=>{prefixes=v;},icon:'id-badge',  inputId:'new-prefix-input', listId:'prefix-list'},
 };
-/* ── เมื่อแก้ไขชื่อ master item (แก้ ID เดิม) ให้ไล่อัปเดตข้อมูลที่เคยผูกไว้ตามให้อัตโนมัติ
-   venue/trainer ผูกกับ sessions, dept/prefix ผูกกับ registrations (ผ่าน session ของโครงการปัจจุบัน) ── */
-const MASTER_CASCADE={
-  venue:  {table:'trn_sessions',      col:'venue',  scope:'site'},
-  dept:   {table:'trn_registrations', col:'dept',   scope:'session'},
-  prefix: {table:'trn_registrations', col:'prefix', scope:'session'},
-};
-async function _cascadeMasterRename(key,oldVal,newVal){
-  const cc=MASTER_CASCADE[key];
-  if(!cc||!oldVal||oldVal===newVal)return 0;
-  if(cc.scope==='site'){
-    const affected=sessions.filter(s=>s[cc.col]===oldVal);
-    if(!affected.length)return 0;
-    const {error}=await _sb.from(cc.table).update({[cc.col]:newVal}).eq('site',currentSite).eq(cc.col,oldVal);
-    if(error){console.error(error);return -1;}
-    affected.forEach(s=>s[cc.col]=newVal);
-    return affected.length;
-  }else{
-    const siteSessIds=new Set(sessions.map(s=>s.id)); // sessions ในหน่วยความจำ = เฉพาะโครงการปัจจุบันอยู่แล้ว
-    const affected=registrations.filter(r=>siteSessIds.has(r.sessionId)&&r[cc.col]===oldVal);
-    if(!affected.length)return 0;
-    const ids=affected.map(r=>r.id);
-    const {error}=await _sb.from(cc.table).update({[cc.col]:newVal}).in('id',ids);
-    if(error){console.error(error);return -1;}
-    affected.forEach(r=>r[cc.col]=newVal);
-    return affected.length;
-  }
+/* ── รอบอบรม/ผู้ลงทะเบียน/ตรวจสอบสิทธิ์/คีย์ยอด ผูกรายการหลักด้วยรหัส — แก้ชื่อรายการหลักที่เดียว ทุกที่เปลี่ยนตาม
+   (ข้อมูลในหน่วยความจำเก็บชื่อไว้แสดง → map ใหม่จาก masterById หลังแก้/เพิ่ม) ── */
+function _relabelMasters(){
+  sessions.forEach(s=>{s.venue=_mVal(s.venueId);});
+  registrations.forEach(r=>{r.dept=_mVal(r.deptId);r.prefix=_mVal(r.prefixId);});
+  loginVerifyData.forEach(r=>{r.dept=_mVal(r.dept_id);});
+  keyEntryData.forEach(r=>{r.dept=_mVal(r.dept_id);});
 }
 function renderMasters(){
   Object.entries(MASTER_CFG).forEach(([key,cfg])=>{
@@ -3712,6 +3734,7 @@ async function addMaster(key){
   if(error){showToast('บันทึกไม่สำเร็จ','danger');return;}
   cfg.setList([...arr,val]);
   masterIds[key]=[...(masterIds[key]||[]),data.id];
+  masterById[data.id]=data;
   input.value='';renderMasters();showToast(`เพิ่ม "${val}" สำเร็จ`,'success');
 }
 async function removeMaster(key,idx){
@@ -3721,7 +3744,9 @@ async function removeMaster(key,idx){
   const id=(masterIds[key]||[])[idx];
   if(id){
     const {error}=await _sb.from('trn_master_items').delete().eq('id',id);
-    if(error){showToast('ลบไม่สำเร็จ','danger');return;}
+    // ยังมีรอบอบรม/ผู้ลงทะเบียน/ตรวจสอบสิทธิ์ อ้างรายการนี้อยู่
+    if(error){showToast(_isInUse(error)?`ลบ "${arr[idx]}" ไม่ได้ — ยังมีข้อมูลที่ใช้รายการนี้อยู่ (แก้ชื่อแทนได้)`:'ลบไม่สำเร็จ','danger');return;}
+    delete masterById[id];
   }
   const name=arr[idx];
   cfg.setList(arr.filter((_,i)=>i!==idx));
@@ -3752,13 +3777,14 @@ async function saveMasterInline(key,idx){
   if(id){
     const {error}=await _sb.from('trn_master_items').update({value:val}).eq('id',id);
     if(error){showToast('บันทึกไม่สำเร็จ','danger');return;}
+    if(masterById[id])masterById[id].value=val;
   }
   const old=arr[idx];arr[idx]=val;cfg.setList([...arr]);
-  const cascaded=await _cascadeMasterRename(key,old,val);
+  _relabelMasters();
   renderMasters();
   if(key==='venue')renderAdminSessions();
   if(key==='dept'||key==='prefix')renderAdminRegs();
-  showToast(cascaded>0?`แก้ไข "${old}" → "${val}" สำเร็จ (อัปเดตให้อัตโนมัติ ${cascaded} รายการ)`:`แก้ไข "${old}" → "${val}" สำเร็จ`,'success');
+  showToast(`แก้ไข "${old}" → "${val}" สำเร็จ`,'success');
 }
 
 /* ══ ADD/EDIT SESSION ══ */
@@ -3769,7 +3795,7 @@ function _siteTeamIds(siteCode){
   const loc=locations.find(l=>l.code===siteCode);
   const impl=_implRows.find(d=>d.id===loc?.project_id);
   const projects=_mapProjects(_projRows);
-  const implProj=impl&&{name:impl.project_name||'',sourceProjectId:impl.source_project_id||''};
+  const implProj=impl&&{sourceProjectId:impl.source_project_id||''};
   const sp=ProjectTeam.source(implProj,projects);
   return [sp?.pm,...ProjectTeam.staffIds(implProj,projects)].filter(Boolean).map(String);
 }
@@ -3785,11 +3811,11 @@ function populateSessionDropdowns(keepTrainerId){
   document.getElementById('ns-cat').innerHTML='<option value="">เลือกหลักสูตร...</option>'
     +(on.length?`<optgroup label="เปิดในโครงการนี้แล้ว">${on.map(opt).join('')}</optgroup>`:'')
     +(off.length?`<optgroup label="หลักสูตรกลางอื่น ๆ (เปิดในโครงการให้เมื่อบันทึก)">${off.map(opt).join('')}</optgroup>`:'');
-  populateSelect('ns-venue',venues,'เลือกสถานที่...');
+  populateSelect('ns-venue',venues.map((v,i)=>({v:masterIds.venue[i],l:v})),'เลือกสถานที่...',true); // ค่า = รหัสรายการหลัก
   const tr=_sessTrainers(keepTrainerId);
   populateSelect('ns-trainer',tr.map(t=>({v:t.id,l:t.name+(t.nickname?' ('+t.nickname+')':'')})),'เลือกวิทยากร (ทีมโครงการ)...',true);
   // มีตัวเลือกเดียว → เลือกให้เลย
-  if(venues.length===1)document.getElementById('ns-venue').value=venues[0];
+  if(venues.length===1)document.getElementById('ns-venue').value=masterIds.venue[0];
   if(tr.length===1)document.getElementById('ns-trainer').value=tr[0].id;
 }
 // วันที่รอบอบรม: เก็บ ค.ศ. ใน input[type=date] (ซ่อน) · แสดง วว/ดด/ปปปป พ.ศ.
@@ -3996,7 +4022,7 @@ function openEditSession(id){
   populateSessionDropdowns(s.trainerId);
   setTimeout(()=>{
     document.getElementById('ns-cat').value=s.catId;
-    document.getElementById('ns-venue').value=s.venue;
+    document.getElementById('ns-venue').value=s.venueId??'';
     document.getElementById('ns-trainer').value=s.trainerId;
   },50);
   document.getElementById('modal-session').classList.add('open');
@@ -4008,21 +4034,21 @@ async function submitSession(){
   const date=document.getElementById('ns-date').value;
   const timeStart=document.getElementById('ns-time-start').value;
   const timeEnd=document.getElementById('ns-time-end').value;
-  const venue=document.getElementById('ns-venue').value;
+  const venueId=parseInt(document.getElementById('ns-venue').value)||null;
   const trainer=document.getElementById('ns-trainer').value;
   const cap=parseInt(document.getElementById('ns-cap').value);
-  if(!catId||!name||!date||!timeStart||!timeEnd||!venue||!trainer||!cap){showToast('กรุณากรอกข้อมูลให้ครบ','danger');return;}
+  if(!catId||!name||!date||!timeStart||!timeEnd||!venueId||!trainer||!cap){showToast('กรุณากรอกข้อมูลให้ครบ','danger');return;}
   if(timeEnd<=timeStart){showToast('เวลาสิ้นสุดต้องหลังเวลาเริ่ม','danger');return;}
   if(editId){
     const s=getSess(parseInt(editId));
     const cnt=getCount(s.id);
     if(cap<cnt){showToast(`ที่นั่งต้องไม่น้อยกว่าผู้ลงทะเบียน (${cnt} คน)`,'danger');return;}
-    const {error}=await _sb.from('trn_sessions').update({cat_id:catId,name,date,time_start:timeStart,time_end:timeEnd,venue,trainer,capacity:cap}).eq('id',s.id);
+    const {error}=await _sb.from('trn_sessions').update({cat_id:catId,name,date,time_start:timeStart,time_end:timeEnd,venue_id:venueId,trainer,capacity:cap}).eq('id',s.id);
     if(error){showToast('บันทึกไม่สำเร็จ','danger');return;}
-    Object.assign(s,{catId,name,date,timeStart,timeEnd,venue,trainerId:trainer,trainer:_staffName(trainer),capacity:cap});
+    Object.assign(s,{catId,name,date,timeStart,timeEnd,venueId,venue:_mVal(venueId),trainerId:trainer,trainer:_staffName(trainer),capacity:cap});
     showToast('แก้ไขรอบสำเร็จ','success');
   } else {
-    const {data,error}=await _sb.from('trn_sessions').insert({cat_id:catId,name,date,time_start:timeStart,time_end:timeEnd,venue,trainer,capacity:cap,site:currentSite}).select().single();
+    const {data,error}=await _sb.from('trn_sessions').insert({cat_id:catId,name,date,time_start:timeStart,time_end:timeEnd,venue_id:venueId,trainer,capacity:cap,site:currentSite}).select().single();
     if(error){showToast('บันทึกไม่สำเร็จ','danger');return;}
     sessions.push(_mSess(data));
     showToast('เพิ่มรอบอบรมสำเร็จ','success');
@@ -4210,7 +4236,7 @@ async function deleteCat(id){
   if(u.sess){showToast(`ลบไม่ได้ — "${c.name}" มีรอบอบรม ${u.sess} รอบ`,'warn');return;}
   if(!await showConfirm(`ลบหลักสูตร "${c.name}"?`,u.sites?`เปิดใช้อยู่ ${u.sites} โครงการ (ยังไม่มีรอบอบรม) — จะหายจากโครงการเหล่านั้นด้วย`:'',{okLabel:'ลบ'}))return;
   const {error}=await _sb.from('trn_categories').delete().eq('id',id);
-  if(error){showToast('ลบไม่สำเร็จ'+(error.code==='23503'?' — มีรอบอบรมใช้หลักสูตรนี้อยู่':''),'danger');_ovCats();return;}
+  if(error){showToast('ลบไม่สำเร็จ'+(_isInUse(error)?' — มีรอบอบรมใช้หลักสูตรนี้อยู่':''),'danger');_ovCats();return;}
   showToast('ลบหลักสูตรสำเร็จ','success');_ovCats();
 }
 
@@ -4221,7 +4247,7 @@ async function deleteCat(id){
 async function _projectHospital(ip){
   if(!ip)return{sp:null,h:null};
   const {data}=await _qProj();
-  const sp=ProjectTeam.source({name:ip.project_name||'',sourceProjectId:ip.source_project_id||''},_mapProjects(data));
+  const sp=ProjectTeam.source({sourceProjectId:ip.source_project_id||''},_mapProjects(data));
   if(!sp||!sp.hospitalId)return{sp,h:null};
   const {data:h}=await _sb.from('hospitals').select('id,code,name').eq('id',sp.hospitalId).maybeSingle();
   return{sp,h:h||null};
@@ -4262,7 +4288,7 @@ async function _canOpenTraining(p){
   if(a.role==='superadmin')return true;
   if(!a.perm?.add||!a.staffId)return false;
   const {data}=await _qProj();
-  return ProjectTeam.isMember(a.staffId,{name:p.project_name||'',sourceProjectId:p.source_project_id||''},_mapProjects(data));
+  return ProjectTeam.isMember(a.staffId,{sourceProjectId:p.source_project_id||''},_mapProjects(data));
 }
 async function renderUnopened(){
   const el=document.getElementById('unopened-content');
@@ -4811,7 +4837,7 @@ async function saveLoginVerifyAll(){
   const seen=new Map();
   registrations.filter(r=>!!getSess(r.sessionId)).forEach(r=>{
     const k=_lvKey(r.fname,r.lname,r.dept);
-    if(!seen.has(k))seen.set(k,{fname:r.fname,lname:r.lname,dept:r.dept,position:r.position||''});
+    if(!seen.has(k))seen.set(k,{fname:r.fname,lname:r.lname,dept:r.dept,deptId:r.deptId,position:r.position||''});
   });
   // Collect current DOM values (may be filtered subset)
   const domMap={};
@@ -4826,16 +4852,16 @@ async function saveLoginVerifyAll(){
   seen.forEach((p,k)=>{
     const status=domMap[k]?.login_status||_lvGetVal(p.fname,p.lname,p.dept,'login_status','pending');
     const notes=domMap[k]?.notes??_lvGetVal(p.fname,p.lname,p.dept,'notes','');
-    rows.push({fname:p.fname,lname:p.lname,dept:p.dept,position:p.position,login_status:status,notes:notes||'',site:currentSite});
+    rows.push({fname:p.fname,lname:p.lname,dept_id:p.deptId,position:p.position,login_status:status,notes:notes||'',site:currentSite});
   });
   if(!rows.length){showToast('ไม่มีข้อมูลให้บันทึก','warn');return;}
   const btn=document.getElementById('lv-save-btn');
   if(btn){btn.disabled=true;btn.innerHTML='<i class="ti ti-loader-2" style="animation:spin .8s linear infinite"></i>กำลังบันทึก...';}
   try{
-    const {error}=await _sb.from('trn_login_verify').upsert(rows,{onConflict:'fname,lname,dept,site'});
+    const {error}=await _sb.from('trn_login_verify').upsert(rows,{onConflict:'fname,lname,dept_id,site'});
     if(error)throw error;
     const {data}=await _sb.from('trn_login_verify').select('*').eq('site',currentSite);
-    loginVerifyData=data||[];
+    loginVerifyData=(data||[]).map(_mDeptRow);
     _lvEdits={};
     showToast(`บันทึกสถานะ ${rows.length} รายการสำเร็จ`,'success');
     renderLoginVerify();
@@ -4844,7 +4870,7 @@ async function saveLoginVerifyAll(){
 }
 async function loadLoginVerify(){
   const {data}=await _sb.from('trn_login_verify').select('*').eq('site',currentSite);
-  loginVerifyData=data||[];
+  loginVerifyData=(data||[]).map(_mDeptRow);
   _lvEdits={};
   renderLoginVerify();
   showToast('โหลดข้อมูลใหม่แล้ว','success');
@@ -4854,7 +4880,7 @@ async function loadLoginVerify(){
 async function loadKeyEntryStatus(){
   const {data,error}=await _sb.from('trn_key_entry_status').select('*').eq('site',currentSite);
   if(error){showToast('โหลดข้อมูลคีย์ยอดไม่สำเร็จ: '+error.message,'danger');return;}
-  keyEntryData=data||[];
+  keyEntryData=(data||[]).map(_mDeptRow);
   renderKeyEntry();
 }
 function filterKeyEntry(){
@@ -4907,16 +4933,18 @@ function renderKeyEntry(){
   }).join('');
 }
 async function _keUpsert(payload){
-  const {data,error}=await _sb.from('trn_key_entry_status').upsert(payload,{onConflict:'dept,site'}).select().single();
+  const {data,error}=await _sb.from('trn_key_entry_status').upsert(payload,{onConflict:'dept_id,site'}).select().single();
   if(error){showToast('บันทึกไม่สำเร็จ: '+error.message,'danger');return null;}
-  const idx=keyEntryData.findIndex(k=>k.dept===data.dept&&k.site===data.site);
-  if(idx>=0)keyEntryData[idx]=data;else keyEntryData.push(data);
-  return data;
+  const row=_mDeptRow(data);
+  const idx=keyEntryData.findIndex(k=>k.dept_id===row.dept_id&&k.site===row.site);
+  if(idx>=0)keyEntryData[idx]=row;else keyEntryData.push(row);
+  return row;
 }
+// dept = ชื่อแผนก (แถวในตาราง = รายการแผนกของโครงการ) → เก็บเป็นรหัสแผนก
 async function _keOnStatusChange(dept,status){
   const existing=keyEntryData.find(k=>k.dept===dept);
   const payload={
-    dept,
+    dept_id:_mId('dept',dept),
     site:currentSite,
     status,
     keyed_at: status==='keyed' ? new Date().toISOString() : null,
@@ -4932,7 +4960,7 @@ function _keOnReasonInput(dept,value){
   _keReasonTimers[dept]=setTimeout(async()=>{
     const existing=keyEntryData.find(k=>k.dept===dept);
     await _keUpsert({
-      dept,
+      dept_id:_mId('dept',dept),
       site:currentSite,
       status:existing?.status||'not_keyed',
       keyed_at:existing?.keyed_at||null,
@@ -5235,7 +5263,7 @@ async function adminSubmitReg(){
     }
   }
   const {data,error}=await _sb.from('trn_registrations').insert({
-    session_id:sessId,prefix,fname,lname,position:pos,dept,email:reqEmail?email:null,
+    session_id:sessId,prefix_id:_mId('prefix',prefix),fname,lname,position:pos,dept_id:_mId('dept',dept),email:reqEmail?email:null,
     reg_date:new Date().toISOString().split('T')[0],attended:false
   }).select().single();
   if(error){showToast('บันทึกไม่สำเร็จ','danger');return;}
@@ -5335,10 +5363,10 @@ async function submitEditReg(){
     }
   }
   const {error}=await _sb.from('trn_registrations').update({
-    session_id:newSessId,prefix,fname,lname,position:pos,dept,email:reqEmail?email:reg.email||null
+    session_id:newSessId,prefix_id:_mId('prefix',prefix),fname,lname,position:pos,dept_id:_mId('dept',dept),email:reqEmail?email:reg.email||null
   }).eq('id',reg.id);
   if(error){showToast('บันทึกไม่สำเร็จ','danger');return;}
-  Object.assign(reg,{prefix,fname,lname,position:pos,dept,sessionId:newSessId,email:reqEmail?email:reg.email});
+  Object.assign(reg,{prefix,prefixId:_mId('prefix',prefix),fname,lname,position:pos,dept,deptId:_mId('dept',dept),sessionId:newSessId,email:reqEmail?email:reg.email});
   window._editRegAdmin=false;
   closeModal('modal-edit-reg');
   renderCategories();

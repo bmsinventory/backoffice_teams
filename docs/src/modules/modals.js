@@ -48,12 +48,10 @@ window.execDelete=async function(){
   else if(t==='imt_project'){
     window.IMPL_PHASES.filter(x=>x.projectId===id).forEach(p=>{_imtCascadePhase(p.id);deleteDoc(getDocRef('IMPL_PHASES',p.id));});
     window.IMPL_ISSUES.filter(x=>x.projectId===id).forEach(i=>deleteDoc(getDocRef('IMPL_ISSUES',i.id)));
-    window.IMPL_RISKS.filter(x=>x.projectId===id).forEach(r=>deleteDoc(getDocRef('IMPL_RISKS',r.id)));
     window.IMPL_ACTIVITY_LOG.filter(x=>x.projectId===id).forEach(a=>deleteDoc(getDocRef('IMPL_ACTIVITY_LOG',a.id)));
     _ftkCascadeProject(id);
     window.IMPL_PHASES=window.IMPL_PHASES.filter(x=>x.projectId!==id);
     window.IMPL_ISSUES=window.IMPL_ISSUES.filter(x=>x.projectId!==id);
-    window.IMPL_RISKS=window.IMPL_RISKS.filter(x=>x.projectId!==id);
     window.IMPL_ACTIVITY_LOG=window.IMPL_ACTIVITY_LOG.filter(x=>x.projectId!==id);
     window.IMPL_PROJECTS=window.IMPL_PROJECTS.filter(x=>x.id!==id);
     if(window.imtCurrentProjectId===id){window.imtCurrentProjectId='';window.imtTab='dashboard';}
@@ -106,9 +104,8 @@ window.imtRefreshProjectImportOptions=function(){
     list=list.filter(p=>!p.end||pd(p.end)>=today);
   }
   list.sort((a,b)=>a.name.localeCompare(b.name,'th'));
-  // IMPL_PROJECTS ไม่มี typeId — ยืมจากโครงการต้นทาง (sourceProjectId หรือชื่อตรงกัน) เพื่อจัดกลุ่มตามประเภทงาน
-  const srcOf=p=>(window.PROJECTS||[]).find(sp=>sp.id===p.sourceProjectId)||(window.PROJECTS||[]).find(sp=>sp.name===p.name);
-  const items=list.map(p=>{const sp=srcOf(p);return{id:p.id,name:p.name,typeId:sp?sp.typeId:''};});
+  // IMPL_PROJECTS ไม่มี typeId — ยืมจากโครงการต้นทาง (sourceProjectId) เพื่อจัดกลุ่มตามประเภทงาน
+  const items=list.map(p=>{const sp=p.source;return{id:p.id,name:p.name,typeId:sp?sp.typeId:''};});
   const cur=prevSelected&&items.some(p=>p.id===prevSelected)?prevSelected:'';
   window.initProjectCombobox(window.projectComboIds('import-imt-cmb','import-imt-project'),items,cur,null,{fixed:true});
 };
@@ -123,6 +120,7 @@ window.updateImportPreview=function(){
   const imtProjectWrap=document.getElementById('import-imt-project-wrap');
   const clearFirstLabel=document.getElementById('import-clear-first-label');
   const clearFirstCb=document.getElementById('import-clear-first');
+  window._importAlert(null);
   // ── ช่องเลือกโครงการปลายทาง (เฉพาะ IMPL_ISSUES) — ซ่อน/รีเซ็ตทุกครั้งที่สลับประเภทออกไปเป็นอย่างอื่น
   // กันค่าที่เลือกไว้ค้างข้ามประเภท ── */
   if(type!=='IMPL_ISSUES'){
@@ -131,37 +129,37 @@ window.updateImportPreview=function(){
   }
   if(type==='CONTRACTS'){
     if(fileInput)fileInput.accept='.csv';
-    if(fileLabel)fileLabel.textContent='2. เลือกไฟล์ CSV';
+    if(fileLabel)fileLabel.textContent='เลือกไฟล์ CSV ที่กรอกข้อมูลแล้ว';
     if(msgEl)msgEl.innerHTML='1 แถว = 1 สัญญา · <b>วันที่รองรับ:</b> YYYY-MM-DD · DD/MM/YYYY · DD/MM/พ.ศ. · contract_id ถ้าไม่ระบุจะ generate อัตโนมัติ · status: active / completed / cancelled';
     if(formatBox)formatBox.textContent='contract_id, project_name, customer_name, total_contract_value, contract_sign_date, contract_start_date, end_date, status, note';
-    if(templateBtn)templateBtn.textContent='📥 โหลดไฟล์ Template (.csv)';
+    if(templateBtn)templateBtn.textContent='⬇ ดาวน์โหลดไฟล์ตัวอย่าง (.csv)';
     if(titleEl)titleEl.textContent='นำเข้าข้อมูลสัญญา (CSV)';
     return;
   }
   if(type==='HOSPITALS'){
     if(fileInput)fileInput.accept='.xlsx,.xls,.csv';
-    if(fileLabel)fileLabel.textContent='2. เลือกไฟล์ Excel (.xlsx / .xls / .csv)';
+    if(fileLabel)fileLabel.textContent='เลือกไฟล์ Excel ที่กรอกข้อมูลแล้ว (.xlsx / .xls / .csv)';
     if(msgEl)msgEl.innerHTML='รองรับ .xlsx / .xls / .csv · ใส่แค่รหัส รพ. ก็พอ หากเชื่อมต่อ MOPH API';
-    if(formatBox)formatBox.textContent='hospital_code, hospital_name, province, district, tambon, type, tel, beds, affiliation (ดูคำอธิบายในไฟล์ Template)';
-    if(templateBtn)templateBtn.textContent='📄 โหลดไฟล์ Template (.xlsx)';
+    if(formatBox)formatBox.textContent='hospital_code, hospital_name, province, district, tambon, type, tel, beds, affiliation (ดูคำอธิบายในไฟล์ตัวอย่าง)';
+    if(templateBtn)templateBtn.textContent='⬇ ดาวน์โหลดไฟล์ตัวอย่าง (.xlsx)';
     if(titleEl)titleEl.textContent='นำเข้าข้อมูล (Excel)';
     return;
   }
   if(type==='HELPDESK'){
     if(fileInput)fileInput.accept='.xlsx,.xls,.csv';
-    if(fileLabel)fileLabel.textContent='2. เลือกไฟล์ Excel (.xlsx / .xls / .csv)';
+    if(fileLabel)fileLabel.textContent='เลือกไฟล์ Excel ที่กรอกข้อมูลแล้ว (.xlsx / .xls / .csv)';
     if(msgEl)msgEl.innerHTML='1 แถว = 1 Ticket เก่า · จับคู่ รพ./หมวด/เจ้าหน้าที่อัตโนมัติ · จะมีหน้าพรีวิวก่อนยืนยัน · <b>ไม่รองรับ</b> "ลบข้อมูลเดิมก่อน"';
-    if(formatBox)formatBox.textContent='hospital, reporter_name, phone, line_group, source_system, category, subject, description, priority, status, assignee, resolution, resolved_by, created_at, resolved_at (ดูคำอธิบายในไฟล์ Template)';
-    if(templateBtn)templateBtn.textContent='📄 โหลดไฟล์ Template (.xlsx)';
+    if(formatBox)formatBox.textContent='hospital, reporter_name, phone, line_group, source_system, category, subject, description, priority, status, assignee, resolution, resolved_by, created_at, resolved_at (ดูคำอธิบายในไฟล์ตัวอย่าง)';
+    if(templateBtn)templateBtn.textContent='⬇ ดาวน์โหลดไฟล์ตัวอย่าง (.xlsx)';
     if(titleEl)titleEl.textContent='นำเข้าปัญหาเก่า HelpDesk (Excel)';
     return;
   }
   if(type==='IMPL_ISSUES'){
     if(fileInput)fileInput.accept='.xlsx,.xls,.csv';
-    if(fileLabel)fileLabel.textContent='2. เลือกไฟล์ Excel (.xlsx / .xls / .csv)';
+    if(fileLabel)fileLabel.textContent='เลือกไฟล์ Excel ที่กรอกข้อมูลแล้ว (.xlsx / .xls / .csv)';
     if(msgEl)msgEl.innerHTML='1 แถว = 1 ปัญหาเก่า · 1 ไฟล์ = 1 โครงการ — เลือกโครงการปลายทางด้านบนก่อนกด "นำเข้า"';
-    if(formatBox)formatBox.textContent='created_at, department, reported_by, problem, category, severity, status, solution, received_by, fixed_by, fixed_date (ดูคำอธิบายในไฟล์ Template)';
-    if(templateBtn)templateBtn.textContent='📄 โหลดไฟล์ Template (.xlsx)';
+    if(formatBox)formatBox.textContent='created_at, department, reported_by, problem, category, severity, status, solution, received_by, fixed_by, fixed_date (ดูคำอธิบายในไฟล์ตัวอย่าง)';
+    if(templateBtn)templateBtn.textContent='⬇ ดาวน์โหลดไฟล์ตัวอย่าง (.xlsx)';
     if(titleEl)titleEl.textContent='นำเข้าปัญหาการใช้งานเก่า (Impl Tracker, Excel)';
     if(imtProjectWrap){
       imtProjectWrap.style.display='';
@@ -175,23 +173,23 @@ window.updateImportPreview=function(){
   }
   if(type==='HOSPITAL_CONTACTS'){
     if(fileInput)fileInput.accept='.xlsx,.xls,.csv';
-    if(fileLabel)fileLabel.textContent='2. เลือกไฟล์ Excel (.xlsx / .xls / .csv)';
+    if(fileLabel)fileLabel.textContent='เลือกไฟล์ Excel ที่กรอกข้อมูลแล้ว (.xlsx / .xls / .csv)';
     if(msgEl)msgEl.innerHTML='1 แถว = 1 ผู้ติดต่อ · ระบุรหัส รพ. ทุกแถว · รพ. เดียวกันใส่หลายแถวได้';
     if(formatBox)formatBox.textContent='hospital_code, contact_name, phone, position, email, note';
-    if(templateBtn)templateBtn.textContent='📄 โหลดไฟล์ Template (.xlsx)';
+    if(templateBtn)templateBtn.textContent='⬇ ดาวน์โหลดไฟล์ตัวอย่าง (.xlsx)';
     if(titleEl)titleEl.textContent='นำเข้าผู้ติดต่อ รพ. (Excel)';
     return;
   }
   if(fileInput)fileInput.accept='.csv';
-  if(fileLabel)fileLabel.textContent='2. เลือกไฟล์ CSV';
+  if(fileLabel)fileLabel.textContent='เลือกไฟล์ CSV ที่กรอกข้อมูลแล้ว';
   if(msgEl)msgEl.innerHTML='รองรับเฉพาะไฟล์ .csv เท่านั้น';
-  if(templateBtn)templateBtn.textContent='📥 โหลดไฟล์ Template (.csv)';
+  if(templateBtn)templateBtn.textContent='⬇ ดาวน์โหลดไฟล์ตัวอย่าง (.csv)';
   if(titleEl)titleEl.textContent='นำเข้าข้อมูล (CSV)';
   const schema=window.IMPORT_SCHEMAS[type];
   if(schema&&formatBox)formatBox.textContent=schema.headers.join(', ');
 }
 window.openImportModal=function(){
-  document.getElementById('import-file').value='';
+  document.getElementById('import-file').value='';window._importFileChanged();
   window._importProgress(null);
   var activeView=document.querySelector('.view.on');
   var viewId=activeView?activeView.id.replace('view-',''):'';
@@ -209,22 +207,63 @@ window.downloadTemplate=function(){
   if(type==='IMPL_ISSUES'){window.imtDownloadIssueImportTemplate&&window.imtDownloadIssueImportTemplate();return;}
   const schema=window.IMPORT_SCHEMAS[type];if(!schema)return;const csvContent="data:text/csv;charset=utf-8,\uFEFF"+schema.headers.join(",")+"\n"+schema.example.join(",");const link=document.createElement("a");link.setAttribute("href",encodeURI(csvContent));link.setAttribute("download",`Template_${type}.csv`);document.body.appendChild(link);link.click();document.body.removeChild(link);
 }
-// ── หลอดความคืบหน้าตอนนำเข้า CSV — total = จำนวนรายการที่ต้องเขียน (รวมรายการที่ลบก่อนนำเข้า) ──
+// ── หลอดความคืบหน้าตอนนำเข้า (บังทั้งกล่อง) — total = จำนวนรายการที่ต้องเขียน (รวมรายการที่ลบก่อนนำเข้า)
+// total = 0 → ยังไม่รู้จำนวน (กำลังอ่านไฟล์) แสดงหลอดวิ่งแทน % ──
 window._importProgress=function(done,total,label){
   const wrap=document.getElementById('import-progress');if(!wrap)return;
   const btn=document.getElementById('import-exec-btn');
   if(done===null){wrap.style.display='none';if(btn)btn.disabled=false;return;}
   wrap.style.display='';if(btn)btn.disabled=true;
-  const pct=total>0?Math.min(100,Math.round(done/total*100)):0;
+  const busy=!(total>0);wrap.classList.toggle('busy',busy);
+  const pct=busy?0:Math.min(100,Math.round(done/total*100));
   document.getElementById('import-progress-bar').style.width=pct+'%';
-  document.getElementById('import-progress-pct').textContent=pct+'%';
-  document.getElementById('import-progress-text').textContent=(label||'กำลังนำเข้า')+' '+done.toLocaleString()+' / '+total.toLocaleString()+' รายการ';
+  document.getElementById('import-progress-pct').textContent=busy?'⏳':pct+'%';
+  document.getElementById('import-progress-text').textContent=(label||'กำลังนำเข้า')+(busy?'...':' '+done.toLocaleString()+' / '+total.toLocaleString()+' รายการ');
+};
+// ── กล่องแจ้งผล/ข้อผิดพลาดในหน้านำเข้า — kind: error | warn | ok · items = รายการย่อย (เช่น แถวที่ผิด) ·
+// kind=null → ซ่อน ──
+window._importAlert=function(kind,title,items,foot){
+  const el=document.getElementById('import-alert');if(!el)return;
+  if(!kind){el.style.display='none';el.innerHTML='';return;}
+  const e=window.esc||(s=>String(s));
+  const ico={error:'❌',warn:'⚠',ok:'✅'}[kind]||'';
+  const list=(items||[]).filter(Boolean);
+  el.className='imp-alert '+kind;
+  el.innerHTML='<div class="imp-alert-title">'+ico+' '+e(title)+'</div>'
+    +(list.length?'<ul>'+list.slice(0,50).map(x=>'<li>'+e(x)+'</li>').join('')+(list.length>50?'<li>… และอีก '+(list.length-50)+' รายการ</li>':'')+'</ul>':'')
+    +(foot?'<div class="imp-alert-foot">'+e(foot)+'</div>':'');
+  el.style.display='';
+  el.scrollIntoView({block:'nearest',behavior:'smooth'});
+};
+// ── เลือกไฟล์แล้ว → โชว์ชื่อไฟล์ + กระพริบปุ่ม "นำเข้าข้อมูล" ให้รู้ว่าขั้นถัดไปคือกดปุ่มนั้น ──
+window._importFileChanged=function(){
+  const f=(document.getElementById('import-file').files||[])[0];
+  const drop=document.getElementById('import-drop'),txt=document.getElementById('import-drop-txt'),btn=document.getElementById('import-exec-btn');
+  const e=window.esc||(s=>String(s));
+  window._importAlert(null);
+  if(drop)drop.classList.toggle('has-file',!!f);
+  if(btn)btn.classList.toggle('ready',!!f);
+  if(txt)txt.innerHTML=f?'<b>✓ '+e(f.name)+'</b><br><span style="font-size:12px;color:var(--txt3)">พร้อมแล้ว — กดปุ่ม "🚀 นำเข้าข้อมูล" ด้านล่างเพื่อเริ่ม · คลิกที่นี่เพื่อเปลี่ยนไฟล์</span>'
+    :'<b>คลิกเพื่อเลือกไฟล์</b> หรือลากไฟล์มาวางที่นี่';
+};
+(function(){
+  const drop=document.getElementById('import-drop');if(!drop)return;
+  drop.addEventListener('dragover',ev=>{ev.preventDefault();drop.classList.add('drag');});
+  drop.addEventListener('dragleave',()=>drop.classList.remove('drag'));
+  drop.addEventListener('drop',ev=>{ev.preventDefault();drop.classList.remove('drag');
+    if(ev.dataTransfer&&ev.dataTransfer.files.length){document.getElementById('import-file').files=ev.dataTransfer.files;window._importFileChanged();}});
+})();
+// ── ช่องที่เก็บเป็นรหัส แต่ในไฟล์ CSV พิมพ์เป็นชื่อ → แปลงเป็นรหัสตอนนำเข้า (รับรหัสตรง ๆ ได้ด้วย) · หาไม่เจอ → '' ──
+const _refByLabel=list=>v=>{const x=(list()||[]).find(o=>o.id===v||o.label===v);return x?x.id:'';};
+const _IMPORT_REF={
+  STAFF:{department:_refByLabel(()=>window.DEPT_LIST),position:_refByLabel(()=>window.POSITIONS)},
+  PROJECTS:{site_owner:v=>{const s=window.staffByRef(v)||window.staffByName(v);return s?s.id:'';}},
 };
 window.execImport=async function(){
   const fileInput=document.getElementById('import-file');const selType=document.getElementById('import-type').value;const schema=window.IMPORT_SCHEMAS[selType];const isClearFirst=document.getElementById('import-clear-first').checked;
-  if(!fileInput.files.length){document.getElementById('import-msg').innerHTML='<span style="color:var(--coral)">⚠ กรุณาเลือกไฟล์ก่อน</span>';return;}
+  if(!fileInput.files.length){window._importAlert('error','กรุณาเลือกไฟล์ก่อน');return;}
   if(selType==='CONTRACTS'){
-    if(!window.auth.currentUser){document.getElementById('import-msg').innerHTML='<span style="color:var(--coral)">⚠ กรุณาเชื่อมต่อก่อน</span>';return;}
+    if(!window.auth.currentUser){window._importAlert('error','กรุณาเชื่อมต่อก่อน');return;}
     const file=fileInput.files[0];const reader=new FileReader();
     reader.onload=async function(e){
       let text=e.target.result;if(text.charCodeAt(0)===0xFEFF)text=text.substring(1);
@@ -232,9 +271,8 @@ window.execImport=async function(){
       // normalize date to YYYY-MM-DD; accepts YYYY-MM-DD / DD/MM/YYYY / Buddhist year
       function _normDate(v){if(!v)return'';v=v.trim();if(!v)return'';if(/^\d{4}-\d{2}-\d{2}$/.test(v))return v;var m=v.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/);if(m){var y=parseInt(m[3]);if(y>=2500)y-=543;return y+'-'+String(parseInt(m[2])).padStart(2,'0')+'-'+String(parseInt(m[1])).padStart(2,'0');}var d=new Date(v);if(!isNaN(d))return d.toISOString().slice(0,10);return'';}
       const CT_DATE_FIELDS=['contract_sign_date','contract_start_date','end_date'];
-      const lines=parseCSV2(text);if(lines.length<=1){document.getElementById('import-msg').innerHTML='<span style="color:var(--coral)">⚠ ไม่พบข้อมูลในไฟล์</span>';return;}
+      const lines=parseCSV2(text);if(lines.length<=1){window._importAlert('error','ไม่พบข้อมูลในไฟล์');return;}
       const headers=lines[0].map(h=>h.trim());
-      document.getElementById('import-msg').innerHTML='<span style="color:var(--teal)">⏳ กำลังประมวลผล...</span>';
       const ctSchema=window.IMPORT_SCHEMAS['CONTRACTS'];
       let done=0,total=lines.length-1,label='กำลังนำเข้า';const tick=()=>{done++;window._importProgress(done,total,label);};window._importProgress(0,total,label);
       try{
@@ -259,39 +297,41 @@ window.execImport=async function(){
         }
         if(opCount>0)await batch.commit(tick);
         window._importProgress(null);window.closeM('m-import');window.showAlert(`นำเข้าสัญญาสำเร็จ ${lines.length-1} รายการ`,'success');
-      }catch(err){window._importProgress(null);document.getElementById('import-msg').innerHTML='<span style="color:var(--coral)">❌ เกิดข้อผิดพลาด: '+err.message+' (เขียนไปแล้ว '+done+' / '+total+' รายการ)</span>';}
+      }catch(err){window._importProgress(null);window._importAlert('error','นำเข้าไม่สำเร็จ — เกิดข้อผิดพลาด',[err.message||String(err)],'เขียนไปแล้ว '+done+' / '+total+' รายการ ก่อนเกิดข้อผิดพลาด');}
     };reader.readAsText(file);return;
   }
   if(selType==='HELPDESK'){window.closeM('m-import');window.hdImportFromFile&&window.hdImportFromFile(fileInput.files[0]);return;}
   if(selType==='IMPL_ISSUES'){
     const pid=(document.getElementById('import-imt-project')||{}).value||'';
-    if(!pid){document.getElementById('import-msg').innerHTML='<span style="color:var(--coral)">⚠ กรุณาเลือกโครงการปลายทางก่อน</span>';return;}
+    if(!pid){window._importAlert('error','กรุณาเลือกโครงการปลายทางก่อน');return;}
     // ล็อกปุ่มตลอดการทำงาน (รวมช่วงอ่านไฟล์ก่อนหลอดความคืบหน้าจะขึ้น) กันกดซ้ำแล้วนำเข้าซ้ำ
     const execBtn=document.getElementById('import-exec-btn');if(execBtn)execBtn.disabled=true;
     try{window.imtRunIssueImportInline&&await window.imtRunIssueImportInline(fileInput.files[0],pid,isClearFirst);}
+    catch(err){console.error(err);window._importAlert('error','นำเข้าไม่สำเร็จ — เกิดข้อผิดพลาด',[err.message||String(err)]);}
     finally{window._importProgress(null);}
     return;
   }
   if(selType==='HOSPITALS'){window.closeM('m-import');await window.importHospitalsFromFile(fileInput.files[0]);return;}
   if(selType==='HOSPITAL_CONTACTS'){window.closeM('m-import');await window.importHospitalContactsFromFile(fileInput.files[0]);return;}
   if(selType==='HOSPITAL_PRODUCTS'){window.closeM('m-import');await window.importHospitalProductsFromFile(fileInput.files[0]);return;}
-  if(!window.auth.currentUser){document.getElementById('import-msg').innerHTML='<span style="color:var(--coral)">⚠ กรุณาเชื่อมต่อก่อน</span>';return;}
+  if(!window.auth.currentUser){window._importAlert('error','กรุณาเชื่อมต่อก่อน');return;}
   const file=fileInput.files[0];const reader=new FileReader();
   reader.onload=async function(e){
     let text=e.target.result;if(text.charCodeAt(0)===0xFEFF)text=text.substring(1);
     function parseCSV(str){var arr=[];var quote=false;for(var row=0,col=0,c=0;c<str.length;c++){var cc=str[c],nc=str[c+1];arr[row]=arr[row]||[];arr[row][col]=arr[row][col]||'';if(cc=='"'&&quote&&nc=='"'){arr[row][col]+=cc;++c;continue;}if(cc=='"'){quote=!quote;continue;}if(cc==','&&!quote){++col;continue;}if(cc=='\r'&&nc=='\n'&&!quote){++row;col=0;++c;continue;}if(cc=='\n'&&!quote){++row;col=0;continue;}if(cc=='\r'&&!quote){++row;col=0;continue;}arr[row][col]+=cc;}return arr.filter(r=>r.join('').trim()!=='');}
-    const lines=parseCSV(text);if(lines.length<=1){document.getElementById('import-msg').innerHTML='<span style="color:var(--coral)">⚠ ไม่พบข้อมูลในไฟล์</span>';return;}
-    const headers=lines[0].map(h=>h.trim());document.getElementById('import-msg').innerHTML='<span style="color:var(--teal)">⏳ กำลังประมวลผล...</span>';
+    const lines=parseCSV(text);if(lines.length<=1){window._importAlert('error','ไม่พบข้อมูลในไฟล์');return;}
+    const headers=lines[0].map(h=>h.trim());
     let done=0,total=lines.length-1,label='กำลังนำเข้า';const tick=()=>{done++;window._importProgress(done,total,label);};window._importProgress(0,total,label);
+    const unmatched=[];
     try{
       let batch=writeBatch();let opCount=0;
       const commitBatchIfNeeded=async()=>{if(opCount>=400){await batch.commit(tick);batch=writeBatch();opCount=0;}};
       if(isClearFirst){const existingDocs=await getDocs(getColRef(selType));total+=existingDocs.docs.length;label='กำลังลบ/นำเข้า';window._importProgress(done,total,label);for(let docSnap of existingDocs.docs){batch.delete(docSnap.ref);opCount++;await commitBatchIfNeeded();}}
-      for(let i=1;i<lines.length;i++){const values=lines[i].map(v=>v.trim());let rowObj={};const newId=schema.prefix+Date.now()+i;rowObj[schema.idField]=newId;if(selType==='PROJECTS'){rowObj.status='active';rowObj.team=[];rowObj.members=[];}headers.forEach((h,index)=>{if(values[index]!==undefined&&schema.headers.includes(h)){let val=values[index];if(['budget','progress_pct','amount_requested','amount_cleared'].includes(h))val=Number(val)||0;if(['is_active'].includes(h))val=(val.toUpperCase()==='TRUE');rowObj[h]=val;}});batch.set(getDocRef(selType,newId),rowObj);opCount++;await commitBatchIfNeeded();}
+      for(let i=1;i<lines.length;i++){const values=lines[i].map(v=>v.trim());let rowObj={};const newId=schema.prefix+Date.now()+i;rowObj[schema.idField]=newId;if(selType==='PROJECTS'){rowObj.status='active';rowObj.team=[];rowObj.members=[];}headers.forEach((h,index)=>{if(values[index]!==undefined&&schema.headers.includes(h)){let val=values[index];if(['budget','progress_pct','amount_requested','amount_cleared'].includes(h))val=Number(val)||0;if(['is_active'].includes(h))val=(val.toUpperCase()==='TRUE');const conv=_IMPORT_REF[selType]&&_IMPORT_REF[selType][h];if(conv&&val){const ref=conv(val);if(!ref)unmatched.push(h+'="'+val+'"');val=ref;}rowObj[h]=val;}});batch.set(getDocRef(selType,newId),rowObj);opCount++;await commitBatchIfNeeded();}
       if(opCount>0)await batch.commit(tick);
-      window._importProgress(null);window.closeM('m-import');window.showAlert(`นำเข้าข้อมูล ${selType} สำเร็จ ${lines.length-1} รายการ`,'success');
+      window._importProgress(null);window.closeM('m-import');window.showAlert(`นำเข้าข้อมูล ${selType} สำเร็จ ${lines.length-1} รายการ`+(unmatched.length?` · ไม่พบในระบบ (เว้นว่างไว้) ${unmatched.length} ช่อง: ${[...new Set(unmatched)].slice(0,5).join(', ')}`:''),unmatched.length?'warn':'success');
       var admEl=document.getElementById('view-admin');if(admEl&&admEl.classList.contains('on')&&window.admCur)setTimeout(function(){window.admTab(window.admCur);},600);
-    }catch(err){window._importProgress(null);document.getElementById('import-msg').innerHTML='<span style="color:var(--coral)">❌ เกิดข้อผิดพลาด: '+err.message+' (เขียนไปแล้ว '+done+' / '+total+' รายการ)</span>';}
+    }catch(err){window._importProgress(null);window._importAlert('error','นำเข้าไม่สำเร็จ — เกิดข้อผิดพลาด',[err.message||String(err)],'เขียนไปแล้ว '+done+' / '+total+' รายการ ก่อนเกิดข้อผิดพลาด');}
   };reader.readAsText(file);
 }
 

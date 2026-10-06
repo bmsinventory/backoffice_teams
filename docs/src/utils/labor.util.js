@@ -8,7 +8,7 @@
     var s = window.STAFF.find(function (x) { return x.id === staffId; });
     if (!s) return 0;
     if (s.dailyRate != null && s.dailyRate > 0) return s.dailyRate;
-    var pos = window.POSITIONS.find(function (p) { return p.label === s.role; });
+    var pos = window.positionById(s.positionId);
     return pos ? pos.dailyRate : 0;
   };
 

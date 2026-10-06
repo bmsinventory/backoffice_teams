@@ -718,7 +718,7 @@ function _populateTsFilters() {
   const sids = [...new Set(window.TIMESHEETS.map(r => r.staffId).filter(Boolean))];
   const curStf = stfSel.value;
   stfSel.innerHTML = '<option value="">ทุกคน</option>' +
-    window.STAFF.filter(s => s.active && sids.includes(s.id)).map(s => `<option value="${s.id}"${s.id === curStf ? ' selected' : ''}>${esc(s.name)}</option>`).join('');
+    window.staffOptionsGrouped(window.STAFF.filter(s => s.active && sids.includes(s.id)), curStf);
 }
 
 // ── AUTO-SYNC FROM PROJECT MEMBERS / VISITS ──────────────────────────────────

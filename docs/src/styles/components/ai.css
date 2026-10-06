@@ -55,7 +55,7 @@
 .air-fbtn b { margin-left: 5px; }
 .air-fbtn.on { background: var(--violet); border-color: var(--violet); color: #fff; }
 .air-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr; }
-.air.editing .air-body { grid-template-columns: minmax(0, 1fr) minmax(360px, 44%); }
+.air.editing .air-body { grid-template-columns: minmax(0, 1fr) minmax(400px, 46%); }
 .air-list { overflow-y: auto; padding: 12px 6px 16px 0; }
 .air-detail { display: none; overflow-y: auto; padding: 12px 4px 16px 16px; border-left: 1px solid var(--border); }
 .air.editing .air-detail { display: block; }
@@ -92,21 +92,29 @@
 .air-edit-btn { flex-shrink: 0; }
 
 /* แผงแก้ไข */
-.air-d-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 13px; }
-.air-d-pick { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
-.air-d-pick input { width: 17px; height: 17px; }
-.air-detail .air-warn, .air-detail .air-miss { margin: 0 0 6px; }
-.air-seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin: 2px 0 12px; }
-.air-seg button { border: none; background: var(--surface); padding: 7px 14px; font-size: 12.5px; cursor: pointer; font-family: inherit; color: var(--txt2); }
+.air-d-head { position: sticky; top: -12px; z-index: 3; margin: -12px 0 12px; padding: 12px 0 10px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
+.air-d-row { display: flex; align-items: center; gap: 10px; min-height: 30px; }
+.air-d-t { flex: 1; font-size: 14px; }
+.air-d-t span { color: var(--txt3); font-weight: 500; }
+.air-d-nav { display: flex; gap: 4px; }
+.air-d-nav .btn { min-width: 34px; justify-content: center; font-size: 14px; }
+.air-d-pick { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; cursor: pointer; padding: 5px 12px; border: 1px solid var(--border); border-radius: 999px; color: var(--txt2); }
+.air-d-pick.on { border-color: var(--violet); background: rgba(124,92,252,.08); color: var(--violet); }
+.air-d-pick input { width: 16px; height: 16px; margin: 0; }
+.air-d-row .air-when { margin-left: auto; }
+.air-detail .air-warn, .air-detail .air-miss { margin: 0 0 10px; }
+.air-seg { display: flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.air-seg button { flex: 1; border: none; background: var(--surface); padding: 9px 12px; font-size: 12.5px; cursor: pointer; font-family: inherit; color: var(--txt2); }
 .air-seg button + button { border-left: 1px solid var(--border); }
 .air-seg button.on.open { background: rgba(229,72,77,.1); color: var(--coral); font-weight: 700; }
 .air-seg button.on.done { background: rgba(6,214,160,.12); color: var(--teal); font-weight: 700; }
 .air-seg button.on.mid { background: rgba(67,97,238,.1); color: var(--indigo); font-weight: 700; }
-.air-f { display: flex; flex-direction: column; gap: 4px; font-size: 11.5px; color: var(--txt3); margin-bottom: 10px; }
+.air-f { display: flex; flex-direction: column; gap: 5px; font-size: 12px; font-weight: 600; color: var(--txt2); margin-bottom: 12px; min-width: 0; }
 .air-f textarea { resize: vertical; }
 .air-req { color: var(--coral); font-weight: 700; }
-.air-req-hint { font-size: 11.5px; color: var(--txt3); margin: -4px 0 8px; }
-.air-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0 10px; }
+.air-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0 12px; }
+.air-grid.c2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }   /* 2 คอลัมน์คงที่ — ช่องค้นหา (combobox) ไม่ถูกบีบจนตัวหนังสือขาด */
+.air-grid .full { grid-column: 1 / -1; }
 .air-why { font-size: 11px; color: var(--txt3); }
 .air-chat { margin-top: 4px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
 .air-chat-h { font-size: 12px; font-weight: 700; padding: 7px 12px; background: var(--bg); border-bottom: 1px solid var(--border); }
@@ -119,6 +127,7 @@
   .air.editing .air-body { grid-template-columns: 1fr; }
   .air.editing .air-list { display: none; }   /* มือถือ: แผงแก้ไขเต็มจอ กด ✕ ปิด กลับมาที่รายการ */
   .air-detail { border-left: none; padding-left: 0; }
+  .air-grid.c2 { grid-template-columns: 1fr; }
   .air-note { display: none; }
   .air-card { padding: 10px 12px; }
   .air-edit-btn { padding: 4px 8px; }

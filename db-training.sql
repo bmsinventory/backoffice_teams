@@ -46,6 +46,17 @@ create table if not exists trn_categories (
 );
 alter table trn_categories drop column if exists site;
 
+-- ข้อมูลพื้นฐานของโครงการ: สถานที่ / แผนก / คำนำหน้า (วิทยากรใช้รายชื่อพนักงาน ไม่เก็บที่นี่)
+-- ตารางอื่นอ้างด้วยรหัส (venue_id / dept_id / prefix_id) — แก้ชื่อที่นี่ที่เดียว · ที่ยังถูกใช้อยู่ลบไม่ได้ (restrict)
+create table if not exists trn_master_items (
+  id          serial primary key,
+  type        text    not null,                     -- 'venue' | 'dept' | 'prefix'
+  value       text    not null,
+  sort_order  integer not null default 0,
+  site        text    not null,
+  unique(type, value, site)
+);
+
 -- รอบอบรม (ตามโครงการ) — ประเภทที่ยังมีรอบอบรมใช้อยู่ลบไม่ได้ (restrict)
 create table if not exists trn_sessions (
   id          serial primary key,
@@ -54,7 +65,7 @@ create table if not exists trn_sessions (
   date        date    not null,
   time_start  text    not null default '09:00',
   time_end    text    not null default '16:00',
-  venue       text    not null default '',
+  venue_id    integer constraint trn_sessions_venue_id_fkey references trn_master_items(id) on delete restrict, -- สถานที่
   trainer     text    not null default '',        -- รหัสพนักงาน (staff.id) — วิทยากรเลือกจากรายชื่อพนักงาน
   capacity    integer not null default 20,
   site        text    not null,
@@ -87,11 +98,11 @@ create trigger trg_trn_session_enable_cat after insert or update of cat_id, site
 create table if not exists trn_registrations (
   id            serial primary key,
   session_id    integer references trn_sessions(id) on delete cascade,
-  prefix        text    not null default '',
+  prefix_id     integer constraint trn_registrations_prefix_id_fkey references trn_master_items(id) on delete restrict, -- คำนำหน้า
   fname         text    not null,
   lname         text    not null,
   position      text    not null default '',
-  dept          text    not null default '',
+  dept_id       integer constraint trn_registrations_dept_id_fkey references trn_master_items(id) on delete restrict,   -- แผนก
   email         text,
   reg_date      date    not null default current_date,
   attended      boolean not null default false,
@@ -100,40 +111,31 @@ create table if not exists trn_registrations (
   created_at    timestamptz default now()
 );
 
--- ข้อมูลพื้นฐาน: สถานที่ / แผนก / คำนำหน้า (วิทยากรใช้รายชื่อพนักงาน ไม่เก็บที่นี่)
-create table if not exists trn_master_items (
-  id          serial primary key,
-  type        text    not null,                     -- 'venue' | 'dept' | 'prefix'
-  value       text    not null,
-  sort_order  integer not null default 0,
-  site        text    not null,
-  unique(type, value, site)
-);
-
 -- ตรวจสอบสิทธิ์ Login ของผู้ใช้งาน รพ.
+-- NULLS NOT DISTINCT (PostgreSQL 15+): คนที่ไม่มีแผนกก็ upsert ทับแถวเดิมได้ ไม่เพิ่มแถวซ้ำ
 create table if not exists trn_login_verify (
   id           serial primary key,
   fname        text    not null,
   lname        text    not null,
-  dept         text    not null default '',
+  dept_id      integer constraint trn_login_verify_dept_id_fkey references trn_master_items(id) on delete restrict, -- แผนก
   position     text    not null default '',
   login_status text    not null default 'pending', -- 'has_login' | 'no_login' | 'disabled' | 'pending'
   notes        text    not null default '',
   site         text    not null,
   created_at   timestamptz default now(),
-  unique(fname, lname, dept, site)
+  constraint trn_login_verify_person_key unique nulls not distinct (fname, lname, dept_id, site)
 );
 
--- ตรวจสอบคีย์ยอดรายแผนก
+-- ตรวจสอบคีย์ยอดรายแผนก (ลบแผนก → สถานะคีย์ยอดของแผนกนั้นหายตาม)
 create table if not exists trn_key_entry_status (
   id         serial primary key,
-  dept       text    not null,
+  dept_id    integer not null constraint trn_key_entry_status_dept_id_fkey references trn_master_items(id) on delete cascade,
   site       text    not null,
   status     text    not null default 'not_keyed', -- 'keyed' | 'not_keyed'
   keyed_at   timestamptz,
   reason     text    not null default '',
   updated_at timestamptz default now(),
-  unique(dept, site)
+  constraint trn_key_entry_status_dept_site_key unique (dept_id, site)
 );
 
 -- แบบประเมินหลังอบรม (/training/?page=survey) — คะแนน 1–5
@@ -426,8 +428,9 @@ begin
     select x.* into r from trn_registrations x join trn_sessions s on s.id = x.session_id
       where x.id = p_reg and s.site = p_site;
     if not found then raise exception 'ไม่พบรายชื่อผู้ลงทะเบียน'; end if;
-    p_name := trim(coalesce(r.prefix, '') || r.fname || ' ' || r.lname);
-    p_dept := r.dept; p_position := r.position;
+    -- คำนำหน้า/แผนกเก็บเป็นรหัสรายการหลัก
+    p_name := trim(coalesce((select value from trn_master_items where id = r.prefix_id), '') || r.fname || ' ' || r.lname);
+    p_dept := coalesce((select value from trn_master_items where id = r.dept_id), ''); p_position := r.position;
   end if;
   p_name := trim(coalesce(p_name, ''));
   if p_name = '' then raise exception 'กรุณากรอกชื่อ-นามสกุล'; end if;

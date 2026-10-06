@@ -401,13 +401,13 @@ window.openLeaveForm=function(id){
   var _isViewerForm=window.cu&&window.cu.role==='viewer';
   var _viewerStaffId=_isViewerForm?window.cu.staffId:'';
   var _autoStaff=lv?lv.staffId:(_viewerStaffId||'');
-  var staffOpts='<option value="">-- เลือกพนักงาน --</option>'+window.STAFF.filter(s=>s.active).map(s=>`<option value="${s.id}"${s.id===_autoStaff?' selected':''}>${esc(s.name)}</option>`).join('');
+  var staffOpts='<option value="">-- เลือกพนักงาน --</option>'+window.staffOptionsGrouped(window.STAFF.filter(s=>s.active),_autoStaff);
   var staffEl=document.getElementById('leavef-staff');
   staffEl.innerHTML=staffOpts;
   if(_isViewerForm){staffEl.disabled=!!_viewerStaffId;staffEl.parentElement.style.opacity=_viewerStaffId?'.7':'1';}
   else{staffEl.disabled=false;staffEl.parentElement.style.opacity='';}
 
-  var subOpts='<option value="">-- ไม่มี --</option>'+window.STAFF.filter(s=>s.active).map(s=>`<option value="${s.id}"${lv&&lv.substituteId===s.id?' selected':''}>${esc(s.name)}</option>`).join('');
+  var subOpts='<option value="">-- ไม่มี --</option>'+window.staffOptionsGrouped(window.STAFF.filter(s=>s.active),lv&&lv.substituteId);
   document.getElementById('leavef-sub').innerHTML=subOpts;
   var leaveType=lv?lv.leaveType:'sick';
   document.getElementById('leavef-type').value=leaveType;
@@ -447,7 +447,7 @@ window.approveLeave=function(id){
   var stName=(window.STAFF.find(s=>s.id===lv.staffId)||{name:'?'}).name;
   window.showConfirm('อนุมัติการลาของ '+stName+' ?',async function(){
     try{
-      var rec={leave_id:lv.id,staff_id:lv.staffId,leave_type:lv.leaveType,start_date:lv.startDate,end_date:lv.endDate,substitute_id:lv.substituteId||'',note:lv.note||'',status:'approved',approved_by:window.cu?window.cu.name:''};
+      var rec={leave_id:lv.id,staff_id:lv.staffId,leave_type:lv.leaveType,start_date:lv.startDate,end_date:lv.endDate,substitute_id:lv.substituteId||'',note:lv.note||'',status:'approved',approved_by:window.meId()};
       await setDoc(getDocRef('LEAVES',lv.id),rec);
       window.sendLeaveNotify('approved',rec);
     }catch(e){window.showDbError(e);}
@@ -473,7 +473,7 @@ window.saveLeave=async function(){
   var id=eid||('LV'+Date.now());
   var statusVal=document.getElementById('leavef-status').value||'pending';
   if(statusVal==='approved') statusVal='pending'; // อนุมัติได้เฉพาะผ่านปุ่มอนุมัติเท่านั้น
-  var approvedBy=(statusVal==='rejected'&&window.cu)?window.cu.name:'';
+  var approvedBy=statusVal==='rejected'?window.meId():''; // รหัสผู้ใช้ (users.id)
   var rec={leave_id:id,staff_id:staffId,leave_type:leaveType,start_date:start,end_date:end,substitute_id:subId,note:note,status:statusVal,approved_by:approvedBy};
   try{
     await setDoc(getDocRef('LEAVES',id),rec);

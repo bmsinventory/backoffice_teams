@@ -62,7 +62,7 @@ var M_WIDE = 22, M_CLAMP = 90;
 function mCardCell(td, tr) {
   if (td.hasAttribute('colspan')) return;
   var txt = (td.textContent || '').replace(/\s+/g, ' ').trim();
-  td.classList.toggle('m-wide', txt.length > M_WIDE || !!td.querySelector('.pbar, .aio-mini-stack'));
+  td.classList.toggle('m-wide', txt.length > M_WIDE || !!td.querySelector('.pbar'));
   if (txt.length <= M_CLAMP || td.querySelector('.m-clampbox') || td.querySelector('button, input, select, textarea, a')) return;
   var box = document.createElement('div');
   box.className = 'm-clampbox';

@@ -41,7 +41,7 @@
       if (f.groupId && i.groupId !== f.groupId) return false;
       if (f.formType && i.formType !== f.formType) return false;
       if (f.status && i.status !== f.status) return false;
-      if (f.owner && i.owner !== f.owner) return false;
+      if (f.owner && i.ownerId !== f.owner) return false; // f.owner = รหัสพนักงาน
       return true;
     });
   }
@@ -49,8 +49,11 @@
   function ftkItemRowHtml(item, idx, staffOpts, canEdit, canDel) {
     var st = ftkStatus(item.status);
     var doneDate = item.status === 'done' && item.updatedAt ? fd(item.updatedAt) : '-';
-    var ownerOptsHtml = ['<option value="">— ไม่ระบุ —</option>'].concat(staffOpts.map(function (o) {
-      return '<option value="'+esc(o.n)+'"'+(item.owner===o.n?' selected':'')+'>'+esc(o.label)+'</option>';
+    // ผู้จัดทำเดิมที่ไม่อยู่ในทีมโครงการแล้ว ยังต้องแสดงชื่อ ไม่ใช่กลายเป็น "ไม่ระบุ"
+    var curOwner = item.ownerId && !staffOpts.some(function (o) { return o.id === item.ownerId; })
+      ? [{ id:item.ownerId, label:window.staffNameByRef(item.ownerId) || '(พนักงานที่ถูกลบ)' }] : [];
+    var ownerOptsHtml = ['<option value="">— ไม่ระบุ —</option>'].concat(curOwner.concat(staffOpts).map(function (o) {
+      return '<option value="'+esc(o.id)+'"'+(item.ownerId===o.id?' selected':'')+'>'+esc(o.label)+'</option>';
     })).join('');
     var formTypeOptsHtml = ['<option value="">— ไม่ระบุ —</option>'].concat(window.FORM_TYPE.map(function (ft) {
       return '<option value="'+ft.id+'"'+(item.formType===ft.id?' selected':'')+'>'+esc(ft.label)+'</option>';
@@ -90,10 +93,10 @@
     if (!item) return;
     var row = {
       project_id: item.projectId, group_id: item.groupId, form_name: item.name, form_type: item.formType,
-      status: item.status, owner: window.staffIdByRef(item.ownerId), description: item.description, sort_order: item.order,
+      status: item.status, owner: item.ownerId, description: item.description, sort_order: item.order,
       received_date: item.receivedDate || null,
     };
-    var overrides = {}; overrides[field] = field === 'owner' ? window.staffIdByRef(value) : value; overrides.updated_at = new Date().toISOString(); // ผู้จัดทำ: ช่องเลือกให้ชื่อเล่น → เก็บเป็นรหัส
+    var overrides = {}; overrides[field] = value; overrides.updated_at = new Date().toISOString(); // ผู้จัดทำ = รหัสพนักงาน
     Object.assign(row, overrides);
     window.ftkApplyLocal('FORM_ITEMS', itemId, row);
     window.renderImplTracker();
@@ -286,8 +289,8 @@
       +   '<div class="ftkp-header-eyebrow">📄 สรุปการจัดทำแบบฟอร์ม</div>'
       +   '<div class="ftkp-header-title">'+esc(proj.name)+'</div>'
       +   '<div class="ftkp-header-sub">'
-      +     (proj.hospitalName ? '👤 PM: '+esc(proj.hospitalName)+' · ' : '')
-      +     (proj.pm ? '🔧 ผู้ติดตั้ง: '+esc(proj.pm)+' · ' : '')
+      +     (proj.siteOwner ? '👤 PM: '+esc(proj.siteOwner)+' · ' : '')
+      +     (proj.installer ? '🔧 ผู้ติดตั้ง: '+esc(proj.installer)+' · ' : '')
       +     'พิมพ์เมื่อ '+fd(new Date().toISOString())
       +   '</div>'
       + '</div>'
@@ -392,10 +395,10 @@
     var statusOpts = ['<option value="">ทุกสถานะ</option>'].concat(window.FORM_STATUS.map(function (s) { return '<option value="'+s.id+'"'+(f.status===s.id?' selected':'')+'>'+s.icon+' '+s.label+'</option>'; })).join('');
     var staffOpts = window.imtProjectTeamStaff(pid).map(function (s) {
       var nick = s.nickname || s.name;
-      return { n:nick, label:s.name+' ('+nick+')' };
+      return { id:s.id, label:s.name+' ('+nick+')' };
     }).sort(function (a,b) { return a.label.localeCompare(b.label, 'th'); });
     var ownerOpts = ['<option value="">ทุกคน</option>'].concat(staffOpts.map(function (o) {
-      return '<option value="'+esc(o.n)+'"'+(f.owner===o.n?' selected':'')+'>'+esc(o.label)+'</option>';
+      return '<option value="'+esc(o.id)+'"'+(f.owner===o.id?' selected':'')+'>'+esc(o.label)+'</option>';
     })).join('');
 
     var filterBar = '<div class="ftk-filterbar">'

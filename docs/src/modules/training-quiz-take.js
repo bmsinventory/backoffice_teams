@@ -296,10 +296,11 @@ async function pick(catId) {
   show('sc-who');
   if (!_regs) {
     const [rR, dR] = await Promise.all([
-      _sb.from('trn_registrations').select('id,prefix,fname,lname,dept,position,email,trn_sessions!inner(site,cat_id)').eq('trn_sessions.site', SITE),
+      // คำนำหน้า/แผนก เก็บเป็นรหัสรายการหลัก — ดึงชื่อมาพร้อมกัน (embed ผ่าน foreign key)
+      _sb.from('trn_registrations').select('id,fname,lname,position,email,pm:trn_master_items!trn_registrations_prefix_id_fkey(value),dm:trn_master_items!trn_registrations_dept_id_fkey(value),trn_sessions!inner(site,cat_id)').eq('trn_sessions.site', SITE),
       _sb.from('trn_master_items').select('value').eq('type', 'dept').eq('site', SITE).order('sort_order'),
     ]);
-    _regs = (rR.data || []).map(r => ({ ...r, name: `${r.prefix || ''}${r.fname} ${r.lname}`, catId: r.trn_sessions?.cat_id }));
+    _regs = (rR.data || []).map(r => ({ ...r, prefix: r.pm?.value || '', dept: r.dm?.value || '', name: `${r.pm?.value || ''}${r.fname} ${r.lname}`, catId: r.trn_sessions?.cat_id }));
     $('tq-depts').innerHTML = (dR.data || []).map(d => `<option value="${esc(d.value)}">`).join('');
   }
 }

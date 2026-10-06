@@ -177,7 +177,7 @@ async function _analyticsFacts(){
   let lv=loginVerifyData,ke=keyEntryData;
   try{
     if(!lv.length){const{data}=await _sb.from('trn_login_verify').select('login_status').eq('site',currentSite);lv=data||[];}
-    if(!ke.length){const{data}=await _sb.from('trn_key_entry_status').select('dept,status').eq('site',currentSite);ke=data||[];}
+    if(!ke.length){const{data}=await _sb.from('trn_key_entry_status').select('dept_id,status').eq('site',currentSite);ke=(data||[]).map(_mDeptRow);}
   }catch(e){}
   const lvCnt={};lv.forEach(x=>{lvCnt[x.login_status]=(lvCnt[x.login_status]||0)+1;});
   const keyed=new Set(ke.filter(x=>x.status==='keyed').map(x=>x.dept));

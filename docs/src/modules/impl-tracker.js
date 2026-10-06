@@ -29,7 +29,7 @@
   function imtTaskRow(t, overrides) {
     return Object.assign({
       phase_id:t.phaseId, project_id:t.projectId, task_name:t.name, description:t.description,
-      owner:window.staffIdByRef(t.ownerId), start_date:t.start, due_date:t.due, priority:t.priority, status:t.status,
+      owner:t.ownerId, start_date:t.start, due_date:t.due, priority:t.priority, status:t.status,
       progress_percent:t.progress, sort_order:t.order,
     }, overrides || {});
   }
@@ -65,12 +65,13 @@
 
   // ── Markup ของ combobox "ผู้รับผิดชอบ" — รูปแบบเดียวกับ combobox เลือกโครงการ (ค้นหา + คลิกเลือก
   // + position:fixed กันโดน overflow ของ modal ตัด) แทน input+datalist เดิม (บาง browser ไม่โชว์ label) ──
-  function imtStaffComboMarkup(curNick, disabled) {
-    if (disabled) return '<input class="f-input" value="'+esc(curNick||'-')+'" disabled><input type="hidden" id="imt-t-owner" value="'+esc(curNick||'')+'">';
+  // ── ค่าที่เลือก (#imt-t-owner) = รหัสพนักงาน ──
+  function imtStaffComboMarkup(curId, disabled) {
+    if (disabled) return '<input class="f-input" value="'+esc(window.staffNickByRef(curId)||'-')+'" disabled><input type="hidden" id="imt-t-owner" value="'+esc(curId||'')+'">';
     return '<div id="imt-t-owner-wrap" style="position:relative;">'
       +   '<input id="imt-t-owner-cmb-input" type="text" class="f-input" placeholder="ค้นหาหรือเลือกชื่อ..." autocomplete="off" spellcheck="false" style="padding-right:28px;cursor:pointer;">'
       +   '<span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:11px;color:var(--txt3);">▼</span>'
-      +   '<input type="hidden" id="imt-t-owner" value="'+esc(curNick||'')+'">'
+      +   '<input type="hidden" id="imt-t-owner" value="'+esc(curId||'')+'">'
       +   '<div id="imt-t-owner-drop" style="display:none;z-index:9500;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.15);overflow:hidden;">'
       +     '<div id="imt-t-owner-list" style="max-height:220px;overflow-y:auto;"></div>'
       +   '</div>'
@@ -92,26 +93,27 @@
       }
       return out;
     }
-    return function (staffList, curNick) {
+    return function (staffList, curId) {
       var inp = document.getElementById('imt-t-owner-cmb-input'), drop = document.getElementById('imt-t-owner-drop'),
         lst = document.getElementById('imt-t-owner-list'), hid = document.getElementById('imt-t-owner');
       if (!inp || !drop || !lst || !hid) return;
       var UNASSIGNED = '— ไม่ระบุผู้รับผิดชอบ —';
-      var items = staffList.map(function (s) { var nick = s.nickname || s.name; return { nick:nick, label:s.name+' ('+nick+')' }; });
-      var selNick = curNick || '', q = '', fi = -1, flat = [], dt = null, isOpen = false;
-      var initItem = items.find(function (it) { return it.nick === selNick; });
-      var selLabel = initItem ? initItem.label : selNick;
+      var label = function (s) { var nick = s.nickname || s.name; return s.name + ' (' + nick + ')'; };
+      var items = staffList.map(function (s) { return { id:s.id, label:label(s) }; });
+      var selId = curId || '', q = '', fi = -1, flat = [], dt = null, isOpen = false;
+      var curStaff = window.staffByRef(selId); // ผู้รับผิดชอบเดิมที่ไม่อยู่ในทีมแล้ว ยังแสดงชื่อได้
+      var selLabel = curStaff ? label(curStaff) : '';
       function bFlat(sq) {
         var f = [], lq = sq.toLowerCase();
-        if (!sq) f.push({ nick:'', label:UNASSIGNED, unbound:true });
+        if (!sq) f.push({ id:'', label:UNASSIGNED, unbound:true });
         items.forEach(function (it) { if (!sq || it.label.toLowerCase().indexOf(lq) !== -1) f.push(it); });
         return f;
       }
       function render() {
         if (!flat.length) { lst.innerHTML = '<div style="padding:18px 12px;text-align:center;color:var(--txt3);font-size:12px;">ไม่พบชื่อ' + (q ? '<br><small style="opacity:.7;">' + esc(q) + '</small>' : '') + '</div>'; return; }
         lst.innerHTML = flat.map(function (it, idx) {
-          var foc = idx === fi, isSel = !it.unbound && it.nick === selNick;
-          return '<div class="imto-i" data-nick="' + esc(it.nick) + '" data-label="' + esc(it.label) + '" data-idx="' + idx + '" style="height:' + IH + 'px;display:flex;align-items:center;padding:0 12px;cursor:pointer;font-size:12.5px;border-bottom:1px solid rgba(0,0,0,.04);background:' + (foc ? 'var(--indigo)12' : isSel ? 'var(--teal)0d' : 'transparent') + ';color:' + (it.unbound ? 'var(--txt3);font-style:italic;' : 'var(--txt1);') + '">'
+          var foc = idx === fi, isSel = !it.unbound && it.id === selId;
+          return '<div class="imto-i" data-id="' + esc(it.id) + '" data-label="' + esc(it.label) + '" data-idx="' + idx + '" style="height:' + IH + 'px;display:flex;align-items:center;padding:0 12px;cursor:pointer;font-size:12.5px;border-bottom:1px solid rgba(0,0,0,.04);background:' + (foc ? 'var(--indigo)12' : isSel ? 'var(--teal)0d' : 'transparent') + ';color:' + (it.unbound ? 'var(--txt3);font-style:italic;' : 'var(--txt1);') + '">'
             + (isSel ? '<span style="color:var(--teal);margin-right:6px;font-size:10px;flex-shrink:0;">✓</span>' : '')
             + (it.unbound ? esc(it.label) : hi(it.label, q))
             + '</div>';
@@ -120,8 +122,8 @@
       function positionDrop() { window.placeDropdown(inp, drop, lst, 260); }
       function openDrop() { if (isOpen) return; isOpen = true; q = ''; fi = -1; flat = bFlat(''); lst.scrollTop = 0; render(); positionDrop(); drop.style.display = 'block'; window.addEventListener('resize', positionDrop); window.addEventListener('scroll', positionDrop, true); }
       function closeDrop() { if (!isOpen) return; isOpen = false; drop.style.display = 'none'; inp.value = selLabel; window.removeEventListener('resize', positionDrop); window.removeEventListener('scroll', positionDrop, true); }
-      function selItem(nick, label) { selNick = nick; selLabel = nick ? label : ''; hid.value = nick; closeDrop(); hid.dispatchEvent(new Event('change')); }
-      lst.addEventListener('click', function (e) { var it = e.target.closest('.imto-i'); if (it) selItem(it.dataset.nick, it.dataset.label); });
+      function selItem(id, lbl) { selId = id; selLabel = id ? lbl : ''; hid.value = id; closeDrop(); hid.dispatchEvent(new Event('change')); }
+      lst.addEventListener('click', function (e) { var it = e.target.closest('.imto-i'); if (it) selItem(it.dataset.id, it.dataset.label); });
       lst.addEventListener('mousemove', function (e) { var it = e.target.closest('.imto-i'); if (it) { var ni = +it.dataset.idx; if (ni !== fi) { fi = ni; render(); } } });
       inp.addEventListener('click', function () { if (isOpen) closeDrop(); else openDrop(); });
       inp.addEventListener('input', function () { if (!isOpen) openDrop(); clearTimeout(dt); dt = setTimeout(function () { q = inp.value.trim(); fi = -1; flat = bFlat(q); render(); }, 150); });
@@ -131,7 +133,7 @@
         if (!isOpen && (e.key === 'ArrowDown' || e.key === 'Enter')) { openDrop(); return; }
         if (e.key === 'ArrowDown') { e.preventDefault(); fi = fi < flat.length - 1 ? fi + 1 : fi; render(); }
         else if (e.key === 'ArrowUp') { e.preventDefault(); fi = fi > 0 ? fi - 1 : 0; render(); }
-        else if (e.key === 'Enter') { e.preventDefault(); if (flat[fi]) selItem(flat[fi].nick, flat[fi].label); }
+        else if (e.key === 'Enter') { e.preventDefault(); if (flat[fi]) selItem(flat[fi].id, flat[fi].label); }
       });
       document.addEventListener('mousedown', function onOut(e) { var wrap = document.getElementById('imt-t-owner-wrap'); if (!wrap) { document.removeEventListener('mousedown', onOut); return; } if (!wrap.contains(e.target)) closeDrop(); });
       inp.value = selLabel; flat = bFlat(''); render();
@@ -463,7 +465,7 @@
     return '<div class="imt-pcard imt-hcard" style="border-left:4px solid '+h.color+';" onclick="window.imtSelectProject(\''+p.id+'\')">'
       + '<div class="imt-hcard-top"><span class="imt-hcard-badge" style="background:'+h.color+'18;color:'+h.color+'">'+h.icon+' '+h.label+'</span><span class="imt-hcard-top-r">'+flag+scoreHtml+'</span></div>'
       + '<div class="imt-pcard-title">'+esc(p.name)+'</div>'
-      + '<div class="imt-pcard-sub">🏥 '+esc(p.hospitalName||'—')+' &nbsp;·&nbsp; 👤 '+esc(p.pm||'—')+'</div>'
+      + '<div class="imt-pcard-sub">👤 '+esc(p.siteOwner||'—')+' &nbsp;·&nbsp; 🔧 '+esc(p.installer||'—')+'</div>'
       + '<div class="imt-hcard-pbar-wrap">'+pbarHtml(h.progress, h.color)+(h.expected!==null?'<div class="imt-hcard-expected" style="left:'+h.expected+'%" title="ควรได้ตามกำหนดการ ~'+h.expected+'%"></div>':'')+'</div>'
       + '<div class="imt-pcard-meta"><span>'+progressTxt+'</span><span>'+endInfo+'</span></div>'
       + footHtml
@@ -515,13 +517,11 @@
         .sort(function (a,b) { return (a.due||'').localeCompare(b.due||''); });
       var stuck = tasks.filter(function (t) { return t.status === 'issue' || t.status === 'review'; });
       var openIss = (window.IMPL_ISSUES || []).filter(function (s) { return s.projectId === pid && s.status !== 'closed'; });
-      var risks = (window.IMPL_RISKS || []).filter(function (r) { return r.projectId === pid && r.status === 'open'; });
-      var impactLbl = function (id) { return ((window.IMPL_IMPACT || []).find(function (x) { return x.id === id; }) || { label:id }).label; };
       var acts = (window.IMPL_ACTIVITY_LOG || []).filter(function (a) { return a.projectId === pid; })
         .sort(function (a,b) { return (b.createdAt||'').localeCompare(a.createdAt||''); });
       var endTxt = p.end ? (dayDiff(p.end) > 0 ? 'เลยกำหนดจบ ' + dayDiff(p.end) + ' วัน' : 'เหลือ ' + (-dayDiff(p.end)) + ' วันถึงกำหนดจบ') : 'ไม่มีกำหนดจบ';
       lines.push('', (i + 1) + ') ' + p.name + ' [' + h.label + ']',
-        '   ความคืบหน้า ' + h.progress + '%' + (h.expected !== null ? ' (ตามแผนควรได้ ~' + h.expected + '%)' : '') + ' · ' + endTxt + (p.pm ? ' · ผู้ดูแล ' + p.pm : ''),
+        '   ความคืบหน้า ' + h.progress + '%' + (h.expected !== null ? ' (ตามแผนควรได้ ~' + h.expected + '%)' : '') + ' · ' + endTxt + (p.installer ? ' · ผู้ดูแล ' + p.installer : ''),
         '   คะแนนสุขภาพ ' + h.score + '/100' + (h.reason ? ' · สาเหตุหลัก: ' + h.reason : ''));
       if (overdueT.length) lines.push('   งานเกินกำหนด ' + overdueT.length + ' งาน: ' + overdueT.slice(0, 3).map(function (t) {
         return t.name + ' (เกิน ' + dayDiff(t.due) + ' วัน' + (t.owner ? ', ' + t.owner : '') + ')'; }).join('; '));
@@ -531,7 +531,6 @@
         var oldest = openIss.reduce(function (m, s) { return Math.max(m, dayDiff(s.createdAt || today.toISOString())); }, 0);
         lines.push('   ปัญหาการใช้งานค้าง ' + openIss.length + ' เรื่อง (ค้างนานสุด ' + oldest + ' วัน)');
       }
-      if (risks.length) lines.push('   ความเสี่ยงที่ยังเปิดอยู่: ' + risks.slice(0, 3).map(function (r) { return r.title + ' (ผลกระทบ' + impactLbl(r.impact) + ')'; }).join('; '));
       lines.push('   อัปเดตล่าสุด: ' + (acts.length ? dayDiff(acts[0].createdAt) + ' วันก่อน' : 'ยังไม่มีการอัปเดต'));
     });
     if (rows.length > 30) lines.push('', '(และโครงการสถานะปกติอีก ' + (rows.length - 30) + ' โครงการ ไม่ได้แสดงรายละเอียด)');
@@ -646,7 +645,7 @@
 
     return '<div class="imt-pt-row" onclick="window.imtSelectProject(\''+p.id+'\')">'
       + '<div class="imt-pt-c-s">'+scoreCell+'</div>'
-      + '<div class="imt-pt-c-n"><div class="imt-pt-name">'+esc(p.name)+'</div><div class="imt-pt-small imt-pt-ell">🏥 '+esc(p.hospitalName||'—')+' · 👤 '+esc(p.pm||'—')+'</div></div>'
+      + '<div class="imt-pt-c-n"><div class="imt-pt-name">'+esc(p.name)+'</div><div class="imt-pt-small imt-pt-ell">👤 '+esc(p.siteOwner||'—')+' · 🔧 '+esc(p.installer||'—')+'</div></div>'
       + '<div class="imt-pt-c-p">'+prog+'</div>'
       + '<div class="imt-pt-c-ph">'+phaseCell+'</div>'
       + '<div class="imt-pt-c-r">'+reasonCell+'</div>'
@@ -780,10 +779,9 @@
         }).join('') : imtDashEmpty('ยังไม่มีงานที่ระบุผู้รับผิดชอบ'));
 
     var pmMap = {};
-    // PM = เจ้าของไซต์ (site_owner) ของโครงการต้นทาง — อ่านสดจาก PROJECTS (p.pm เก็บชื่อผู้ติดตั้งไว้ตอนสร้าง ไม่ใช่เจ้าของโครงการ)
+    // PM = เจ้าของไซต์ (site_owner) ของโครงการต้นทาง
     window.IMPL_PROJECTS.forEach(function (p) {
-      var sp = p.sourceProjectId && (window.PROJECTS || []).find(function (x) { return x.id === p.sourceProjectId; });
-      var n = (sp && sp.siteOwner) || 'ไม่ระบุ PM';
+      var n = p.siteOwner || 'ไม่ระบุ PM';
       (pmMap[n] = pmMap[n] || []).push(p);
     });
     var pmRows = Object.keys(pmMap).map(function (name) {
@@ -1161,8 +1159,6 @@
       id = window.imtUid('IPJ');
       row = {
         project_name: name,
-        hospital_name: sp.siteOwner || '',
-        project_manager: sp.installer || '',
         start_date: sp.start || null,
         end_date: sp.end || null,
         status: 'not_started',
@@ -1192,8 +1188,6 @@
     name = editSp ? editSp.name : curP.name;
     row = {
       project_name: name,
-      hospital_name: editSp ? (editSp.siteOwner || '') : (curP.hospitalName || ''),
-      project_manager: editSp ? (editSp.installer || '') : (curP.pm || ''),
       start_date: editSp ? (editSp.start || null) : (curP.start || null),
       end_date: editSp ? (editSp.end || null) : (curP.end || null),
       status: document.getElementById('imt-p-status').value,
@@ -1217,7 +1211,7 @@
     return list.filter(function (t) {
       if (q && t.name.toLowerCase().indexOf(q) === -1) return false;
       if (f.status && t.status !== f.status) return false;
-      if (f.owner && t.owner !== f.owner) return false;
+      if (f.owner && t.ownerId !== f.owner) return false; // f.owner = รหัสพนักงาน
       if (f.phaseId && t.phaseId !== f.phaseId) return false;
       return true;
     });
@@ -1270,9 +1264,9 @@
     // (เผื่อยังมอบหมายไม่ครบทุกคน) — แสดงป้ายกำกับเป็น "ชื่อ-นามสกุล (ชื่อเล่น)" ให้อ่านง่ายขึ้น ──
     var ownerOpts = ['<option value="">ทุกคน</option>'].concat(imtProjectTeamStaff(pid).map(function (s) {
       var nick = s.nickname || s.name;
-      return { n:nick, label:s.name+' ('+nick+')' };
+      return { id:s.id, label:s.name+' ('+nick+')' };
     }).sort(function (a,b) { return a.label.localeCompare(b.label, 'th'); }).map(function (o) {
-      return '<option value="'+esc(o.n)+'"'+(f.owner===o.n?' selected':'')+'>'+esc(o.label)+'</option>';
+      return '<option value="'+esc(o.id)+'"'+(f.owner===o.id?' selected':'')+'>'+esc(o.label)+'</option>';
     })).join('');
     var phaseOpts = ['<option value="">ทุก Phase</option>'].concat(phases.map(function (p) { return '<option value="'+p.id+'"'+(f.phaseId===p.id?' selected':'')+'>'+esc(p.name)+'</option>'; })).join('');
     var statusOpts = ['<option value="">ทุกสถานะ</option>'].concat(window.IMPL_STATUS.map(function (s) { return '<option value="'+s.id+'"'+(f.status===s.id?' selected':'')+'>'+s.icon+' '+s.label+'</option>'; })).join('');
@@ -1616,7 +1610,7 @@
       + phaseFieldHtml
       + '<div class="f-group"><label class="f-label">รายละเอียด</label><textarea class="f-input" id="imt-t-desc" '+(canEdit?'':'disabled')+'>'+esc(t.description)+'</textarea></div>'
       + teamHint
-      + '<div class="f-grid"><div class="f-group"><label class="f-label">👤 ผู้รับผิดชอบ</label>' + imtStaffComboMarkup(t.owner, !canEdit) + '</div>'
+      + '<div class="f-grid"><div class="f-group"><label class="f-label">👤 ผู้รับผิดชอบ</label>' + imtStaffComboMarkup(t.ownerId, !canEdit) + '</div>'
       + '<div class="f-group"><label class="f-label">⚡ ระดับความสำคัญ</label><select class="f-input" id="imt-t-priority" '+(canEdit?'':'disabled')+'>'+window.IMPL_PRIORITY.map(function (p) { return '<option value="'+p.id+'"'+(t.priority===p.id?' selected':'')+'>'+p.label+'</option>'; }).join('')+'</select></div></div>'
       + '<div class="f-grid"><div class="f-group"><label class="f-label">📅 วันเริ่มต้น</label><input type="date" class="f-input" id="imt-t-start" value="'+esc(t.start)+'" '+(canEdit?'':'disabled')+'></div>'
       + '<div class="f-group"><label class="f-label">⏰ กำหนดเสร็จ (Due Date)</label><input type="date" class="f-input" id="imt-t-due" value="'+esc(t.due)+'" '+(canEdit?'':'disabled')+'></div></div>'
@@ -1676,7 +1670,7 @@
       + (id && canEdit && t.status !== 'done' && (!ck || !ck.length) ? '<button class="btn btn-teal" onclick="window.imtMarkDone(\''+id+'\')">✅ Mark as Done</button>' : '')
       + (canEdit ? '<button class="btn btn-pri" onclick="window.saveImtTask(\''+(phaseId||(t.phaseId||''))+'\')">💾 บันทึก</button>' : '');
     window.openM('m-imt-task');
-    if (canEdit) window._initImtStaffCombobox && window._initImtStaffCombobox(imtProjectTeamStaff(window.imtCurrentProjectId), t.owner);
+    if (canEdit) window._initImtStaffCombobox && window._initImtStaffCombobox(imtProjectTeamStaff(window.imtCurrentProjectId), t.ownerId);
   };
 
   window.imtSetTaskStatusField = function (statusId) {
@@ -1703,7 +1697,7 @@
     var row = {
       phase_id: finalPhaseId, project_id: pid, task_name: name,
       description: document.getElementById('imt-t-desc').value.trim(),
-      owner: window.staffIdByRef(document.getElementById('imt-t-owner').value.trim()), // ช่องเลือกให้ชื่อเล่น → เก็บเป็นรหัสพนักงาน
+      owner: document.getElementById('imt-t-owner').value, // รหัสพนักงาน
       start_date: document.getElementById('imt-t-start').value || null,
       due_date: document.getElementById('imt-t-due').value || null,
       priority: document.getElementById('imt-t-priority').value,
@@ -1745,7 +1739,7 @@
     var c = window.IMPL_CHECKLIST_ITEMS.find(function (x) { return x.id === ckId; });
     if (!c) return;
     var done = forceDone !== undefined ? forceDone : !c.done;
-    var actor = (window.cu && (window.cu.name || window.cu.username)) || '';
+    var actor = window.meId(); // รหัสผู้ใช้ (users.id)
     var row = { task_id:c.taskId, checklist_name:c.name, is_done:done, done_date: done ? new Date().toISOString().slice(0,10) : null, done_by: done ? actor : '', remark:c.remark, sort_order:c.order };
     window.imtApplyLocal('IMPL_CHECKLIST_ITEMS', ckId, row);
     await window.setDoc(window.getDocRef('IMPL_CHECKLIST_ITEMS', ckId), row);
@@ -1791,7 +1785,7 @@
     var text = input.value.trim();
     if (!text) return;
     var id = window.imtUid('ICM');
-    var author = (window.cu && (window.cu.name || window.cu.username)) || '';
+    var author = window.meId(); // รหัสผู้ใช้ (users.id)
     var row = { task_id:taskId, author:author, comment_text:text };
     window.imtApplyLocal('IMPL_COMMENTS', id, row);
     await window.setDoc(window.getDocRef('IMPL_COMMENTS', id), row);
@@ -1888,15 +1882,6 @@
       if (d && !seen[d]) { seen[d] = true; out.push(d); }
     });
     return out.sort(function (a, b) { return a.localeCompare(b, 'th'); });
-  }
-
-  // ── "ผู้แก้ไข" เก็บเป็นชื่อเล่น (nickname) ในฐานข้อมูล (ดู fixedByOpts ใน openImtIssueModal — ตาม
-  // convention เดียวกับ Task.owner) แต่ตารางทะเบียนต้องการโชว์ชื่อจริงให้อ่านง่ายกว่า — หาไม่เจอ
-  // (เช่น พนักงานลาออกไปแล้ว/พิมพ์เอง) ก็ใช้ค่าที่เก็บไว้ตรง ๆ แทน ──
-  function imtStaffNameByNick(nick) {
-    if (!nick) return '';
-    var s = (window.STAFF || []).find(function (x) { return (x.nickname || x.name) === nick; });
-    return s ? s.name : nick;
   }
 
   function renderImtIssues(mount) {
@@ -2140,24 +2125,23 @@
   // อ่านแชท/เลือกช่วงวันที่ และขั้นตรวจทาน ใช้ตัวกลางใน src/utils/chat-import.util.js (lineChat / aiReview)
   // ส่วนนี้กำหนดเฉพาะของโครงการ: ค่าเริ่มต้นผู้แจ้ง/หน่วยงาน/ผู้รับปัญหา, คำสั่ง AI, ช่องของปัญหา และการบันทึก ──
   function imtBkVal(id) { return ((document.getElementById(id) || {}).value || '').trim(); }
-  // ── ตัวเลือก "ผู้รับปัญหา" จากรายชื่อในระบบ: ทีมโครงการก่อน แล้วพนักงานอื่น · เก็บเป็นชื่อ (ตามข้อมูลเดิม)
-  // ค่าเดิมที่ไม่อยู่ในรายชื่อ (เช่น ข้อมูลนำเข้า/คนนอกทีม) แทรกไว้บนสุดให้ยังเลือกค้างได้ ──
+  // ── ตัวเลือก "ผู้รับปัญหา" จากรายชื่อในระบบ: ทีมโครงการก่อน แล้วพนักงานอื่นแยกกลุ่มตามแผนก (เรียงระดับตำแหน่ง) · ค่า = รหัสพนักงาน
+  // ค่าเดิมที่ไม่อยู่ในรายชื่อ (พนักงานที่ปิดใช้งาน/ถูกลบ) แทรกไว้บนสุดให้ยังเลือกค้างได้ ──
   function imtReceiverOptions(pid, cur) {
     var team = imtProjectTeamStaff(pid), inTeam = {};
     team.forEach(function (s) { inTeam[s.id] = true; });
     var others = (window.STAFF || []).filter(function (s) { return s.active !== false && s.name && !inTeam[s.id]; });
-    var byName = function (a, b) { return a.name.localeCompare(b.name, 'th'); };
-    var opt = function (s) { return '<option value="' + esc(s.name) + '"' + (s.name === cur ? ' selected' : '') + '>' + esc(s.name) + (s.nickname ? ' (' + esc(s.nickname) + ')' : '') + '</option>'; };
-    var known = team.concat(others).some(function (s) { return s.name === cur; });
-    return (cur && !known ? '<option value="' + esc(cur) + '" selected>' + esc(cur) + '</option>' : '')
+    var opt = function (s) { return '<option value="' + esc(s.id) + '"' + (s.id === cur ? ' selected' : '') + '>' + esc(s.name) + (s.nickname ? ' (' + esc(s.nickname) + ')' : '') + '</option>'; };
+    var known = team.concat(others).some(function (s) { return s.id === cur; });
+    return (cur && !known ? '<option value="' + esc(cur) + '" selected>' + esc(window.staffNameByRef(cur) || '(พนักงานที่ถูกลบ)') + '</option>' : '')
       + (cur ? '' : '<option value="">-- เลือกผู้รับปัญหา --</option>')
-      + (team.length ? '<optgroup label="ทีมโครงการ">' + team.slice().sort(byName).map(opt).join('') + '</optgroup>' : '')
-      + (others.length ? '<optgroup label="พนักงานอื่น">' + others.sort(byName).map(opt).join('') + '</optgroup>' : '');
+      + (team.length ? '<optgroup label="ทีมโครงการ">' + team.slice().sort(window.sortStaffByRank).map(opt).join('') + '</optgroup>' : '')
+      + window.staffOptionsGrouped(others, cur, true);
   }
   window.openImtBulkModal = function () {
     var pid = window.imtCurrentProjectId, proj = imtProject(pid);
     if (!proj) return;
-    var curName = (window.cu && (window.cu.name || window.cu.username)) || '';
+    var curStaffId = (window.cu && (window.cu.staffId || window.cu.staff_id)) || '';
     var deptOpts = imtIssueDepartments(pid).map(function (d) { return '<option value="' + esc(d) + '">'; }).join('');
     document.getElementById('m-imt-bulk-body').innerHTML =
       '<div id="imtbk-step1">'
@@ -2166,7 +2150,7 @@
       + '<div class="m-stack" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:4px;">'
       +   '<div class="f-group"><label class="f-label">ผู้แจ้ง (ถ้าแชทไม่ระบุ)</label><input class="f-input" id="imt-bk-rep" placeholder="ชื่อผู้แจ้ง"></div>'
       +   '<div class="f-group"><label class="f-label">หน่วยงาน (ถ้าแชทไม่ระบุ)</label><input class="f-input" id="imt-bk-dept" list="imt-bk-dept-dl" placeholder="เช่น ห้องจ่ายยา IPD"><datalist id="imt-bk-dept-dl">' + deptOpts + '</datalist></div>'
-      +   '<div class="f-group"><label class="f-label">ผู้รับปัญหา <span class="imt-req">*</span></label><select class="f-input" id="imt-bk-recv">' + imtReceiverOptions(pid, curName) + '</select></div>'
+      +   '<div class="f-group"><label class="f-label">ผู้รับปัญหา <span class="imt-req">*</span></label><select class="f-input" id="imt-bk-recv">' + imtReceiverOptions(pid, curStaffId) + '</select></div>'
       + '</div>'
       + '<button type="button" class="btn btn-ghost btn-sm" onclick="window.imtBulkParse(this)">🤖 ให้ AI แยกปัญหา</button>'
       + '<div id="imtbk-out" style="margin-top:12px;"></div>'
@@ -2188,7 +2172,7 @@
       + 'ตอบ "เฉพาะ JSON" รูปแบบ: {"items":[{"problem":"<สรุปปัญหาให้ชัด 1–2 ประโยค ภาษาไทย>","department":"<หน่วยงาน/แผนกที่แจ้ง หรือ empty>",'
       + '"reported_by":"<ชื่อผู้แจ้ง หรือ empty>","category":"<ชื่อกลุ่มปัญหาจากรายการ หรือ empty>",'
       + '"solved":true|false,"solution":"<วิธีแก้ ถ้าข้อความบอกว่าแก้แล้ว หรือ empty>","handled_by":"<ชื่อทีมงานที่แก้เรื่องนี้ หรือ empty>"'
-      + (c.numbered ? ',"first_msg":<เลขข้อความที่เริ่มแจ้ง>,"last_msg":<เลขข้อความสุดท้ายของเรื่องนี้>' : '') + '}]} '
+      + (c.numbered ? ',"first_msg":<เลขข้อความที่เริ่มแจ้ง>,"last_msg":<เลขข้อความสุดท้ายของเรื่องนี้>,"msgs":[<เลขข้อความที่เกี่ยวกับเรื่องนี้โดยตรงเท่านั้น — แจ้ง/ถาม-ตอบ/ส่งข้อมูล/ยืนยันว่าแก้แล้ว ไม่รวมทักทาย/ขอบคุณ/สติกเกอร์/เรื่องอื่นที่คุยแทรก>]' : '') + '}]} '
       + 'กฎ: ข้อความทักทาย/ขอบคุณ/สติกเกอร์/รูป/นัดหมาย/คุยเรื่องอื่นที่ไม่ใช่ปัญหา ให้ข้าม · ปัญหาเดียวกันที่พูดซ้ำหลายข้อความ ให้รวมเป็นข้อเดียว · '
       + 'ผู้แจ้งคือฝั่งโรงพยาบาล ไม่ใช่คนในรายชื่อทีมงาน · ห้ามแต่งข้อมูลที่ไม่มีในข้อความ · หน่วยงานให้ใช้ชื่อจากรายการที่มีอยู่ถ้าตรงกัน';
     var ctx = 'กลุ่มปัญหาที่เลือกได้ (ตอบชื่อให้ตรงตัวอักษร):\n' + cats.map(function (x) { return '- ' + x; }).join('\n')
@@ -2207,7 +2191,7 @@
       raw.forEach(function (x) {
         var problem = String(x.problem || '').trim(), solution = String(x.solution || '').trim();
         if (!problem) return;
-        var ex = window.lineChat.excerpt(c.msgs, x.first_msg, x.last_msg), closed = x.solved === true && !!solution;
+        var ex = window.lineChat.excerpt(c.msgs, x.first_msg, x.last_msg, x.msgs), closed = x.solved === true && !!solution;
         var fixer = closed ? window.lineChat.matchPerson(x.handled_by, team) : null;
         var it = {
           problem: problem,
@@ -2216,7 +2200,7 @@
           category: cats.indexOf(x.category) > -1 ? x.category : '',
           status: closed ? 'closed' : 'open',
           solution: solution,
-          fixedBy: fixer ? (fixer.nickname || fixer.name) : '',
+          fixedBy: fixer ? fixer.id : '', // รหัสพนักงาน
           fixedDate: closed ? String(ex.endAt || '').slice(0, 10) : '',
           createdAt: ex.createdAt, whenLabel: ex.whenLabel, chat: ex.chat, dup: '',
         };
@@ -2243,7 +2227,7 @@
       modalId: 'm-imt-bulk', step1Id: 'imtbk-step1', step2Id: 'imtbk-step2', reviewId: 'imtbk-review', footId: 'm-imt-bulk-foot',
       items: items, unit: 'รายการ',
       ctxHtml: function () {
-        var recv = imtBkVal('imt-bk-recv');
+        var recv = window.staffNameByRef(imtBkVal('imt-bk-recv'));
         return '📁 <b>' + esc(proj ? proj.name : '') + '</b> · ผู้รับปัญหา: ' + (recv ? esc(recv) : '<span style="color:var(--coral);">ยังไม่ระบุ</span>');
       },
       title: function (x) { return x.problem; },
@@ -2256,7 +2240,7 @@
             ['🏢', 'หน่วยงาน', x.department || imtBkVal('imt-bk-dept')],
             ['👤', 'ผู้แจ้ง', x.reportedBy || imtBkVal('imt-bk-rep')],
             ['🗂', 'กลุ่มปัญหา', x.category],
-          ].concat(x.status === 'closed' ? [['🔧', 'ผู้แก้ไข', x.fixedBy ? imtStaffNameByNick(x.fixedBy) : '']] : []),
+          ].concat(x.status === 'closed' ? [['🔧', 'ผู้แก้ไข', window.staffNameByRef(x.fixedBy)]] : []),
           note: x.status === 'closed' && String(x.solution || '').trim() ? '<div class="air-fix"><b>วิธีแก้:</b> ' + esc(x.solution) + '</div>' : '',
         };
       },
@@ -2283,7 +2267,7 @@
           + (x.status === 'closed'
             ? h.fld('วิธีการแก้ไข', '<textarea class="f-input" rows="2"' + h.txt('solution') + '>' + esc(x.solution) + '</textarea>')
               + '<div class="air-grid">'
-              +   h.fld('ผู้แก้ไข', '<select class="f-input"' + h.pick('fixedBy') + '>' + h.opt('', '— ไม่ระบุ —', !x.fixedBy) + team.map(function (s) { var nk = s.nickname || s.name; return h.opt(nk, s.name + ' (' + nk + ')', nk === x.fixedBy); }).join('') + '</select>')
+              +   h.fld('ผู้แก้ไข', '<select class="f-input"' + h.pick('fixedBy') + '>' + h.opt('', '— ไม่ระบุ —', !x.fixedBy) + team.map(function (s) { var nk = s.nickname || s.name; return h.opt(s.id, s.name + ' (' + nk + ')', s.id === x.fixedBy); }).join('') + '</select>')
               +   h.fld('วันที่แก้ไขปัญหา', '<input type="date" class="f-input" value="' + esc(x.fixedDate) + '"' + h.pick('fixedDate') + '>')
               + '</div>'
             : '');
@@ -2302,8 +2286,8 @@
           department: String(x.department || '').trim() || imtBkVal('imt-bk-dept'),
           reportedBy: String(x.reportedBy || '').trim() || imtBkVal('imt-bk-rep'),
           category: x.category, status: x.status, solution: String(x.solution || '').trim(),
-          receivedBy: imtBkVal('imt-bk-recv'), receivedDate: x.createdAt || '',
-          fixedBy: closed ? x.fixedBy : '', fixedDate: closed ? x.fixedDate : '',
+          receivedById: imtBkVal('imt-bk-recv'), receivedDate: x.createdAt || '',
+          fixedById: closed ? x.fixedBy : '', fixedDate: closed ? x.fixedDate : '',
         });
       },
       onDone: function (made) {
@@ -2324,33 +2308,27 @@
     window.imtEditIssueId = id;
     var pid = window.imtCurrentProjectId;
     var cats = imtIssueCategories();
-    var curName = (window.cu && (window.cu.name || window.cu.username)) || '';
-    var i = id ? imtIssue(id) : { department:'', reportedBy:'', problem:'', category:'', status:'open', solution:'', receivedBy:curName, fixedBy:'', fixedDate:'', createdAt:new Date().toISOString() };
+    var curStaffId = (window.cu && (window.cu.staffId || window.cu.staff_id)) || '';
+    var i = id ? imtIssue(id) : { department:'', reportedBy:'', problem:'', category:'', status:'open', solution:'', receivedById:curStaffId, fixedById:'', fixedDate:'', createdAt:new Date().toISOString() };
     var catOpts = '<option value="">--ระบุกลุ่มปัญหา--</option>' + cats.map(function (c) { return '<option value="'+esc(c)+'"'+(i.category===c?' selected':'')+'>'+esc(c)+'</option>'; }).join('');
     var stOpts = window.IMPL_ISSUE_STATUS.map(function (s) { return '<option value="'+s.id+'"'+(i.status===s.id?' selected':'')+'>'+esc(s.label)+'</option>'; }).join('');
-    // ── "ผู้แก้ไข" เลือกจากทีมงานของโครงการนี้เท่านั้น (imtProjectTeamStaff — แหล่งเดียวกับตัวกรอง
-    // "ผู้รับผิดชอบ" ในแท็บ "งาน") เก็บเป็นชื่อเล่น (nickname) ตาม convention เดียวกับ Task.owner ──
+    // ── "ผู้แก้ไข" เลือกจากทีมงานของโครงการนี้ (imtProjectTeamStaff — แหล่งเดียวกับ "ผู้รับผิดชอบ" ในแท็บ "งาน")
+    // ค่าที่เลือก = รหัสพนักงาน ──
     var teamStaff = imtProjectTeamStaff(pid);
-    var curStaffId = (window.cu && (window.cu.staffId || window.cu.staff_id)) || '';
     var curTeamMember = teamStaff.find(function (s) { return s.id === curStaffId; });
-    var curNick = curTeamMember ? (curTeamMember.nickname || curTeamMember.name) : '';
-    // ยังไม่มีใครแก้จริง (fixedBy ว่าง) → เดาให้เป็นคน Login เอง (ถ้าอยู่ในทีมโครงการนี้) กดบันทึกได้เลยไม่ต้องเลือกเอง
-    var defaultFixedBy = i.fixedBy || curNick;
-    // ── ข้อมูลเก่า/นำเข้าจาก Excel อาจเก็บชื่อที่ไม่ตรงกับทีมงานปัจจุบันของโครงการนี้เป๊ะ ๆ (คนละชื่อเล่น/
-    // ไม่ได้อยู่ในทีมที่ตั้งค่าไว้ตอนนี้แล้ว) — ถ้าไม่แทรกตัวเลือกนี้เข้าไปเอง <select> จะไม่มี option ไหน
-    // ตรงกับค่าที่เก็บไว้เลย เบราว์เซอร์เลย fallback ไปเลือก "— ไม่ระบุ —" (option แรก) แทนโดยอัตโนมัติ
-    // ทำให้ดูเหมือนข้อมูล "หายไป" ทั้งที่ยังอยู่ใน DB ปกติ (แค่ dropdown แสดงผิด) ──
+    // ยังไม่มีใครแก้จริง (fixedById ว่าง) → เดาให้เป็นคน Login เอง (ถ้าอยู่ในทีมโครงการนี้) กดบันทึกได้เลยไม่ต้องเลือกเอง
+    var defaultFixedBy = i.fixedById || (curTeamMember ? curTeamMember.id : '');
+    // ผู้แก้ไขเดิมที่ไม่อยู่ในทีมโครงการแล้ว — แทรกตัวเลือกไว้ ไม่งั้น <select> ตกไปที่ "— ไม่ระบุ —" ดูเหมือนข้อมูลหาย
     var extraFixedByOpt = '';
-    if (defaultFixedBy && !teamStaff.some(function (s) { return (s.nickname || s.name) === defaultFixedBy; })) {
-      var matchedStaff = (window.STAFF || []).find(function (s) { return (s.nickname || s.name) === defaultFixedBy; });
-      var extraLabel = matchedStaff ? matchedStaff.name + ' (' + defaultFixedBy + ')' : defaultFixedBy + ' (ไม่อยู่ในทีมโครงการนี้)';
+    if (defaultFixedBy && !teamStaff.some(function (s) { return s.id === defaultFixedBy; })) {
+      var extraLabel = (window.staffNameByRef(defaultFixedBy) || '(พนักงานที่ถูกลบ)') + ' (ไม่อยู่ในทีมโครงการนี้)';
       extraFixedByOpt = '<option value="' + esc(defaultFixedBy) + '" selected>' + esc(extraLabel) + '</option>';
     }
     var fixedByOpts = ['<option value="">— ไม่ระบุ —</option>', extraFixedByOpt].concat(teamStaff.map(function (s) {
       var nick = s.nickname || s.name;
-      return { n:nick, label:s.name+' ('+nick+')' };
+      return { id:s.id, label:s.name+' ('+nick+')' };
     }).sort(function (a, b) { return a.label.localeCompare(b.label, 'th'); }).map(function (o) {
-      return '<option value="'+esc(o.n)+'"'+(defaultFixedBy===o.n?' selected':'')+'>'+esc(o.label)+'</option>';
+      return '<option value="'+esc(o.id)+'"'+(defaultFixedBy===o.id?' selected':'')+'>'+esc(o.label)+'</option>';
     })).join('');
     // ครั้งแรก (แจ้งปัญหาใหม่) แสดงแค่ข้อมูลรับแจ้ง — ส่วน "การแก้ไข" (วิธีแก้/ผู้แก้ไข/วันที่แก้)
     // ยังไม่มีข้อมูลจริง เลยซ่อนไว้ก่อน มาแสดงตอนกดแก้ไขปัญหาที่บันทึกไว้แล้วเท่านั้น — และเน้นให้เด่น
@@ -2380,7 +2358,7 @@
       + '<div class="imt-issue-row3" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">'
       +   '<div class="f-group"><label class="f-label">กลุ่มปัญหา <span class="imt-req">*</span></label><select class="f-input" id="imt-is-cat">'+catOpts+'</select></div>'
       +   '<div class="f-group"><label class="f-label">สถานะ <span class="imt-req">*</span></label><select class="f-input" id="imt-is-status">'+stOpts+'</select></div>'
-      +   '<div class="f-group"><label class="f-label">ผู้รับปัญหา <span class="imt-req">*</span></label><select class="f-input" id="imt-is-received-by">'+imtReceiverOptions(pid, i.receivedBy)+'</select></div>'
+      +   '<div class="f-group"><label class="f-label">ผู้รับปัญหา <span class="imt-req">*</span></label><select class="f-input" id="imt-is-received-by">'+imtReceiverOptions(pid, i.receivedById)+'</select></div>'
       + '</div>'
       + resolutionSection;
     document.getElementById('m-imt-issue-title').textContent = id ? 'แก้ไขปัญหา' : 'แจ้งปัญหาใหม่';
@@ -2432,8 +2410,8 @@
       category: category,
       status: status,
       solution: solutionEl ? solutionEl.value.trim() : '',
-      receivedBy: receivedBy,
-      fixedBy: fixedByEl ? fixedByEl.value.trim() : '',
+      receivedById: receivedBy, // รหัสพนักงาน
+      fixedById: fixedByEl ? fixedByEl.value : '',
       fixedDate: fixedDateEl ? fixedDateEl.value : '',
     };
     window.closeM('m-imt-issue');
@@ -2646,9 +2624,8 @@
       var inp = document.getElementById('iip-lname'), drop = document.getElementById('iip-lname-drop'),
         lst = document.getElementById('iip-lname-list');
       if (!inp || !drop || !lst) return;
-      var items = (window.STAFF || []).filter(function (s) { return s.active !== false; })
-        .map(function (s) { return { name: s.name, sub: (s.role || '') + (s.role && s.dept ? ' · ' : '') + (s.dept || '') }; })
-        .sort(function (a, b) { return a.name.localeCompare(b.name, 'th'); });
+      var items = (window.STAFF || []).filter(function (s) { return s.active !== false; }).sort(window.sortStaffByDeptRank)
+        .map(function (s) { return { name: s.name, sub: (s.role || '') + (s.role && s.dept ? ' · ' : '') + (s.dept || '') }; });
       var q = '', fi = -1, flat = [], dt = null, isOpen = false;
       function bFlat(sq) {
         var f = [], lq = sq.toLowerCase();
@@ -2697,10 +2674,7 @@
     var sp = imtResolveSourceProject(proj);
     var siteOwnerName = sp ? (sp.siteOwner || '') : '';
     // ── "โรงพยาบาล/หน่วยงาน" ฝั่งผู้ลงนาม รพ. — ถ้าเคยพิมพ์/เลือกไว้แล้วใช้ค่านั้น ไม่งั้นใช้ รพ. ของโครงการ (ถ้ามี) หรือปล่อยว่างให้พิมพ์
-    // ค้นหาเอง ห้าม default จาก proj.hospitalName เพราะคอลัมน์นั้นดันเก็บชื่อ "เจ้าของไซต์" (คน) มาตั้งแต่
-    // ตอนสร้างโครงการ (ดู saveImtProject: hospital_name = sp.siteOwner) ไม่ใช่ชื่อโรงพยาบาลจริง — ถ้าเอามา
-    // ตั้ง default ตรงนี้ จะกลายเป็นโชว์ชื่อคน (บ่อยครั้งคือคน Login เอง) แทนชื่อ รพ. ──
-    // ยังไม่เคยกรอก → ตั้งต้นจากโรงพยาบาลของโครงการ (เมนูโครงการ › 🏥 โรงพยาบาล)
+    // ค้นหาเอง ── ยังไม่เคยกรอก → ตั้งต้นจากโรงพยาบาลของโครงการ (เมนูโครงการ › 🏥 โรงพยาบาล)
     var srcHosp = sp && sp.hospitalId ? (window.HOSPITALS || []).find(function (h) { return h.id === sp.hospitalId; }) : null;
     var defOrgText = o.signROrg != null ? o.signROrg : (srcHosp ? imtHospDisplayText(srcHosp) : '');
     var defOrgHosp = (window.HOSPITALS || []).find(function (h) { return imtHospDisplayText(h) === defOrgText; });
@@ -2749,8 +2723,8 @@
     if (!token) {
       token = imtToken40();
       var row = {
-        project_name: proj.name, hospital_name: proj.hospitalName, start_date: proj.start || null, end_date: proj.end || null,
-        project_manager: proj.pm, status: proj.status, progress_percent: proj.progress, template_id: proj.templateId,
+        project_name: proj.name, start_date: proj.start || null, end_date: proj.end || null,
+        status: proj.status, progress_percent: proj.progress, template_id: proj.templateId,
         source_project_id: proj.sourceProjectId, dashboard_token: token, created_at: proj.createdAt,
       };
       window.imtApplyLocal('IMPL_PROJECTS', pid, row);
@@ -3166,8 +3140,8 @@
       + '<div class="ppc-header-card">'
       +   '<div class="ppc-title">'+esc(proj.name)+'</div>'
       +   '<div class="ppc-subtitle">'
-      +     (proj.hospitalName ? '👤 PM: '+esc(proj.hospitalName)+' · ' : '')
-      +     (proj.pm ? '🔧 ผู้ติดตั้ง: '+esc(proj.pm)+' · ' : '')
+      +     (proj.siteOwner ? '👤 PM: '+esc(proj.siteOwner)+' · ' : '')
+      +     (proj.installer ? '🔧 ผู้ติดตั้ง: '+esc(proj.installer)+' · ' : '')
       +     'งานทั้งหมด '+tasks.length+' · พิมพ์เมื่อ '+fd(new Date().toISOString())
       +   '</div>'
       +   '<div class="ppc-progress-row"><div class="ppc-progress-num">'+overallPct+'%</div>'
@@ -3241,7 +3215,7 @@
       + '- หัวข้อ "สิ่งที่ยังไม่ได้ทำ" ให้ขึ้นต้นด้วย ⏳ สิ่งที่ยังไม่ได้ทำ\n'
       + '- แต่ละรายการย่อยขึ้นต้นด้วย ✅ (ถ้าทำแล้ว) หรือ ▪️ (ถ้ายังไม่ทำ) แทนเครื่องหมาย -\n'
       + 'เขียนสรุปเป็น 2 หัวข้อตามรูปแบบข้างต้น แบบอ่านง่าย ความยาวรวมไม่เกิน 200 คำ';
-    var user = 'โครงการ: ' + proj.name + (proj.hospitalName ? ' (' + proj.hospitalName + ')' : '') + '\n'
+    var user = 'โครงการ: ' + proj.name + (proj.siteOwner ? ' (PM: ' + proj.siteOwner + ')' : '') + '\n'
       + 'วันที่เลือกดู: ' + fd(selDate) + '\n'
       + 'สัปดาห์ปัจจุบัน: ' + fd(wk.startStr) + ' - ' + fd(wk.endStr) + '\n\n'
       + 'รายการที่ทำไปแล้วในวันที่ ' + fd(selDate) + ':\n' + doneLines + '\n\n'
@@ -3592,17 +3566,17 @@
     return 'medium';
   }
 
-  // ── "ผู้แก้ไข" ในไฟล์นำเข้าจะพิมพ์เป็นชื่อเล่นหรือชื่อ-นามสกุลเต็มก็ได้ (เพื่อความง่าย ไม่ต้องเปิด
-  // รายชื่อพนักงานไปหาว่าใครชื่อเล่นอะไร) — หาตัวตรงในระบบให้อัตโนมัติแล้วแปลงเป็นชื่อเล่นเก็บไว้เสมอ
-  // (ตาม convention เดิมของ fixedBy ทั้งระบบ) หาไม่เจอเลยก็เก็บข้อความเดิมไว้ตามที่พิมพ์มา ──
-  function imtResolveStaffToNick(v) {
+  // ── "ผู้รับปัญหา/ผู้แก้ไข" ในไฟล์นำเข้าพิมพ์เป็นชื่อเล่นหรือชื่อ-นามสกุลเต็มก็ได้ → แปลงเป็นรหัสพนักงาน
+  // หาไม่เจอ → เว้นว่าง และนับไว้แจ้งในสรุปผล (unmatched) ──
+  function imtImportStaffId(v, unmatched) {
     var s = String(v || '').trim();
     if (!s) return '';
-    var staff = (window.STAFF || []).find(function (x) { return (x.nickname && x.nickname === s) || (x.name && x.name === s); });
-    return staff ? (staff.nickname || staff.name) : s;
+    var staff = window.staffByRef(s) || window.staffByName(s);
+    if (!staff) unmatched.push(s);
+    return staff ? staff.id : '';
   }
 
-  function imtIssueImportParse(objs) {
+  function imtIssueImportParse(objs, unmatched) {
     return (objs || []).map(function (o, idx) {
       var rec = {};
       Object.keys(o).forEach(function (k) {
@@ -3628,8 +3602,8 @@
           severity: imtNormSeverity(rec.severity),
           status: status,
           solution: String(rec.solution || '').trim(),
-          receivedBy: String(rec.received_by || '').trim(),
-          fixedBy: imtResolveStaffToNick(rec.fixed_by),
+          receivedById: imtImportStaffId(rec.received_by, unmatched),
+          fixedById: imtImportStaffId(rec.fixed_by, unmatched),
           fixedDate: fixedIso ? fixedIso.slice(0, 10) : '',
           createdAt: createdIso,
         },
@@ -3649,7 +3623,7 @@
       ['category', 'ชื่อหมวดปัญหา (ไม่บังคับ)'],
       ['created_at', 'วันที่แจ้งปัญหา'],
       ['fixed_date', 'วันที่แก้ไขเสร็จ (ถ้าสถานะ = ดำเนินการแล้ว แต่ไม่ระบุ จะใช้วันที่แจ้งแทน)'],
-      ['fixed_by', 'ชื่อผู้แก้ไข — พิมพ์ชื่อเล่นหรือชื่อ-นามสกุลเต็มก็ได้ ระบบจะจับคู่กับรายชื่อพนักงานให้อัตโนมัติ'],
+      ['received_by / fixed_by', 'ผู้รับปัญหา / ผู้แก้ไข — พิมพ์ชื่อเล่นหรือชื่อ-นามสกุลเต็มก็ได้ ระบบจะจับคู่กับรายชื่อพนักงานให้อัตโนมัติ (ไม่พบ = เว้นว่าง)'],
       ['รูปแบบวันที่', 'YYYY-MM-DD หรือ DD/MM/YYYY (รองรับปี พ.ศ.)'],
       ['หมายเหตุ', '1 ไฟล์ = 1 โครงการ ต้องเลือกโครงการปลายทางก่อนนำเข้า'],
     ];
@@ -3660,20 +3634,17 @@
   };
 
   // ── เรียกตรงจาก modals.js execImport (หน้าแรกของ modal นำเข้ากลาง ไม่ต้องเปิดป๊อบอับซ้อนอีกชั้น) —
-  // ประมวลผลไฟล์ + (ถ้าติ๊กไว้) ลบปัญหาเดิมเฉพาะโครงการที่เลือก + เขียนแถวใหม่ ครบในคลิกเดียว แล้วสรุปผล
-  // เป็น toast (ไม่มีหน้าพรีวิวแยกต่างหากอีกต่อไป — เพื่อให้ใช้งานง่าย ไม่ต้องคลิกหลายรอบ) ──
+  // ประมวลผลไฟล์ + (ถ้าติ๊กไว้) ลบปัญหาเดิมเฉพาะโครงการที่เลือก + เขียนแถวใหม่ ครบในคลิกเดียว
+  // สำเร็จครบ → ปิดหน้าต่าง + toast · มีแถวผิด/ข้าม/ไม่พบชื่อ → ค้างหน้าต่างไว้ แสดงรายการแถวที่มีปัญหา ──
   window.imtRunIssueImportInline = async function (file, pid, clearFirst) {
-    var msgEl = document.getElementById('import-msg');
-    if (!(window.canAdd && window.canAdd(window.IMPL_MODULE))) {
-      if (msgEl) msgEl.innerHTML = '<span style="color:var(--coral)">⚠ ไม่มีสิทธิ์นำเข้าปัญหา Impl Tracker</span>';
-      return;
-    }
-    if (!pid) { if (msgEl) msgEl.innerHTML = '<span style="color:var(--coral)">⚠ กรุณาเลือกโครงการปลายทางก่อน</span>'; return; }
-    if (!file) { if (msgEl) msgEl.innerHTML = '<span style="color:var(--coral)">⚠ กรุณาเลือกไฟล์ก่อน</span>'; return; }
-    if (!(await window.LibLoader.need('xlsx'))) { if (msgEl) msgEl.innerHTML = ''; return; }
+    var alertBox = function (kind, title, items, foot) { window._importAlert && window._importAlert(kind, title, items, foot); };
+    if (!(window.canAdd && window.canAdd(window.IMPL_MODULE))) { alertBox('error', 'ไม่มีสิทธิ์นำเข้าปัญหา Impl Tracker'); return; }
+    if (!pid) { alertBox('error', 'กรุณาเลือกโครงการปลายทางก่อน'); return; }
+    if (!file) { alertBox('error', 'กรุณาเลือกไฟล์ก่อน'); return; }
+    window._importProgress && window._importProgress(0, 0, 'กำลังอ่านไฟล์');
+    if (!(await window.LibLoader.need('xlsx'))) { alertBox('error', 'โหลดตัวอ่านไฟล์ Excel ไม่สำเร็จ', [], 'ตรวจสอบอินเทอร์เน็ตแล้วลองใหม่'); return; }
     var proj = imtProject(pid);
 
-    if (msgEl) msgEl.innerHTML = '<span style="color:var(--txt3)">⏳ กำลังอ่านไฟล์...</span>';
     var objs;
     try {
       var buf = await file.arrayBuffer();
@@ -3681,32 +3652,43 @@
       var ws = wb.Sheets[wb.SheetNames[0]];
       objs = window.XLSX.utils.sheet_to_json(ws, { defval: '' });
     } catch (err) {
-      if (msgEl) msgEl.innerHTML = '<span style="color:var(--coral)">อ่านไฟล์ไม่ได้: ' + esc(String(err.message || err)) + '</span>';
+      alertBox('error', 'อ่านไฟล์ไม่ได้', [String(err.message || err)], 'ตรวจว่าเป็นไฟล์ .xlsx / .xls / .csv ที่ไม่เสียหาย และไม่ได้เปิดค้างใน Excel');
       return;
     }
-    var parsed = imtIssueImportParse(objs);
+    if (!objs.length) { alertBox('error', 'ไม่พบข้อมูลในไฟล์', [], 'ข้อมูลต้องอยู่ในชีตแรก แถวแรกเป็นหัวคอลัมน์'); return; }
+    // ── หัวคอลัมน์ไม่ตรงเลย (เช่น เลือกไฟล์ผิด/ข้อมูลไม่ได้อยู่ชีตแรก) → บอกหัวคอลัมน์ที่เจอให้เทียบ ──
+    var heads = Object.keys(objs[0]);
+    var probCol = IMT_ISSUE_IMPORT_COLS.find(function (c) { return c.key === 'problem'; });
+    if (!heads.some(function (h) { return probCol.syn.some(function (s) { return imtNorm(s) === imtNorm(h); }); })) {
+      alertBox('error', 'ไม่พบคอลัมน์ "problem" (รายละเอียดปัญหา) ในชีตแรกของไฟล์',
+        ['หัวคอลัมน์ที่พบ: ' + heads.slice(0, 15).join(', ')],
+        'ใช้หัวคอลัมน์ตามไฟล์ตัวอย่าง (เปิด "ยังไม่มีไฟล์? ดาวน์โหลดไฟล์ตัวอย่าง" ด้านล่าง)');
+      return;
+    }
+    var unmatched = [];
+    var parsed = imtIssueImportParse(objs, unmatched);
     var rows = parsed.filter(function (p) { return p.ok; });
     var badRows = parsed.filter(function (p) { return !p.ok; });
-    if (!parsed.length) { if (msgEl) msgEl.innerHTML = '<span style="color:var(--coral)">⚠ ไม่พบข้อมูลในไฟล์</span>'; return; }
-    if (!rows.length) { if (msgEl) msgEl.innerHTML = '<span style="color:var(--coral)">⚠ ไม่มีแถวที่นำเข้าได้เลย (ทุกแถวไม่มีรายละเอียดปัญหา)</span>'; return; }
+    if (!rows.length) { alertBox('error', 'ไม่มีแถวที่นำเข้าได้เลย — ทุกแถวไม่มีรายละเอียดปัญหา (คอลัมน์ problem ว่าง)'); return; }
 
-    if (msgEl) msgEl.innerHTML = '<span style="color:var(--txt3)">⏳ กำลังนำเข้า...</span>';
-
-    // ── หลอดความคืบหน้า (ตัวเดียวกับนำเข้า CSV ใน modals.js) — นับรวมแถวที่ลบก่อนนำเข้าด้วย ──
+    // ── หลอดความคืบหน้า — นับรวมแถวที่ลบก่อนนำเข้าด้วย ──
     var toDelete = clearFirst ? (window.IMPL_ISSUES || []).filter(function (x) { return x.projectId === pid; }) : [];
     var total = toDelete.length + rows.length, step = 0;
     var prog = function (label) { window._importProgress && window._importProgress(step, total, label); };
+    var errors = [];
+    var errText = function (e) { return String((e && (e.message || e.details || e.hint)) || e || 'ไม่ทราบสาเหตุ'); };
 
     // ── ลบปัญหาเดิม "เฉพาะของโครงการที่เลือกไว้" ก่อนนำเข้า (กรณีนำเข้าซ้ำ) — กรองด้วย projectId
     // ทุกครั้งกันพลาดลบข้ามโครงการอื่นโดยไม่ตั้งใจ ──
     if (toDelete.length) {
       prog('กำลังลบปัญหาเดิม');
+      var delFailed = {};
       for (var j = 0; j < toDelete.length; j++) {
         try { await window.deleteDoc(window.getDocRef('IMPL_ISSUES', toDelete[j].id)); }
-        catch (e) { console.warn('[impl issue import] delete old row failed', toDelete[j].id, e); }
+        catch (e) { delFailed[toDelete[j].id] = 1; errors.push('ลบปัญหาเดิมไม่สำเร็จ: ' + (toDelete[j].problem || toDelete[j].id).slice(0, 40) + ' — ' + errText(e)); }
         step++; prog('กำลังลบปัญหาเดิม');
       }
-      window.IMPL_ISSUES = (window.IMPL_ISSUES || []).filter(function (x) { return x.projectId !== pid; });
+      window.IMPL_ISSUES = (window.IMPL_ISSUES || []).filter(function (x) { return x.projectId !== pid || delFailed[x.id]; });
     }
 
     var done = 0, failed = 0;
@@ -3719,23 +3701,44 @@
           project_id: pid, task_id: '',
           department: d.department, reported_by: d.reportedBy, problem: d.problem,
           category: d.category, severity: d.severity, status: d.status, solution: d.solution,
-          received_by: window.staffIdByRef(d.receivedBy), fixed_by: window.staffIdByRef(d.fixedBy), fixed_date: d.fixedDate || null,
+          received_by: d.receivedById, fixed_by: d.fixedById, fixed_date: d.fixedDate || null,
           created_at: d.createdAt,
         };
-        window.imtApplyLocal('IMPL_ISSUES', id, row);
         await window.setDoc(window.getDocRef('IMPL_ISSUES', id), row);
+        window.imtApplyLocal('IMPL_ISSUES', id, row); // ใส่ลงหน้าจอเฉพาะแถวที่บันทึกสำเร็จ
         done++;
-      } catch (e) { failed++; console.warn('[impl issue import] row', rows[i].row, e); }
+      } catch (e) {
+        failed++;
+        errors.push('แถวที่ ' + rows[i].row + ' (' + d.problem.slice(0, 30) + ') — ' + errText(e));
+        console.warn('[impl issue import] row', rows[i].row, e);
+      }
       step++; prog('กำลังนำเข้า');
     }
 
     window._importProgress && window._importProgress(null);
-    window.closeM('m-import');
-    var summary = 'นำเข้าปัญหาเข้าโครงการ "' + (proj ? proj.name : pid) + '" สำเร็จ ' + done + ' รายการ'
-      + (badRows.length ? ' · ข้าม ' + badRows.length + ' รายการ (ไม่มีรายละเอียดปัญหา)' : '')
-      + (failed ? ' · ผิดพลาด ' + failed : '');
-    window.showAlert && window.showAlert(summary, failed ? 'warn' : 'success');
     if (window._von && window._von('view-impl-tracker')) window.renderImplTracker && window.renderImplTracker();
+    var projName = proj ? proj.name : pid;
+    var uniqUnmatched = Array.from(new Set(unmatched));
+
+    if (!errors.length && !badRows.length && !uniqUnmatched.length) {
+      window.closeM('m-import');
+      window.showAlert && window.showAlert('นำเข้าปัญหาเข้าโครงการ "' + projName + '" สำเร็จครบ ' + done + ' รายการ', 'success');
+      return;
+    }
+    // ── มีปัญหาบางส่วน → ค้างหน้าต่างไว้ให้อ่านรายละเอียด · ล้างไฟล์ที่เลือกกันกดนำเข้าซ้ำโดยไม่ตั้งใจ ──
+    var items = errors.slice();
+    badRows.forEach(function (b) { items.push('แถวที่ ' + b.row + ' — ข้าม: ' + b.errs.join(', ')); });
+    if (uniqUnmatched.length) items.push('ไม่พบชื่อพนักงาน (ช่องผู้รับเรื่อง/ผู้แก้ไขเว้นว่างไว้): ' + uniqUnmatched.join(', '));
+    var fileEl = document.getElementById('import-file');
+    if (fileEl) { fileEl.value = ''; window._importFileChanged && window._importFileChanged(); }
+    alertBox(failed || errors.length ? 'error' : 'warn',
+      (done ? 'นำเข้าสำเร็จ ' + done + ' จาก ' + parsed.length + ' แถว' : 'นำเข้าไม่สำเร็จ') + ' — โครงการ "' + projName + '"'
+        + (failed ? ' · ผิดพลาด ' + failed + ' แถว' : '') + (badRows.length ? ' · ข้าม ' + badRows.length + ' แถว' : ''),
+      items,
+      failed || badRows.length
+        ? 'แก้ไขแถวที่มีปัญหาในไฟล์ แล้วนำเข้าใหม่ — ถ้าจะนำเข้าทั้งไฟล์อีกรอบ ให้ติ๊ก "ลบปัญหาเดิมของโครงการนี้" ก่อน เพื่อไม่ให้ข้อมูลซ้ำ'
+        : 'ข้อมูลถูกนำเข้าครบแล้ว — แก้ชื่อพนักงานที่ไม่พบได้ในหน้าแก้ไขปัญหา');
+    window.showAlert && window.showAlert((done ? 'นำเข้าได้ ' + done + ' จาก ' + parsed.length + ' แถว' : 'นำเข้าไม่สำเร็จ') + ' — ดูรายการแถวที่มีปัญหาในหน้าต่างนำเข้า', failed && !done ? 'error' : 'warn');
   };
 
 })();

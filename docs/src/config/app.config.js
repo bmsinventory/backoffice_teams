@@ -88,7 +88,7 @@
 
   // ── Excel Import Schemas ──
   window.IMPORT_SCHEMAS = {
-    PROJECTS:    { idField:'project_id', prefix:'P',    headers:['project_name','group_id','site_owner','type_id','stage_id','budget','start_date','end_date','revisit_1','revisit_2','progress_pct','note','pm_staff_id'], example:['โครงการตัวอย่าง A','','คุณสมชาย','gen','init','100000','2026-01-01','2026-12-31','','','0','หมายเหตุ',''] },
+    PROJECTS:    { idField:'project_id', prefix:'P',    headers:['project_name','group_id','site_owner','type_id','stage_id','budget','start_date','end_date','revisit_1','revisit_2','progress_pct','note','pm_staff_id'], example:['โครงการตัวอย่าง A','','สมชาย ใจดี','gen','init','100000','2026-01-01','2026-12-31','','','0','หมายเหตุ',''] },
     STAFF:       { idField:'staff_id',   prefix:'S',    headers:['full_name','nickname','department','position','email','phone','start_date','birth_date','is_active','remark'], example:['สมชาย ใจดี','ชาย','IT','Developer','somchai@test.com','0812345678','2024-01-01','1990-01-01','TRUE',''] },
     USERS:       { idField:'user_id',    prefix:'U',    headers:['username','password','name','role','is_active'], example:['newuser','pass1234','ชื่อผู้ใช้','viewer','TRUE'] },
     ADVANCES:    { idField:'advance_id', prefix:'A',    headers:['project_id','purpose','amount_requested','amount_cleared','request_date','due_date','status','note','advance_no'], example:['P123','ค่าที่พัก','5000','0','2026-01-10','2026-01-20','draft','','ADV-001'] },

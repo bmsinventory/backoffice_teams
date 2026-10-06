@@ -370,31 +370,32 @@
       issues = isr.data || [];
     } catch (e) {}
 
-    // ── impl_issues.fixed_by เก็บ "ชื่อเล่น" จริงในระบบ (เช่น "แบม","ฟลุ๊ค") ไม่ใช่ชื่อ-นามสกุล —
-    // ดึง staff มาแปลงชื่อเล่น -> ชื่อ-นามสกุลเฉพาะตอนแสดงในตัวกรอง "ผู้แก้ไข" (ค่าที่ใช้กรองจริงยังอิง
-    // ชื่อเล่นเดิม ไม่กระทบข้อมูล) — หาไม่เจอ (พิมพ์ผิด/ลาออกแล้ว) ก็ใช้ชื่อเล่นเดิมแสดงแทน ──
-    var nicknameToFullName = {};
+    // ── รหัสพนักงาน → ชื่อ-นามสกุล (impl_issues.fixed_by และ PM/ผู้ประสานงานของโครงการต้นทาง เก็บเป็นรหัสพนักงาน) ──
+    var staffNames = {};
     try {
-      var str = await db.from('staff').select('staff_id,full_name,nickname');
-      (str.data || []).forEach(function (s) {
-        if (!s.full_name) return;
-        if (s.nickname) nicknameToFullName[s.nickname.trim()] = s.full_name;
-        if (s.staff_id) nicknameToFullName[s.staff_id] = s.full_name; // ข้อมูลใหม่เก็บเป็นรหัสพนักงาน
-      });
+      var str = await db.from('staff').select('id,staff_id,full_name');
+      (str.data || []).forEach(function (s) { if (s.full_name) staffNames[s.staff_id || s.id] = s.full_name; });
     } catch (e) {}
 
-    render(proj, issues, nicknameToFullName);
+    // ── PM / ผู้ประสานงาน อ่านจากโครงการต้นทาง (projects.site_owner / installer_name — รหัสพนักงาน) ──
+    var src = null;
+    if (proj.source_project_id) {
+      try {
+        var sr = await db.from('projects').select('site_owner,installer_name').eq('id', proj.source_project_id).limit(1);
+        src = (sr.data && sr.data[0]) || null;
+      } catch (e) {}
+    }
+    proj.pmName = src ? staffNames[src.site_owner] || '' : '';
+    proj.coordinatorName = src ? staffNames[src.installer_name] || '' : '';
+
+    render(proj, issues, staffNames);
   }
 
-  function render(proj, issues, nicknameToFullName) {
+  function render(proj, issues, staffNames) {
     var st = IMPL_STATUS[proj.status] || IMPL_STATUS.not_started;
 
     // ── ชื่อโครงการ (project_name) คือชื่อที่ระบุ รพ./สถานที่จริงเสมอ (เช่น "ติดตั้ง Inventory
-    // โรงพยาบาลทุ่งช้าง จ.น่าน") — ใช้เป็นหัวเรื่องเด่นแทน hospital_name เพราะข้อมูลจริงในระบบพบว่า
-    // hospital_name เก็บชื่อคน ไม่ใช่ชื่อ รพ. เลยสักโครงการ (ตรวจสอบกับฐานข้อมูลจริงแล้ว) ──
-    // ── ชื่อคอลัมน์ 2 ตัวนี้สลับความหมายกับของจริงในทีม (ยืนยันจากผู้ใช้งานจริง): คอลัมน์ project_manager
-    // ในฐานข้อมูลจริงๆ เก็บชื่อ "ผู้ประสานงาน" ส่วนคอลัมน์ hospital_name เก็บชื่อ "PM" ตัวจริง — จึงต้องสลับ
-    // label ตอนแสดงผล (ไม่แตะชื่อคอลัมน์ในฐานข้อมูล เพราะที่อื่นในระบบยังอ้างอิงชื่อเดิมอยู่) ──
+    // โรงพยาบาลทุ่งช้าง จ.น่าน") — ใช้เป็นหัวเรื่องเด่น · PM = เจ้าของไซต์ · ผู้ประสานงาน = ผู้ติดตั้ง ของโครงการต้นทาง ──
     var headerCard = '<div class="card full header-card" style="border-top-color:var(' + st.v + ')">'
       + '<div class="header-card-top">'
       + '<span class="badge" style="background:var(' + st.v + '-soft,rgba(137,135,129,.14));color:var(' + st.v + ')">' + esc(st.l) + '</span>'
@@ -402,9 +403,9 @@
       + '</div>'
       + '<div class="proj-name">' + esc(proj.project_name) + '</div>'
       + '<div class="proj-meta">'
-      + (proj.hospital_name ? '<span>PM <b>' + esc(proj.hospital_name) + '</b></span>' : '')
+      + (proj.pmName ? '<span>PM <b>' + esc(proj.pmName) + '</b></span>' : '')
       + ((proj.start_date || proj.end_date) ? '<span>' + fd(proj.start_date) + ' – ' + fd(proj.end_date) + '</span>' : '')
-      + (proj.project_manager ? '<span>ผู้ประสานงาน <b>' + esc(proj.project_manager) + '</b></span>' : '')
+      + (proj.coordinatorName ? '<span>ผู้ประสานงาน <b>' + esc(proj.coordinatorName) + '</b></span>' : '')
       + '</div></div>';
 
     // ── ตัวกรอง: ตัวเลือกสร้างจากข้อมูลปัญหาทั้งหมดของโครงการนี้ (ไม่ขึ้นกับตัวกรองที่เลือกอยู่)
@@ -416,10 +417,9 @@
     }
     function plainOptionsHtml(opts) { return '<option value="">ทั้งหมด</option>' + opts.map(function (o) { return '<option value="' + esc(o) + '">' + esc(o) + '</option>'; }).join(''); }
     var statusOptionsHtml = '<option value="">ทั้งหมด</option>' + Object.keys(ISSUE_STATUS).map(function (k) { return '<option value="' + k + '">' + esc(ISSUE_STATUS[k].l) + '</option>'; }).join('');
-    // ── impl_issues.fixed_by เก็บชื่อเล่น — option value ยังเป็นชื่อเล่นเดิม (ใช้กรองข้อมูลจริง)
-    // แต่ label ที่เห็นแปลงเป็นชื่อ-นามสกุลจาก staff แล้ว (หาไม่เจอก็โชว์ชื่อเล่นเดิม) ──
+    // ── impl_issues.fixed_by เก็บรหัสพนักงาน — option value = รหัส (ใช้กรอง) · label = ชื่อ-นามสกุล ──
     function fixedByOptionsHtml() {
-      var rows = distinctValues('fixed_by').map(function (n) { return { value: n, label: nicknameToFullName[n] || n }; });
+      var rows = distinctValues('fixed_by').map(function (n) { return { value: n, label: staffNames[n] || '(พนักงานที่ถูกลบ)' }; });
       rows.sort(function (a, b) { return a.label.localeCompare(b.label, 'th'); });
       return '<option value="">ทั้งหมด</option>' + rows.map(function (r) { return '<option value="' + esc(r.value) + '">' + esc(r.label) + '</option>'; }).join('');
     }

@@ -408,9 +408,7 @@ window.advInitLaborTable = function(pid, workStart, workEnd, isBorder, existingI
 window.advAddLaborRow = function(item, defaultWorkDays, isBorder) {
   var rowId = 'lab-' + Date.now() + Math.random().toString(36).slice(2,5);
   _laborRows.push(rowId);
-  var staffOpts = window.STAFF.filter(function(s){return s.active!==false;}).map(function(s){
-    return`<option value="${s.id}"${item&&item.staffId===s.id?' selected':''}>${esc(s.name)}${s.nickname?' ('+esc(s.nickname)+')':''}</option>`;
-  }).join('');
+  var staffOpts = window.staffOptionsGrouped(window.STAFF.filter(function(s){return s.active!==false;}), item&&item.staffId, true);
   var sid       = item ? item.staffId : '';
   var rate      = item&&item.dailyRate!=null ? item.dailyRate : (sid ? window.getStaffDailyRate(sid) : 0);
   var wStart    = item&&item.workStart ? item.workStart : '';

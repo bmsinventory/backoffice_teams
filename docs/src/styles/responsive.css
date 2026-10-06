@@ -183,9 +183,6 @@
   .adv-exp-row { grid-template-columns: 1fr 1fr auto !important; }
   .adv-exp-row > :nth-child(2) { grid-column: 1 / -1; order: 5; }
 
-  /* ── ปัญหาทุกโครงการ: ตารางกลายเป็นการ์ดแล้ว ช่องสถานะไม่ต้องกว้างขั้นต่ำ 180px (ล้นการ์ด) ── */
-  .aio-matrix-tbl td { min-width: 0 !important; }
-
   /* ── ตารางที่ไม่ได้อยู่ใน .dtable-inner (popup/พรีวิว) — เลื่อนแนวนอนได้ แทนการถูกตัดขอบ ── */
   table.m-scroll-tbl { display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 

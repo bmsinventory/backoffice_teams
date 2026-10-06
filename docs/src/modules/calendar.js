@@ -68,7 +68,7 @@ window.updateCalFilterOpts=function(){
   var fDept=(deptSel&&deptSel.value)||'';
   cf.innerHTML='<option value="">ทั้งหมด</option>';
   if(isStaff){
-    window.STAFF.filter(s=>s.active&&(!fDept||(s.dept||'')===fDept)).forEach(s=>{cf.insertAdjacentHTML('beforeend','<option value="'+s.id+'">'+esc(s.name)+'</option>');});
+    cf.insertAdjacentHTML('beforeend',window.staffOptionsGrouped(window.STAFF.filter(s=>s.active&&(!fDept||(s.dept||'')===fDept))));
   } else if(isProject){
     window.PROJECTS.forEach(p=>{cf.insertAdjacentHTML('beforeend','<option value="'+p.id+'">'+esc(p.name)+'</option>');});
   }
@@ -300,7 +300,7 @@ window.calDeptChange=function(){
   if(cf){
     cf.innerHTML='<option value="">ทั้งหมด</option>';
     if(window.calView==='staff'){
-      window.STAFF.filter(function(s){return s.active&&(!fDept||(s.dept||'')===fDept);}).forEach(function(s){cf.insertAdjacentHTML('beforeend','<option value="'+s.id+'">'+esc(s.name)+'</option>');});
+      cf.insertAdjacentHTML('beforeend',window.staffOptionsGrouped(window.STAFF.filter(function(s){return s.active&&(!fDept||(s.dept||'')===fDept);})));
     } else if(window.calView==='project'){
       window.PROJECTS.forEach(function(p){cf.insertAdjacentHTML('beforeend','<option value="'+p.id+'">'+esc(p.name)+'</option>');});
     }

@@ -7,8 +7,7 @@
  * "Product" (= ประเภทโครงการ window.PROJECTS.typeId/PTYPES ที่มีอยู่แล้ว ไม่ได้เพิ่ม field ใหม่ในฐานข้อมูล)
  * → กราฟแท่งแนวนอนแบบ stacked 2 กราฟ (สถานะต่อ Product / กลุ่มปัญหาต่อ Product Top 7)
  * → การ์ดวิเคราะห์ปัญหาตามประเภทโครงการ (อันดับกลุ่มปัญหา/แผนกที่พบมากสุดต่อประเภท)
- * → ตารางสรุปรายโครงการ (1 แถว = 1 โครงการ + ป้ายประเภท) (ใช้ IMPL_PROJECTS.name ตรง ๆ เป็นชื่อแถว — เคยลองอ่าน
- * window.PROJECTS.siteOwner/IMPL_PROJECTS.hospitalName มาแสดงเป็น "โรงพยาบาล" แต่ค่าที่ได้ไม่ถูกต้อง)
+ * → การ์ดสถานะรายโรงพยาบาล (1 การ์ด = 1 รพ. จาก projects.hospital_id ของโครงการต้นทาง, ในการ์ด 1 แถว = 1 โครงการ)
  * ทุกจุด (KPI/การ์ด/กราฟ/เมทริกซ์) คลิกดูรายละเอียดได้ — เปิด modal รายการปัญหา (#m-aio-detail ใน
  * index.html) ยกเว้นเซลล์เมทริกซ์ที่รู้โครงการแน่ชัดอยู่แล้ว จะพาไปแท็บ "ปัญหา" ของโครงการนั้นใน
  * Impl Tracker ตรง ๆ (แก้ไข/ปิดงานได้จริง ไม่ใช่แค่ดูอย่างเดียว)
@@ -20,6 +19,9 @@
   var _selectedYear = String(new Date().getFullYear()); // ปี ค.ศ. (string) เริ่มต้นที่ปีปัจจุบัน — คงค่าไว้ข้ามการ render ซ้ำ (realtime/goView)
   var _trendMode = 'week'; // 'week' | 'month' — โหมดแนวโน้มปัญหา คงค่าไว้ข้ามการ render ซ้ำเช่นกัน
   var _anaDim = 'category'; // 'category' | 'department' — มิติของการ์ด "วิเคราะห์ปัญหาตามประเภทโครงการ"
+  var _selectedHosp = ''; // key รพ. (aioHospKey) ที่กรองอยู่ — '' = ทุกโรงพยาบาล
+  var _hideDone = false; // การ์ดรายโรงพยาบาล: ซ่อน รพ. ที่แก้ครบแล้ว
+  var _cellMap = {};     // ตาราง รพ. × ระบบ: key ช่อง/แถว → { title, pids } จาก render ล่าสุด (ใช้ตอนคลิก)
   var TREND_PERIODS = 12;
 
   function aioIssueStatus(id) {
@@ -43,12 +45,15 @@
     var p = (window.IMPL_PROJECTS || []).find(function (x) { return x.id === pid; });
     return p ? p.name : 'ไม่ทราบโครงการ';
   }
-  // ── "ผู้แก้ไข" เก็บเป็นชื่อเล่นในฐานข้อมูล — แปลงเป็นชื่อ-นามสกุลจาก STAFF แบบเดียวกับ imtStaffNameByNick
-  // ใน impl-tracker.js (หาไม่เจอ เช่นลาออก/พิมพ์เอง ก็แสดงค่าที่เก็บไว้ตรง ๆ) ──
-  function aioStaffNameByNick(nick) {
-    if (!nick) return '';
-    var s = (window.STAFF || []).find(function (x) { return (x.nickname || x.name) === nick; });
-    return s ? s.name : nick;
+  // ── โรงพยาบาลของโครงการ — จาก รพ. ของโครงการต้นทาง (projects.hospital_id) · ยังไม่ได้ผูกก็เดาจากชื่อ
+  // โครงการ (เหมือน expense-form) · หาไม่เจอ → null (การ์ดใช้ชื่อโครงการแทน) ──
+  function aioProjectHospital(pid) {
+    var p = (window.IMPL_PROJECTS || []).find(function (x) { return x.id === pid; });
+    if (!p) return null;
+    var hosps = window.HOSPITALS || [];
+    var src = aioResolveSourceProject(p);
+    return (src && src.hospitalId && hosps.find(function (h) { return h.id === src.hospitalId; }))
+      || (window.HospitalMatch && window.HospitalMatch.guess(p.name, hosps)) || null;
   }
   // ── escape ข้อความอิสระ (เช่นชื่อกลุ่มปัญหา) ก่อนฝังใน onclick="...('...')" กัน apostrophe ตัดสตริงกลางคัน ──
   function aioJsStr(s) { return String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
@@ -170,7 +175,7 @@
     return d;
   }
   function aioTrendChartSvg(data, seriesKeys, seriesMeta) {
-    var W = 1040, H = 260, padL = 34, padR = 14, padT = 16, padB = 30;
+    var W = 1040, H = 190, padL = 34, padR = 14, padT = 16, padB = 30;
     var innerW = W - padL - padR, innerH = H - padT - padB;
     var n = data.length;
     var maxVal = 0;
@@ -228,17 +233,38 @@
     setTimeout(function () { if (window.imtGoTab) window.imtGoTab('issues'); }, 60);
   };
 
-  // ── ตัวกรองปี พ.ศ. ── //
+  // ── ตัวกรองปี พ.ศ. + โรงพยาบาล — มีผลทั้งหน้า (KPI/กราฟ/การ์ด/สรุป AI/popup) ── //
   window.aioSetYear = function (v) {
     _selectedYear = v || '';
     window.renderAllIssuesOverview();
   };
-  function aioYearFilteredIssues() {
+  window.aioSetHosp = function (v) {
+    _selectedHosp = v || '';
+    window.renderAllIssuesOverview();
+  };
+  // key รพ. ของโครงการ = hospitals.id · หา รพ. ไม่เจอ → 'p:' + id โครงการ (การ์ด/ตัวกรองใช้ชื่อโครงการแทน)
+  function aioHospKey(pid) { var h = aioProjectHospital(pid); return h ? h.id : 'p:' + pid; }
+  function aioHospName(hk) {
+    if (hk.indexOf('p:') === 0) return aioProjectLabel(hk.slice(2));
+    var h = (window.HOSPITALS || []).find(function (x) { return x.id === hk; });
+    return h ? h.name : hk;
+  }
+  function aioYearOnlyIssues() {
     return (window.IMPL_ISSUES || []).filter(function (i) {
       if (!_selectedYear) return true;
       return (i.createdAt || '').slice(0, 4) === _selectedYear;
     });
   }
+  function aioYearFilteredIssues() {
+    var list = aioYearOnlyIssues();
+    if (!_selectedHosp) return list;
+    var memo = {};
+    return list.filter(function (i) {
+      if (!(i.projectId in memo)) memo[i.projectId] = aioHospKey(i.projectId);
+      return memo[i.projectId] === _selectedHosp;
+    });
+  }
+  function aioFilterKey() { return _selectedYear + '|' + _selectedHosp; }
 
   // ── Drill-down: เปิด modal รายการปัญหาตามเงื่อนไขที่คลิก ── //
   // ── คลิกชื่อโครงการในตาราง "สถานะรายโครงการ" — เปิด popup รายการปัญหาของโครงการนั้นในหน้านี้เลย
@@ -247,6 +273,15 @@
     var list = aioYearFilteredIssues().filter(function (i) { return i.projectId === pid; });
     window.aioShowIssueDetail(list, aioProjectLabel(pid), pid);
   };
+  // ── คลิกในตาราง รพ. × ระบบ — ปัญหาของกลุ่มโครงการนั้น (ช่อง = รพ.+ระบบ, ชื่อ/รวม = ทั้ง รพ.) ·
+  // pendingOnly = เฉพาะข้อที่ยังไม่เสร็จ (คลิกช่องที่ค้าง / ยอดรวมที่ค้าง) ──
+  window.aioShowGroupIssues = function (key, pendingOnly) {
+    var g = _cellMap[key];
+    if (!g) return;
+    var list = aioYearFilteredIssues().filter(function (i) { return g.pids.indexOf(i.projectId) > -1 && (!pendingOnly || i.status !== 'closed'); });
+    window.aioShowIssueDetail(list, g.title + (pendingOnly ? ' · ยังค้าง' : ''), g.pids.length === 1 ? g.pids[0] : undefined);
+  };
+  window.aioSetHideDone = function (v) { _hideDone = !!v; window.renderAllIssuesOverview(); };
   // ── คลิกแถวปัญหาใน popup — กาง/พับรายละเอียด (แผนก/ผู้แจ้ง/วิธีแก้/ผู้แก้) ในตัว ไม่เปลี่ยนหน้า ──
   window.aioToggleIssueRow = function (tr) {
     var nx = tr && tr.nextElementSibling;
@@ -286,7 +321,7 @@
           + '</tr>'
           + '<tr class="aio-detail-more" style="display:none;"><td></td><td colspan="4"><div class="aio-detail-kv">'
           +   kv('แผนก', i.department) + kv('ผู้แจ้ง', i.reportedBy) + kv('ผู้รับแจ้ง', i.receivedBy)
-          +   kv('ผู้แก้ไข', aioStaffNameByNick(i.fixedBy)) + kv('วันที่แก้ไข', i.fixedDate ? window.fd(i.fixedDate) : '')
+          +   kv('ผู้แก้ไข', window.staffNameByRef(i.fixedById)) + kv('วันที่แก้ไข', i.fixedDate ? window.fd(i.fixedDate) : '')
           +   '<div class="full"><span>วิธีแก้ไข</span>' + (i.solution ? window.esc(i.solution) : '<i>-</i>') + '</div>'
           + '</div></td></tr>';
       }).join('');
@@ -329,8 +364,8 @@
   };
 
   // ── 🤖 สรุปบทวิเคราะห์ด้วย AI — ส่ง "ตัวเลขสรุป + ตัวอย่างปัญหา" (ไม่ส่งข้อมูลดิบทั้งหมด) ให้ AI เขียน
-  // บทสรุปสำหรับผู้บริหาร · เก็บผลไว้ต่อปีที่เลือก (render ซ้ำจาก realtime ไม่หาย) กดใหม่เพื่อสรุปใหม่ ──
-  var _aiSummary = null; // { year, text, loading, error }
+  // บทสรุปสำหรับผู้บริหาร · เก็บผลไว้ต่อปี/รพ. ที่เลือก (render ซ้ำจาก realtime ไม่หาย) กดใหม่เพื่อสรุปใหม่ ──
+  var _aiSummary = null; // { key (aioFilterKey), text, loading, error }
   function aioAiStatsText() {
     var issues = aioYearFilteredIssues();
     var st = function (arr) {
@@ -340,6 +375,7 @@
     var byType = {};
     issues.forEach(function (i) { var k = aioProjectTypeId(i.projectId) || '__none__'; (byType[k] = byType[k] || []).push(i); });
     var lines = ['ปี: ' + (_selectedYear ? 'พ.ศ. ' + (Number(_selectedYear) + 543) : 'ทุกปี'), 'ภาพรวม: ' + st(issues)];
+    if (_selectedHosp) lines.splice(1, 0, 'โรงพยาบาล: ' + aioHospName(_selectedHosp));
     Object.keys(byType).sort(function (a, b) { return byType[b].length - byType[a].length; }).forEach(function (k) {
       var arr = byType[k];
       var projN = {}; arr.forEach(function (i) { projN[i.projectId] = (projN[i.projectId] || 0) + 1; });
@@ -362,9 +398,9 @@
   }
   window.aioRunAiSummary = async function () {
     if (_aiSummary && _aiSummary.loading) return;
-    if (!aioYearFilteredIssues().length) { window.showAlert && window.showAlert('ยังไม่มีข้อมูลปัญหาในปีที่เลือก', 'warn'); return; }
-    var year = _selectedYear;
-    _aiSummary = { year: year, loading: true };
+    if (!aioYearFilteredIssues().length) { window.showAlert && window.showAlert('ยังไม่มีข้อมูลปัญหาตามตัวกรองที่เลือก', 'warn'); return; }
+    var key = aioFilterKey();
+    _aiSummary = { key: key, loading: true };
     window.renderAllIssuesOverview();
     try {
       var text = await window.aiChat(
@@ -372,9 +408,9 @@
         + 'ใช้หัวข้อ "## ภาพรวม", "## ประเด็นสำคัญรายประเภทโครงการ", "## ข้อเสนอแนะ" · แต่ละหัวข้อเป็น bullet สั้น กระชับ อ้างตัวเลขจริง '
         + '· ข้อเสนอแนะ 3–5 ข้อ ต้องเจาะจง นำไปทำได้จริง (เช่น ปรับขั้นตอนติดตั้ง/อบรม/template) · ห้ามแต่งตัวเลขที่ไม่มีในข้อมูล',
         aioAiStatsText(), { maxTokens: 1200, temperature: 0.3 });
-      _aiSummary = { year: year, text: text };
+      _aiSummary = { key: key, text: text };
     } catch (e) {
-      _aiSummary = { year: year, error: String(e.message || e) };
+      _aiSummary = { key: key, error: String(e.message || e) };
     }
     window.renderAllIssuesOverview();
   };
@@ -383,11 +419,11 @@
     navigator.clipboard.writeText(_aiSummary.text).then(function () { window.showAlert && window.showAlert('คัดลอกบทสรุปแล้ว', 'success'); });
   };
   function aioAiSummaryHtml() {
-    if (!_aiSummary || _aiSummary.year !== _selectedYear) return '';
+    if (!_aiSummary || _aiSummary.key !== aioFilterKey()) return '';
     var body = _aiSummary.loading ? '<div style="color:var(--txt3);font-size:12.5px;">⏳ AI กำลังวิเคราะห์ข้อมูล… (อาจใช้เวลาสักครู่)</div>'
       : _aiSummary.error ? '<div style="color:var(--coral);font-size:12.5px;">' + window.esc(_aiSummary.error) + '</div>'
       : '<div class="ai-text">' + window.aiTextToHtml(_aiSummary.text) + '</div>';
-    return '<div style="padding:0 24px 24px;"><div class="ai-card">'
+    return '<div class="aio-sec"><div class="ai-card">'
       + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">'
       +   '<div class="sec-label" style="margin:0;">🤖 บทสรุปจาก AI</div><div style="flex:1"></div>'
       +   (_aiSummary.text ? '<button class="btn btn-ghost btn-sm" onclick="window.aioCopyAiSummary()">📋 คัดลอก</button>' : '')
@@ -409,6 +445,19 @@
       return;
     }
 
+    // ── ตัวเลือกโรงพยาบาล — เฉพาะ รพ. ที่มีปัญหาในปีที่เลือก (เรียงตามชื่อ + จำนวนปัญหา) · รพ. ที่เลือกไว้
+    // ไม่มีข้อมูลในปีใหม่ → กลับเป็นทุกโรงพยาบาล ──
+    var hospCnt = {}, pidHosp = {};
+    aioYearOnlyIssues().forEach(function (i) {
+      if (!(i.projectId in pidHosp)) pidHosp[i.projectId] = aioHospKey(i.projectId);
+      hospCnt[pidHosp[i.projectId]] = (hospCnt[pidHosp[i.projectId]] || 0) + 1;
+    });
+    if (_selectedHosp && !hospCnt[_selectedHosp]) _selectedHosp = '';
+    var hospOptionsHtml = '<option value="">ทุกโรงพยาบาล</option>' + Object.keys(hospCnt)
+      .map(function (k) { return { k: k, name: aioHospName(k) }; })
+      .sort(function (a, b) { return a.name.localeCompare(b.name, 'th'); })
+      .map(function (o) { return '<option value="' + window.esc(o.k) + '"' + (_selectedHosp === o.k ? ' selected' : '') + '>' + window.esc(o.name) + ' (' + hospCnt[o.k] + ')</option>'; }).join('');
+
     var allIssues = aioYearFilteredIssues();
     var allProjects = window.IMPL_PROJECTS || [];
     var stOpen = aioIssueStatus('open'), stProg = aioIssueStatus('in_progress'), stClosed = aioIssueStatus('closed');
@@ -424,6 +473,8 @@
     var yearBar = '<div class="toolbar">'
       + '<span style="font-size:12.5px;font-weight:700;color:var(--txt2);">ปี</span>'
       + '<select class="t-sel" id="aio-f-year" onchange="window.aioSetYear(this.value)">' + yearOptionsHtml + '</select>'
+      + '<span style="font-size:12.5px;font-weight:700;color:var(--txt2);margin-left:8px;">โรงพยาบาล</span>'
+      + '<select class="t-sel" id="aio-f-hosp" onchange="window.aioSetHosp(this.value)">' + hospOptionsHtml + '</select>'
       + '<div style="flex:1"></div>'
       + '<button class="btn btn-pri btn-sm" onclick="window.aioRunAiSummary()"' + (_aiSummary && _aiSummary.loading ? ' disabled' : '') + '>🤖 สรุปด้วย AI</button>'
       + '</div>';
@@ -446,7 +497,9 @@
     var progN = allIssues.filter(function (i) { return i.status === 'in_progress'; }).length;
     var closedN = allIssues.filter(function (i) { return i.status === 'closed'; }).length;
     var rate = total ? Math.round(closedN / total * 100) : 0;
-    var projectCount = allProjects.length;
+    var projectCount = _selectedHosp
+      ? allProjects.filter(function (p) { return aioHospKey(p.id) === _selectedHosp; }).length
+      : allProjects.length;
 
     var kpiRow = '<div class="stat-row aio-stat-row" id="aio-stat-row">'
       + aioStatCard('var(--violet)', 'ปัญหาทั้งหมด', total, 'จาก ' + projectCount + ' โครงการ', null, "window.aioDrillStatus('')")
@@ -512,66 +565,81 @@
       segClick: function (pkey, cat) { return "window.aioDrillProductCategory('" + pkey + "','" + aioJsStr(cat) + "')"; },
     }) : '<div class="aio-empty">ยังไม่มีข้อมูลกลุ่มปัญหา</div>';
 
-    // ── ตารางสรุปรายโครงการ — 1 โครงการ = 1 ประเภทอยู่แล้ว จึงไม่แยกคอลัมน์ตาม Product (เดิมเป็นเมทริกซ์
-    // โครงการ × Product ที่มีช่องว่าง "—" เต็มตาราง อ่านยาก) แสดงประเภทเป็นป้ายสีในแถวแทน + แถบสถานะ +
-    // กลุ่มปัญหาที่พบบ่อยสุดของโครงการนั้น — คลิกแถวไปแท็บ "ปัญหา" ของโครงการใน Impl Tracker ──
-    var projRowMap = {};
-    allIssues.forEach(function (i) {
-      if (!projRowMap[i.projectId]) projRowMap[i.projectId] = { pid: i.projectId, label: aioProjectLabel(i.projectId), pkey: aioProjectTypeId(i.projectId) || '__none__', issues: [] };
-      projRowMap[i.projectId].issues.push(i);
-    });
-    // ── จัดกลุ่มแถวตามประเภทโครงการ (ลำดับกลุ่มตาม products = ประเภทที่มีปัญหามากสุดก่อน) — หัวกลุ่มแสดง
-    // ยอดรวมของประเภทในคอลัมน์เดียวกับแถวโครงการ (จำนวน/แถบสถานะ/% แก้ไข/พบบ่อยสุด) · ในกลุ่มเรียงโครงการ
-    // ที่มีปัญหามากสุดก่อน ลำดับนับใหม่ในแต่ละกลุ่ม ──
-    function aioSumRow(issues) {
-      var n = issues.length;
-      var o = issues.filter(function (i) { return i.status === 'open'; }).length;
-      var pr = issues.filter(function (i) { return i.status === 'in_progress'; }).length;
-      var c = issues.filter(function (i) { return i.status === 'closed'; }).length;
-      var catN = {};
-      issues.forEach(function (i) { var k = i.category || 'ไม่ระบุ'; catN[k] = (catN[k] || 0) + 1; });
-      var topCat = Object.keys(catN).sort(function (x, y) { return catN[y] - catN[x]; })[0];
-      var seg = function (v, color, lbl) { return v ? '<div style="width:' + (v / n * 100) + '%;background:' + color + ';" title="' + window.esc(lbl) + ': ' + v + '"></div>' : ''; };
-      var pct = n ? Math.round(c / n * 100) : 0;
-      return '<td style="text-align:center;font-weight:800;font-size:14px;">' + n + '</td>'
-        + '<td style="min-width:180px;"><div class="aio-mini-stack">' + seg(o, stOpen.color, stOpen.label) + seg(pr, stProg.color, stProg.label) + seg(c, stClosed.color, stClosed.label) + '</div>'
-        +   '<div class="aio-mini-stack-lbl"><span style="color:' + stOpen.color + ';">รอ ' + o + '</span> · <span style="color:' + stProg.color + ';">แก้ไข ' + pr + '</span> · <span style="color:' + stClosed.color + ';">เสร็จ ' + c + '</span></div></td>'
-        + '<td style="text-align:center;font-weight:700;color:' + (pct === 100 ? stClosed.color : 'var(--txt)') + ';">' + pct + '%</td>'
-        + '<td style="font-size:12px;">' + (topCat ? window.esc(topCat) + ' <span style="color:var(--txt3);">(' + catN[topCat] + ')</span>' : '-') + '</td>';
-    }
-    var allProjRows = Object.keys(projRowMap).map(function (k) { return projRowMap[k]; });
-    var projTableBody = allProjRows.length ? products.map(function (p) {
-      var rows = allProjRows.filter(function (r) { return r.pkey === p.key; })
-        .sort(function (a, b) { return b.issues.length - a.issues.length || a.label.localeCompare(b.label, 'th'); });
-      if (!rows.length) return '';
-      // ── หัวกลุ่ม = แถบสีเต็มแถว + สรุปเป็นข้อความ (ไม่ใช้แถบกราฟ/คอลัมน์ซ้ำแบบแถวโครงการ ให้แยกออกชัด) ──
-      var gN = p.issues.length;
-      var gOpen = p.issues.filter(function (i) { return i.status !== 'closed'; }).length;
-      var gPct = gN ? Math.round((gN - gOpen) / gN * 100) : 0;
-      var gCat = {};
-      p.issues.forEach(function (i) { var k = i.category || 'ไม่ระบุ'; gCat[k] = (gCat[k] || 0) + 1; });
-      var gTop = Object.keys(gCat).sort(function (x, y) { return gCat[y] - gCat[x]; })[0];
-      var headHtml = '<tr class="aio-proj-grouphead" onclick="window.aioDrillProduct(\'' + p.key + '\')" style="--gc:' + p.color + ';" title="คลิกดูปัญหาทั้งหมดของประเภทนี้">'
-        + '<td colspan="6"><div class="aio-gh">'
-        +   '<span class="aio-gh-name"><i></i>' + window.esc(p.label) + '</span>'
-        +   '<span class="aio-gh-chip">' + rows.length + ' โครงการ</span>'
-        +   '<span class="aio-gh-chip">' + gN + ' ปัญหา</span>'
-        +   '<span class="aio-gh-chip" style="color:' + (gOpen ? stOpen.color : stClosed.color) + ';">' + (gOpen ? 'ค้าง ' + gOpen : '✓ แก้ครบ') + ' · ' + gPct + '%</span>'
-        +   (gTop ? '<span class="aio-gh-chip">🔥 พบบ่อยสุด: ' + window.esc(gTop) + ' (' + gCat[gTop] + ')</span>' : '')
-        + '</div></td>'
-        + '</tr>';
-      return headHtml + rows.map(function (row, idx) {
-        return '<tr onclick="window.aioShowProjectIssues(\'' + row.pid + '\')" style="cursor:pointer;">'
-          + '<td style="text-align:center;color:var(--txt3);">' + (idx + 1) + '</td>'
-          + '<td class="aio-matrix-hname" style="white-space:normal;">' + window.esc(row.label) + '</td>'
-          + aioSumRow(row.issues)
-          + '</tr>';
-      }).join('');
-    }).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--txt3);padding:30px;">ยังไม่มีข้อมูลปัญหา</td></tr>';
+    // ── ตารางสถานะ โรงพยาบาล × Product — 1 แถว = 1 รพ. (เรียงตามชื่อ, มีเลขลำดับหน้าชื่อ) · คอลัมน์ = ประเภทโครงการ เรียงเหมือนกัน
+    // ทุกแถว · ช่องเป็นการ์ดเล็ก: จำนวนข้อ + รอ/แก้ไข/เสร็จ · สีการ์ด เขียว = แก้ครบ, แดง = ยังค้าง, ส้ม = ยังไม่มีปัญหา ·
+    // รพ. ที่ไม่มีระบบนั้น = "—" · รวมโครงการที่ยังไม่มีปัญหาด้วย (0 ข้อ) ถ้าประเภทนั้นมีคอลัมน์อยู่แล้ว ·
+    // คลิกการ์ดที่ยังค้าง = ดูเฉพาะข้อที่ค้าง · คลิกชื่อ รพ. = ปัญหาทั้งหมดของ รพ. ──
+    var isPending = function (i) { return i.status !== 'closed'; };
+    var cntSt = function (issues, st) { return issues.filter(function (i) { return i.status === st; }).length; };
+    var productByKey = {};
+    products.forEach(function (p) { productByKey[p.key] = p; });
 
-    var matrixHtml = '<div class="dtable-inner" style="overflow-x:auto;">'
-      + '<table class="aio-matrix-tbl"><thead><tr><th style="width:60px;">ลำดับ</th><th>โครงการ</th><th style="text-align:center;">ปัญหา</th><th>สถานะ</th><th style="text-align:center;">แก้ไขแล้ว</th><th>พบบ่อยสุด</th></tr></thead>'
-      + '<tbody>' + projTableBody + '</tbody></table>'
+    var issuesByPid = {};
+    allIssues.forEach(function (i) { (issuesByPid[i.projectId] = issuesByPid[i.projectId] || []).push(i); });
+    var matrixPids = Object.keys(issuesByPid);
+    allProjects.forEach(function (p) {
+      if (issuesByPid[p.id] || !productByKey[aioProjectTypeId(p.id) || '__none__']) return;
+      if (_selectedHosp && aioHospKey(p.id) !== _selectedHosp) return;
+      matrixPids.push(p.id);
+    });
+
+    var hospMap = {};
+    matrixPids.forEach(function (pid) {
+      var h = aioProjectHospital(pid);
+      var hk = h ? h.id : 'p:' + pid;
+      var pkey = aioProjectTypeId(pid) || '__none__';
+      var prov = h ? String(h.province || '').replace(/^(จ\.|จังหวัด)\s*/, '') : '';
+      if (!hospMap[hk]) hospMap[hk] = { key: hk, name: h ? h.name + (prov ? ' จ.' + prov : '') : aioProjectLabel(pid), cells: {}, pids: [], issues: [] };
+      var g = hospMap[hk];
+      var cell = g.cells[pkey] = g.cells[pkey] || { pids: [], issues: [], names: [] };
+      var list = issuesByPid[pid] || [];
+      cell.pids.push(pid); cell.names.push(aioProjectLabel(pid)); cell.issues = cell.issues.concat(list);
+      g.pids.push(pid); g.issues = g.issues.concat(list);
+    });
+    var hosps = Object.keys(hospMap).map(function (k) {
+      var g = hospMap[k];
+      g.pending = g.issues.filter(isPending).length;
+      return g;
+    }).sort(function (a, b) { return a.name.localeCompare(b.name, 'th'); });
+
+    // กลุ่มโครงการที่คลิกได้ (ช่อง/แถว) — key → { title, pids }
+    _cellMap = {};
+    var reg = function (key, title, pids) { _cellMap[key] = { title: title, pids: pids }; return aioJsStr(key); };
+    var pendingHospN = hosps.filter(function (g) { return g.pending; }).length;
+    var shownHosps = _hideDone ? hosps.filter(function (g) { return g.pending; }) : hosps;
+
+    var bodyHtml = shownHosps.map(function (g, gi) {
+      var cellsHtml = products.map(function (p) {
+        var cell = g.cells[p.key];
+        if (!cell) return '<td class="aio-mx-none">—</td>';
+        var n = cell.issues.length;
+        var o = cntSt(cell.issues, 'open'), pr = cntSt(cell.issues, 'in_progress'), c = n - o - pr;
+        var cls = !n ? 'zero' : (o + pr) ? 'pend' : 'done';
+        var k = reg(g.key + '|' + p.key, g.name + ' · ' + p.label, cell.pids);
+        return '<td><div class="aio-mx-card ' + cls + '" title="' + window.esc(cell.names.join('\n')) + '"'
+          + (n ? ' onclick="window.aioShowGroupIssues(\'' + k + '\',' + (o + pr ? 'true' : 'false') + ')"' : '') + '>'
+          + '<div class="aio-mx-n"><i></i><b>' + n + '</b> ข้อ</div>'
+          + '<div class="aio-mx-st">'
+          +   '<span style="color:' + stOpen.color + ';">รอ <b>' + o + '</b></span>'
+          +   '<span style="color:' + stProg.color + ';">แก้ไข <b>' + pr + '</b></span>'
+          +   '<span style="color:' + stClosed.color + ';">เสร็จ <b>' + c + '</b></span>'
+          + '</div></div></td>';
+      }).join('');
+      var hk = reg(g.key, g.name, g.pids);
+      return '<tr><td class="aio-mx-hosp" onclick="window.aioShowGroupIssues(\'' + hk + '\',false)" title="คลิกดูปัญหาทั้งหมดของ รพ. นี้"><span class="aio-mx-no">' + (gi + 1) + '</span>' + window.esc(g.name) + '</td>' + cellsHtml + '</tr>';
+    }).join('');
+
+    var headHtml = '<tr><th class="aio-mx-hosp"><span class="aio-mx-no">#</span>โรงพยาบาล</th>' + products.map(function (p) {
+      return '<th><span class="aio-mx-th" style="--gc:' + p.color + ';"><i></i>' + window.esc(p.label) + '</span></th>';
+    }).join('') + '</tr>';
+
+    var matrixHtml = !hosps.length ? '<div class="aio-empty">ยังไม่มีข้อมูลปัญหา</div>'
+      : !shownHosps.length ? '<div class="aio-empty">✓ ทุกโรงพยาบาลแก้ไขปัญหาครบแล้ว</div>'
+      : '<div class="dtable-inner aio-mx-wrap"><table class="aio-mx"><thead>' + headHtml + '</thead><tbody>' + bodyHtml + '</tbody></table></div>';
+    var hospToolbar = '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px;">'
+      + '<div class="sec-label" style="margin:0;">🏥 สถานะรายโรงพยาบาล × Product <span style="font-weight:600;color:var(--txt3);">— ' + hosps.length + ' รพ. · ค้าง ' + pendingHospN + ' รพ.</span></div>'
+      + '<label style="display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:var(--txt2);cursor:pointer;">'
+      +   '<input type="checkbox"' + (_hideDone ? ' checked' : '') + ' onchange="window.aioSetHideDone(this.checked)"> ซ่อนที่แก้ครบแล้ว</label>'
       + '</div>';
 
     // ── วิเคราะห์ปัญหาตามประเภทโครงการ — 1 การ์ดต่อประเภท: อันดับกลุ่มปัญหา (หรือแผนกที่แจ้ง) จากมากไปน้อย
@@ -614,7 +682,7 @@
       var on = (_anaDim === 'department') === (dim === 'department');
       return '<button class="btn btn-sm" onclick="window.aioSetAnaDim(\'' + dim + '\')" style="' + (on ? 'background:var(--violet);color:#fff;' : 'background:var(--surface2);color:var(--txt2);') + '">' + lbl + '</button>';
     };
-    var anaHtml = products.length ? '<div style="padding:0 24px 24px;">'
+    var anaHtml = products.length ? '<div class="aio-sec">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px;">'
       +   '<div class="sec-label">🔍 วิเคราะห์ปัญหาตามประเภทโครงการ — ' + dimLabel + 'ที่พบมากที่สุด</div>'
       +   '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">'
@@ -638,32 +706,29 @@
     var trendLegendHtml = ['open', 'in_progress', 'closed', 'total'].map(function (k) {
       return '<span class="aio-legend-item"><i style="background:' + trendMeta[k].color + '"></i>' + window.esc(trendMeta[k].label) + '</span>';
     }).join('');
-    var trendHtml = '<div class="dtable-inner" style="padding:18px;margin:0 24px 24px;">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;">'
+    var trendHtml = '<div class="aio-sec"><div class="dtable-inner aio-box">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:8px;">'
       +   '<div class="sec-label">📈 แนวโน้มปัญหา — ย้อนหลัง ' + TREND_PERIODS + ' ' + periodLabel + '</div>'
       +   '<div style="display:flex;gap:6px;">'
       +     '<button class="btn btn-sm" onclick="window.aioSetTrendMode(\'week\')" style="' + (_trendMode === 'week' ? 'background:var(--violet);color:#fff;' : 'background:var(--surface2);color:var(--txt2);') + '">รายสัปดาห์</button>'
       +     '<button class="btn btn-sm" onclick="window.aioSetTrendMode(\'month\')" style="' + (_trendMode === 'month' ? 'background:var(--violet);color:#fff;' : 'background:var(--surface2);color:var(--txt2);') + '">รายเดือน</button>'
       +   '</div>'
       + '</div>'
-      + '<div class="aio-legend" style="margin-bottom:12px;">' + trendLegendHtml + '</div>'
+      + '<div class="aio-legend" style="margin-bottom:6px;">' + trendLegendHtml + '</div>'
       + aioTrendChartSvg(trendData, ['open', 'in_progress', 'closed', 'total'], trendMeta)
-      + '</div>';
+      + '</div></div>';
 
     mount.innerHTML = yearBar
       + kpiRow
       + aioAiSummaryHtml()
       + productCardsHtml
       + '<div class="aio-chart-grid-2">'
-      +   '<div class="dtable-inner" style="padding:18px;"><div class="sec-label" style="margin-bottom:14px;">📊 สถานะต่อ Product</div>' + statusChartHtml + '</div>'
-      +   '<div class="dtable-inner" style="padding:18px;"><div class="sec-label" style="margin-bottom:14px;">🏷️ กลุ่มปัญหาต่อ Product (Top 7)</div>' + catChartHtml + '</div>'
+      +   '<div class="dtable-inner aio-box"><div class="sec-label aio-box-h">📊 สถานะต่อ Product</div>' + statusChartHtml + '</div>'
+      +   '<div class="dtable-inner aio-box"><div class="sec-label aio-box-h">🏷️ กลุ่มปัญหาต่อ Product (Top 7)</div>' + catChartHtml + '</div>'
       + '</div>'
       + anaHtml
       + trendHtml
-      + '<div style="padding:0 24px 24px;">'
-      +   '<div class="sec-label" style="margin-bottom:12px;">📋 สถานะรายโครงการ</div>'
-      +   matrixHtml
-      + '</div>';
+      + '<div class="aio-sec">' + hospToolbar + matrixHtml + '</div>';
   };
 
 })();

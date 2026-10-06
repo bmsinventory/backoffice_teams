@@ -14,30 +14,41 @@
 
 /* ── 5 การ์ด KPI — .stat-row ทั่วไปถูกบังคับ 4 คอลัมน์ด้วย !important จาก responsive.css ทุก breakpoint
    ต้อง override ด้วย selector ที่ specificity สูงกว่า (.stat-row.aio-stat-row) ไม่ใช่แค่เพิ่ม class เฉย ๆ ── */
-.stat-row.aio-stat-row { grid-template-columns: repeat(5,1fr) !important; padding: 20px 24px; }
+.stat-row.aio-stat-row { grid-template-columns: repeat(5,1fr) !important; padding: 14px 24px; gap: 10px; }
+/* การ์ด KPI แบบกะทัดรัด — เฉพาะหน้านี้ (.stat-c ใช้ร่วมหลายหน้า) */
+.aio-stat-row .stat-c { padding: 10px 14px; }
+.aio-stat-row .stat-k { font-size: 10.5px; margin-bottom: 2px; }
+.aio-stat-row .stat-v { font-size: 19px; margin-bottom: 0; line-height: 1.25; }
+.aio-stat-row .stat-s { font-size: 11px; }
+.aio-stat-row .pbar   { margin-top: 5px !important; }
+
+/* ── ระยะห่างของแต่ละส่วน / กล่องกราฟ ── */
+.aio-sec   { padding: 0 24px 14px; }
+.aio-box   { padding: 12px 14px; }
+.aio-box-h { margin-bottom: 10px; }
 @media (max-width: 1100px) { .stat-row.aio-stat-row { grid-template-columns: repeat(3,1fr) !important; } }
 @media (max-width: 640px)  { .stat-row.aio-stat-row { grid-template-columns: repeat(2,1fr) !important; } }
 
 /* ── การ์ดสรุปต่อ Product ── */
 .aio-prod-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(190px,1fr));
-  gap: 14px; padding: 0 24px 24px;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(160px,1fr));
+  gap: 10px; padding: 0 24px 14px;
 }
 .aio-prod-card {
   background: var(--surface); border: 1px solid var(--border); border-top: 3px solid var(--violet);
-  border-radius: var(--r2); padding: 16px 18px; box-shadow: var(--sh-sm); transition: all .2s;
+  border-radius: var(--r2); padding: 10px 12px; box-shadow: var(--sh-sm); transition: all .2s;
 }
 .aio-prod-card:hover { box-shadow: var(--sh-md); transform: translateY(-2px); border-color: var(--border2); }
-.aio-prod-name     { font-size: 12.5px; font-weight: 800; margin-bottom: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.aio-prod-total     { font-size: 28px; font-weight: 800; color: var(--txt); line-height: 1; }
-.aio-prod-total-sub { font-size: 11px; color: var(--txt3); margin-bottom: 12px; }
-.aio-prod-mini       { display: flex; gap: 16px; }
+.aio-prod-name     { font-size: 12px; font-weight: 800; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.aio-prod-total     { font-size: 20px; font-weight: 800; color: var(--txt); line-height: 1; }
+.aio-prod-total-sub { font-size: 10.5px; color: var(--txt3); margin-bottom: 6px; }
+.aio-prod-mini       { display: flex; gap: 12px; }
 .aio-prod-mini-item  { display: flex; flex-direction: column; align-items: center; font-size: 10.5px; color: var(--txt3); font-weight: 600; }
-.aio-prod-mini-item b { font-size: 15px; }
-.aio-prod-pct        { text-align: right; font-size: 11px; font-weight: 700; color: var(--txt3); margin-top: 4px; }
+.aio-prod-mini-item b { font-size: 13px; }
+.aio-prod-pct        { text-align: right; font-size: 10.5px; font-weight: 700; color: var(--txt3); margin-top: 2px; }
 
 /* ── กราฟ 2 คอลัมน์: สถานะต่อ Product / กลุ่มปัญหาต่อ Product ── */
-.aio-chart-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 0 24px 24px; }
+.aio-chart-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 0 24px 14px; }
 @media (max-width: 1000px) { .aio-chart-grid-2 { grid-template-columns: 1fr; } }
 
 .aio-legend { display: flex; gap: 14px; flex-wrap: wrap; }
@@ -45,11 +56,11 @@
 .aio-legend-item i { width: 9px; height: 9px; border-radius: 3px; display: inline-block; flex-shrink: 0; }
 
 /* ── กราฟแท่งแนวนอน stacked (div+flex ธรรมดา ไม่ใช้ไลบรารีภายนอก) ── */
-.aio-hbar-chart { display: flex; flex-direction: column; gap: 14px; }
+.aio-hbar-chart { display: flex; flex-direction: column; gap: 7px; }
 .aio-hbar-row   { display: flex; align-items: center; gap: 10px; }
 .aio-hbar-label { flex: 0 0 130px; font-size: 12px; font-weight: 600; color: var(--txt2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .aio-hbar-label[onclick]:hover { color: var(--violet); text-decoration: underline; }
-.aio-hbar-track { flex: 1; background: var(--surface3); border-radius: 6px; height: 22px; overflow: hidden; }
+.aio-hbar-track { flex: 1; background: var(--surface3); border-radius: 5px; height: 15px; overflow: hidden; }
 .aio-hbar-fill  { display: flex; height: 100%; transition: width .4s ease; }
 .aio-hbar-seg   { height: 100%; transition: filter .15s; }
 .aio-hbar-seg[onclick]:hover { filter: brightness(1.15); }
@@ -62,12 +73,6 @@
 /* ── กราฟแนวโน้มปัญหา (เส้นโค้ง SVG) ── */
 .aio-trend-svg { width: 100%; height: auto; overflow: visible; }
 .aio-trend-svg circle:hover { r: 5.5; }
-
-/* ── ตารางเมทริกซ์ โรงพยาบาล × Product ── */
-.aio-matrix-tbl { width: 100%; border-collapse: collapse; }
-.aio-matrix-tbl th { white-space: nowrap; }
-.aio-matrix-tbl td { vertical-align: middle; padding: 8px 10px; }
-.aio-matrix-hname { font-weight: 700; color: var(--txt); white-space: nowrap; }
 
 @media (max-width: 640px) {
   .aio-hbar-label, .aio-hbar-axis-spacer { flex-basis: 90px; }
@@ -82,42 +87,54 @@
 .aio-detail-grouphead:hover td { background: var(--surface2); }
 .aio-detail-groupcount { font-weight: 600; color: var(--txt3); font-size: 11.5px; margin-left: 2px; }
 
-/* ── ตารางสรุปรายโครงการ: ป้ายประเภท + แถบสถานะเล็ก (แทนเมทริกซ์ โครงการ × Product เดิม) ── */
-.aio-matrix-tbl tbody tr:hover td { background: var(--surface2); }
-.aio-mini-stack { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--surface3); }
-.aio-mini-stack-lbl { font-size: 10.5px; margin-top: 4px; color: var(--txt3); white-space: nowrap; }
 
 /* ── วิเคราะห์ปัญหาตามประเภทโครงการ: 1 การ์ดต่อประเภท อันดับกลุ่มปัญหา/แผนก ── */
-.aio-ana-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 16px; }
+.aio-ana-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 10px; }
 @media (max-width: 640px) { .aio-ana-grid { grid-template-columns: 1fr; } }
-.aio-ana-card { background: var(--surface); border: 1px solid var(--border); border-top: 3px solid var(--violet); border-radius: var(--r2); padding: 16px 18px; box-shadow: var(--sh-sm); }
-.aio-ana-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; font-weight: 800; margin-bottom: 8px; }
+.aio-ana-card { background: var(--surface); border: 1px solid var(--border); border-top: 3px solid var(--violet); border-radius: var(--r2); padding: 10px 12px; box-shadow: var(--sh-sm); }
+.aio-ana-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; font-weight: 800; margin-bottom: 6px; }
 .aio-ana-cnt  { font-size: 12px; font-weight: 700; color: var(--txt3); }
-.aio-ana-top  { font-size: 12px; color: var(--txt2); background: var(--surface2); border-radius: 8px; padding: 8px 10px; margin-bottom: 12px; }
-.aio-ana-row  { display: flex; align-items: center; gap: 8px; padding: 5px 4px; border-radius: 6px; cursor: pointer; }
+.aio-ana-top  { font-size: 12px; color: var(--txt2); background: var(--surface2); border-radius: 6px; padding: 5px 8px; margin-bottom: 6px; }
+.aio-ana-row  { display: flex; align-items: center; gap: 8px; padding: 2px 4px; border-radius: 6px; cursor: pointer; }
 .aio-ana-row:hover { background: var(--surface2); }
 .aio-ana-row.top .aio-ana-lbl { font-weight: 800; color: var(--txt); }
 .aio-ana-rank { flex: 0 0 18px; font-size: 11px; font-weight: 700; color: var(--txt3); text-align: center; }
 .aio-ana-lbl  { flex: 0 0 150px; font-size: 12px; font-weight: 600; color: var(--txt2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.aio-ana-track { flex: 1; height: 14px; background: var(--surface3); border-radius: 4px; overflow: hidden; }
+.aio-ana-track { flex: 1; height: 10px; background: var(--surface3); border-radius: 4px; overflow: hidden; }
 .aio-ana-val  { flex: 0 0 64px; text-align: right; font-size: 12px; white-space: nowrap; }
 .aio-ana-val span { color: var(--txt3); font-size: 11px; }
-.aio-ana-rest { font-size: 11px; color: var(--txt3); margin-top: 6px; padding-left: 30px; }
+.aio-ana-rest { font-size: 11px; color: var(--txt3); margin-top: 3px; padding-left: 30px; }
 @media (max-width: 640px) { .aio-ana-lbl { flex-basis: 100px; } }
 
-/* ── หัวกลุ่มประเภทโครงการในตารางสถานะรายโครงการ — แถบสีเต็มแถว + ชิปสรุปเป็นข้อความ
-   (ตั้งใจให้ต่างจากแถวโครงการที่มีแถบกราฟ/คอลัมน์ตัวเลข) คลิกเปิดรายการปัญหาทั้งประเภท ── */
-.aio-matrix-tbl tbody tr.aio-proj-grouphead td {
-  padding: 12px 14px; cursor: pointer; border-top: 10px solid var(--surface);
-  background: linear-gradient(90deg, color-mix(in srgb, var(--gc) 16%, var(--surface)) 0%, color-mix(in srgb, var(--gc) 4%, var(--surface)) 100%);
-  border-left: 5px solid var(--gc);
+/* ── ตารางสถานะ โรงพยาบาล × Product — ช่องเป็นการ์ดเล็ก (done = แก้ครบ, pend = ยังค้าง, zero = ยังไม่มีปัญหา)
+   คอลัมน์ชื่อ รพ. ค้างซ้ายเวลาเลื่อนตารางแนวนอนบนจอแคบ ── */
+.aio-mx-wrap { overflow-x: auto; }
+.aio-mx { width: 100%; border-collapse: separate; border-spacing: 0; }
+.aio-mx th, .aio-mx td { padding: 5px 8px; border-bottom: 1px solid var(--border); text-align: center; vertical-align: middle; }
+.aio-mx th { font-size: 12px; font-weight: 700; color: var(--txt3); white-space: nowrap; background: var(--surface); }
+.aio-mx-th { display: inline-flex; align-items: center; gap: 6px; color: var(--gc); }
+.aio-mx-th i { width: 7px; height: 7px; border-radius: 50%; background: var(--gc); }
+.aio-mx .aio-mx-hosp { text-align: left; position: sticky; left: 0; z-index: 1; background: var(--surface); min-width: 180px; }
+.aio-mx td.aio-mx-hosp { font-size: 13px; font-weight: 600; color: var(--txt); cursor: pointer; }
+.aio-mx td.aio-mx-hosp:hover { color: var(--violet); }
+.aio-mx-no { display: inline-block; min-width: 22px; margin-right: 8px; font-size: 12px; font-weight: 700; color: var(--txt3); text-align: right; font-variant-numeric: tabular-nums; }
+.aio-mx tbody tr:hover td { background: var(--surface2); }
+.aio-mx-none { color: var(--txt3); opacity: .5; }
+/* การ์ดเล็กแถวเดียว: ● จำนวนข้อ | รอ · แก้ไข · เสร็จ */
+.aio-mx-card {
+  --c: var(--teal); display: inline-flex; align-items: center; gap: 8px; border-radius: 6px; padding: 3px 8px; white-space: nowrap;
+  border: 1px solid color-mix(in srgb, var(--c) 30%, transparent); background: color-mix(in srgb, var(--c) 9%, var(--surface));
+  transition: box-shadow .15s, transform .15s;
 }
-.aio-matrix-tbl tbody tr.aio-proj-grouphead:first-child td { border-top: 0; }
-.aio-matrix-tbl tbody tr.aio-proj-grouphead:hover td { filter: brightness(.97); }
-.aio-gh { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.aio-gh-name { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 800; color: var(--gc); margin-right: 8px; }
-.aio-gh-name i { width: 10px; height: 10px; border-radius: 50%; background: var(--gc); display: inline-block; }
-.aio-gh-chip { font-size: 11.5px; font-weight: 700; color: var(--txt2); background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; white-space: nowrap; }
+.aio-mx-card.pend { --c: var(--coral); }
+.aio-mx-card.zero { --c: var(--amber); }
+.aio-mx-card[onclick] { cursor: pointer; }
+.aio-mx-card[onclick]:hover { box-shadow: var(--sh-md); transform: translateY(-1px); }
+.aio-mx-n { display: flex; align-items: center; gap: 4px; font-size: 10.5px; color: var(--txt3); padding-right: 8px; border-right: 1px solid color-mix(in srgb, var(--c) 30%, transparent); }
+.aio-mx-n i { width: 6px; height: 6px; border-radius: 50%; background: var(--c); }
+.aio-mx-n b { font-size: 13px; font-weight: 800; color: var(--txt); }
+.aio-mx-st { display: flex; gap: 7px; font-size: 10.5px; white-space: nowrap; }
+.aio-mx-st b { color: var(--txt); margin-left: 2px; }
 
 /* ── popup รายการปัญหา: แถวกางรายละเอียด ── */
 .aio-detail-row { cursor: pointer; }

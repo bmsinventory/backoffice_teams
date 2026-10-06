@@ -32,26 +32,26 @@
   }
 
   // ── ทีมงาน ──
-  function staff(id) { return (window.STAFF || []).find(function (s) { return s.id === id; }); }
-  function nick(id) { var s = staff(id); return s ? (s.nickname || s.name) : (id || ''); }
-  // คืน { ids, needle } ของทีมงานที่ตรงชื่อ — ref บางตารางเก็บเป็นชื่อแทน id จึงเทียบชื่อด้วย
+  function staff(id) { return window.staffByRef(id); }
+  function nick(id) { return window.staffNickByRef(id); }
+  // คืน { ids, needle } ของทีมงานที่ตรงชื่อ — ช่องที่เก็บคนทุกตารางเป็นรหัสพนักงาน
   function personQuery(q) {
     if (!q) return null;
     var ids = {};
     (window.STAFF || []).forEach(function (s) { if (has(s.nickname, q) || has(s.name, q)) ids[s.id] = true; });
     return { ids: ids, needle: q, found: Object.keys(ids).length > 0 };
   }
-  function personHit(pq, ref) {
-    if (!pq) return true;
-    if (!ref) return false;
-    if (pq.ids[ref]) return true;
-    var s = staff(ref);
-    return has(s ? (s.nickname + ' ' + s.name) : ref, pq.needle);
-  }
+  function personHit(pq, id) { return !pq || (!!id && !!pq.ids[id]); }
 
   function hospName(id) { var h = (window.HOSPITALS || []).find(function (x) { return x.id === id; }); return h ? h.name : ''; }
   function implProj(id) { return (window.IMPL_PROJECTS || []).find(function (x) { return x.id === id; }) || {}; }
   function proj(id) { return (window.PROJECTS || []).find(function (x) { return x.id === id; }) || {}; }
+  // ชื่อโรงพยาบาลของโครงการ impl — จากโครงการต้นทาง (projects.hospital_id)
+  function implHospName(p) {
+    var hid = p.source && p.source.hospitalId;
+    var h = hid && (window.HOSPITALS || []).find(function (x) { return x.id === hid; });
+    return h ? h.name : '';
+  }
   function lbl(list, id) { var x = (list || []).find(function (o) { return o.id === id; }); return x ? x.label : id; }
 
   // ══ แหล่งข้อมูลที่ค้นได้ — แต่ละตัวคืนรายการ { key(ใช้จัดกลุ่ม), title, meta, badge, go } ══
@@ -102,7 +102,7 @@
           if (!inRange(dateOf(i.createdAt), f.dateFrom, f.dateTo)) return false;
           if (pq && !personHit(pq, i.receivedById) && !personHit(pq, i.fixedById)) return false;
           var p = implProj(i.projectId);
-          if (f.hospital && !has(p.name + ' ' + p.hospitalName, f.hospital)) return false;
+          if (f.hospital && !has(p.name + ' ' + implHospName(p), f.hospital)) return false;
           if (f.keyword && !has([i.problem, i.category, i.department, i.solution].join(' '), f.keyword)) return false;
           return true;
         }).map(function (i) {
