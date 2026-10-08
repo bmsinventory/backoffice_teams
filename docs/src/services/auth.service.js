@@ -105,6 +105,7 @@
   function _enterApp(usr, restore) {
     // Set current user & switch to app view
     window.cu = usr;
+    window.syncWebPush && window.syncWebPush();
     document.getElementById('login').style.display = 'none';
     document.getElementById('wrap').style.display = 'flex';
 
@@ -240,6 +241,7 @@
 
   // ── Logout ──
   window.doLogout = function () {
+    window.disableWebPush && window.disableWebPush(true);
     window.cu = null;
     window.StorageService.clearSession();
     if (window._loginRetryInterval) { clearInterval(window._loginRetryInterval); window._loginRetryInterval = null; }

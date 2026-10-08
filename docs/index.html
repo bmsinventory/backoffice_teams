@@ -18,6 +18,7 @@
 <link rel="apple-touch-startup-image" href="img/BMS_T.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+Thai:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css">
 <!-- defer: ดาวน์โหลดคู่ขนาน ไม่บล็อกการวาดหน้า · ใช้ภายในฟังก์ชันหลังเปิดหน้าเท่านั้น (รันก่อน DOMContentLoaded)
      Excel (xlsx) / สร้างรูป (html2canvas) โหลดเมื่อจะใช้ — src/utils/lib-loader.util.js -->
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
@@ -175,85 +176,89 @@
       <div>
         <div class="sb-title">Backoffice Teams</div>
         <!-- เลขเวอร์ชัน: +0.001 ทุกครั้งที่ปล่อยเวอร์ชัน (deploy) -->
-        <div class="sb-sub">V1.003</div>
+        <div class="sb-sub">V1.005</div>
       </div>
     </div>
     <div class="sb-nav">
       <div class="sb-sec">Workspace</div>
       <div class="nav-btn on" onclick="window.goView('overview',this)">
-        <span class="ni">📊</span><span class="nl">Overview</span>
+        <i class="ti ti-chart-bar ni" aria-hidden="true"></i><span class="nl">Overview</span>
       </div>
       <div class="nav-btn" onclick="window.goView('kanban',this)">
-        <span class="ni">🗂</span><span class="nl">Delivery Board</span>
+        <i class="ti ti-layout-kanban ni" aria-hidden="true"></i><span class="nl">Delivery Board</span>
       </div>
       <div class="nav-btn" onclick="window.goView('projects',this)">
-        <span class="ni">📁</span><span class="nl">โครงการ</span>
+        <i class="ti ti-folder ni" aria-hidden="true"></i><span class="nl">โครงการ</span>
       </div>
       <div class="nav-btn" onclick="window.goView('advance',this)">
-        <span class="ni">💳</span><span class="nl">Advance</span>
+        <i class="ti ti-credit-card ni" aria-hidden="true"></i><span class="nl">Advance</span>
         <span class="nb" id="adv-nb" style="display:none">0</span>
       </div>
       <div class="nav-btn" onclick="window.goView('lodging',this)">
-        <span class="ni">🏨</span><span class="nl">จัดหาที่พัก</span>
+        <i class="ti ti-bed ni" aria-hidden="true"></i><span class="nl">จัดหาที่พัก</span>
       </div>
       <div class="nav-btn" onclick="window.goView('impl_tracker',this)">
-        <span class="ni">🛠️</span><span class="nl">ติดตามสถานะโครงการ</span>
+        <i class="ti ti-timeline-event ni" aria-hidden="true"></i><span class="nl">ติดตามสถานะโครงการ</span>
       </div>
       <div class="nav-btn" onclick="window.goView('all_issues',this)">
-        <span class="ni">🩹</span><span class="nl">ภาพรวมปัญหาการใช้งาน</span>
+        <i class="ti ti-alert-hexagon ni" aria-hidden="true"></i><span class="nl">ภาพรวมปัญหาการใช้งาน</span>
       </div>
       <div class="nav-btn" onclick="window.goView('training',this)">
-        <span class="ni">🎓</span><span class="nl">ระบบอบรม</span>
+        <i class="ti ti-school ni" aria-hidden="true"></i><span class="nl">ระบบอบรม</span>
       </div>
       <div class="sb-sec">ต้นทุน</div>
       <div class="nav-btn" onclick="window.goView('timesheet',this)">
-        <span class="ni">⏱</span><span class="nl">Timesheet</span>
+        <i class="ti ti-clock-hour-4 ni" aria-hidden="true"></i><span class="nl">Timesheet</span>
       </div>
       <div class="nav-btn" onclick="window.goView('budget',this)">
-        <span class="ni">💰</span><span class="nl">งบประมาณ &amp; ค่าใช้จ่าย</span>
+        <i class="ti ti-wallet ni" aria-hidden="true"></i><span class="nl">งบประมาณ &amp; ค่าใช้จ่าย</span>
       </div>
       <div class="sb-sec">ทีม</div>
       <div class="nav-btn" onclick="window.goView('workload',this)">
-        <span class="ni">🏢</span><span class="nl">ภาระงานทีม</span>
+        <i class="ti ti-chart-arrows-vertical ni" aria-hidden="true"></i><span class="nl">ภาระงานทีม</span>
       </div>
       <div class="nav-btn" onclick="window.goView('calendar',this)">
-        <span class="ni">📅</span><span class="nl">ปฏิทินทีม</span>
+        <i class="ti ti-calendar-event ni" aria-hidden="true"></i><span class="nl">ปฏิทินทีม</span>
+      </div>
+      <div class="nav-btn" onclick="window.goView('server_request',this)">
+        <i class="ti ti-server ni" aria-hidden="true"></i><span class="nl">ขอใช้งานทีม Server</span>
+        <span class="nb" id="srv-nb" style="display:none">0</span>
       </div>
       <div class="nav-btn" onclick="window.goView('leave',this)">
-        <span class="ni">🏖</span><span class="nl">การลางาน</span>
+        <i class="ti ti-calendar-off ni" aria-hidden="true"></i><span class="nl">การลางาน</span>
         <span class="nb" id="leave-nb" style="display:none">0</span>
       </div>
       <div class="nav-btn" onclick="window.goView('worklog',this)">
-        <span class="ni">📝</span><span class="nl">บันทึกงาน</span>
+        <i class="ti ti-notes ni" aria-hidden="true"></i><span class="nl">บันทึกงาน</span>
       </div>
       <div class="nav-btn targets-only" style="display:none" onclick="window.goView('targets',this)">
-        <span class="ni">🎯</span><span class="nl">เป้าหมายทีม</span>
+        <i class="ti ti-target-arrow ni" aria-hidden="true"></i><span class="nl">เป้าหมายทีม</span>
       </div>
 
       <div class="sb-sec">ศูนย์ช่วยเหลือ</div>
       <div class="nav-btn" onclick="window.goView('helpdesk',this)">
-        <span class="ni">🎧</span><span class="nl">ศูนย์ช่วยเหลือ</span>
+        <i class="ti ti-headset ni" aria-hidden="true"></i><span class="nl">ศูนย์ช่วยเหลือ</span>
         <span class="nb" id="hd-nb" style="display:none">0</span>
       </div>
       <div class="nav-btn" onclick="window.goView('assist',this)">
-        <span class="ni">💬</span><span class="nl">ผู้ช่วยทีม</span>
+        <i class="ti ti-messages ni" aria-hidden="true"></i><span class="nl">ผู้ช่วยทีม</span>
       </div>
 
       <div class="sb-sec">ข้อมูลอ้างอิง</div>
       <div class="nav-btn" onclick="window.goView('hospital',this)">
-        <span class="ni">🏥</span><span class="nl">รายชื่อ รพ.</span>
+        <i class="ti ti-building-hospital ni" aria-hidden="true"></i><span class="nl">รายชื่อ รพ.</span>
       </div>
       <div class="nav-btn" onclick="window.goView('contract',this)">
-        <span class="ni">📄</span><span class="nl">ข้อมูลสัญญา</span>
+        <i class="ti ti-file-description ni" aria-hidden="true"></i><span class="nl">ข้อมูลสัญญา</span>
       </div>
 
       <div class="sb-sec" id="sb-sec-system" style="display:none">ระบบ</div>
       <div class="nav-btn admin-only" style="display:none" onclick="window.goView('admin',this)">
-        <span class="ni">⚙️</span><span class="nl">Admin Panel</span>
+        <i class="ti ti-settings ni" aria-hidden="true"></i><span class="nl">Admin Panel</span>
       </div>
       <!-- จัดการวันหยุด (เพิ่ม/แก้/นำเข้า) — เฉพาะผู้มีสิทธิ์เพิ่ม/แก้วันหยุด · ทีมดูรายการได้จากปุ่ม 🎌 วันหยุด ในปฏิทินทีม -->
       <div class="nav-btn" style="display:none" onclick="window.goView('holiday',this)">
-        <span class="ni">🎌</span><span class="nl">จัดการวันหยุด</span>
+        <i class="ti ti-calendar-star ni" aria-hidden="true"></i><span class="nl">จัดการวันหยุด</span>
       </div>
     </div>
     <div class="sb-foot">
@@ -264,10 +269,10 @@
           <div class="u-name" id="u-name">Admin</div>
           <div class="u-role" id="u-role">ADMIN</div>
         </div>
-        <span class="u-caret">⋯</span>
+        <i class="ti ti-dots-vertical u-caret" aria-hidden="true"></i>
       </div>
     </div>
-    <div class="sb-toggle" onclick="window.toggleSB()">◀</div>
+    <button class="sb-toggle" type="button" onclick="window.toggleSB()" aria-label="ย่อแถบเมนู"><i class="ti ti-chevron-left" aria-hidden="true"></i></button>
   </div>
 
   <!-- Mobile sidebar overlay backdrop -->
@@ -276,37 +281,37 @@
   <!-- Bottom Navigation (mobile only) -->
   <nav id="bottom-nav" role="navigation" aria-label="เมนูหลัก">
     <button class="bottom-nav-item active" data-view="overview" onclick="window.goView('overview',this)">
-      <span class="bottom-nav-icon">📊</span>
+      <i class="ti ti-chart-bar bottom-nav-icon" aria-hidden="true"></i>
       <span class="bottom-nav-label">Overview</span>
     </button>
     <button class="bottom-nav-item" data-view="projects" onclick="window.goView('projects',this)">
-      <span class="bottom-nav-icon">📁</span>
+      <i class="ti ti-folder bottom-nav-icon" aria-hidden="true"></i>
       <span class="bottom-nav-label">โครงการ</span>
     </button>
     <button class="bottom-nav-item" data-view="advance" onclick="window.goView('advance',this)">
-      <span class="bottom-nav-icon">💳</span>
+      <i class="ti ti-credit-card bottom-nav-icon" aria-hidden="true"></i>
       <span class="bottom-nav-label">Advance</span>
       <span class="bottom-nav-badge" id="bnav-adv-badge" style="display:none">0</span>
     </button>
     <button class="bottom-nav-item" data-view="hospital" onclick="window.goView('hospital',this)">
-      <span class="bottom-nav-icon">🏥</span>
+      <i class="ti ti-building-hospital bottom-nav-icon" aria-hidden="true"></i>
       <span class="bottom-nav-label">รพ.</span>
     </button>
     <button class="bottom-nav-item" onclick="window.toggleMobSidebar()">
-      <span class="bottom-nav-icon">☰</span>
+      <i class="ti ti-menu-2 bottom-nav-icon" aria-hidden="true"></i>
       <span class="bottom-nav-label">เพิ่มเติม</span>
     </button>
   </nav>
 
   <div id="main">
     <div id="topbar">
-      <button id="mob-menu-btn" class="btn btn-ghost btn-sm" onclick="window.toggleMobSidebar()" style="display:none;" aria-label="เมนู">☰</button>
-      <div class="tp-title" id="tp-title">Overview</div>
+      <button id="mob-menu-btn" class="btn btn-ghost btn-sm" onclick="window.toggleMobSidebar()" style="display:none;" aria-label="เมนู"><i class="ti ti-menu-2" aria-hidden="true"></i></button>
+      <div class="tp-title" id="tp-title"><i class="ti ti-chart-bar tp-title-icon" aria-hidden="true"></i><span class="tp-title-label">Overview</span></div>
       <div id="tp-actions"></div>
-      <button class="btn btn-ghost btn-sm" id="btn-ask-ai" onclick="window.askAiOpen()" title="ถาม AI — ค้นข้อมูลด้วยภาษาคน (Ctrl+K)">🤖 <span class="btn-lbl">ถาม AI</span></button>
-      <button class="btn btn-ghost btn-sm admin-only" id="btn-import-top" style="display:none" onclick="window.openImportModal()" title="นำเข้าข้อมูล">📥 <span class="btn-lbl">นำเข้า</span></button>
-      <button id="dm-toggle" onclick="window.toggleDarkMode()" title="Dark/Light Mode" aria-label="สลับธีม">🌙</button>
-      <button id="noti-bell" onclick="window.toggleNotiMenu(event)" title="ไม่มีการแจ้งเตือน" aria-label="การแจ้งเตือน">🔔<span id="noti-count" style="display:none">0</span></button>
+      <button class="btn btn-ghost btn-sm" id="btn-ask-ai" onclick="window.askAiOpen()" title="ถาม AI — ค้นข้อมูลด้วยภาษาคน (Ctrl+K)"><i class="ti ti-sparkles" aria-hidden="true"></i><span class="btn-lbl">ถาม AI</span></button>
+      <button class="btn btn-ghost btn-sm admin-only" id="btn-import-top" style="display:none" onclick="window.openImportModal()" title="นำเข้าข้อมูล"><i class="ti ti-file-import" aria-hidden="true"></i><span class="btn-lbl">นำเข้า</span></button>
+      <button id="dm-toggle" onclick="window.toggleDarkMode()" title="Dark/Light Mode" aria-label="สลับธีม"><i class="ti ti-moon" aria-hidden="true"></i></button>
+      <button id="noti-bell" onclick="window.toggleNotiMenu(event)" title="ไม่มีการแจ้งเตือน" aria-label="การแจ้งเตือน"><i class="ti ti-bell" aria-hidden="true"></i><span id="noti-count" style="display:none">0</span></button>
     </div>
 
     <div id="content">
@@ -314,12 +319,12 @@
       <!-- OVERVIEW -->
       <div class="view on" id="view-overview">
         <div style="padding:20px 24px 0;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
-          <div style="font-size:18px;font-weight:800;color:var(--txt);">Dashboard Overview</div>
+          <div class="ui-section-title" style="font-size:18px;font-weight:800;color:var(--txt);"><i class="ti ti-dashboard" aria-hidden="true"></i>Dashboard Overview</div>
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
             <select class="t-sel" id="ov-yr" onchange="window.renderOverview()"><option value="">ทุกปี พ.ศ.</option></select>
             <div class="ms-filter" id="ov-grp"></div>
             <div class="ms-filter" id="ov-type"></div>
-            <button class="btn btn-pri btn-sm m-icon-btn" id="ov-ai-btn" onclick="window.ovAiDaily()" title="ให้ AI สรุปสิ่งที่ต้องทำวันนี้/สัปดาห์นี้ จากทุกโมดูล">🤖 AI สรุปประจำวัน</button>
+            <button class="btn btn-pri btn-sm m-icon-btn" id="ov-ai-btn" onclick="window.ovAiDaily()" title="ให้ AI สรุปสิ่งที่ต้องทำวันนี้/สัปดาห์นี้ จากทุกโมดูล"><i class="ti ti-sparkles" aria-hidden="true"></i>AI สรุปประจำวัน</button>
           </div>
         </div>
         <div id="ov-ai-wrap" style="padding:14px 24px 0;display:none;"></div>
@@ -330,11 +335,11 @@
         <!-- Row 1: Workload trend + Resource ring -->
         <div class="ov-row" style="display:grid;grid-template-columns:1fr 340px;gap:16px;padding:0 24px 16px;">
           <div class="ov-card">
-            <div class="ov-card-title">📈 Monthly Workload Trend</div>
+            <div class="ov-card-title"><i class="ti ti-chart-line" aria-hidden="true"></i>Monthly Workload Trend<span class="calc-tip" tabindex="0" data-html2canvas-ignore data-calc="จำนวนโครงการที่ดำเนินอยู่ในแต่ละเดือน แยกตามประเภท&#10;นับโครงการที่ช่วง วันเริ่ม–วันสิ้นสุด คาบเกี่ยวกับเดือนนั้น (ต้องมีทั้งวันเริ่มและวันสิ้นสุด)">i</span></div>
             <div style="height:220px;position:relative"><canvas id="chart-workload-trend"></canvas></div>
           </div>
           <div class="ov-card">
-            <div class="ov-card-title">👥 Resource Status</div>
+            <div class="ov-card-title"><i class="ti ti-users-group" aria-hidden="true"></i>Resource Status<span class="calc-tip" tabindex="0" data-html2canvas-ignore data-calc="นับพนักงานที่ใช้งานอยู่ ตามจำนวนโครงการ (ยังไม่ยกเลิก/ไม่เสร็จสิ้น) ที่มีชื่ออยู่ในทีม&#10;Overload = มากกว่า 3 โครงการ · Active = 1–3 โครงการ · Available = ไม่มีโครงการ">i</span></div>
             <div style="height:160px;position:relative"><canvas id="chart-resource"></canvas></div>
             <div id="ov-resource-legend" style="display:flex;justify-content:center;gap:14px;margin-top:10px;font-size:11px;"></div>
           </div>
@@ -342,12 +347,12 @@
         <!-- Row 2: Budget distribution + Critical timeline -->
         <div class="ov-row" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:0 24px 16px;">
           <div class="ov-card">
-            <div class="ov-card-title">💰 Budget Distribution (งบตามประเภท)</div>
+            <div class="ov-card-title"><i class="ti ti-chart-donut" aria-hidden="true"></i>Budget Distribution (งบตามประเภท)<span class="calc-tip" tabindex="0" data-html2canvas-ignore data-calc="ผลรวมมูลค่าโครงการ แยกตามประเภทโครงการ (ตามตัวกรองด้านบน)">i</span></div>
             <div style="height:200px;position:relative"><canvas id="chart-budget-bar"></canvas></div>
           </div>
           <div class="ov-card" style="display:flex;flex-direction:column;">
             <div class="ov-card-title" style="display:flex;justify-content:space-between;align-items:center;">
-              <span>⏰ Critical Timeline (Ending Soon)</span>
+              <span class="icon-label"><i class="ti ti-clock-exclamation" aria-hidden="true"></i>Critical Timeline (Ending Soon)<span class="calc-tip" tabindex="0" data-html2canvas-ignore data-calc="โครงการที่ยังไม่เสร็จ และวันสิ้นสุดเหลือ ≤ 30 วัน (รวมที่เลยกำหนด) เรียงจากใกล้สิ้นสุดที่สุด&#10;ตัวเลขวัน = วันสิ้นสุด − วันนี้">i</span></span>
               <span id="ov-crit-count" style="font-size:10px;background:var(--coral)18;color:var(--coral);padding:2px 8px;border-radius:10px;font-weight:700;"></span>
             </div>
             <div id="ov-critical" style="flex:1;overflow-y:auto;max-height:220px;"></div>
@@ -356,15 +361,15 @@
         <!-- Row 3: Health + Stage + Advance alerts -->
         <div class="ov-row ov-row-3" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;padding:0 24px 16px;">
           <div class="ov-card">
-            <div class="ov-card-title">🩺 Project Health</div>
+            <div class="ov-card-title"><i class="ti ti-heart-rate-monitor" aria-hidden="true"></i>Project Health<span class="calc-tip" tabindex="0" data-html2canvas-ignore data-calc="เสร็จ = คืบหน้า 100% / ปิดโครงการ / เสร็จสิ้น&#10;ล่าช้า = เลยวันสิ้นสุดแล้ว&#10;เสี่ยง = เหลือ ≤ 15 วัน และคืบหน้า &lt; 80%&#10;ปกติ = นอกเหนือจากนี้ (รวมโครงการที่ไม่มีวันสิ้นสุด)">i</span></div>
             <div style="height:180px;position:relative"><canvas id="chart-health"></canvas></div>
           </div>
           <div class="ov-card">
-            <div class="ov-card-title">🗂 Stage Distribution</div>
+            <div class="ov-card-title"><i class="ti ti-chart-pie" aria-hidden="true"></i>Stage Distribution<span class="calc-tip" tabindex="0" data-html2canvas-ignore data-calc="จำนวนโครงการในแต่ละขั้นตอน (ตามตัวกรองด้านบน)">i</span></div>
             <div style="height:180px;position:relative"><canvas id="chart-stage"></canvas></div>
           </div>
           <div class="ov-card" style="display:flex;flex-direction:column;">
-            <div class="ov-card-title" style="color:var(--coral);">💳 Financial Alerts</div>
+            <div class="ov-card-title" style="color:var(--coral);"><i class="ti ti-credit-card" aria-hidden="true"></i>Financial Alerts<span class="calc-tip" tabindex="0" data-html2canvas-ignore data-calc="ใบเบิกล่วงหน้า (Adv.) ของโครงการที่ผ่านตัวกรอง ที่ยังไม่เคลียร์ เรียงตามวันครบกำหนดเคลียร์ (แสดง 8 รายการแรก)&#10;เกินกำหนด = วันครบกำหนดเคลียร์ผ่านไปแล้ว">i</span></div>
             <div id="ov-adv-alerts" style="flex:1;overflow-y:auto;max-height:200px;"></div>
           </div>
         </div>
@@ -372,7 +377,7 @@
         <div style="padding:0 24px 28px;">
           <div class="ov-card" style="padding:0;overflow:hidden;">
             <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-              <span style="font-size:12px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.7px;">📋 รายการโครงการทั้งหมด</span>
+              <span class="icon-label" style="font-size:12px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.7px;"><i class="ti ti-list-details" aria-hidden="true"></i>รายการโครงการทั้งหมด</span>
               <div class="t-search" style="margin-left:auto"><input id="ov-tbl-q" placeholder="ค้นหาโครงการ..." oninput="window.renderOvTable()"></div>
               <select class="t-sel" id="ov-tbl-yr" onchange="window.renderOvTable()"><option value="">ทุกปี</option></select>
               <div class="ms-filter" id="ov-tbl-type"></div>
@@ -383,7 +388,7 @@
                 <option value="progress_asc">📊 คืบหน้า น้อยก่อน</option>
                 <option value="name_asc">🔤 ชื่อ ก→ฮ</option>
               </select>
-              <button class="btn btn-ghost btn-sm" onclick="window.exportOvExcel()" title="Export ตารางโครงการเป็น Excel" style="white-space:nowrap;">📥 Export Excel</button>
+              <button class="btn btn-ghost btn-sm" onclick="window.exportOvExcel()" title="Export ตารางโครงการเป็น Excel" style="white-space:nowrap;"><i class="ti ti-file-spreadsheet" aria-hidden="true"></i>Export Excel</button>
             </div>
             <div style="overflow-x:auto;">
               <table class="t-table" style="min-width:820px;">
@@ -413,8 +418,8 @@
           <div class="ms-filter" id="kb-type"></div>
           <div class="ms-filter" id="kb-grp"></div>
           <div style="flex:1"></div>
-          <button class="btn btn-pri btn-sm" onclick="window.kbAiAdvSummary()" title="สรุปไซต์ในคอลัมน์ วางแผนงาน/จัดทำ Adv. ที่ต้องขออนุมัติ Adv. เป็นข้อความส่ง LINE">🤖 AI สรุปขออนุมัติ Adv.</button>
-          <button class="btn btn-sm ce-only" style="background:var(--violet)15;color:var(--violet);border:1px solid var(--violet)30;font-weight:700;" onclick="window.runAutoStage(false)">⚡ อัปเดต Stage อัตโนมัติ</button>
+          <button class="btn btn-pri btn-sm" onclick="window.kbAiAdvSummary()" title="สรุปไซต์ในคอลัมน์ วางแผนงาน/จัดทำ Adv. ที่ต้องขออนุมัติ Adv. เป็นข้อความส่ง LINE"><i class="ti ti-sparkles" aria-hidden="true"></i>AI สรุปขออนุมัติ Adv.</button>
+          <button class="btn btn-sm ce-only" style="background:var(--violet)15;color:var(--violet);border:1px solid var(--violet)30;font-weight:700;" onclick="window.runAutoStage(false)"><i class="ti ti-bolt" aria-hidden="true"></i>อัปเดต Stage อัตโนมัติ</button>
           <div id="kb-last-auto" style="font-size:10px;color:var(--txt3);padding:0 8px;"></div>
         </div>
         <div id="kb-board"></div>
@@ -439,8 +444,8 @@
             <option value="progress_asc">📊 ความคืบหน้า (น้อย→มาก)</option>
           </select>
           <div style="flex:1"></div>
-          <button class="btn btn-xls btn-sm" onclick="window.exportProjects()" title="Export Excel">📥 Excel</button>
-          <button class="btn btn-pri btn-sm ce-only" id="btn-add-proj" onclick="window.openProjModal(null)">+ เพิ่มโครงการ</button>
+          <button class="btn btn-xls btn-sm" onclick="window.exportProjects()" title="Export Excel"><i class="ti ti-file-spreadsheet" aria-hidden="true"></i>Excel</button>
+          <button class="btn btn-pri btn-sm ce-only" id="btn-add-proj" onclick="window.openProjModal(null)"><i class="ti ti-plus" aria-hidden="true"></i>เพิ่มโครงการ</button>
         </div>
         <div class="dtable-wrap">
           <div class="dtable-inner">
@@ -475,14 +480,14 @@
             <option value="name_asc">🔤 ชื่อโครงการ (ก→ฮ)</option>
           </select>
           <div style="flex:1"></div>
-          <button class="btn btn-xls btn-sm" onclick="window.exportAdvances()" title="Export Excel">📥 Excel</button>
-          <button class="btn btn-teal btn-sm" id="btn-add-adv" onclick="window.openAdvModal(null)">+ New Advance</button>
+          <button class="btn btn-xls btn-sm" onclick="window.exportAdvances()" title="Export Excel"><i class="ti ti-file-spreadsheet" aria-hidden="true"></i>Excel</button>
+          <button class="btn btn-teal btn-sm" id="btn-add-adv" onclick="window.openAdvModal(null)"><i class="ti ti-plus" aria-hidden="true"></i>New Advance</button>
         </div>
         </div>
         <!-- Summary bar -->
         <div id="adv-summary-bar" style="display:flex;gap:12px;padding:12px 24px;background:var(--bg);flex-wrap:wrap;"></div>
         <!-- Cards grid -->
-        <div id="adv-cards" style="padding:0 24px 28px;display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;"></div>
+        <div id="adv-cards" style="padding:0 24px 28px;display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;"></div>
       </div>
 
       <!-- EXPENSE CLEARING FORM (expense_form) -->
@@ -510,13 +515,13 @@
             <option value="name_asc">🔤 ชื่อโครงการ (ก→ฮ)</option>
           </select>
           <div style="flex:1"></div>
-          <button class="btn btn-xls btn-sm" onclick="window.exportLodging()" title="Export Excel">📥 Excel</button>
-          <button class="btn btn-pri btn-sm cl-only" id="btn-add-ld" onclick="window.openLodgingGroupModal(null)">+ เพิ่มที่พัก</button>
+          <button class="btn btn-xls btn-sm" onclick="window.exportLodging()" title="Export Excel"><i class="ti ti-file-spreadsheet" aria-hidden="true"></i>Excel</button>
+          <button class="btn btn-pri btn-sm cl-only" id="btn-add-ld" onclick="window.openLodgingGroupModal(null)"><i class="ti ti-plus" aria-hidden="true"></i>เพิ่มที่พัก</button>
         </div>
         <!-- Summary bar -->
-        <div id="ld-summary-bar" style="display:flex;gap:12px;padding:12px 24px;background:var(--bg);flex-wrap:wrap;"></div>
+        <div id="ld-summary-bar" style="display:flex;gap:8px;padding:8px 24px 10px;background:var(--bg);flex-wrap:wrap;"></div>
         <!-- Cards grid -->
-        <div id="lodging-cards" style="padding:0 24px 28px;display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;"></div>
+        <div id="lodging-cards"></div>
       </div>
 
       <!-- WORKLOAD -->
@@ -532,8 +537,8 @@
               <span class="month-lbl" id="wl-lbl"></span>
               <button class="mnav-btn" onclick="window.wlNav(1)">›</button>
             </div>
-            <button class="btn btn-pri btn-sm" onclick="window.wlAiAnalyze()" title="ให้ AI วิเคราะห์ภาระงานทีมเดือนนี้ และแนะนำการวางคนให้โครงการที่ยังขาดคน">🤖 AI วิเคราะห์ภาระงาน</button>
-            <button class="btn btn-pri btn-sm ce-only" onclick="window.openWlNotifyReport()" title="สรุปตารางงานที่ยังไม่เริ่ม แยกรายคน สำหรับคัดลอก/บันทึกภาพส่ง LINE">📤 สรุปแจ้งงาน</button>
+            <button class="btn btn-pri btn-sm" onclick="window.wlAiAnalyze()" title="ให้ AI วิเคราะห์ภาระงานทีมเดือนนี้ และแนะนำการวางคนให้โครงการที่ยังขาดคน"><i class="ti ti-sparkles" aria-hidden="true"></i>AI วิเคราะห์ภาระงาน</button>
+            <button class="btn btn-pri btn-sm ce-only" onclick="window.openWlNotifyReport()" title="สรุปตารางงานที่ยังไม่เริ่ม แยกรายคน สำหรับคัดลอก/บันทึกภาพส่ง LINE"><i class="ti ti-send" aria-hidden="true"></i>สรุปแจ้งงาน</button>
           </div>
         </div>
         <div id="wl-stats" style="flex-shrink:0;background:var(--surface);border-bottom:2px solid var(--border);"></div>
@@ -596,8 +601,8 @@
           <label id="cal-only-active-wrap" style="display:none;align-items:center;gap:5px;font-size:12px;color:var(--txt2);cursor:pointer;white-space:nowrap;">
             <input type="checkbox" id="cal-only-active" checked onchange="window.renderCalendar()"> แสดงเฉพาะคนที่มีงาน
           </label>
-          <button class="btn btn-ghost btn-sm" onclick="window.openHolView()" style="margin-left:4px;padding:5px 10px;font-size:12px;" title="ดูรายการวันหยุดทั้งปี">🎌 วันหยุด</button>
-          <button class="btn btn-ghost btn-sm" id="cal-fs-btn" onclick="window.toggleCalFullscreen()" style="margin-left:4px;padding:5px 10px;font-size:12px;" title="ขยายเต็มจอ">⛶ เต็มจอ</button>
+          <button class="btn btn-ghost btn-sm" onclick="window.openHolView()" style="margin-left:4px;padding:5px 10px;font-size:12px;" title="ดูรายการวันหยุดทั้งปี"><i class="ti ti-calendar-star" aria-hidden="true"></i>วันหยุด</button>
+          <button class="btn btn-ghost btn-sm" id="cal-fs-btn" onclick="window.toggleCalFullscreen()" style="margin-left:4px;padding:5px 10px;font-size:12px;" title="ขยายเต็มจอ"><i class="ti ti-maximize" aria-hidden="true"></i>เต็มจอ</button>
         </div>
         <div class="tl-wrap" id="cal-grid"></div>
         <div class="cal-agenda-wrap" id="cal-agenda"></div>
@@ -606,11 +611,11 @@
       <!-- HOLIDAYS -->
       <div class="view" id="view-holidays">
         <div style="padding:20px 24px 0;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
-          <div style="font-size:18px;font-weight:800;color:var(--txt);">🎌 วันหยุด</div>
+          <div class="ui-section-title" style="font-size:18px;font-weight:800;color:var(--txt);"><i class="ti ti-calendar-star" aria-hidden="true"></i>วันหยุด</div>
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
             <select class="t-sel" id="hol-yr" onchange="window.renderHolidays()"><option value="">ทุกปี</option></select>
-            <button id="hol-import-btn" class="btn btn-ghost btn-sm" onclick="window.openHolImport()">📥 นำเข้าวันหยุด</button>
-            <button id="hol-add-btn" class="btn btn-pri btn-sm" onclick="window.openHolForm(null)">+ เพิ่มวันหยุด</button>
+            <button id="hol-import-btn" class="btn btn-ghost btn-sm" onclick="window.openHolImport()"><i class="ti ti-file-import" aria-hidden="true"></i>นำเข้าวันหยุด</button>
+            <button id="hol-add-btn" class="btn btn-pri btn-sm" onclick="window.openHolForm(null)"><i class="ti ti-plus" aria-hidden="true"></i>เพิ่มวันหยุด</button>
           </div>
         </div>
         <div id="hol-summary" style="display:flex;gap:12px;padding:12px 24px;flex-wrap:wrap;"></div>
@@ -621,8 +626,8 @@
       <div class="view" id="view-leave">
         <!-- Top bar -->
         <div style="padding:14px 24px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;">
-          <div style="font-size:16px;font-weight:800;color:var(--txt);">🏖 การลางาน</div>
-          <button id="leave-add-btn" class="btn btn-pri btn-sm" onclick="window.openLeaveForm(null)" style="margin-left:auto;">+ เพิ่มการลางาน</button>
+          <div class="ui-section-title" style="font-size:16px;font-weight:800;color:var(--txt);"><i class="ti ti-calendar-off" aria-hidden="true"></i>การลางาน</div>
+          <button id="leave-add-btn" class="btn btn-pri btn-sm" onclick="window.openLeaveForm(null)" style="margin-left:auto;"><i class="ti ti-plus" aria-hidden="true"></i>เพิ่มการลางาน</button>
         </div>
 
         <!-- Filters + leave cards -->
@@ -680,7 +685,7 @@
                 <input type="checkbox" id="leave-show-all" onchange="window.renderLeave()"> แสดงทั้งหมด
               </label>
               <div class="lv-filter-xls" style="margin-left:auto;align-self:flex-end;">
-                <button class="btn btn-xls btn-sm" onclick="window.exportLeaves()" title="Export Excel">📥 Excel</button>
+                <button class="btn btn-xls btn-sm" onclick="window.exportLeaves()" title="Export Excel"><i class="ti ti-file-spreadsheet" aria-hidden="true"></i>Excel</button>
               </div>
             </div>
           </div>
@@ -691,10 +696,10 @@
       <!-- WORK LOG -->
       <div class="view" id="view-worklog" style="overflow-y:auto;">
         <div style="padding:16px 24px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;">
-          <div style="font-size:16px;font-weight:800;color:var(--txt);">📝 บันทึกงาน</div>
+          <div class="ui-section-title" style="font-size:16px;font-weight:800;color:var(--txt);"><i class="ti ti-notes" aria-hidden="true"></i>บันทึกงาน</div>
           <div style="flex:1;"></div>
           <input type="text" id="wl-q" class="t-sel" placeholder="🔍 ค้นหา..." style="width:160px;" oninput="window.renderWorkLog&&window.renderWorkLog()">
-          <button class="btn btn-pri btn-sm" onclick="window.openWorkLogModal()">+ เพิ่มบันทึก</button>
+          <button class="btn btn-pri btn-sm" onclick="window.openWorkLogModal()"><i class="ti ti-plus" aria-hidden="true"></i>เพิ่มบันทึก</button>
         </div>
         <div id="wl-list" style="padding:12px 24px 28px;"></div>
       </div>
@@ -702,7 +707,7 @@
       <!-- TARGETS -->
       <div class="view" id="view-targets" style="overflow-y:auto;">
         <div style="padding:14px 24px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;">
-          <div style="font-size:16px;font-weight:800;color:var(--txt);">🎯 เป้าหมายทีม</div>
+          <div class="ui-section-title" style="font-size:16px;font-weight:800;color:var(--txt);"><i class="ti ti-target-arrow" aria-hidden="true"></i>เป้าหมายทีม</div>
         </div>
         <div id="targets-body" style="padding:24px;max-width:680px;margin:0 auto;"></div>
       </div>
@@ -723,7 +728,7 @@
           <div id="ts-proj-cmb-wrap" style="position:relative;width:230px;"><input id="ts-proj-cmb-input" type="text" class="t-sel" placeholder="ทุกโครงการ" autocomplete="off" spellcheck="false" style="width:100%;padding-right:26px;cursor:pointer;"><span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:10px;color:var(--txt3);">▼</span><input type="hidden" id="ts-proj"><div id="ts-proj-cmb-drop" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:9500;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.15);overflow:hidden;"><div id="ts-proj-cmb-list" style="max-height:320px;overflow-y:auto;"></div></div></div>
           <select class="t-sel" id="ts-staff" onchange="window.renderTimesheet()"><option value="">ทุกคน</option></select>
           <div style="flex:1"></div>
-          <button class="btn btn-xls btn-sm" onclick="window.exportTimesheet()" title="Export Excel">📥 Excel</button>
+          <button class="btn btn-xls btn-sm" onclick="window.exportTimesheet()" title="Export Excel"><i class="ti ti-file-spreadsheet" aria-hidden="true"></i>Excel</button>
         </div>
         <div id="ts-summary-bar" class="ts-kpis"></div>
         <div id="ts-viewbar" class="ts-viewbar"></div>
@@ -764,7 +769,7 @@
             <option value="other">📝 อื่นๆ</option>
           </select>
           <div style="flex:1"></div>
-          <button class="btn btn-xls btn-sm" onclick="window.exportCosts()" title="Export Excel">📥 Excel</button>
+          <button class="btn btn-xls btn-sm" onclick="window.exportCosts()" title="Export Excel"><i class="ti ti-file-spreadsheet" aria-hidden="true"></i>Excel</button>
         </div>
         </div>
         <div id="cost-summary-bar" style="display:flex;gap:12px;padding:12px 24px;background:var(--bg);flex-wrap:wrap;"></div>
@@ -802,29 +807,29 @@
             <option value="has">✅ ใช้งาน Products</option>
             <option value="none">⬜ ยังไม่ได้ใช้ Products</option>
           </select>
-          <button class="btn btn-ghost btn-sm admin-only" style="display:none" onclick="window.openHspApiSettings()" title="ตั้งค่าการเชื่อมต่อ MOPH API">⚙️ MOPH API</button>
-          <button class="btn btn-ghost btn-sm admin-only" style="display:none" onclick="window.openHspAutoEnrich()" title="เติมข้อมูลที่ไม่ครบถ้วนจาก MOPH API อัตโนมัติ">🔄 เติมข้อมูล API</button>
+          <button class="btn btn-ghost btn-sm admin-only" style="display:none" onclick="window.openHspApiSettings()" title="ตั้งค่าการเชื่อมต่อ MOPH API"><i class="ti ti-settings" aria-hidden="true"></i>MOPH API</button>
+          <button class="btn btn-ghost btn-sm admin-only" style="display:none" onclick="window.openHspAutoEnrich()" title="เติมข้อมูลที่ไม่ครบถ้วนจาก MOPH API อัตโนมัติ"><i class="ti ti-refresh" aria-hidden="true"></i>เติมข้อมูล API</button>
 
-          <button class="btn btn-xls btn-sm" onclick="window.exportHospitals()" title="Export Excel">📥 Excel</button>
-          <button class="btn btn-pri btn-sm admin-only" style="display:none" onclick="window.openHospitalModal(null)">➕ เพิ่ม รพ.</button>
+          <button class="btn btn-xls btn-sm" onclick="window.exportHospitals()" title="Export Excel"><i class="ti ti-file-spreadsheet" aria-hidden="true"></i>Excel</button>
+          <button class="btn btn-pri btn-sm admin-only" style="display:none" onclick="window.openHospitalModal(null)"><i class="ti ti-plus" aria-hidden="true"></i>เพิ่ม รพ.</button>
         </div>
         <!-- View toggle tabs -->
         <div style="display:flex;gap:0;border-bottom:2px solid var(--border);padding:0 24px;background:var(--surface);">
           <button id="hsp-vtab-list" onclick="window.goHspView('list')"
             style="padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;cursor:pointer;color:var(--violet);border-bottom:2px solid var(--violet);margin-bottom:-2px;transition:all .15s;">
-            📋 รายชื่อ รพ.
+            <i class="ti ti-list-details" aria-hidden="true"></i> รายชื่อ รพ.
           </button>
           <button id="hsp-vtab-summary" onclick="window.goHspView('summary')"
             style="padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;cursor:pointer;color:var(--txt-muted);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s;">
-            📇 สรุปข้อมูลการติดต่อ
+            <i class="ti ti-address-book" aria-hidden="true"></i> สรุปข้อมูลการติดต่อ
           </button>
           <button id="hsp-vtab-analysis" onclick="window.goHspView('analysis')"
             style="padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;cursor:pointer;color:var(--txt-muted);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s;">
-            📊 วิเคราะห์ Product
+            <i class="ti ti-chart-bar" aria-hidden="true"></i> วิเคราะห์ Product
           </button>
           <button id="hsp-vtab-dashboard" onclick="window.goHspView('dashboard')"
             style="padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;cursor:pointer;color:var(--txt-muted);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s;">
-            🗺️ Dashboard
+            <i class="ti ti-map-2" aria-hidden="true"></i> Dashboard
           </button>
         </div>
         <div id="hsp-import-progress" style="text-align:center;padding:6px 24px;font-size:12px;color:var(--primary);display:block;min-height:0;"></div>
@@ -874,7 +879,7 @@
             <option value="name_asc">ชื่อโครงการ A-Z</option>
           </select>
           <div style="flex:1"></div>
-          <button class="btn btn-xls btn-sm" onclick="window.exportBudget()" title="Export Excel">📥 Excel</button>
+          <button class="btn btn-xls btn-sm" onclick="window.exportBudget()" title="Export Excel"><i class="ti ti-file-spreadsheet" aria-hidden="true"></i>Excel</button>
         </div>
         </div>
         <!-- Tab: Budget -->
@@ -883,18 +888,18 @@
           <div id="bud-body" style="padding:4px 24px 0;"></div>
           <div style="padding:0 24px 28px;" id="bud-table-card">
             <div class="ov-card" style="padding:0;overflow:hidden;">
-              <div class="ov-card-title" style="padding:16px 16px 4px;">📋 รายโครงการ <span id="bud-table-cnt" style="font-weight:500;color:var(--txt3);"></span></div>
+              <div class="ov-card-title" style="padding:16px 16px 4px;"><i class="ti ti-list-details" aria-hidden="true"></i>รายโครงการ <span id="bud-table-cnt" style="font-weight:500;color:var(--txt3);"></span></div>
               <div style="overflow-x:auto;">
                 <table class="t-table" style="min-width:960px;">
                   <thead><tr>
                     <th>ชื่อโครงการ</th>
                     <th style="text-align:right">งบประมาณ (฿)</th>
-                    <th style="text-align:right">ใช้จริง (฿)</th>
-                    <th style="text-align:right">ผูกพัน (฿)</th>
-                    <th style="text-align:right">คงเหลือ (฿)</th>
-                    <th>% ใช้งบ</th>
-                    <th style="text-align:right">คืบหน้า</th>
-                    <th>สถานะงบ</th>
+                    <th style="text-align:right">ใช้จริง (฿)<span class="calc-tip" tabindex="0" data-html2canvas-ignore data-calc="ผลรวมรายการค่าใช้จ่าย (หน้า &quot;รายการค่าใช้จ่าย&quot;) ของโครงการ&#10;Advance ที่เคลียร์แล้วแต่ยังไม่ถูกแตกเป็นรายการค่าใช้จ่าย จะใช้ยอดเคลียร์ของ Advance แทน">i</span></th>
+                    <th style="text-align:right">ผูกพัน (฿)<span class="calc-tip" tabindex="0" data-html2canvas-ignore data-calc="Advance ที่สถานะ อนุมัติแล้ว / เบิกแล้ว / รอเคลียร์ (เงินออกไปแล้วหรือกำลังจะออก แต่ยังไม่มีรายการค่าใช้จ่ายจริง)&#10;ไม่นับ Advance ที่รออนุมัติ">i</span></th>
+                    <th style="text-align:right">คงเหลือ (฿)<span class="calc-tip" tabindex="0" data-html2canvas-ignore data-calc="งบประมาณ − (ใช้จริง + ผูกพัน)&#10;ติดลบ = เกินงบ">i</span></th>
+                    <th>% ใช้งบ<span class="calc-tip" tabindex="0" data-html2canvas-ignore data-calc="(ใช้จริง + ผูกพัน) ÷ งบประมาณ × 100">i</span></th>
+                    <th style="text-align:right">คืบหน้า<span class="calc-tip" tabindex="0" data-html2canvas-ignore data-calc="ความคืบหน้าที่บันทึกไว้ในโครงการ">i</span></th>
+                    <th>สถานะงบ<span class="calc-tip" tabindex="0" data-html2canvas-ignore data-calc="เกินงบ = ใช้จริง+ผูกพัน มากกว่างบ&#10;ใกล้เกิน = ใช้งบ ≥ 80%&#10;ไม่ได้ตั้งงบ = งบเป็น 0 แต่มีค่าใช้จ่าย&#10;ปกติ = นอกเหนือจากนี้">i</span></th>
                   </tr></thead>
                   <tbody id="bud-rows"></tbody>
                 </table>
@@ -946,8 +951,8 @@
             <option value="value_asc">มูลค่า (น้อย→มาก)</option>
           </select>
           <div style="flex:1"></div>
-          <button class="btn btn-xls btn-sm" onclick="window.exportContracts()" title="Export Excel">📥 Excel</button>
-          <button class="btn btn-pri btn-sm ce-only" onclick="window.openContractModal(null)">+ เพิ่มสัญญา</button>
+          <button class="btn btn-xls btn-sm" onclick="window.exportContracts()" title="Export Excel"><i class="ti ti-file-spreadsheet" aria-hidden="true"></i>Excel</button>
+          <button class="btn btn-pri btn-sm ce-only" onclick="window.openContractModal(null)"><i class="ti ti-plus" aria-hidden="true"></i>เพิ่มสัญญา</button>
         </div>
         <div id="ct-summary-bar"></div>
         <div id="ct-rows" style="padding:12px 24px 32px;"></div>
@@ -961,6 +966,9 @@
 
       <!-- ผู้ช่วยทีม — แชทถามข้อความ/โค้ดที่ทีมเก็บไว้ (ซ้าย) + คลังคำตอบ (ขวา) · src/modules/assist.js renderAssist -->
       <div class="view" id="view-assist"></div>
+
+      <!-- ขอใช้งานทีม Server — คำขอจากฟอร์ม public server-request.html → อนุมัติ → จัดคน/สร้างโครงการ · src/modules/server-request.js -->
+      <div class="view" id="view-server-request"></div>
 
       <!-- ระบบอบรม — ภาพรวมการอบรมทุกโครงการ + ตั้งค่ากลาง (หลักสูตรอบรม/คลังแบบทดสอบ/ใบประกาศ) จากระบบอบรม (/training/?view=overview) (src/modules/training.js)
            งานอบรมของแต่ละโครงการอยู่ที่ติดตามสถานะโครงการ › แท็บ "🎓 อบรม" · หน้าใน iframe ซ่อนแถบเมนูของตัวเอง -->
@@ -1075,6 +1083,23 @@
     <div class="m-foot">
       <button class="btn btn-ghost" onclick="window.closeM('m-hd-link')">ปิด</button>
       <button class="btn btn-pri" onclick="window.hdCopyPublicFormLink()">📋 คัดลอกลิงก์</button>
+    </div>
+  </div>
+</div>
+
+<!-- HELPDESK PROBLEM PLAN MODAL (แผนจัดการปัญหาที่พบซ้ำ — แท็บ 🔁 ปัญหาซ้ำ) -->
+<div class="overlay" id="m-hd-prob">
+  <div class="modal md">
+    <div class="m-head">
+      <div class="m-icon" style="background:rgba(255,166,43,.14)">🔁</div>
+      <div class="m-title" id="m-hd-prob-title">แผนจัดการปัญหา</div>
+      <button class="m-x" onclick="window.closeM('m-hd-prob')">✕</button>
+    </div>
+    <div class="m-body" id="m-hd-prob-body"></div>
+    <div class="m-foot">
+      <button class="btn btn-ghost" id="m-hd-prob-del" style="color:var(--coral);margin-right:auto" onclick="window.hdRcPlanDelete()">🗑 ลบแผน</button>
+      <button class="btn btn-ghost" onclick="window.closeM('m-hd-prob')">ยกเลิก</button>
+      <button class="btn btn-pri" id="m-hd-prob-save" onclick="window.hdRcPlanSave()">💾 บันทึก</button>
     </div>
   </div>
 </div>
@@ -2454,9 +2479,12 @@
 <script src="src/config/site-deploy-form.config.js"></script>
 <script src="src/config/site-notice-form.config.js"></script>
 <script src="src/config/helpdesk.config.js"></script>
+<script src="src/config/server-request.config.js"></script>
 
 <!-- 2. Utils Layer (ไม่มี dependency ต่อกัน) -->
+<script src="src/utils/icons.util.js"></script>
 <script src="src/utils/dom.util.js"></script>
+<script src="src/utils/calc-tip.util.js"></script>
 <script src="src/utils/chat-import.util.js"></script>
 <script src="src/utils/date.util.js"></script>
 <script src="src/utils/number.util.js"></script>
@@ -2485,6 +2513,7 @@
 <script src="src/services/site-notice-form.service.js"></script>
 <script src="src/services/ai.service.js"></script>
 <script src="src/services/helpdesk.service.js"></script>
+<script src="src/services/push.service.js"></script>
 
 <!-- 4. Router -->
 <script src="src/router.js"></script>
@@ -2512,11 +2541,13 @@
 <script type="module" src="src/modules/worklog.js"></script>
 <script type="module" src="src/modules/form-tracker.js"></script>
 <script type="module" src="src/modules/impl-tracker.js"></script>
+<script src="src/modules/print-documents.js"></script>
 <script type="module" src="src/modules/helpdesk.js"></script>
 <script src="src/modules/all-issues.js"></script>
 <script src="src/modules/ask-ai.js"></script>
 <script src="src/modules/schedule-email.js"></script>
 <script src="src/modules/assist.js"></script>
+<script src="src/modules/server-request.js"></script>
 <script src="src/modules/training.js"></script>
 <script src="src/modules/budget.js"></script>
 <script src="src/modules/export.js"></script>

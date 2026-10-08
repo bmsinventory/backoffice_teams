@@ -4,11 +4,16 @@
 ================================================================ */
 
 // ── Dark Mode ── (ตั้งค่าตอนเปิดหน้าอยู่ที่ src/utils/theme.util.js ใช้ร่วมกับระบบอบรม — ที่นี่เหลือปุ่มสลับ)
-// ตั้งไอคอนปุ่มหลังหน้าโหลด (ไฟล์นี้โหลดใน <head> ก่อนมีปุ่ม — เดิมจึงเป็น 🌙 เสมอแม้อยู่โหมดมืด)
+// ตั้งไอคอนปุ่มหลังหน้าโหลด (ไฟล์นี้โหลดใน <head> ก่อนมีปุ่ม)
 document.addEventListener('DOMContentLoaded', function () { updateDMIcon(window.BmsTheme.isDark()); });
 function updateDMIcon(isDark) {
   var btn = document.getElementById('dm-toggle');
-  if (btn) btn.textContent = isDark ? '☀️' : '🌙';
+  if (btn) {
+    btn.innerHTML = window.appIcon
+      ? window.appIcon(isDark ? 'sun' : 'moon')
+      : (isDark ? '☀️' : '🌙');
+    btn.title = isDark ? 'เปลี่ยนเป็นโหมดสว่าง' : 'เปลี่ยนเป็นโหมดมืด';
+  }
 }
 
 window.toggleDarkMode = function () {

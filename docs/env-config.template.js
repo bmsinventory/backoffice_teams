@@ -1,5 +1,6 @@
 window.SUPABASE_URL      = '${SUPABASE_URL}';
 window.SUPABASE_ANON_KEY = '${SUPABASE_ANON_KEY}';
+window.WEB_PUSH_PUBLIC_KEY = '${WEB_PUSH_PUBLIC_KEY}';
 
 // ── คำขอข้อมูล (REST /rest/v1/) วิ่งผ่าน nginx ของหน้าเว็บนี้ที่ /db/rest/v1/ ซึ่งบีบอัด gzip ให้
 // (Proxy ข้างหน้าส่ง JSON เต็มขนาด — เปิดระบบครั้งหนึ่ง ~1.3 MB) · ครอบ fetch ก่อนโหลด supabase-js → ทุกหน้า/ทุก client ได้ผลเหมือนกัน

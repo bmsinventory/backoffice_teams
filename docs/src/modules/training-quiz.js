@@ -9,7 +9,7 @@
    ข้อที่มีคนสอบแล้วแก้คำถาม/ตัวเลือก/เฉลยไม่ได้ (ผลสอบเก่าจะไม่ตรง) — แก้ = ปิดข้อเดิม + เพิ่มเป็นข้อใหม่ · ลบ = ปิดข้อ
    ผู้สอบใช้ /training/?page=quiz (src/modules/training-quiz-take.js) · ใบประกาศ/อีเมล = src/utils/trn-cert.util.js
 ══════════════════════════════════════════════════════════════════════════ */
-let _tqaTab='quizzes',_tqaQuizzes=[],_tqaUse=[],_tqaQ=null,_tqaQs=[],_tqaRes=[],_tqaCerts=[],_tqaSt=null,_tqaSite=null,_tqaDraft=[];
+let _tqaTab='quizzes',_tqaQuizzes=[],_tqaUse=[],_tqaQ=null,_tqaQs=[],_tqaRes=[],_tqaPending=[],_tqaCerts=[],_tqaSt=null,_tqaSite=null,_tqaDraft=[];
 const _TQA_CH=['ก','ข','ค','ง','จ','ฉ'];
 const _tqaLink=catId=>`${location.origin}${location.pathname.replace(/[^/]*$/,'')}?page=quiz&site=${encodeURIComponent(currentSite)}&cat=${catId}`;
 const _tqaName=q=>q?.title||'';
@@ -50,13 +50,15 @@ function _tqaRender(){
 
 /* ══════════════════ คลังแบบทดสอบกลาง ══════════════════ */
 async function _tqaLoadQuizzes(){
-  const [qR,uR,cR]=await Promise.all([
+  const [qR,uR,cR,tR]=await Promise.all([
     _sb.from('trn_quizzes').select('*').order('title'),
     _allRows(()=>_sb.from('trn_site_categories').select('site,cat_id,trn_categories!inner(quiz_id)').order('cat_id')),
     OVERVIEW?_sb.from('trn_categories').select('*').order('id'):_NONE, // เมนูระบบอบรม: หลักสูตรกลางทั้งหมด (แสดงว่าชุดไหนผูกกับหลักสูตรใด)
+    OVERVIEW?_sb.from('ptypes').select('id,type_id,label_th,label,color_hex'):_NONE, // ประเภทโครงการ (จัดกลุ่มตามประเภทของหลักสูตรที่ผูก)
   ]);
   _tqaQuizzes=qR.data||[];
   if(cR.data)allCategories=categories=cR.data.map(r=>_mCat(r,null));
+  if(tR.data)_ovPtypes=_mapPtypes(tR.data);
   _tqaUse=(uR.data||[]).map(x=>({site:x.site,quiz_id:x.trn_categories?.quiz_id})).filter(x=>x.quiz_id);
   _tqaSyncCats();
 }
@@ -64,7 +66,7 @@ async function _tqaLoadQuizzes(){
 function _tqaSyncCats(){
   categories.forEach(c=>{const q=_tqaQuizzes.find(x=>x.id===c.quizId);if(q&&q.is_active&&c.quizOpen)_quizCatIds.add(c.id);else _quizCatIds.delete(c.id);});
 }
-// แถบสรุป (ทั้งหมด/ใช้งาน/ปิดใช้งาน/ข้อสอบไม่พอ — กดชิปเพื่อกรอง) + ค้นหา · การ์ดหน้าตาเดียวกับแท็บหลักสูตรอบรม (ov-cat-*)
+// แถบสรุป (ทั้งหมด/ใช้งาน/ปิดใช้งาน/ข้อสอบไม่พอ — กดชิปเพื่อกรอง) + ค้นหา · แถวหน้าตาเดียวกับแท็บหลักสูตรอบรม (ov-cg / ov-cr)
 let _tqaQCount={},_tqaListQ='',_tqaListF='all';
 const _tqaShort=q=>(_tqaQCount[q.id]||0)<q.questions_count;
 async function _tqaList(){
@@ -95,39 +97,50 @@ function _tqaListGrid(){
   if(!el)return;
   const edit=_tqaCanEdit(),kw=_tqaListQ.trim().toLowerCase();
   const pass={all:()=>true,on:q=>q.is_active,off:q=>!q.is_active,short:_tqaShort}[_tqaListF]||(()=>true);
-  const list=[..._tqaQuizzes.filter(q=>q.is_active),..._tqaQuizzes.filter(q=>!q.is_active)]
-    .filter(q=>pass(q)&&(!kw||q.title.toLowerCase().includes(kw)));
+  const match=q=>pass(q)&&(!kw||q.title.toLowerCase().includes(kw)||categories.some(c=>c.quizId===q.id&&c.name.toLowerCase().includes(kw)));
+  const list=_tqaQuizzes.filter(match);
   if(!list.length){el.innerHTML='<div class="tqa-empty">ไม่พบแบบทดสอบที่ตรงกับเงื่อนไข</div>';return;}
-  el.innerHTML='<div class="ov-cat-grid">'+list.map(q=>{
+  // ประเภทโครงการ → หลักสูตรอบรม → แบบทดสอบที่หลักสูตรนั้นผูก (ชุดเดียวผูกหลายหลักสูตร = แสดงใต้ทุกหลักสูตร) · ชุดที่ยังไม่ผูกหลักสูตร = กลุ่มท้าย
+  // แสดงเฉพาะหลักสูตรที่ผูกแบบทดสอบแล้ว
+  const ids=new Set(list.map(q=>q.id));
+  const byActive=(a,b)=>(b.is_active-a.is_active)||a.title.localeCompare(b.title,'th');
+  const row=q=>{
     const cnt=_tqaQCount[q.id]||0,short=_tqaShort(q),used=_tqaSites(q.id).size;
-    const cats=categories.filter(c=>c.quizId===q.id);
-    return`<div class="ov-cat-card${q.is_active?'':' off'}" style="--cat-c:${q.is_active?'var(--primary)':'var(--text-muted)'};">
-      <div class="ov-cat-head">
-        <span class="tqa-cat-ic" style="background:var(--primary-light);color:var(--primary);"><i class="ti ti-clipboard-list"></i></span>
-        <div class="ov-cat-name">${_esc(q.title)}${q.is_active?'':' <span class="badge badge-gray">ปิดใช้งาน</span>'}</div>
-        ${edit?`<div class="ov-cat-act">
-          <button class="btn btn-ghost btn-sm" onclick="_tqaEdit(${q.id})" title="ตั้งค่า"><i class="ti ti-settings"></i></button>
-          <button class="btn btn-ghost btn-sm" onclick="_tqaCopy(${q.id})" title="คัดลอก — สร้างชุดใหม่จากชุดนี้ แล้วแก้ต่อ"><i class="ti ti-copy"></i></button>
-          <button class="btn btn-ghost btn-sm" onclick="_tqaDelete(${q.id})" title="ลบแบบทดสอบ"><i class="ti ti-trash" style="color:var(--danger)"></i></button></div>`:''}
+    const meta=[`สุ่ม ${q.questions_count} จาก ${cnt} ข้อ`,`ผ่าน ${q.pass_percent}%`,q.time_limit_min?q.time_limit_min+' นาที':'ไม่จับเวลา',q.max_attempts?'สอบได้ '+q.max_attempts+' ครั้ง':'ไม่จำกัดครั้ง'];
+    return`<div class="ov-cr tqa-qr${q.is_active?'':' off'}">
+      <span class="tqa-cat-ic" style="background:var(--primary-light);color:var(--primary);"><i class="ti ti-clipboard-list"></i></span>
+      <div class="ov-cr-main">
+        <div class="ov-cr-name">${_esc(q.title)}${q.is_active?'':' <span class="badge badge-gray">ปิดใช้งาน</span>'}</div>
+        <div class="tqa-qr-meta">${meta.map(_esc).join('<i>·</i>')}</div>
+        ${short?`<div class="tqa-qr-warn"><i class="ti ti-alert-triangle"></i>ข้อสอบในคลังน้อยกว่าจำนวนที่สุ่ม — ผู้สอบจะได้เพียง ${cnt} ข้อ</div>`:''}
       </div>
-      <div class="ov-cat-stats three">
-        <div${short?' class="warn"':''}><i class="ti ti-database"></i><b>${cnt}</b> ข้อในคลัง</div>
-        <div><i class="ti ti-arrows-shuffle"></i><b>${q.questions_count}</b> สุ่ม/ครั้ง</div>
-        <div><i class="ti ti-target"></i><b>${q.pass_percent}%</b> ผ่าน</div>
-      </div>
-      <div class="tqa-chips">
-        <span><i class="ti ti-clock"></i>${q.time_limit_min?q.time_limit_min+' นาที':'ไม่จับเวลา'}</span>
-        <span><i class="ti ti-repeat"></i>${q.max_attempts?'สอบได้ '+q.max_attempts+' ครั้ง':'ไม่จำกัดครั้ง'}</span>
-        <span><i class="ti ti-building-hospital"></i>ใช้ใน ${used} โครงการ</span>
-      </div>
-      ${short?`<div class="tqa-warn" style="margin:0;"><i class="ti ti-alert-triangle"></i>ข้อสอบในคลังน้อยกว่าจำนวนที่สุ่ม — ผู้สอบจะได้เพียง ${cnt} ข้อ</div>`:''}
-      <div class="ov-cat-quizbox${cats.length?'':' none'}">
-        <label><i class="ti ti-${cats.length?'category':'alert-triangle'}"></i>${cats.length?'ผูกกับหลักสูตรอบรม':'ยังไม่ผูกกับหลักสูตรใด'}</label>
-        ${cats.length?`<div class="ov-cat-quiz-name">${cats.map(c=>_esc(c.name)).join(', ')}</div>`:''}
-      </div>
-      <button class="btn btn-primary btn-sm" onclick="_tqaOpen(${q.id})"><i class="ti ti-list-details"></i>จัดการข้อสอบ (${cnt} ข้อ)</button>
+      <div class="ov-cr-use"><span title="โครงการที่ใช้ชุดนี้"><i class="ti ti-building-hospital"></i>${used} โครงการ</span></div>
+      <button class="btn btn-primary btn-sm" onclick="_tqaOpen(${q.id})"><i class="ti ti-list-details"></i>ข้อสอบ ${cnt} ข้อ</button>
+      ${edit?`<div class="ov-cr-act">
+        <button class="btn btn-ghost btn-sm" onclick="_tqaEdit(${q.id})" title="ตั้งค่า"><i class="ti ti-settings"></i></button>
+        <button class="btn btn-ghost btn-sm" onclick="_tqaCopy(${q.id})" title="คัดลอก — สร้างชุดใหม่จากชุดนี้ แล้วแก้ต่อ"><i class="ti ti-copy"></i></button>
+        <button class="btn btn-ghost btn-sm" onclick="_tqaDelete(${q.id})" title="ลบแบบทดสอบ"><i class="ti ti-trash" style="color:var(--danger)"></i></button></div>`:''}
     </div>`;
-  }).join('')+'</div>';
+  };
+  const course=c=>{
+    const cm=CM[c.color]||CM.blue,qs=_tqaQuizzes.filter(q=>q.id===c.quizId&&ids.has(q.id));
+    if(!qs.length)return'';
+    return`<div class="tqa-cg-course"><span class="tqa-cg-ic" style="background:${cm.bg};color:${cm.c};"><i class="ti ti-${c.icon}"></i></span>${_esc(c.name)}${c.certCode?`<span class="ov-cr-code">${_esc(c.certCode)}</span>`:''}</div>
+      ${qs.map(row).join('')}`;
+  };
+  const known=new Set(_ovPtypes.map(t=>t.id));
+  const byName=(a,b)=>a.name.localeCompare(b.name,'th');
+  const groups=[..._ovPtypes,{id:'',label:'ยังไม่ระบุประเภทโครงการ',color:'var(--text-muted)'}].map(t=>{
+    const cats=categories.filter(c=>t.id?c.typeId===t.id:!known.has(c.typeId)).sort(byName);
+    const html=cats.map(course).join('');
+    return{t,html,n:new Set(cats.filter(c=>ids.has(c.quizId)).map(c=>c.quizId)).size};
+  }).filter(g=>g.html);
+  const loose=list.filter(q=>!categories.some(c=>c.quizId===q.id)).sort(byActive);
+  if(loose.length)groups.push({t:{label:'ยังไม่ผูกกับหลักสูตรอบรม',color:'var(--warn)'},n:loose.length,html:loose.map(row).join('')});
+  el.innerHTML=groups.map(g=>`<div class="ov-cg">
+      <div class="ov-cg-head"><span class="ov-cg-dot" style="background:${g.t.color};"></span>${_esc(g.t.label)}<b>${g.n} ชุด</b></div>
+      <div class="ov-cg-list">${g.html}</div>
+    </div>`).join('');
 }
 function _tqaEdit(id){
   const q=id?_tqaQuizzes.find(x=>x.id===id):{title:'',questions_count:10,pass_percent:80,time_limit_min:0,max_attempts:0,is_active:true};
@@ -316,10 +329,10 @@ function _tqaAiOpen(){
   _tqaDraft=[];
   _tqaModal('modal-tqa-ai',`<div class="modal-title"><i class="ti ti-sparkles"></i>AI ร่างข้อสอบ</div>
     <div class="form-row">
-      <div class="form-group"><label class="form-label">จำนวนข้อ</label><select class="form-control" id="tqa-ai-n">${[5,10,15,20].map(n=>`<option ${n===10?'selected':''}>${n}</option>`).join('')}</select></div>
-      <div class="form-group"><label class="form-label">หัวข้อ</label><input class="form-control" value="${_esc(_tqaName(_tqaQ))}" id="tqa-ai-topic"></div>
+      <div class="form-group"><label class="form-label tqa-lbl"><i class="ti ti-list-numbers"></i>จำนวนข้อ</label><select class="form-control" id="tqa-ai-n">${[5,10,15,20].map(n=>`<option ${n===10?'selected':''}>${n}</option>`).join('')}</select></div>
+      <div class="form-group"><label class="form-label tqa-lbl"><i class="ti ti-bookmark"></i>หัวข้อ</label><input class="form-control" value="${_esc(_tqaName(_tqaQ))}" id="tqa-ai-topic"></div>
     </div>
-    <div class="form-group"><label class="form-label" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">เนื้อหาอ้างอิง <span style="font-weight:400;color:var(--text-muted)">(แนบไฟล์หรือวางเนื้อหาจากคู่มือ/สไลด์ — ว่าง = ออกจากชื่อหัวข้อ)</span>
+    <div class="form-group"><label class="form-label" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><span class="tqa-lbl"><i class="ti ti-file-text"></i>เนื้อหาอ้างอิง</span> <span style="font-weight:400;color:var(--text-muted)">(แนบไฟล์หรือวางเนื้อหาจากคู่มือ/สไลด์ — ว่าง = ออกจากชื่อหัวข้อ)</span>
         <button type="button" class="btn btn-sm" id="tqa-ai-filebtn" onclick="document.getElementById('tqa-ai-file').click()" style="margin-left:auto;"><i class="ti ti-paperclip"></i>แนบไฟล์ PDF / Word / PowerPoint</button></label>
       <input type="file" id="tqa-ai-file" accept=".pdf,.docx,.pptx" multiple hidden onchange="_tqaAiFiles(this)">
       <textarea class="form-control" id="tqa-ai-src" rows="5" placeholder="วางเนื้อหาที่ต้องการให้ออกข้อสอบ หรือกด แนบไฟล์" oninput="_tqaAiSrcInfo()"></textarea>
@@ -413,11 +426,20 @@ ${existing.length?`ข้อสอบที่มีอยู่แล้ว (�
 function _tqaAiShow(){
   const el=document.getElementById('tqa-ai-out');
   if(!_tqaDraft.length){el.innerHTML='';return;}
-  el.innerHTML=`<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">ตรวจความถูกต้องก่อนเพิ่ม — ติ๊กเฉพาะข้อที่ใช้ได้ (แก้ไขรายละเอียดได้หลังเพิ่มเข้าคลัง)</div>
-    ${_tqaDraft.map((q,i)=>`<label class="tqa-draft${q.dup?' dup':''}"><input type="checkbox" ${q.pick?'checked':''} onchange="_tqaDraft[${i}].pick=this.checked">
-      <div><b>${i+1}. ${_esc(q.question)}</b>${q.dup?' <span class="badge badge-warn">คล้ายข้อที่มีอยู่</span>':''}
-      <div class="tqa-q-ch">${q.choices.map((c,j)=>`<div class="${j===q.answer?'ok':''}"><b>${_TQA_CH[j]}</b>${_esc(c)}</div>`).join('')}</div></div></label>`).join('')}
-    <button class="btn btn-success" onclick="_tqaAiAdd()" style="width:100%;justify-content:center;margin-top:8px;"><i class="ti ti-plus"></i>เพิ่มข้อที่เลือกเข้าคลัง</button>`;
+  const dup=_tqaDraft.filter(q=>q.dup).length;
+  el.innerHTML=`<div class="tqa-draft-head"><i class="ti ti-wand"></i><div><b>AI ร่างได้ ${_tqaDraft.length} ข้อ</b>
+      <span><i class="ti ti-eye-check"></i>ตรวจความถูกต้องก่อนเพิ่ม — ติ๊กเฉพาะข้อที่ใช้ได้ (แก้ไขรายละเอียดได้หลังเพิ่มเข้าคลัง)</span></div>
+      ${dup?`<span class="badge badge-warn"><i class="ti ti-copy"></i>คล้ายของเดิม ${dup} ข้อ</span>`:''}</div>
+    ${_tqaDraft.map((q,i)=>`<label class="tqa-draft${q.dup?' dup':''}"><input type="checkbox" ${q.pick?'checked':''} onchange="_tqaDraft[${i}].pick=this.checked;_tqaAiCount()">
+      <div class="tqa-draft-body"><div class="tqa-q-head"><span class="tqa-q-no">${i+1}</span><div class="tqa-q-text"><i class="ti ti-help-circle tqa-draft-qi"></i>${_esc(q.question)}${q.dup?' <span class="badge badge-warn"><i class="ti ti-alert-triangle"></i>คล้ายข้อที่มีอยู่</span>':''}</div></div>
+      <div class="tqa-q-ch">${q.choices.map((c,j)=>`<div class="${j===q.answer?'ok':''}"><b>${_TQA_CH[j]}</b>${_esc(c)}${j===q.answer?'<i class="ti ti-circle-check-filled" title="ข้อที่ถูก"></i>':''}</div>`).join('')}</div>
+      ${q.explanation?`<div class="tqa-q-ex"><i class="ti ti-bulb"></i>${_esc(q.explanation)}</div>`:''}</div></label>`).join('')}
+    <button class="btn btn-success" id="tqa-ai-add" onclick="_tqaAiAdd()" style="width:100%;justify-content:center;margin-top:8px;"></button>`;
+  _tqaAiCount();
+}
+function _tqaAiCount(){
+  const b=document.getElementById('tqa-ai-add'),n=_tqaDraft.filter(q=>q.pick).length;
+  if(b)b.innerHTML=`<i class="ti ti-database-plus"></i>เพิ่มข้อที่เลือกเข้าคลัง (${n} ข้อ)`;
 }
 async function _tqaAiAdd(){
   const base=(_tqaQs.at(-1)?.sort_order||0)+1;
@@ -457,11 +479,12 @@ async function _tqaImport(inp){
 /* ══════════════════ ผลสอบ + ใบประกาศ ══════════════════ */
 async function _tqaResults(){
   await _tqaLoadQuizzes();
-  const [aR,cR]=await Promise.all([
+  const [aR,pR,cR]=await Promise.all([
     _allRows(()=>_sb.from('trn_quiz_attempts').select('id,quiz_id,reg_id,full_name,dept,position,email,score,total,percent,status,completed_at').eq('site',currentSite).neq('status','started').order('completed_at',{ascending:false})),
+    _allRows(()=>_sb.from('trn_quiz_attempts').select('id,quiz_id,reg_id,full_name,dept,position,email,status,started_at').eq('site',currentSite).eq('status','started').order('started_at',{ascending:false})),
     _sb.from('trn_quiz_certs').select('*').eq('site',currentSite),
   ]);
-  _tqaRes=aR.data||[];_tqaCerts=cR.data||[];
+  _tqaRes=aR.data||[];_tqaPending=pR.data||[];_tqaCerts=cR.data||[];
   _tqaEl().innerHTML=`<div class="tqa-bar">
       <div class="tqa-filters">
         <select class="form-control" id="tqa-r-quiz" onchange="_tqaResTable()"><option value="">ทุกแบบทดสอบ</option>${_tqaQuizzes.filter(q=>_tqaRes.some(a=>a.quiz_id===q.id)).map(q=>`<option value="${q.id}">${_esc(_tqaName(q))}</option>`).join('')}</select>
@@ -469,8 +492,14 @@ async function _tqaResults(){
         <input class="form-control" id="tqa-r-q" placeholder="ค้นหาชื่อ / หน่วยงาน / อีเมล" oninput="_tqaResTable()">
       </div>
       <div class="tqa-bar-actions"><button class="btn btn-success btn-sm" onclick="_tqaExportRes()"><i class="ti ti-file-spreadsheet"></i>Export Excel</button></div>
-    </div><div id="tqa-r-sum" class="tqa-sum"></div><div id="tqa-r-table" class="an-table-wrap" style="max-height:none;"></div>`;
+    </div><div id="tqa-r-sum" class="tqa-sum"></div><div id="tqa-r-table" class="an-table-wrap" style="max-height:none;"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:24px;margin-bottom:10px;">
+      <div><h3 style="margin:0;font-size:16px;"><i class="ti ti-hourglass"></i> คิวสอบที่ค้าง <span class="badge badge-gray">${_tqaPending.length}</span></h3>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:3px;">ผู้ที่เริ่มทำแบบทดสอบแต่ยังไม่ได้ส่งคำตอบ รวมถึงผู้ที่กำลังทำอยู่ในขณะนี้</div></div>
+      ${_tqaPending.length?'<button class="btn btn-danger btn-sm" onclick="_tqaDelPendingAll()"><i class="ti ti-trash"></i>ลบคิวทั้งหมด</button>':''}
+    </div><div id="tqa-p-table" class="an-table-wrap" style="max-height:none;"></div>`;
   _tqaResTable();
+  _tqaPendingTable();
 }
 function _tqaResRows(){
   const qz=+document.getElementById('tqa-r-quiz').value,st=document.getElementById('tqa-r-st').value,q=_normTxt(document.getElementById('tqa-r-q').value);
@@ -501,6 +530,41 @@ function _tqaResTable(){
         ${c?`<button class="btn btn-ghost btn-sm" title="${c.is_revoked?'คืนสถานะใบประกาศ':'ยกเลิกใบประกาศ'}" onclick="_tqaRevoke('${_esc(c.cert_id)}',${!c.is_revoked})"><i class="ti ti-${c.is_revoked?'rotate-clockwise':'certificate-off'}"></i></button>`:''}
         <button class="btn btn-ghost btn-sm" title="ลบผลสอบ" onclick="_tqaDelAttempt('${a.id}')"><i class="ti ti-trash" style="color:var(--danger)"></i></button></td></tr>`;
   }).join('')+'</tbody></table>';
+}
+function _tqaPendingTable(){
+  const el=document.getElementById('tqa-p-table');
+  if(!el)return;
+  if(!_tqaPending.length){el.innerHTML='<div class="tqa-empty">ไม่มีคิวสอบที่ค้าง</div>';return;}
+  const now=Date.now(),age=d=>{
+    if(!d)return'-';
+    const mins=Math.max(0,Math.floor((now-new Date(d).getTime())/60000));
+    if(mins<60)return`${mins} นาที`;
+    const hrs=Math.floor(mins/60);return hrs<24?`${hrs} ชั่วโมง`:`${Math.floor(hrs/24)} วัน`;
+  };
+  el.innerHTML=`<table class="adetail-table"><thead><tr><th>เริ่มเมื่อ</th><th>ผู้สอบ</th><th>แบบทดสอบ</th><th>ค้างมาแล้ว</th><th></th></tr></thead><tbody>`+_tqaPending.map(a=>{
+    const qz=_tqaQuizzes.find(q=>q.id===a.quiz_id);
+    return`<tr><td style="white-space:nowrap;font-size:12px;">${a.started_at?new Date(a.started_at).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'}):'-'}</td>
+      <td><div style="font-weight:600;">${_esc(a.full_name)}${a.reg_id?'':' <span class="badge badge-gray">นอกรายชื่อ</span>'}</div>
+        <div style="font-size:11px;color:var(--text-muted);">${_esc([a.dept,a.email].filter(Boolean).join(' · '))}</div></td>
+      <td style="font-size:12px;">${_esc(qz?_tqaName(qz):'-')}</td><td style="white-space:nowrap;">${age(a.started_at)}</td>
+      <td style="text-align:right;"><button class="btn btn-ghost btn-sm" title="ลบคิวสอบ" onclick="_tqaDelPending('${a.id}')"><i class="ti ti-trash" style="color:var(--danger)"></i></button></td></tr>`;
+  }).join('')+'</tbody></table>';
+}
+async function _tqaDelPending(id){
+  const a=_tqaPending.find(x=>x.id===id);if(!a)return;
+  if(!await showConfirm(`ลบคิวสอบของ ${a.full_name}?`,'หากผู้สอบกำลังทำข้อสอบอยู่ จะไม่สามารถส่งคำตอบของคิวนี้ได้',{okLabel:'ลบคิว'}))return;
+  try{await _tqaAdmin('delete_attempt',{id});showToast('ลบคิวสอบแล้ว');_tqaResults();}
+  catch(e){showToast(e.message,'danger');}
+}
+async function _tqaDelPendingAll(){
+  const rows=_tqaPending.slice();if(!rows.length)return;
+  if(!await showConfirm(`ลบคิวสอบที่ค้างทั้งหมด ${rows.length} รายการ?`,'รวมผู้ที่อาจกำลังทำข้อสอบอยู่ และไม่สามารถกู้คืนคิวเดิมได้',{okLabel:'ลบทั้งหมด'}))return;
+  try{
+    const rs=await Promise.allSettled(rows.map(a=>_tqaAdmin('delete_attempt',{id:a.id})));
+    const failed=rs.filter(x=>x.status==='rejected');
+    showToast(failed.length?`ลบสำเร็จ ${rows.length-failed.length} รายการ · ไม่สำเร็จ ${failed.length} รายการ`:`ลบคิวสอบแล้ว ${rows.length} รายการ`,failed.length?'warn':'success');
+    _tqaResults();
+  }catch(e){showToast(e.message,'danger');}
 }
 function _tqaResend(certId){
   const c=_tqaCerts.find(x=>x.cert_id===certId);

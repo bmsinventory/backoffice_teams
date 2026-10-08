@@ -30,15 +30,15 @@ window.renderOverview = function(){
   var critCount=fProjs.filter(p=>{if(p.progress===100||p.stage==='close'||!p.end)return false;var d=Math.ceil((pd(p.end)-now)/(1000*60*60*24));return d<=30;}).length;
   // ── KPI cards ──
   var stats=[
-    {k:'Budget Health',v:fc(totalBudget),s:'Total Budget '+(yr||'ทุกปี'),sub:totalBudget>0?'<span style="color:#06d6a0;font-size:11px;font-weight:700;">↑ On Target</span>':'',icon:'💵',g1:'#06d6a0',g2:'#4cc9f0'},
-    {k:'Project Velocity',v:`${totalActive} / ${fProjs.length}`,s:'Active Projects Now',sub:`<span style="color:#4361ee;font-size:11px;font-weight:700;">↑ ${health.completed} Completed</span>`,icon:'⚡',g1:'#4361ee',g2:'#7209b7'},
-    {k:'Resource Efficiency',v:`${resourceEff}%`,s:`${activeStaff.size} of ${totalStaff} Members Active`,sub:`<span style="font-size:11px;font-weight:700;color:${resourceEff===100?'#06d6a0':'#ffa62b'};">${resourceEff===100?'Full Utilization':'Partial Utilization'}</span>`,icon:'👥',g1:'#7209b7',g2:'#f72585'},
-    {k:'Critical Alerts',v:critCount,s:`Projects Ending < 30 Days`,sub:`<span style="color:${issueCount>0?'var(--coral)':'#06d6a0'};font-size:11px;font-weight:700;">${issueCount>0?'⚠ Action Required':'✓ All on track'}</span>`,icon:'🚨',g1:critCount>0?'#ff6b6b':'#06d6a0',g2:critCount>0?'#ffa62b':'#4cc9f0'},
+    {k:'Budget Health',tip:'ผลรวม "มูลค่าโครงการ" ของทุกโครงการที่ผ่านตัวกรอง (ปีที่เริ่มโครงการ / กลุ่ม / ประเภท)',v:fc(totalBudget),s:'Total Budget '+(yr||'ทุกปี'),sub:totalBudget>0?'<span style="color:#06d6a0;font-size:11px;font-weight:700;">↑ On Target</span>':'',icon:'💵',g1:'#06d6a0',g2:'#4cc9f0'},
+    {k:'Project Velocity',tip:'โครงการที่ยังไม่เสร็จ / โครงการทั้งหมดที่ผ่านตัวกรอง\nถือว่า "เสร็จ" เมื่อ ความคืบหน้า 100% หรือ ขั้นตอน = ปิดโครงการ หรือ สถานะ = เสร็จสิ้น',v:`${totalActive} / ${fProjs.length}`,s:'Active Projects Now',sub:`<span style="color:#4361ee;font-size:11px;font-weight:700;">↑ ${health.completed} Completed</span>`,icon:'⚡',g1:'#4361ee',g2:'#7209b7'},
+    {k:'Resource Efficiency',tip:'จำนวนพนักงานในทีมของโครงการที่ยังไม่เสร็จ (ไม่นับซ้ำ) ÷ พนักงานที่ใช้งานอยู่ทั้งหมด × 100',v:`${resourceEff}%`,s:`${activeStaff.size} of ${totalStaff} Members Active`,sub:`<span style="font-size:11px;font-weight:700;color:${resourceEff===100?'#06d6a0':'#ffa62b'};">${resourceEff===100?'Full Utilization':'Partial Utilization'}</span>`,icon:'👥',g1:'#7209b7',g2:'#f72585'},
+    {k:'Critical Alerts',tip:'จำนวนโครงการที่ยังไม่เสร็จ และวันสิ้นสุดเหลือไม่เกิน 30 วัน (รวมที่เลยกำหนดแล้ว)\n"Action Required" = มีโครงการล่าช้า (เลยวันสิ้นสุด) หรือเสี่ยง (เหลือ ≤ 15 วันแต่คืบหน้า < 80%)',v:critCount,s:`Projects Ending < 30 Days`,sub:`<span style="color:${issueCount>0?'var(--coral)':'#06d6a0'};font-size:11px;font-weight:700;">${issueCount>0?'⚠ Action Required':'✓ All on track'}</span>`,icon:'🚨',g1:critCount>0?'#ff6b6b':'#06d6a0',g2:critCount>0?'#ffa62b':'#4cc9f0'},
   ];
   document.getElementById('stat-row').innerHTML=stats.map(function(s,i){
     return `<div class="stat-c fade" style="animation-delay:${i*60}ms;display:flex;flex-direction:column;gap:2px;">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px;">
-        <div class="stat-k">${s.k}</div>
+        <div class="stat-k">${s.k}${window.calcTip(s.tip)}</div>
         <div class="stat-icon" style="background:linear-gradient(135deg,${s.g1}18,${s.g2}18);width:36px;height:36px;flex-shrink:0;">${s.icon}</div>
       </div>
       <div class="stat-v" style="background:linear-gradient(135deg,${s.g1},${s.g2});-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-size:26px;">${s.v}</div>
@@ -447,11 +447,11 @@ window.renderAnnualTarget = function(fProjs, yr) {
         '<table style="width:100%;border-collapse:collapse;min-width:600px;">' +
           '<thead><tr>' +
             '<th style="' + colH + 'text-align:left;">ประเภท / กลุ่มโครงการ</th>' +
-            '<th style="' + colH + 'text-align:right;">🎯 เป้าหมาย</th>' +
-            '<th style="' + colH + '">📁 ยอดโครงการทั้งหมด</th>' +
-            '<th style="' + colH + '">✅ ปิดโครงการแล้ว</th>' +
-            '<th style="' + colH + 'text-align:right;">ต้องหาเพิ่ม</th>' +
-            '<th style="' + colH + 'text-align:right;">ต้องปิดเพิ่ม</th>' +
+            '<th style="' + colH + 'text-align:right;">🎯 เป้าหมาย' + window.calcTip('เป้ามูลค่าที่ตั้งไว้ของปีนี้ ต่อประเภทโครงการ (แถวกลุ่ม = รวมเป้าของทุกประเภทในกลุ่ม)') + '</th>' +
+            '<th style="' + colH + '">📁 ยอดโครงการทั้งหมด' + window.calcTip('ผลรวมมูลค่าของทุกโครงการในประเภทนั้นที่เริ่มในปีที่เลือก\n(%) = ยอดโครงการ ÷ เป้าหมาย × 100 (สูงสุด 100%)') + '</th>' +
+            '<th style="' + colH + '">✅ ปิดโครงการแล้ว' + window.calcTip('ผลรวมมูลค่าเฉพาะโครงการที่อยู่ขั้นตอน "ปิดโครงการ"\n(%) = ยอดปิดแล้ว ÷ เป้าหมาย × 100 (สูงสุด 100%)') + '</th>' +
+            '<th style="' + colH + 'text-align:right;">ต้องหาเพิ่ม' + window.calcTip('เป้าหมาย − ยอดโครงการทั้งหมด (ถ้าไม่เหลือ = ถึงเป้า)') + '</th>' +
+            '<th style="' + colH + 'text-align:right;">ต้องปิดเพิ่ม' + window.calcTip('เป้าหมาย − ยอดที่ปิดโครงการแล้ว (ถ้าไม่เหลือ = ถึงเป้า)') + '</th>' +
           '</tr></thead>' +
           '<tbody>' + rows.map(displayRow).join('') + sumRow + '</tbody>' +
         '</table>' +

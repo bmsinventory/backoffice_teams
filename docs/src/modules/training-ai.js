@@ -43,6 +43,47 @@ const _todayTH=()=>new Date().toLocaleDateString('th-TH',{year:'numeric',month:'
 const _isoToday=()=>{const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
 const _sessIso=s=>{const[y,...r]=String(s.date||'').split('-');const yr=parseInt(y);return[yr>2500?yr-543:yr,...r].join('-');};
 
+/* ══ AI ช่วยจัดทำหลักสูตร — แนะนำเท่านั้น ผู้ใช้เลือกและกดนำไปใช้เอง ══ */
+let _aiCourseDraft=null;
+window.trnAiCourseReset=function(){
+  _aiCourseDraft=null;
+  const ctx=document.getElementById('nc-ai-context'),out=document.getElementById('nc-ai-result'),btn=document.getElementById('nc-ai-btn');
+  document.querySelectorAll('#modal-add-cat .ai-flag').forEach(el=>el.remove());
+  if(ctx)ctx.value='';if(out){out.innerHTML='';out.hidden=true;}if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-sparkles"></i>AI ช่วยจัดทำ';}
+};
+window.trnAiCourseSuggest=async function(){
+  const name=document.getElementById('nc-name')?.value.trim();
+  if(!name){showToast('กรุณาใส่ชื่อหลักสูตรก่อนให้ AI ช่วยคิด','warn');document.getElementById('nc-name')?.focus();return;}
+  const btn=document.getElementById('nc-ai-btn'),out=document.getElementById('nc-ai-result');
+  const extra=document.getElementById('nc-ai-context')?.value.trim()||'ไม่มี';
+  const quizzes=(_ovQuizzes||[]).filter(q=>q.is_active).map(q=>({id:q.id,title:q.title}));
+  btn.disabled=true;btn.innerHTML='<i class="ti ti-loader-2 tqa-spin"></i>AI กำลังวิเคราะห์...';out.hidden=false;out.innerHTML='<div class="form-hint">กำลังจัดทำข้อมูลหลักสูตร อาจใช้เวลา 5–30 วินาที</div>';
+  try{
+    const data=await window.aiChatJson('คุณเป็นนักออกแบบหลักสูตรอบรมระบบซอฟต์แวร์โรงพยาบาล ตอบ JSON เท่านั้น ห้ามใส่ markdown',`ชื่อหลักสูตร: ${name}\nข้อมูลเพิ่มเติม: ${extra}\nแบบทดสอบที่มีให้เลือก: ${JSON.stringify(quizzes)}\nสร้าง JSON {"description":"คำอธิบายภาษาไทย 2-4 บรรทัด ระบุสิ่งที่จะเรียนรู้แบบกระชับ","cert_code":"รหัสอังกฤษตัวใหญ่ 2-6 ตัว","icon":"หนึ่งค่าจาก box,package,building-hospital,clipboard-check,school,book,device-desktop,settings,users,report","color":"หนึ่งค่าจาก blue,teal,amber,red,purple,green","quiz_id":0,"quiz_reason":"เหตุผลสั้นๆ"} เลือก quiz_id ได้เฉพาะ id ที่ให้มาและตรงเนื้อหาชัดเจน ไม่ตรงให้ใส่ 0`,{maxTokens:650,temperature:.25});
+    const allowedIcons=['box','package','building-hospital','clipboard-check','school','book','device-desktop','settings','users','report'],allowedColors=['blue','teal','amber','red','purple','green'];
+    const quiz=quizzes.find(q=>String(q.id)===String(data.quiz_id));
+    _aiCourseDraft={description:String(data.description||'').trim(),cert_code:String(data.cert_code||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,10),icon:allowedIcons.includes(data.icon)?data.icon:'school',color:allowedColors.includes(data.color)?data.color:'purple',quiz_id:quiz?quiz.id:null,quiz_title:quiz?quiz.title:'— ไม่ผูกแบบทดสอบ —',quiz_reason:String(data.quiz_reason||'').trim()};
+    const d=_aiCourseDraft;
+    out.innerHTML=`<div class="nc-ai-suggestions">
+      <label class="nc-ai-item"><input type="checkbox" data-ai-course="description" checked><div><b>คำอธิบายหลักสูตร</b><span>${_esc(d.description)}</span></div></label>
+      <label class="nc-ai-item"><input type="checkbox" data-ai-course="cert_code" checked><div><b>รหัสหลักสูตร</b><span>${_esc(d.cert_code||'ไม่แนะนำ')}</span></div></label>
+      <label class="nc-ai-item"><input type="checkbox" data-ai-course="appearance" checked><div><b>รูปลักษณ์</b><span>ไอคอน ${_esc(d.icon)} · สี ${_esc(d.color)}</span></div></label>
+      <label class="nc-ai-item"><input type="checkbox" data-ai-course="quiz" checked><div><b>แบบทดสอบจากคลัง</b><span>${_esc(d.quiz_title)}${d.quiz_reason?' — '+_esc(d.quiz_reason):''}</span></div></label></div>
+      <div class="nc-ai-apply"><span>AI ไม่บันทึกอัตโนมัติ คุณยังแก้ไขได้ก่อนบันทึก</span><button type="button" class="btn btn-primary btn-sm" onclick="trnAiCourseApply()"><i class="ti ti-check"></i>นำรายการที่เลือกไปใช้</button></div>`;
+  }catch(e){out.innerHTML=`<div class="form-hint" style="color:var(--danger)">${_esc(e.message||'AI ทำงานไม่สำเร็จ')}</div>`;showToast(e.message||'AI ทำงานไม่สำเร็จ','danger');}
+  finally{btn.disabled=false;btn.innerHTML='<i class="ti ti-refresh"></i>คิดให้ใหม่';}
+};
+window.trnAiCourseApply=function(){
+  if(!_aiCourseDraft)return;
+  const picked=k=>!!document.querySelector(`[data-ai-course="${k}"]:checked`),d=_aiCourseDraft;
+  if(picked('description')&&d.description){const el=document.getElementById('nc-desc');el.value=d.description;window.aiFlagField?.(el,true);}
+  if(picked('cert_code')&&d.cert_code){const el=document.getElementById('nc-cert-code');el.value=d.cert_code;window.aiFlagField?.(el,true);}
+  if(picked('appearance')){selectIcon(d.icon);const el=document.getElementById('nc-color');el.value=d.color;window.aiFlagField?.(el,true);}
+  if(picked('quiz')){const el=document.getElementById('nc-quiz');el.value=d.quiz_id?String(d.quiz_id):'';window.aiFlagField?.(el,true);}
+  _ncPreview();
+  showToast('นำคำแนะนำจาก AI ไปใส่ในฟอร์มแล้ว — กรุณาตรวจก่อนบันทึก','success');
+};
+
 /* ── popup กลางของ AI: หัว (ชื่อ + ปุ่ม ร่าง/สร้างใหม่ · คัดลอก · ปิด) → ตัวเลือก (ถ้ามี) → ช่องผลลัพธ์ที่แก้ได้
    ทั้งกล่องสูงไม่เกินจอ ช่องผลลัพธ์ยืดเต็มพื้นที่ที่เหลือ — ไม่ต้องเลื่อนแม้จอโน้ตบุ๊ก/อยู่ใน iframe ของ Backoffice ── */
 let _aiCtx=null;
@@ -287,16 +328,25 @@ function trnAiFollowNoReg(){
       const tone=document.querySelector('input[name="ai-ftone"]:checked')?.value;
       const today=_isoToday();
       const open=document.getElementById('ai-fsess')?.checked
-        ?sessions.filter(s=>_sessIso(s)>=today).sort((a,b)=>_sessIso(a)<_sessIso(b)?-1:1).slice(0,6).map(s=>{
-          const left=s.capacity-registrations.filter(r=>r.sessionId===s.id).length;
-          return`${getCat(s.catId)?.name||''} ${s.name} · ${fmtDate(s.date)} ${sessTxt(s)}${s.venue?' · '+s.venue:''} · ${left>0?'ว่าง '+left+' ที่':'เต็มแล้ว'}`;
-        }):[];
+        ?sessions.map(s=>({s,left:s.capacity-registrations.filter(r=>r.sessionId===s.id).length}))
+          .filter(x=>_sessIso(x.s)>=today&&x.left>0)
+          .sort((a,b)=>_sessIso(a.s)<_sessIso(b.s)?-1:1)
+          .slice(0,6).map(({s,left})=>{
+            return{
+              course:getCat(s.catId)?.name||'',
+              round:s.name,
+              date:fmtDateShort(s.date),
+              time:sessTxt(s),
+              venue:s.venue||'',
+              seats:`ว่าง ${left} ที่`,
+            };
+          }):[];
       const TONE={polite:'สุภาพ ขอความร่วมมือ',friendly:'เป็นกันเอง เชิญชวน',urgent:'เร่งด่วน ย้ำว่าใกล้ถึงวันอบรมและที่นั่งมีจำกัด แต่ยังสุภาพ'};
       const user=`ข้อมูล:
 - โรงพยาบาล/โครงการ: ${_siteLabel()}
 - ข้อมูล ณ วันที่: ${_todayTH()}
 - ลงทะเบียนแล้ว ${regCount} จาก ${total} หน่วยงาน (${regPct}%) · ยังไม่ลงทะเบียน ${noRegDepts.length} หน่วยงาน
-${open.length?`- มีรอบอบรมที่ยังเปิดรับ ${open.length} รอบ — ห้ามพิมพ์รายละเอียดรอบเอง ให้เขียน {{รอบอบรม}} ไว้ 1 บรรทัดตรงตำแหน่งที่จะแสดง`:'- ไม่ต้องกล่าวถึงรายละเอียดรอบอบรม'}
+${open.length?`- มีรอบอบรมที่ยังเปิดรับ ${open.length} รอบ — ให้เขียนเฉพาะ {{รอบอบรม}} ไว้ 1 บรรทัด ห้ามพิมพ์รายละเอียด หัวข้อ หรือข้อความเกริ่นนำรอบอบรม เพราะระบบจะจัดรูปแบบให้`:'- ไม่ต้องกล่าวถึงรายละเอียดรอบอบรม'}
 
 ร่างข้อความ LINE กลุ่ม ติดตามให้หน่วยงานที่ยังไม่ลงทะเบียนเข้าร่วมอบรมการใช้งานระบบ น้ำเสียง${TONE[tone]||TONE.polite}
 สั้น อ่านง่ายบนมือถือ ใช้อีโมจินำบรรทัดเล็กน้อย ไม่ต้องมีหัวข้อ ##
@@ -308,7 +358,12 @@ ${open.length?`- มีรอบอบรมที่ยังเปิดรั
       txt=txt.includes('{{หน่วยงาน}}')?txt.replace(/\{\{หน่วยงาน\}\}/g,list):`${txt}\n\n${list}`;
       txt=txt.includes('{{ลิงก์}}')?txt.replace(/\{\{ลิงก์\}\}/g,_regUrl()):`${txt}\n\n🔗 ลงทะเบียน: ${_regUrl()}`;
       if(open.length){
-        const sl=open.map(x=>`🔹 ${x}`).join('\n');
+        const sl=`📅 รอบอบรมที่ยังเปิดรับ (${open.length} รอบ)\n\n`+open.map((x,i)=>[
+          `${i+1}. ${[x.course,x.round].filter(Boolean).join(' — ')}`,
+          `   🗓️ ${x.date} | ⏰ ${x.time}`,
+          ...(x.venue?[`   📍 ${x.venue}`]:[]),
+          `   💺 ${x.seats}`,
+        ].join('\n')).join('\n\n');
         txt=txt.includes('{{รอบอบรม}}')?txt.replace(/\{\{รอบอบรม\}\}/g,sl):`${txt}\n\n${sl}`;
       }else txt=txt.replace(/\{\{รอบอบรม\}\}\n?/g,'');
       return txt;

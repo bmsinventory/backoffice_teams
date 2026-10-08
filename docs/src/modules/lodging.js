@@ -1,6 +1,29 @@
 const { esc, fd, fc, fca, pd, gS, gT, gG, gSt, gC, avC, uid, getFY, getYearBE, getStaffOverlaps, overlapWarnText, getStaffLeaveConflicts, getColRef, getDocRef } = window;
 const setDoc = (...a) => window.setDoc(...a);
 // ── LODGING ──
+window.layoutLodgingCards=function(){
+  document.querySelectorAll('#lodging-cards .ld-group-grid').forEach(function(grid){
+    if(!grid.offsetParent)return; // กลุ่มที่ยุบอยู่
+    var styles=getComputedStyle(grid);
+    var row=parseFloat(styles.gridAutoRows)||1;
+    var gap=parseFloat(styles.rowGap)||0;
+    grid.querySelectorAll('.ld-project-card').forEach(function(card){
+      card.style.gridRowEnd='auto';
+      var cs=getComputedStyle(card);
+      var h=card.scrollHeight+(parseFloat(cs.borderTopWidth)||0)+(parseFloat(cs.borderBottomWidth)||0);
+      card.style.gridRowEnd='span '+Math.ceil((h+gap)/(row+gap));
+    });
+  });
+};
+if(!window._lodgingLayoutBound){
+  window._lodgingLayoutBound=true;
+  var _lodgingResizeTimer;
+  window.addEventListener('resize',function(){
+    clearTimeout(_lodgingResizeTimer);
+    _lodgingResizeTimer=setTimeout(window.layoutLodgingCards,80);
+  });
+  if(document.fonts&&document.fonts.ready)document.fonts.ready.then(window.layoutLodgingCards);
+}
 window.renderLodging=function(){
   var qf=document.getElementById('ld-q'),yf=document.getElementById('ld-yr'),sf=document.getElementById('ld-status');
   window.msFilter('ld-grp',window.PGROUPS,{placeholder:'ทุกกลุ่มโครงการ',onChange:window.renderLodging});
@@ -37,45 +60,35 @@ window.renderLodging=function(){
   var budgetM=allLds.filter(l=>l.approvedMonthly==='yes').reduce((s,l)=>s+(l.mTotal||0),0);
   var bar=document.getElementById('ld-summary-bar');
   if(bar)bar.innerHTML=[
-    {icon:'🏨',label:'โครงการมีที่พัก',val:fProjs.length+' โครงการ',c:'var(--violet)'},
-    {icon:'📅',label:'อนุมัติรายวัน',val:approvedDCount+' โครงการ · '+fc(budgetD),c:'var(--indigo)'},
-    {icon:'📆',label:'อนุมัติรายเดือน',val:approvedMCount+' โครงการ · '+fc(budgetM),c:'var(--coral)'},
-    {icon:'⏳',label:'รออนุมัติ',val:pendingCount+' โครงการ',c:'var(--amber)'},
-  ].map(s=>`<div style="display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 16px;flex:1;min-width:160px;">
-    <div style="width:36px;height:36px;border-radius:10px;background:${s.c}18;display:flex;align-items:center;justify-content:center;font-size:18px;">${s.icon}</div>
-    <div style="min-width:0;"><div style="font-size:10px;color:var(--txt3);font-weight:600;text-transform:uppercase;letter-spacing:.5px;">${s.label}</div>
-    <div style="font-size:14px;font-weight:800;color:${s.c};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${s.val}</div></div>
-  </div>`).join('');
+    {icon:'🏨',label:'โครงการมีที่พัก',tip:'จำนวนโครงการที่มีข้อมูลที่พัก ตามตัวกรอง',val:fProjs.length+' โครงการ',c:'var(--violet)'},
+    {icon:'📅',label:'อนุมัติรายวัน',tip:'จำนวนโครงการที่มีที่พักอนุมัติแบบรายวัน · ผลรวม "รวม (ตลอดช่วง)" แบบรายวันของที่พักที่อนุมัติ',val:approvedDCount+' โครงการ · '+fc(budgetD),c:'var(--indigo)'},
+    {icon:'📆',label:'อนุมัติรายเดือน',tip:'จำนวนโครงการที่มีที่พักอนุมัติแบบรายเดือน · ผลรวม "รวม (ตลอดช่วง)" แบบรายเดือนของที่พักที่อนุมัติ',val:approvedMCount+' โครงการ · '+fc(budgetM),c:'var(--coral)'},
+    {icon:'⏳',label:'รออนุมัติ',tip:'โครงการที่ยังไม่มีที่พักใดได้รับอนุมัติ (ทั้งรายวันและรายเดือน)',val:pendingCount+' โครงการ',c:'var(--amber)'},
+  ].map(s=>`<div class="ld-sum"><div class="ld-sum-ic" style="background:color-mix(in srgb, ${s.c} 12%, transparent);">${s.icon}</div><div style="min-width:0;"><div class="ld-sum-lbl">${s.label}${window.calcTip(s.tip)}</div><div class="ld-sum-val" style="color:${s.c};">${s.val}</div></div></div>`).join('');
   // ── Cards ──
   var cards=document.getElementById('lodging-cards');
   if(!cards)return;
+  cards.classList.toggle('is-empty',fProjs.length===0);
   if(fProjs.length===0){
-    cards.innerHTML=`<div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--txt3);">
+    cards.innerHTML=`<div style="text-align:center;padding:60px 20px;color:var(--txt3);">
       <div style="font-size:48px;margin-bottom:12px;">🏨</div>
       <div style="font-size:14px;font-weight:600;">ยังไม่มีข้อมูลที่พัก</div>
       <div style="font-size:12px;margin-top:6px;">กด "+ เพิ่มที่พัก" เพื่อเริ่มต้น</div>
     </div>`;
     return;
   }
-  cards.innerHTML=fProjs.map(p=>{
+  var _card=function(p){
     var lds=grouped[p.id]||[];
     var pt=gT(p.typeId);var pg=gG(p.groupId);
     var appD=lds.find(l=>l.approvedDaily==='yes');
     var appM=lds.find(l=>l.approvedMonthly==='yes');
     var hasAny=appD||appM;
-    // status badge
-    var badges=[];
-    if(appD)badges.push(`<span style="background:#4361ee18;color:var(--indigo);font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;border:1px solid #4361ee30;">✅ รายวัน</span>`);
-    if(appM)badges.push(`<span style="background:var(--coral)18;color:var(--coral);font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;border:1px solid var(--coral)30;">✅ รายเดือน</span>`);
-    if(!hasAny)badges.push(`<span style="background:var(--amber)18;color:var(--amber);font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;border:1px solid var(--amber)30;">⏳ รออนุมัติ</span>`);
-    // budget summary row
-    var budgetRow='';
-    if(appD||appM){
-      var parts=[];
-      if(appD&&appD.dTotal>0)parts.push(`<span style="color:var(--indigo);font-weight:700;">📅 ${fc(appD.dTotal)}</span>`);
-      if(appM&&appM.mTotal>0)parts.push(`<span style="color:var(--coral);font-weight:700;">📆 ${fc(appM.mTotal)}</span>`);
-      if(parts.length)budgetRow=`<div style="display:flex;gap:12px;font-size:11px;">${parts.join('')}</div>`;
-    }
+    // status chips (approved type + total) on the header
+    var chips=[];
+    if(appD)chips.push(`<span class="ld-chip ld-chip-d">✅ รายวัน${appD.dTotal>0?' <b>'+fc(appD.dTotal)+'</b>':''}</span>`);
+    if(appM)chips.push(`<span class="ld-chip ld-chip-m">✅ รายเดือน${appM.mTotal>0?' <b>'+fc(appM.mTotal)+'</b>':''}</span>`);
+    if(!hasAny)chips.push(`<span class="ld-chip ld-chip-wait">⏳ รออนุมัติ</span>`);
+    var canAp=window.canApprove('lodging'),canEd=window.canEdit('lodging');
     // options — approved first, others collapsible
     var _renderOpt=function(l,i){
       var isAppD=l.approvedDaily==='yes';var isAppM=l.approvedMonthly==='yes';var isAnyApp=isAppD||isAppM;
@@ -85,97 +98,117 @@ window.renderLodging=function(){
       if(l.dBreakfast)amenityD.push('🍳');if(l.dWifi)amenityD.push('📶');if(l.dAc)amenityD.push('❄️');if(l.dTv)amenityD.push('📺');if(l.dFridge)amenityD.push('🧊');if(l.dWasher)amenityD.push('🫧');if(l.dShower)amenityD.push('🚿');if(l.dPillow)amenityD.push('🛌');if(l.dBlanket)amenityD.push('🧣');if(l.dTowel)amenityD.push('🏖️');if(l.dApp)amenityD.push('🔌');if(l.dPark)amenityD.push('🅿️');
       if(l.mWifi)amenityM.push('📶');if(l.mAc)amenityM.push('❄️');if(l.mTv)amenityM.push('📺');if(l.mFridge)amenityM.push('🧊');if(l.mWasher)amenityM.push('🫧');if(l.mShower)amenityM.push('🚿');if(l.mPillow)amenityM.push('🛌');if(l.mBlanket)amenityM.push('🧣');if(l.mBedsheet)amenityM.push('🛏');if(l.mTowel)amenityM.push('🏖️');if(l.mApp)amenityM.push('🔌');if(l.mPark)amenityM.push('🅿️');
       var parsedMapUrl=l.mapUrl?(l.mapUrl.startsWith('http')?l.mapUrl:'https://maps.google.com/?q='+encodeURIComponent(l.mapUrl)):'';
-      var appBadges='';
-      if(isAppD)appBadges+=`<span style="font-size:9px;font-weight:700;background:#4361ee18;color:var(--indigo);padding:1px 6px;border-radius:8px;border:1px solid #4361ee30;">✅ อนุมัติรายวัน</span> `;
-      if(isAppM)appBadges+=`<span style="font-size:9px;font-weight:700;background:var(--coral)18;color:var(--coral);padding:1px 6px;border-radius:8px;border:1px solid var(--coral)30;">✅ อนุมัติรายเดือน</span>`;
-      var rateBoxes='';
-      if(hasDRate)rateBoxes+=`<div style="flex:1;background:var(--indigo)06;border:1px solid var(--indigo)20;border-radius:8px;padding:8px 10px;">
-        <div style="font-size:10px;font-weight:700;color:var(--indigo);margin-bottom:4px;">📅 รายวัน</div>
-        ${l.dsQty?`<div style="font-size:10px;color:var(--txt2);">🛏 เดี่ยว ${l.dsQty} ห้อง × ${fc(l.dsRate)}/คืน</div>`:''}
-        ${l.ddQty?`<div style="font-size:10px;color:var(--txt2);">🛏🛏 คู่ ${l.ddQty} ห้อง × ${fc(l.ddRate)}/คืน</div>`:''}
-        ${amenityD.length?`<div style="font-size:10px;margin-top:3px;">${amenityD.join(' ')}</div>`:''}
-        <div style="font-size:12px;font-weight:800;color:var(--indigo);text-align:right;margin-top:4px;">${fc(l.dTotal)}</div>
-        ${l.dDeposit?`<div style="font-size:10px;color:var(--txt3);margin-top:3px;padding-top:3px;border-top:1px dashed var(--indigo)20;">🔐 มัดจำ ${fc(l.dDeposit)}${l.dDepositNote?' · '+esc(l.dDepositNote):''}</div>`:''}
-        ${window.canApprove('lodging')&&hasDRate?`<div style="margin-top:6px;display:flex;gap:4px;">${!isAppD
-          ?`<button onclick="event.stopPropagation();window.approveLdType('${p.id}','${l.id}','daily')" style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;border:1px solid var(--indigo);background:var(--indigo)15;color:var(--indigo);cursor:pointer;flex:1;">✅ อนุมัติรายวัน</button>`
-          :`<button onclick="event.stopPropagation();window.unapproveLdType('${p.id}','${l.id}','daily')" style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;border:1px solid var(--coral);background:var(--coral)15;color:var(--coral);cursor:pointer;flex:1;">↩ ยกเลิก</button>`}
-        </div>`:''}
-      </div>`;
-      if(hasMRate)rateBoxes+=`<div style="flex:1;background:var(--coral)06;border:1px solid var(--coral)20;border-radius:8px;padding:8px 10px;">
-        <div style="font-size:10px;font-weight:700;color:var(--coral);margin-bottom:4px;">📆 รายเดือน</div>
-        ${l.msQty?`<div style="font-size:10px;color:var(--txt2);">🛏 เดี่ยว ${l.msQty} ห้อง × ${fc(l.msRate)}/เดือน</div>`:''}
-        ${l.mdQty?`<div style="font-size:10px;color:var(--txt2);">🛏🛏 คู่ ${l.mdQty} ห้อง × ${fc(l.mdRate)}/เดือน</div>`:''}
-        ${amenityM.length?`<div style="font-size:10px;margin-top:3px;">${amenityM.join(' ')}</div>`:''}
-        <div style="font-size:12px;font-weight:800;color:var(--coral);text-align:right;margin-top:4px;">${fc(l.mTotal)}</div>
-        ${(l.mDeposit||l.mInclUtil||l.mWater||l.mElectric||l.mExtras)?`<div style="margin-top:5px;padding-top:5px;border-top:1px dashed var(--coral)25;">
-          <div style="font-size:9px;font-weight:700;color:var(--coral);opacity:.7;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px;">📋 ค่าเพิ่มเติม (ไม่นับรวม)</div>
-          ${l.mDeposit?`<div style="font-size:10px;color:var(--txt2);">🔐 มัดจำ <b>${fc(l.mDeposit)}</b>${l.mDepositNote?' · '+l.mDepositNote:''}</div>`:''}
-          ${l.mInclUtil?'<div style="font-size:10px;color:var(--teal);font-weight:600;">💧⚡ รวมค่าน้ำ-ไฟแล้ว</div>':
-            (l.mWater||l.mElectric)?`<div style="font-size:10px;color:var(--txt2);">${l.mWater?'💧 '+l.mWater:''}${l.mWater&&l.mElectric?' · ':''}${l.mElectric?'⚡ '+l.mElectric:''}</div>`:''}
-          ${l.mExtras?`<div style="font-size:10px;color:var(--txt2);">📦 ${l.mExtras}</div>`:''}
-        </div>`:''}
-        ${window.canApprove('lodging')&&hasMRate?`<div style="margin-top:6px;display:flex;gap:4px;">${!isAppM
-          ?`<button onclick="event.stopPropagation();window.approveLdType('${p.id}','${l.id}','monthly')" style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;border:1px solid var(--coral);background:var(--coral)15;color:var(--coral);cursor:pointer;flex:1;">✅ อนุมัติรายเดือน</button>`
-          :`<button onclick="event.stopPropagation();window.unapproveLdType('${p.id}','${l.id}','monthly')" style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;border:1px solid var(--amber);background:var(--amber)15;color:var(--amber);cursor:pointer;flex:1;">↩ ยกเลิก</button>`}
-        </div>`:''}
-      </div>`;
-      return`<div style="border:2px solid ${isAnyApp?'var(--teal)':'var(--border)'};border-radius:10px;padding:12px;background:${isAnyApp?'#06d6a005':'var(--surface2)'};margin-bottom:8px;">
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px;">
-          <div>
-            <div style="font-size:12px;font-weight:800;margin-bottom:3px;">🏠 ${esc(l.name||'ตัวเลือกที่ '+(i+1))}</div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:10px;color:var(--txt3);">
-              ${l.phone?`<span>📞 <a href="tel:${esc(l.phone)}" style="color:var(--indigo);font-weight:600;">${esc(l.phone)}</a></span>`:''}
-              ${parsedMapUrl?`<a href="${parsedMapUrl}" target="_blank" style="color:var(--sky);">📍 แผนที่</a>`:''}
-              ${l.checkIn?`<span>📅 ${fd(l.checkIn)}→${fd(l.checkOut)}</span>`:''}
-            </div>
-          </div>
-          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
-            ${appBadges||'<span style="font-size:9px;color:var(--txt3);">ยังไม่อนุมัติ</span>'}
-            ${window.canEdit('lodging')?`<div style="display:flex;gap:4px;margin-top:4px;">
-              <button onclick="event.stopPropagation();window.showLdForm('${p.id}','${l.id}')" style="font-size:10px;padding:2px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);cursor:pointer;">✏️</button>
-              <button onclick="event.stopPropagation();window.askDel('lodging','${l.id}','${l.name||'ตัวเลือก '+(i+1)}')" style="font-size:10px;padding:2px 8px;border-radius:6px;border:1px solid var(--coral)30;background:var(--coral)10;color:var(--coral);cursor:pointer;">🗑</button>
-            </div>`:''}
-          </div>
+      // one compact row per rate type: [type] rooms · amenities | total | approve
+      var rateRow=function(kind,isApp,rooms,amen,total,extras){
+        var isD=kind==='daily';
+        var btn=canAp?(!isApp
+          ?`<button class="ld-rate-btn" onclick="event.stopPropagation();window.approveLdType('${p.id}','${l.id}','${kind}')" title="อนุมัติ${isD?'รายวัน':'รายเดือน'}">✅ อนุมัติ</button>`
+          :`<button class="ld-rate-btn is-undo" onclick="event.stopPropagation();window.unapproveLdType('${p.id}','${l.id}','${kind}')" title="ยกเลิกอนุมัติ${isD?'รายวัน':'รายเดือน'}">↩ ยกเลิก</button>`):'';
+        return`<div class="ld-rate ${isD?'ld-rate-d':'ld-rate-m'}${isApp?' is-app':''}">
+          <span class="ld-rate-tag">${isApp?'✅':isD?'📅':'📆'} ${isD?'รายวัน':'รายเดือน'}</span>
+          <span class="ld-rate-rooms">${rooms.join('<span class="ld-sep">·</span>')||'-'}${amen.length?`<span class="ld-rate-amen">${amen.join(' ')}</span>`:''}</span>
+          <b class="ld-rate-total">${fc(total)}</b>
+          ${btn}
+          ${extras.length?`<div class="ld-rate-extra">${extras.join('<span class="ld-sep">·</span>')}</div>`:''}
+        </div>`;
+      };
+      var rates='';
+      if(hasDRate){
+        var rD=[];if(l.dsQty)rD.push(`🛏 เดี่ยว ${l.dsQty}×${fc(l.dsRate)}`);if(l.ddQty)rD.push(`🛏🛏 คู่ ${l.ddQty}×${fc(l.ddRate)}`);
+        var exD=[];if(l.dDeposit)exD.push(`🔐 มัดจำ <b>${fc(l.dDeposit)}</b>${l.dDepositNote?' '+esc(l.dDepositNote):''}`);
+        rates+=rateRow('daily',isAppD,rD,amenityD,l.dTotal,exD);
+      }
+      if(hasMRate){
+        var rM=[];if(l.msQty)rM.push(`🛏 เดี่ยว ${l.msQty}×${fc(l.msRate)}`);if(l.mdQty)rM.push(`🛏🛏 คู่ ${l.mdQty}×${fc(l.mdRate)}`);
+        var exM=[];
+        if(l.mDeposit)exM.push(`🔐 มัดจำ <b>${fc(l.mDeposit)}</b>${l.mDepositNote?' '+esc(l.mDepositNote):''}`);
+        if(l.mInclUtil)exM.push('<span style="color:var(--teal);font-weight:600;">💧⚡ รวมน้ำ-ไฟ</span>');
+        else{if(l.mWater)exM.push('💧 '+esc(l.mWater));if(l.mElectric)exM.push('⚡ '+esc(l.mElectric));}
+        if(l.mExtras)exM.push('📦 '+esc(l.mExtras));
+        rates+=rateRow('monthly',isAppM,rM,amenityM,l.mTotal,exM);
+      }
+      var meta=[];
+      if(l.phone)meta.push(`<a href="tel:${esc(l.phone)}">📞 ${esc(l.phone)}</a>`);
+      if(parsedMapUrl)meta.push(`<a href="${parsedMapUrl}" target="_blank" rel="noopener">📍 แผนที่</a>`);
+      if(l.checkIn)meta.push(`<span>${fd(l.checkIn)}→${fd(l.checkOut)}</span>`);
+      return`<div class="ld-opt${isAnyApp?' is-app':''}">
+        <div class="ld-opt-head">
+          <div class="ld-opt-name" title="${esc(l.name||'')}">🏠 ${esc(l.name||'ตัวเลือกที่ '+(i+1))}</div>
+          ${canEd?`<div class="ld-opt-acts">
+            <button class="ld-icon-btn" onclick="event.stopPropagation();window.showLdForm('${p.id}','${l.id}')" title="แก้ไข">✏️</button>
+            <button class="ld-icon-btn is-del" onclick="event.stopPropagation();window.askDel('lodging','${l.id}','${esc(l.name||'ตัวเลือก '+(i+1))}')" title="ลบ">🗑</button>
+          </div>`:''}
         </div>
-        ${rateBoxes?`<div style="display:flex;gap:8px;">${rateBoxes}</div>`:''}
-        ${l.note?`<div style="font-size:10px;color:var(--txt3);margin-top:6px;">📝 ${esc(l.note)}</div>`:''}
+        ${meta.length?`<div class="ld-opt-meta">${meta.join('<span class="ld-sep">·</span>')}</div>`:''}
+        ${rates}
+        ${l.note?`<div class="ld-opt-note" title="${esc(l.note)}">📝 ${esc(l.note)}</div>`:''}
       </div>`;
     };
     var _appLds=lds.filter(l=>l.approvedDaily==='yes'||l.approvedMonthly==='yes');
     var _othLds=lds.filter(l=>l.approvedDaily!=='yes'&&l.approvedMonthly!=='yes');
-    var optionList;
+    var optionList,toggleBtn='';
     if(hasAny&&_othLds.length>0){
-      var _appHtml=_appLds.map((l,i)=>_renderOpt(l,i)).join('');
-      var _othHtml=_othLds.map((l,i)=>_renderOpt(l,_appLds.length+i)).join('');
       var _tid='ldx'+p.id;
-      optionList=_appHtml+`<div style="margin-top:6px;"><button onclick="var d=document.getElementById('${_tid}');var e=d.style.display!=='none';d.style.display=e?'none':'block';this.textContent=e?'▼ ดูตัวเลือกอื่น (${_othLds.length}) · ยังไม่อนุมัติ':'▲ ซ่อนตัวเลือกอื่น';" style="width:100%;padding:5px 10px;border:1px dashed var(--border);border-radius:8px;background:var(--surface2);cursor:pointer;color:var(--txt3);font-size:10px;font-weight:600;margin-bottom:6px;">▼ ดูตัวเลือกอื่น (${_othLds.length}) · ยังไม่อนุมัติ</button><div id="${_tid}" style="display:none;">${_othHtml}</div></div>`;
-    } else if(hasAny){
-      optionList=_appLds.map((l,i)=>_renderOpt(l,i)).join('');
+      var _lblShow='▼ ตัวเลือกอื่น ('+_othLds.length+')',_lblHide='▲ ซ่อนตัวเลือกอื่น';
+      optionList=_appLds.map((l,i)=>_renderOpt(l,i)).join('')+`<div id="${_tid}" style="display:none;">${_othLds.map((l,i)=>_renderOpt(l,_appLds.length+i)).join('')}</div>`;
+      toggleBtn=`<button class="ld-more-btn" onclick="var d=document.getElementById('${_tid}');var e=d.style.display!=='none';d.style.display=e?'none':'block';this.textContent=e?'${_lblShow}':'${_lblHide}';requestAnimationFrame(window.layoutLodgingCards);" title="ตัวเลือกที่ยังไม่อนุมัติ">${_lblShow}</button>`;
     } else {
-      optionList=lds.map((l,i)=>_renderOpt(l,i)).join('');
+      optionList=(hasAny?_appLds:lds).map((l,i)=>_renderOpt(l,i)).join('');
     }
-    return`<div class="fade" style="background:var(--surface);border:1px solid ${hasAny?'var(--teal)':'var(--border)'};border-radius:16px;overflow:hidden;box-shadow:var(--sh-sm);display:flex;flex-direction:column;${hasAny?'border-width:2px':''}">
-      <div style="padding:14px 16px;border-bottom:1px solid var(--border);background:linear-gradient(135deg,${pt.color}08,transparent);">
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px;">
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:13px;font-weight:800;line-height:1.3;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(p.name)}</div>
-            <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:4px;">
-              <span style="font-size:10px;font-weight:700;padding:1px 8px;border-radius:20px;background:${pt.color}18;color:${pt.color};">${esc(pt.label)}</span>
-              ${pg?`<span style="font-size:10px;font-weight:700;padding:1px 8px;border-radius:20px;background:${pg.color}18;color:${pg.color};">${esc(pg.label)}</span>`:''}
-            </div>
-            <div style="font-size:10px;color:var(--txt3);">📅 ${fd(p.start)} → ${fd(p.end)} · ${lds.length} ตัวเลือก</div>
-          </div>
-          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">${badges.join('')}${budgetRow}</div>
+    return`<div class="fade ld-project-card${hasAny?' is-app':''}">
+      <div class="ld-project-head" style="background:linear-gradient(135deg,${pt.color}0a,transparent);">
+        <div class="ld-project-top">
+          <div class="ld-project-title" title="${esc(p.name)}">${esc(p.name)}</div>
+          <div class="ld-project-status">${chips.join('')}</div>
+        </div>
+        <div class="ld-project-sub">
+          ${pg?`<span class="ld-tag" style="background:${pg.color}18;color:${pg.color};">${esc(pg.label)}</span>`:''}
+          <span class="ld-project-date">📅 ${fd(p.start)} → ${fd(p.end)} · ${lds.length} ตัวเลือก</span>
         </div>
       </div>
-      <div style="padding:12px 14px;flex:1;">${optionList}</div>
-      <div style="padding:8px 14px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:6px;">
-        ${lds.length?`<button class="btn btn-pri btn-sm" onclick="window.ldAiDecideOpen('${p.id}')" title="ให้ AI เปรียบเทียบตัวเลือกที่พักและแนะนำ">🤖 AI ช่วยตัดสินใจ</button>`:''}
-        ${window.canEdit('lodging')?`<button class="btn btn-teal btn-sm" onclick="window.showLdForm('${p.id}',null)">+ เพิ่มตัวเลือก</button>`:''}
+      <div class="ld-project-body">${optionList}</div>
+      <div class="ld-project-actions">
+        ${toggleBtn||'<span></span>'}
+        <div class="ld-project-btns">
+          ${lds.length?`<button class="btn btn-pri btn-sm" onclick="window.ldAiDecideOpen('${p.id}')" title="ให้ AI เปรียบเทียบตัวเลือกที่พักและแนะนำ">🤖 AI</button>`:''}
+          ${canEd?`<button class="btn btn-teal btn-sm" onclick="window.showLdForm('${p.id}',null)" title="เพิ่มตัวเลือกที่พัก">+ ตัวเลือก</button>`:''}
+        </div>
       </div>
     </div>`;
+  };
+  // ── จัดกลุ่มตามประเภทโครงการ (เรียงตามลำดับใน PTYPES) ──
+  var _typeOrder=function(id){var i=window.PTYPES.findIndex(t=>t.id===id);return i<0?9999:i;};
+  var _grpMap={};fProjs.forEach(p=>{var k=p.typeId||'';(_grpMap[k]=_grpMap[k]||[]).push(p);});
+  var _closed=window._ldGrpClosed=window._ldGrpClosed||{};
+  cards.innerHTML=Object.keys(_grpMap).sort((a,b)=>_typeOrder(a)-_typeOrder(b)).map(tid=>{
+    var ps=_grpMap[tid],t=tid?gT(tid):{label:'ไม่ระบุประเภท',color:'#9ba3b8'};
+    var gLds=ps.flatMap(p=>grouped[p.id]||[]);
+    var gD=gLds.filter(l=>l.approvedDaily==='yes').reduce((s,l)=>s+(l.dTotal||0),0);
+    var gM=gLds.filter(l=>l.approvedMonthly==='yes').reduce((s,l)=>s+(l.mTotal||0),0);
+    var gWait=ps.filter(p=>!(grouped[p.id]||[]).some(l=>l.approvedDaily==='yes'||l.approvedMonthly==='yes')).length;
+    var isClosed=!!_closed[tid];
+    return`<section class="ld-group${isClosed?' is-closed':''}" style="--g:${t.color};">
+      <button type="button" class="ld-group-head" onclick="window.toggleLdGroup(this,'${esc(tid)}')" aria-expanded="${!isClosed}">
+        <span class="ld-group-caret">▾</span>
+        <span class="ld-group-name">${esc(t.label)}</span>
+        <span class="ld-group-count">${ps.length} โครงการ</span>
+        <span class="ld-group-sum">
+          ${gD?`<span class="ld-chip ld-chip-d">รายวัน <b>${fc(gD)}</b></span>`:''}
+          ${gM?`<span class="ld-chip ld-chip-m">รายเดือน <b>${fc(gM)}</b></span>`:''}
+          ${gWait?`<span class="ld-chip ld-chip-wait">⏳ รออนุมัติ ${gWait}</span>`:''}
+        </span>
+      </button>
+      <div class="ld-group-grid">${ps.map(_card).join('')}</div>
+    </section>`;
   }).join('');
+  requestAnimationFrame(window.layoutLodgingCards);
 }
+window.toggleLdGroup=function(btn,tid){
+  var closed=btn.closest('.ld-group').classList.toggle('is-closed');
+  if(closed)window._ldGrpClosed[tid]=1;else delete window._ldGrpClosed[tid];
+  btn.setAttribute('aria-expanded',String(!closed));
+  if(!closed)requestAnimationFrame(window.layoutLodgingCards);
+};
 
 // ── Approve by type (daily / monthly) — independent ──
 window.approveLdType=async function(pid,ldId,type){
@@ -222,6 +255,7 @@ window._initLdCombobox=(function(){
     var col=new Set(),q='',fi=-1,flat=[],dt=null;
     var inp=document.getElementById('ld-cmb-input'),lst=document.getElementById('ld-cmb-list');
     if(!inp||!lst)return;
+    q=inp.value.trim();
     function bFlat(sq){
       var f=[],lq=sq.toLowerCase();
       if(sq){projects.forEach(function(p){if(p.name.toLowerCase().includes(lq))f.push({k:'i',id:p.id,name:p.name});});}
@@ -254,33 +288,51 @@ window._initLdCombobox=(function(){
       html+='<div style="height:'+botH+'px"></div>';
       lst.innerHTML=html;
     }
-    lst.addEventListener('click',function(e){
+    lst.onclick=function(e){
       var h=e.target.closest('.ldc-h'),it=e.target.closest('.ldc-i');
       if(h){var tid=h.dataset.tid;if(col.has(tid))col.delete(tid);else col.add(tid);flat=bFlat(q);fi=-1;render();}
       else if(it)window.openLodgingGroupModal(it.dataset.id);
-    });
-    lst.addEventListener('mousemove',function(e){var it=e.target.closest('.ldc-i');if(it){var ni=+it.dataset.idx;if(ni!==fi){fi=ni;render();}}});
-    lst.addEventListener('scroll',render);
-    inp.addEventListener('input',function(){clearTimeout(dt);dt=setTimeout(function(){q=inp.value.trim();fi=-1;flat=bFlat(q);lst.scrollTop=0;render();},200);});
-    inp.addEventListener('keydown',function(e){
+    };
+    lst.onmousemove=function(e){var it=e.target.closest('.ldc-i');if(it){var ni=+it.dataset.idx;if(ni!==fi){fi=ni;render();}}};
+    lst.onscroll=render;
+    inp.oninput=function(){clearTimeout(dt);dt=setTimeout(function(){q=inp.value.trim();fi=-1;flat=bFlat(q);lst.scrollTop=0;render();},200);};
+    inp.onkeydown=function(e){
       var iis=flat.map(function(it,i){return it.k==='i'?i:-1;}).filter(function(i){return i>=0;});
       if(e.key==='Escape'){window.closeM('m-lodging');return;}
       if(e.key==='Tab'){e.preventDefault();window.closeM('m-lodging');return;}
       if(e.key==='ArrowDown'){e.preventDefault();var ci=iis.indexOf(fi);fi=ci<0?iis[0]:iis[ci+1]!==undefined?iis[ci+1]:iis[ci];render();scFi();}
       else if(e.key==='ArrowUp'){e.preventDefault();var ci2=iis.indexOf(fi);fi=ci2<=0?iis[0]:iis[ci2-1];render();scFi();}
       else if(e.key==='Enter'){e.preventDefault();var it=flat[fi];if(it&&it.k==='i')window.openLodgingGroupModal(it.id);}
-    });
+    };
     function scFi(){if(fi<0)return;var top=0;for(var i=0;i<fi;i++)top+=flat[i]?(flat[i].k==='h'?HH:IH):0;if(top<lst.scrollTop)lst.scrollTop=top;else if(top+IH>lst.scrollTop+lst.clientHeight)lst.scrollTop=top+IH-lst.clientHeight;}
-    flat=bFlat('');render();setTimeout(function(){inp.focus();},80);
+    flat=bFlat(q);render();setTimeout(function(){inp.focus();},80);
   };
 })();
+
+window.ldAvailableProjects=function(includeEnded){
+  var EXCL_LD_GRPS=['GRP17733355541905','GRP17733355541906'];
+  var lodgedPids=new Set(window.LODGINGS.map(function(l){return l.pid;}));
+  var today=new Date();today.setHours(0,0,0,0);
+  return window.PROJECTS.filter(function(proj){
+    if(EXCL_LD_GRPS.includes(proj.groupId))return false;
+    if(lodgedPids.has(proj.id))return false;
+    if(!proj.start)return false;
+    if(!includeEnded&&proj.end&&pd(proj.end)<today)return false;
+    return true;
+  });
+};
+
+window.ldToggleEndedProjects=function(){
+  var showEnded=!!(document.getElementById('ld-show-ended')||{}).checked;
+  window._initLdCombobox(window.ldAvailableProjects(showEnded));
+};
 
 window.openLodgingGroupModal=function(pid){
   window.currentLdPid=pid;
   if(!pid){
     document.getElementById('m-ld-title').textContent='เลือกโครงการ';
-    var EXCL_LD_GRPS=['GRP17733355541905','GRP17733355541906'];var lodgedPids=new Set(window.LODGINGS.map(function(l){return l.pid;}));var _td=new Date();_td.setHours(0,0,0,0);var availLdProjs=window.PROJECTS.filter(function(proj){if(EXCL_LD_GRPS.includes(proj.groupId))return false;if(lodgedPids.has(proj.id))return false;if(!proj.start)return false;return new Date(proj.start)>=_td;});
-    document.getElementById('m-ld-body').innerHTML=`<div id="ld-cmb-wrap"><div style="padding-bottom:10px;"><div style="position:relative;"><span style="position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:14px;pointer-events:none;color:var(--txt3);">🔍</span><input id="ld-cmb-input" type="text" placeholder="ค้นหาโครงการ..." autocomplete="off" spellcheck="false" style="width:100%;padding:9px 12px 9px 34px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;background:var(--surface);color:var(--txt1);outline:none;box-sizing:border-box;transition:border-color .2s;" onfocus="this.style.borderColor='var(--indigo)'" onblur="this.style.borderColor='var(--border)'"></div></div><div id="ld-cmb-list" style="height:380px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;"></div></div>`;
+    var availLdProjs=window.ldAvailableProjects(false);
+    document.getElementById('m-ld-body').innerHTML=`<div id="ld-cmb-wrap"><div style="padding-bottom:10px;"><div style="position:relative;"><span style="position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:14px;pointer-events:none;color:var(--txt3);">🔍</span><input id="ld-cmb-input" type="text" placeholder="ค้นหาโครงการ..." autocomplete="off" spellcheck="false" style="width:100%;padding:9px 12px 9px 34px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;background:var(--surface);color:var(--txt1);outline:none;box-sizing:border-box;transition:border-color .2s;" onfocus="this.style.borderColor='var(--indigo)'" onblur="this.style.borderColor='var(--border)'"></div><label style="display:inline-flex;align-items:center;gap:7px;margin-top:9px;font-size:12px;color:var(--txt2);cursor:pointer;user-select:none;"><input type="checkbox" id="ld-show-ended" onchange="window.ldToggleEndedProjects()" style="width:15px;height:15px;accent-color:var(--violet);cursor:pointer;"> แสดงโครงการที่สิ้นสุดแล้ว</label></div><div id="ld-cmb-list" style="height:380px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;"></div></div>`;
     document.getElementById('m-ld-foot').style.display='none';window.openM('m-lodging');window._initLdCombobox(availLdProjs);return;
   }
   var lds=window.LODGINGS.filter(l=>l.pid===pid);var p=window.PROJECTS.find(x=>x.id===pid);
@@ -570,7 +622,7 @@ window.showLdForm=function(pid,ldId){
 
         <!-- ยอดรวม -->
         <div style="background:var(--indigo)15;border-radius:8px;padding:8px 10px;margin-top:10px;display:flex;justify-content:space-between;align-items:center;">
-          <span style="font-size:10px;color:var(--indigo);font-weight:600;">รวม (ตลอดช่วง)</span>
+          <span style="font-size:10px;color:var(--indigo);font-weight:600;">รวม (ตลอดช่วง)${window.calcTip('จำนวนคืน × (ห้องเดี่ยว × ราคา/คืน + ห้องคู่ × ราคา/คืน)\nจำนวนคืน = Check-out − Check-in\nไม่รวมค่าใช้จ่ายเพิ่มเติม')}</span>
           <span style="font-size:16px;font-weight:800;color:var(--indigo);"><span id="ld-d-sum">0</span> ฿</span>
         </div>
         <!-- ค่าใช้จ่ายเพิ่มเติมรายวัน (ไม่นับรวม) -->
@@ -649,7 +701,7 @@ window.showLdForm=function(pid,ldId){
 
         <!-- ยอดรวม -->
         <div style="background:var(--coral)15;border-radius:8px;padding:8px 10px;margin-top:10px;display:flex;justify-content:space-between;align-items:center;">
-          <span style="font-size:10px;color:var(--coral);font-weight:600;">รวม (ตลอดช่วง)</span>
+          <span style="font-size:10px;color:var(--coral);font-weight:600;">รวม (ตลอดช่วง)${window.calcTip('จำนวนเดือน × (ห้องเดี่ยว × ราคา/เดือน + ห้องคู่ × ราคา/เดือน)\nจำนวนเดือน = จำนวนคืน ÷ 30 ปัดขึ้น\nไม่รวมค่าใช้จ่ายเพิ่มเติม')}</span>
           <span style="font-size:16px;font-weight:800;color:var(--coral);"><span id="ld-m-sum">0</span> ฿</span>
         </div>
       </div>
@@ -762,4 +814,3 @@ window.saveLodging=async function(){
   window.openLodgingGroupModal(pid);
   setDoc(getDocRef('LODGINGS',id),dbLd).catch(e=>window.showDbError(e));
 }
-

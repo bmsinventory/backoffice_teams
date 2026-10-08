@@ -108,8 +108,8 @@
     gap: 3px; padding: 6px 4px; cursor: pointer; transition: all .18s;
     border: none; background: none; font-family: inherit; color: var(--txt3); position: relative;
   }
-  .bottom-nav-item.active { color: var(--violet); }
-  .bottom-nav-item.active::before { content: ''; position: absolute; top: 0; left: 25%; right: 25%; height: 2px; background: var(--violet); border-radius: 0 0 3px 3px; }
+  .bottom-nav-item.active { color: var(--icon-color, var(--violet)); }
+  .bottom-nav-item.active::before { content: ''; position: absolute; top: 0; left: 25%; right: 25%; height: 2px; background: var(--icon-color, var(--violet)); border-radius: 0 0 3px 3px; }
   .bottom-nav-icon  { font-size: 22px; line-height: 1; }
   .bottom-nav-label { font-size: 10px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
   .bottom-nav-badge { position: absolute; top: 6px; right: calc(50% - 18px); background: var(--coral); color: #fff; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 10px; min-width: 16px; text-align: center; }
@@ -165,7 +165,8 @@
 
   /* ── Advance / Lodging card grids: เดิม minmax(340px,1fr) ไม่มี mobile override เลย
      (บั๊กเดียวกับที่เจอใน Leave dept-grid ก่อนหน้านี้) กว้าง 340px ล้นจอมือถือทั่วไปแน่นอน ── */
-  #adv-cards, #lodging-cards { grid-template-columns: 1fr !important; padding: 0 12px 80px !important; gap: 12px !important; }
+  #adv-cards, #lodging-cards .ld-group-grid { grid-template-columns: 1fr !important; gap: 12px !important; }
+  #adv-cards, #lodging-cards { padding: 0 12px 80px !important; }
 
   /* ── รายชื่อ รพ.: การ์ดแต่ละ รพ. เดิม 3 ส่วนเรียงแนวนอน (minmax รวม ≥480px) กว้างเกินจอมือถือ
      และถูกตัดหายเงียบ ๆ (body ปิด overflow-x) — สแตกเป็นแนวตั้ง เส้นคั่นเปลี่ยนจากขวาเป็นบน ── */

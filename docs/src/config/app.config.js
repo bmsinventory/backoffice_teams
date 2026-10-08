@@ -49,12 +49,12 @@
 
   // ── Advance Status Flow ──
   window.AFLW = [
-    { id:'draft',    label:'Draft',       color:'#9ba3b8' },
-    { id:'pending',  label:'รออนุมัติ',   color:'#ffa62b' },
-    { id:'approved', label:'อนุมัติแล้ว', color:'#4361ee' },
-    { id:'disbursed',label:'เบิกแล้ว',    color:'#7c5cfc' },
-    { id:'clearing', label:'รอเคลียร์',   color:'#ff6b6b' },
-    { id:'cleared',  label:'เคลียร์แล้ว', color:'#06d6a0' },
+    { id:'draft',    label:'Draft',       color:'#9ba3b8', icon:'📝' },
+    { id:'pending',  label:'รออนุมัติ',   color:'#ffa62b', icon:'⏳' },
+    { id:'approved', label:'อนุมัติแล้ว', color:'#4361ee', icon:'👍' },
+    { id:'disbursed',label:'เบิกแล้ว',    color:'#7c5cfc', icon:'💸' },
+    { id:'clearing', label:'รอเคลียร์',   color:'#ff6b6b', icon:'🧾' },
+    { id:'cleared',  label:'เคลียร์แล้ว', color:'#06d6a0', icon:'✅' },
   ];
   window.ANXT = { draft:'pending', pending:'approved', approved:'disbursed', disbursed:'clearing', clearing:'cleared' };
   window.APRV = { pending:'draft', approved:'pending', disbursed:'approved', clearing:'disbursed', cleared:'clearing' };

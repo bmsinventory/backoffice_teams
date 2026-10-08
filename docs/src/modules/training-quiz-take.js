@@ -30,25 +30,37 @@ const Sfx = (() => {
   try { on = localStorage.getItem('tq_sound') !== '0'; } catch (e) {}
   const ac = () => {
     if (!ctx) { const A = window.AudioContext || window.webkitAudioContext; if (!A) return null; ctx = new A(); }
-    if (ctx.state === 'suspended') ctx.resume();
     return ctx;
+  };
+  const unlock = () => {
+    if (!on) return Promise.resolve(false);
+    const c = ac();
+    if (!c) return Promise.resolve(false);
+    if (c.state === 'running') return Promise.resolve(true);
+    return c.resume().then(() => c.state === 'running').catch(() => false);
   };
   // โน้ตเดียว: hz เริ่มหลัง at วินาที ยาว dur · to = เลื่อนความถี่ไปถึง
   function note(hz, at = 0, dur = .15, type = 'sine', vol = .15, to) {
     const c = ac(); if (!c) return;
-    const t = c.currentTime + at, o = c.createOscillator(), g = c.createGain();
-    o.type = type; o.frequency.setValueAtTime(hz, t);
-    if (to) o.frequency.exponentialRampToValueAtTime(to, t + dur);
-    g.gain.setValueAtTime(.0001, t);
-    g.gain.exponentialRampToValueAtTime(vol, t + .012);
-    g.gain.exponentialRampToValueAtTime(.0001, t + dur);
-    o.connect(g).connect(c.destination); o.start(t); o.stop(t + dur + .02);
+    const schedule = () => {
+      if (c.state !== 'running') return;
+      const t = c.currentTime + at, o = c.createOscillator(), g = c.createGain();
+      o.type = type; o.frequency.setValueAtTime(hz, t);
+      if (to) o.frequency.exponentialRampToValueAtTime(to, t + dur);
+      g.gain.setValueAtTime(.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol, t + .012);
+      g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+      o.connect(g).connect(c.destination); o.start(t); o.stop(t + dur + .02);
+    };
+    if (c.state === 'running') schedule();
+    else unlock().then(ok => { if (ok) schedule(); });
   }
   const play = f => { if (on) try { f(); } catch (e) {} };
   const SCALE = [523.25, 587.33, 659.25, 783.99, 880, 1046.5]; // แต่ละตัวเลือกเสียงต่างกัน (บันไดเสียงเพนทาโทนิก)
   return {
     get on() { return on; },
     set(v) { on = v; try { localStorage.setItem('tq_sound', v ? '1' : '0'); } catch (e) {} },
+    unlock,
     pick: j => play(() => { note(SCALE[j % 6], 0, .09, 'triangle', .14); note(SCALE[j % 6] * 2, .05, .14, 'sine', .06); }),
     start: () => play(() => [392, 523.25, 659.25, 783.99].forEach((h, i) => note(h, i * .07, .2, 'triangle', .12))),
     milestone: () => play(() => { note(783.99, 0, .12, 'triangle', .12); note(1046.5, .1, .25, 'triangle', .12); }),
@@ -65,6 +77,10 @@ const Sfx = (() => {
     fail: () => play(() => [392, 329.63, 261.63].forEach((h, i) => note(h, i * .22, i === 2 ? .55 : .25, 'triangle', .1))),
   };
 })();
+// Production browsers (especially iOS/Safari) allow Web Audio only after a real
+// user gesture. Unlock early so delayed sounds such as countdown/result can play.
+document.addEventListener('pointerdown', () => Sfx.unlock(), { capture: true, passive: true });
+document.addEventListener('keydown', () => Sfx.unlock(), { capture: true });
 function toggleSound() { Sfx.set(!Sfx.on); soundIcon(); Sfx.pick(2); }
 function soundIcon() {
   const b = $('tq-sound');

@@ -468,8 +468,14 @@ window.saveAdmUser=async function(){
 }
 
 // ── ROLE PERMISSIONS ──
+// ── สิทธิ์ "อนุมัติ" แยกจาก "แก้" — module ที่มีปุ่มอนุมัติ (ใช้ทั้ง renderAdmRoles และ saveRolePerms) ──
+const APPROVE_MODS = [
+  { id:'lodging',        title:'สิทธิ์กดอนุมัติที่พัก', desc:'แยกจากสิทธิ์ "แก้" — กำหนดว่า Role ไหนกดปุ่ม ✅ อนุมัติ/ยกเลิกอนุมัติ ในหน้าที่พักได้บ้าง' },
+  { id:'server_request', title:'สิทธิ์อนุมัติคำขอใช้งานทีม Server (DM/PM)', desc:'แยกจากสิทธิ์ "แก้" — กำหนดว่า Role ไหนกด อนุมัติ/ไม่อนุมัติ คำขอใช้งานทีม Server ได้ (การจัดคนใช้สิทธิ์ "แก้")' },
+];
+
 function renderAdmRoles(c, titleEl) {
-  if(titleEl) titleEl.innerHTML = '🔐 สิทธิ์การใช้งาน (Role Permissions)';
+  if(titleEl) titleEl.innerHTML = (window.appIcon ? window.appIcon('shield-lock') : '') + ' สิทธิ์การใช้งาน (Role Permissions)';
   var mods = window.PERM_MODULES || [];
   // roles ที่ configurable ได้ (ไม่รวม admin เพราะ full access เสมอ)
   var roles = (window.USERS || []).map(function(u){return u.role;}).filter(function(r){return r&&r!=='admin';});
@@ -491,9 +497,9 @@ function renderAdmRoles(c, titleEl) {
   }
   // ── สิทธิ์ "อนุมัติที่พัก" แยกจาก edit — ถ้ายังไม่เคยตั้งค่านี้ไว้ชัดเจน (undefined) ยึดตามสิทธิ์ "แก้" เดิม
   // ไปก่อน (ดู logic เดียวกันใน permission.util.js window.can) กันปุ่มอนุมัติหายไปทันทีตอน deploy ครั้งแรก ──
-  function getLodgingApprove(role) {
-    if(rp[role] && rp[role].lodging && rp[role].lodging.approve !== undefined) return !!rp[role].lodging.approve;
-    return getPerm(role, 'lodging', 'edit');
+  function getApprove(role, modId) {
+    if(rp[role] && rp[role][modId] && rp[role][modId].approve !== undefined) return !!rp[role][modId].approve;
+    return getPerm(role, modId, 'edit');
   }
 
   var actions = [{id:'view',label:'ดู',color:'var(--teal)'},{id:'add',label:'เพิ่ม',color:'var(--violet)'},{id:'edit',label:'แก้',color:'var(--amber)'},{id:'del',label:'ลบ',color:'var(--coral)'}];
@@ -533,7 +539,7 @@ function renderAdmRoles(c, titleEl) {
     </td>`;
 
     return `<tr style="border-bottom:1px solid var(--border);" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
-      <td class="adm-perm-mod" style="padding:10px 14px;font-size:13px;font-weight:500;white-space:nowrap;">${mod.icon} ${esc(mod.label)}</td>
+      <td class="adm-perm-mod" style="padding:10px 14px;font-size:13px;font-weight:500;white-space:nowrap;">${window.appIcon ? window.appIcon(mod.icon) : ''} ${esc(mod.label)}</td>
       ${adminCells}
       ${cells}
     </tr>`;
@@ -542,7 +548,7 @@ function renderAdmRoles(c, titleEl) {
   c.innerHTML = `
     <div style="max-width:900px;">
       <div style="background:rgba(124,92,252,.07);border:1px solid rgba(124,92,252,.2);border-radius:10px;padding:12px 16px;margin-bottom:18px;font-size:12px;color:var(--txt2);">
-        💡 <b>Admin</b> มีสิทธิ์เต็มทุก Module เสมอ — กำหนดสิทธิ์ได้สำหรับ Role อื่นๆ
+        ${window.appIcon ? window.appIcon('bulb') : ''} <b>Admin</b> มีสิทธิ์เต็มทุก Module เสมอ — กำหนดสิทธิ์ได้สำหรับ Role อื่นๆ
       </div>
       <div style="overflow-x:auto;border:1px solid var(--border);border-radius:14px;">
         <table class="adm-perm-tbl" style="width:100%;border-collapse:collapse;min-width:560px;">
@@ -561,22 +567,23 @@ function renderAdmRoles(c, titleEl) {
           <tbody>${rows}</tbody>
         </table>
       </div>
+      ${APPROVE_MODS.map(function(am){ return `
       <div style="margin-top:20px;border:1px solid var(--border);border-radius:14px;padding:16px 18px;">
-        <div style="font-size:13px;font-weight:700;margin-bottom:4px;">🔑 สิทธิ์กดอนุมัติที่พัก</div>
-        <div style="font-size:11.5px;color:var(--txt3);margin-bottom:12px;">แยกจากสิทธิ์ "แก้" — กำหนดว่า Role ไหนกดปุ่ม ✅ อนุมัติ/ยกเลิกอนุมัติ ในหน้าที่พักได้บ้าง (Role ที่ยังไม่เคยตั้งค่านี้จะยึดตามสิทธิ์ "แก้" เดิมไปก่อน)</div>
+        <div style="font-size:13px;font-weight:700;margin-bottom:4px;">🔑 ${am.title}</div>
+        <div style="font-size:11.5px;color:var(--txt3);margin-bottom:12px;">${am.desc} (Role ที่ยังไม่เคยตั้งค่านี้จะยึดตามสิทธิ์ "แก้" เดิมไปก่อน)</div>
         <div style="display:flex;gap:18px;flex-wrap:wrap;">
           ${roles.map(function(role){
             var rc={pm:'var(--violet)',viewer:'var(--teal)'};
-            var checked = getLodgingApprove(role) ? 'checked' : '';
+            var checked = getApprove(role, am.id) ? 'checked' : '';
             return `<label style="display:flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer;">
               <input type="checkbox" class="perm-cb" ${checked}
-                data-role="${role}" data-mod="lodging" data-act="approve"
-                id="pcb-${role}-lodging-approve" style="width:16px;height:16px;accent-color:${rc[role]||'var(--indigo)'};cursor:pointer;">
+                data-role="${role}" data-mod="${am.id}" data-act="approve"
+                id="pcb-${role}-${am.id}-approve" style="width:16px;height:16px;accent-color:${rc[role]||'var(--indigo)'};cursor:pointer;">
               <span style="color:${rc[role]||'var(--txt)'};font-weight:600;">${window.roleLabel(role)}</span>
             </label>`;
           }).join('')}
         </div>
-      </div>
+      </div>`; }).join('')}
       <div style="margin-top:18px;display:flex;gap:10px;justify-content:flex-end;">
         <button class="btn btn-ghost" onclick="window.resetRolePerms()">↩️ รีเซ็ตเป็นค่าเริ่มต้น</button>
         <button class="btn btn-pri" onclick="window.saveRolePerms()">💾 บันทึกสิทธิ์</button>
@@ -616,8 +623,10 @@ window.saveRolePerms = async function() {
         data[role][mod.id][a]=el?el.checked:false;
       });
     });
-    var apEl=document.getElementById('pcb-'+role+'-lodging-approve');
-    if(apEl) data[role].lodging.approve = apEl.checked;
+    APPROVE_MODS.forEach(function(am){
+      var apEl=document.getElementById('pcb-'+role+'-'+am.id+'-approve');
+      if(apEl && data[role][am.id]) data[role][am.id].approve = apEl.checked;
+    });
   });
   try {
     await setDoc(getDocRef('SETTINGS','role_permissions'), data);
@@ -677,5 +686,4 @@ window.regDeptChange=function(){
   if(sfEl)window.regRefreshStaff(sfEl,dept);
   window.renderLeave();
 };
-
 

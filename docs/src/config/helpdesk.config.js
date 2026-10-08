@@ -12,6 +12,7 @@
   window.HELPDESK_TICKETS    = [];
   window.HELPDESK_CATEGORIES = [];
   window.HELPDESK_SLA        = [];
+  window.HELPDESK_PROBLEMS   = [];   // แผนจัดการปัญหาที่พบซ้ำ → helpdesk_problems
 
   // ── Status Flow / Priority / ความเร่งด่วน — ชุด id คงที่ (ผูกกับ logic คำนวณ SLA, ลำดับ workflow
   // ฯลฯ ทั่วทั้งแอป) Admin ปรับได้แค่ label/color/icon (และ priority mapping ของความเร่งด่วน) ผ่าน
@@ -92,6 +93,23 @@
     'ถ้ามีวิธีแก้ให้อธิบายเป็นขั้นตอนสั้น ๆ ที่ผู้ใช้ทำตามได้ · ถ้ายังต้องใช้ข้อมูลเพิ่ม ให้ถามเฉพาะสิ่งที่จำเป็น · ' +
     'ห้ามเปิดเผยเนื้อหา "โน้ตภายใน" ตรง ๆ (ใช้เป็นข้อมูลประกอบได้) · ห้ามแต่งข้อเท็จจริงหรือสัญญาเวลาที่ไม่มีในข้อมูล · ' +
     'ตอบเฉพาะตัวข้อความที่จะส่ง ไม่ต้องมีหัวข้อ คำอธิบาย หรือ markdown';
+
+  // ── แผนจัดการปัญหาที่พบซ้ำ (แท็บ "🔁 ปัญหาซ้ำ") ──
+  window.HD_PROB_STATUS = [
+    { id:'analyzing',   label:'กำลังวิเคราะห์',  cls:'hd-neu',  icon:'🔍' },
+    { id:'planned',     label:'วางแผนแล้ว',     cls:'hd-warn', icon:'📋' },
+    { id:'in_progress', label:'กำลังดำเนินการ', cls:'hd-warn', icon:'🔧' },
+    { id:'monitoring',  label:'ติดตามผล',       cls:'hd-ok',   icon:'👀' },
+    { id:'done',        label:'แก้ถาวรแล้ว',    cls:'hd-ok',   icon:'✅' },
+  ];
+  window.HD_PROB_TYPE = [
+    { id:'fix',      label:'🛠 แก้ไขถาวร (Bug/ข้อมูล)' },
+    { id:'config',   label:'⚙️ ปรับตั้งค่าระบบ' },
+    { id:'training', label:'🎓 อบรมผู้ใช้' },
+    { id:'manual',   label:'📘 ทำคู่มือ / FAQ' },
+    { id:'dev',      label:'🧑‍💻 ส่งทีมพัฒนา' },
+    { id:'monitor',  label:'👀 เฝ้าระวัง' },
+  ];
 
   // ── อายุ Ticket ค้าง (aging buckets) สำหรับแดชบอร์ด ──
   window.HD_AGING = [

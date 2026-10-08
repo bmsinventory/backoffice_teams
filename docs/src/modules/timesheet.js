@@ -392,25 +392,25 @@ function _renderKpis(d) {
   const leavePD = d.staff.reduce((s, x) => s + x.leaveDays, 0);
 
   const card = (lv, icon, val, lbl, sub, title) => `
-    <div class="ts-kpi lv-${lv}" title="${esc(title || '')}">
+    <div class="ts-kpi lv-${lv}">
       <div class="ts-kpi-ic">${icon}</div>
       <div class="ts-kpi-txt">
         <div class="ts-kpi-val">${val}</div>
-        <div class="ts-kpi-lbl">${lbl}</div>
+        <div class="ts-kpi-lbl">${lbl}${window.calcTip(title)}</div>
         ${sub ? `<div class="ts-kpi-sub">${sub}</div>` : ''}
       </div>
     </div>`;
 
   el.innerHTML =
     card('info', '⏱', _n1(totalH) + '<small> ชม.</small>', 'ชั่วโมงที่จัดสรร', '= ' + _n1(totalH / TS_DAY_H) + ' คน-วัน · ' + esc(_periodLabel(d.f)),
-         'ชั่วโมงทำงานที่ลงไว้ในช่วงเวลาที่เลือก (ตัดตามวันทำงานจริง)') +
+         'ชั่วโมงทำงานที่ลงไว้ในช่วงเวลาที่เลือก (ตัดตามวันทำงานจริง)\nคน-วัน = ชั่วโมง ÷ ' + TS_DAY_H + ' ชม.') +
     card(_lvl(teamU), '📈', _pctTxt(teamU), 'Utilization ทีม', capped.length + ' คน · กำลังคน ' + _n1(capSum / TS_DAY_H) + ' คน-วัน',
-         'ชั่วโมงที่จัดสรร ÷ ชั่วโมงที่ทำงานได้ (วันทำงาน − วันลา) × 8 ชม.') +
+         'ชั่วโมงที่จัดสรร ÷ ชั่วโมงที่ทำงานได้ × 100\nชั่วโมงที่ทำงานได้ = (วันทำงาน − วันลา) × ' + TS_DAY_H + ' ชม. รวมทุกคนที่มีกำลังคน\nต่ำ <50% · ปานกลาง 50–84% · เหมาะสม 85–105% · เกิน >105%') +
     card(over.length ? 'over' : 'ok', '🔥', over.length + '<small> คน</small>', 'งานเกินกำลัง / ซ้อน', overPD ? 'งานซ้อนรวม ' + overPD + ' คน-วัน' : 'ไม่มีงานซ้อน',
          'คนที่ Utilization > 105% หรือมีวันที่ถูกจัดงานเกิน 8 ชม./วัน') +
     card(low.length ? 'low' : 'ok', '🟢', low.length + '<small> คน</small>', 'มีเวลาว่าง (<50%)', 'วันว่างรวม ' + _n1(freePD) + ' คน-วัน',
          'คนที่ยังรับงานเพิ่มได้ — วันว่าง = วันทำงานที่ไม่มีงานและไม่ได้ลา') +
-    card('info', '📁', d.projects.length, 'โครงการที่มีงาน', d.rows.length + ' รายการ', '') +
+    card('info', '📁', d.projects.length, 'โครงการที่มีงาน', d.rows.length + ' รายการ', 'จำนวนโครงการ (ไม่ซ้ำ) ที่มีการลงชั่วโมงในช่วงเวลาที่เลือก\nรายการ = จำนวนแถว Timesheet ที่อยู่ในช่วงนั้น') +
     card('info', '🌴', leavePD + '<small> วัน</small>', 'วันลารวม', 'ในช่วงเวลาที่เลือก', 'วันทำงานที่ลา (ไม่นับที่ถูกปฏิเสธ)');
 }
 
@@ -455,8 +455,8 @@ function _renderStaff(d) {
   if (list.length === 1) openSet.add(list[0].sid);
 
   return `<div class="ts-shead">
-      <div>พนักงาน</div><div>Utilization (${d.pDays.length} วันทำงาน)</div>
-      <div class="r">ชม.</div><div class="r">คน-วัน</div><div class="r">โครงการ</div><div>สัญญาณ</div><div></div>
+      <div>พนักงาน</div><div>Utilization (${d.pDays.length} วันทำงาน)${window.calcTip('ชั่วโมงที่ได้รับงาน ÷ ((วันทำงาน − วันลา) × ' + TS_DAY_H + ' ชม.) × 100\nแถบเต็มที่ 150% · เส้นประ = 100% เต็มกำลัง')}</div>
+      <div class="r">ชม.${window.calcTip('ผลรวมชั่วโมงที่ลงไว้ของคนนี้ในช่วงที่เลือก')}</div><div class="r">คน-วัน${window.calcTip('ชั่วโมง ÷ ' + TS_DAY_H)}</div><div class="r">โครงการ</div><div>สัญญาณ${window.calcTip('ซ้อน = จำนวนวันที่ถูกจัดงานเกิน ' + TS_DAY_H + ' ชม.\nว่าง = วันทำงานที่ไม่มีงานและไม่ได้ลา\nลา = วันทำงานที่ลา (ไม่นับที่ถูกปฏิเสธ)')}</div><div></div>
     </div>` + list.map(x => {
     const lv = _lvl(x.util), isOpen = openSet.has(x.sid);
     const flags = [];

@@ -1,0 +1,21 @@
+/* ================================================================
+   EMOJI-ICONS.CSS — ไอคอนอีโมจิสีที่ src/utils/icons.util.js สร้าง (appIcon / แปลงจาก <i class="ti ti-...">)
+   ใช้ทั้ง Backoffice (main.css) และระบบอบรม (training-page.util.js)
+================================================================ */
+.emo-ic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", "Twemoji Mozilla", sans-serif;
+  font-style: normal;
+  font-weight: normal;
+  line-height: 1;
+  vertical-align: -.1em;
+  /* กันหัวข้อ/ปุ่มที่ไล่สีตัวอักษร (background-clip:text) ทำให้อีโมจิกลายเป็นก้อนสี */
+  -webkit-text-fill-color: initial;
+  background-clip: border-box;
+  -webkit-background-clip: border-box;
+}
+/* อีโมจิในปุ่มเล็กลงนิดให้สมดุลกับตัวอักษร */
+.btn > .emo-ic, button > .emo-ic { font-size: .95em; }

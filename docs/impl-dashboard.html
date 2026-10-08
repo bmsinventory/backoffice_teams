@@ -8,6 +8,8 @@
 <link rel="icon" type="image/png" href="img/icon_app.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css">
+<link rel="stylesheet" href="src/styles/components/icons.css">
 <style>
   :root{
     color-scheme: light;
@@ -22,6 +24,7 @@
     --accent:   #4a3aa7;  --accent-soft: rgba(74,58,167,.10);
     --cat-1:#2a78d6; --cat-2:#eb6834; --cat-3:#1baf7a; --cat-4:#eda100; --cat-5:#e87ba4; --cat-6:#008300;
     --shadow: 0 1px 2px rgba(11,11,11,.05), 0 10px 28px rgba(11,11,11,.05);
+    --txt:var(--ink); --txt2:var(--ink2); --violet:var(--accent); --coral:var(--critical);
   }
   @media (prefers-color-scheme:dark){
     :root{
@@ -39,7 +42,24 @@
       --shadow: 0 1px 2px rgba(0,0,0,.35), 0 10px 28px rgba(0,0,0,.35);
     }
   }
+  :root[data-theme="light"]{color-scheme:light;
+    --surface:#fcfcfb;--page:#f9f9f7;--ink:#0b0b0b;--ink2:#52514e;--ink3:#898781;
+    --line:#e1e0d9;--border:rgba(11,11,11,.10);--blue:#2a78d6;--blue-soft:rgba(42,120,214,.12);
+    --good:#0ca30c;--good-soft:rgba(12,163,12,.12);--warning:#fab219;--warning-soft:rgba(250,178,25,.16);
+    --serious:#ec835a;--serious-soft:rgba(236,131,90,.14);--critical:#d03b3b;--critical-soft:rgba(208,59,59,.12);
+    --accent:#4a3aa7;--accent-soft:rgba(74,58,167,.10);--cat-1:#2a78d6;--cat-2:#eb6834;--cat-3:#1baf7a;
+    --cat-4:#eda100;--cat-5:#e87ba4;--cat-6:#008300;--shadow:0 1px 2px rgba(11,11,11,.05),0 10px 28px rgba(11,11,11,.05)}
+  :root[data-theme="dark"]{color-scheme:dark;
+    --surface:#1a1a19;--page:#0d0d0d;--ink:#fff;--ink2:#c3c2b7;--ink3:#898781;
+    --line:#2c2c2a;--border:rgba(255,255,255,.10);--blue:#3987e5;--blue-soft:rgba(57,135,229,.16);
+    --good:#0ca30c;--good-soft:rgba(12,163,12,.18);--warning:#fab219;--warning-soft:rgba(250,178,25,.18);
+    --serious:#ec835a;--serious-soft:rgba(236,131,90,.18);--critical:#e45a5a;--critical-soft:rgba(208,59,59,.20);
+    --accent:#9085e9;--accent-soft:rgba(144,133,233,.16);--cat-1:#3987e5;--cat-2:#d95926;--cat-3:#199e70;
+    --cat-4:#c98500;--cat-5:#d55181;--cat-6:#18a018;--shadow:0 1px 2px rgba(0,0,0,.35),0 10px 28px rgba(0,0,0,.35)}
   *{box-sizing:border-box}
+  .sec-title>.ti{width:29px;height:29px;border-radius:9px;color:var(--glyph-color,var(--accent));background:var(--glyph-bg,var(--accent-soft));font-size:17px}
+  button>.ti{color:var(--glyph-color,currentColor)}
+  .ai-section-icon>.ti{width:26px;height:26px;border-radius:8px;color:var(--glyph-color,var(--accent));background:var(--glyph-bg,var(--accent-soft));font-size:15px}
   body{margin:0;background:var(--page);color:var(--ink);
     font-family:'Noto Sans Thai',system-ui,-apple-system,'Segoe UI',sans-serif;font-size:15px;line-height:1.6;
     -webkit-font-smoothing:antialiased}
@@ -49,6 +69,10 @@
   /* ── Top bar: ไม่มี logo — บรรทัดเดียว บาง ๆ บอกบริบทว่ากำลังดูอะไรอยู่ ── */
   .topbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
     padding:18px 0;font-size:11.5px;font-weight:700;letter-spacing:.06em;color:var(--ink3);text-transform:uppercase}
+  .theme-control{display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0}
+  .theme-control label{font-size:12px;color:var(--ink3)}
+  .theme-control select{font:inherit;font-size:12.5px;font-weight:700;color:var(--ink);background:var(--surface);
+    border:1px solid var(--border);border-radius:9px;padding:7px 30px 7px 10px;cursor:pointer;color-scheme:inherit}
 
   .notice{padding:16px 18px;border-radius:12px;background:var(--blue-soft);color:var(--ink);font-size:14px}
   .notice.err{background:var(--critical-soft);color:var(--critical)}
@@ -127,6 +151,22 @@
 
   .empty{color:var(--ink3);font-size:13px;text-align:center;padding:18px 4px}
 
+  .ai-card{position:relative;overflow:hidden;border-color:color-mix(in srgb,var(--accent) 34%,var(--border));
+    background:linear-gradient(135deg,var(--accent-soft),var(--surface) 48%)}
+  .ai-card::after{content:'AI';position:absolute;right:22px;top:8px;font-size:72px;font-weight:800;line-height:1;
+    color:var(--accent);opacity:.055;pointer-events:none}
+  .ai-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;position:relative;z-index:1}
+  .ai-title{font-size:17px;font-weight:800;margin:0 0 3px}.ai-sub{font-size:12.5px;color:var(--ink3)}
+  .ai-run-btn{background:var(--accent);color:#fff;white-space:nowrap;transition:opacity .15s,transform .15s}
+  .ai-run-btn:hover{opacity:.9;transform:translateY(-1px)}.ai-run-btn:disabled{opacity:.55;cursor:wait;transform:none}
+  .ai-body{margin-top:16px;position:relative;z-index:1}.ai-placeholder{color:var(--ink2);font-size:13.5px}
+  .ai-body p{margin:0 0 9px}.ai-body ul{margin:7px 0 0;padding-left:22px}.ai-body li{margin:5px 0}
+  .ai-h{font-weight:800;color:var(--accent);margin:14px 0 6px}.ai-note{font-size:11.5px;color:var(--ink3);margin-top:14px}
+  .ai-loading{display:flex;align-items:center;gap:10px;color:var(--ink2)}
+  .ai-loading::before{content:'';width:16px;height:16px;border:2px solid var(--accent-soft);border-top-color:var(--accent);
+    border-radius:50%;animation:ai-spin .8s linear infinite}@keyframes ai-spin{to{transform:rotate(360deg)}}
+  @media(max-width:640px){.ai-head{flex-direction:column}.ai-run-btn{width:100%}.theme-control label{display:none}}
+
   /* ── รายการปัญหาแบบละเอียด — เนื้อหาหลักของหน้านี้ (แทนที่ % ความคืบหน้าโครงการ ตามที่ต้องการดู
      "ปัญหา" ไม่ใช่ "รายละเอียดโครงการ") เรียงใหม่สุดก่อน คั่นด้วยเส้นบางระหว่างรายการ ── */
   .issue-item{padding:16px 0;border-top:1px solid var(--line)}
@@ -155,19 +195,131 @@
   .link-copy-btn.copied{background:var(--good-soft);border-color:transparent;color:var(--good)}
 
   .footnote{font-size:11.5px;color:var(--ink3);text-align:center;margin-top:20px}
+
+  /* Executive briefing visual system */
+  body{background:
+    radial-gradient(circle at 8% -10%,rgba(53,112,255,.11),transparent 28rem),
+    radial-gradient(circle at 92% 5%,rgba(125,71,255,.10),transparent 26rem),var(--page);font-size:16px}
+  .wrap{max-width:1440px;padding:0 24px 48px}
+  .topbar{position:sticky;top:0;z-index:20;margin:0 -24px 14px;padding:10px 24px;
+    background:color-mix(in srgb,var(--page) 82%,transparent);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+    border-bottom:1px solid color-mix(in srgb,var(--border) 70%,transparent)}
+  .topbar>span{display:flex;align-items:center;gap:10px;color:var(--ink);font-size:12px;letter-spacing:.09em}
+  .topbar>span::before{content:'';width:11px;height:11px;border-radius:3px;background:linear-gradient(135deg,#3478f6,#8158ff);
+    box-shadow:0 0 0 5px rgba(52,120,246,.10)}
+  .theme-control{padding:4px 4px 4px 12px;border:1px solid var(--border);border-radius:12px;background:var(--surface);box-shadow:var(--shadow)}
+  .theme-control select{border:0;background-color:transparent;padding-block:6px}
+  .dash-grid{gap:14px}.card{border-radius:18px;padding:18px 20px;border-color:color-mix(in srgb,var(--border) 78%,transparent)}
+  .header-card{position:relative;isolation:isolate;overflow:hidden;min-height:136px;padding:14px 22px;border:0;
+    background:linear-gradient(118deg,#0b1f3a 0%,#102c50 54%,#183e6a 100%);color:#fff;
+    box-shadow:0 24px 60px rgba(8,31,59,.22)}
+  .header-card::before{content:'';position:absolute;z-index:-1;width:390px;height:390px;right:7%;top:-270px;border-radius:50%;
+    border:54px solid rgba(86,178,255,.12)}
+  .header-card::after{content:'';position:absolute;z-index:-1;width:240px;height:240px;right:-65px;bottom:-170px;border-radius:50%;
+    background:linear-gradient(135deg,rgba(91,196,255,.28),rgba(130,83,255,.16))}
+  .header-card .badge{background:rgba(255,255,255,.12)!important;color:#dcecff!important;border:1px solid rgba(255,255,255,.14);
+    backdrop-filter:blur(8px);font-size:12px;padding:5px 12px}
+  .header-card .link-copy-btn{display:grid;place-items:center;width:36px;height:36px;min-height:36px;padding:0;
+    background:rgba(255,255,255,.09);border-color:rgba(255,255,255,.16);color:#fff}
+  .header-card .link-copy-btn svg{width:16px;height:16px}
+  .header-card .link-copy-btn:hover{background:rgba(255,255,255,.16)}
+  .header-actions{display:flex;align-items:center;gap:8px}
+  .ai-open-btn{display:grid;place-items:center;width:36px;height:36px;min-height:36px;background:#fff;color:#4232a2;padding:0;
+    box-shadow:0 8px 22px rgba(6,18,43,.18);transition:transform .15s,box-shadow .15s}
+  .ai-open-btn:hover{transform:translateY(-1px);box-shadow:0 11px 26px rgba(6,18,43,.24)}
+  .ai-open-btn svg{width:16px;height:16px;flex:none}
+  .hero-content{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:end;margin-top:8px}
+  .hero-eyebrow{font-size:11px;font-weight:800;color:#72c7ff;letter-spacing:.12em;text-transform:uppercase;margin-bottom:2px}
+  .proj-name{font-size:clamp(22px,2vw,30px);line-height:1.15;margin:0 0 5px;max-width:980px;letter-spacing:-.03em}
+  .proj-meta{font-size:13px;color:#a9bdd2;gap:7px 18px}.proj-meta b{color:#fff}.proj-meta span{display:flex;align-items:center;gap:5px}
+  .health-score{display:flex;align-items:center;gap:10px;min-width:184px;padding:7px 10px;border:1px solid rgba(255,255,255,.14);
+    border-radius:15px;background:rgba(255,255,255,.08);backdrop-filter:blur(12px)}
+  .health-ring{--pct:0;display:grid;place-items:center;width:54px;height:54px;border-radius:50%;flex:none;
+    background:conic-gradient(#62d9a7 calc(var(--pct)*1%),rgba(255,255,255,.13) 0);position:relative}
+  .health-ring::before{content:'';position:absolute;inset:5px;border-radius:50%;background:#123256}.health-ring b{position:relative;font-size:15px}
+  .health-copy span{display:block;color:#9fb5cc;font-size:11px}.health-copy strong{display:block;font-size:14px;margin-top:1px;color:#fff}
+  .filter-card{padding:9px 12px;background:color-mix(in srgb,var(--surface) 88%,transparent);backdrop-filter:blur(10px)}
+  .filter-bar{gap:10px}.filter-field{gap:6px;padding:4px 4px 4px 12px;border:1px solid var(--border);border-radius:12px;background:var(--page)}
+  .filter-field label{font-size:12px}.filter-field select{border:0;background-color:transparent;min-width:116px;font-size:13px}
+  .filter-clear-btn{display:grid;place-items:center;width:38px;height:38px;min-height:38px;padding:0;border-radius:11px}
+  .filter-clear-btn svg{width:18px;height:18px}
+  .stat-row{gap:12px}.stat-card{position:relative;overflow:hidden;border:0;border-top:0!important;border-radius:16px;padding:16px 18px 15px;
+    background:var(--surface);box-shadow:0 14px 36px rgba(17,36,69,.08)}
+  .stat-card::after{content:'';position:absolute;width:90px;height:90px;border-radius:50%;right:-45px;top:-38px;background:currentColor;opacity:.075}
+  .stat-card-lbl{font-size:12px}.stat-card-val{font-size:clamp(30px,2.7vw,40px);letter-spacing:-.045em;margin:4px 0 6px}
+  .stat-card-sub{font-size:12px}.stat-card-meter{height:7px}
+  .ai-card{padding:0;border:0;background:linear-gradient(118deg,#4b36ae 0%,#6547d8 48%,#3877dd 100%);color:#fff;
+    box-shadow:0 24px 60px rgba(74,58,167,.24)}
+  .ai-card::before{content:'';position:absolute;width:420px;height:420px;right:-180px;top:-260px;border-radius:50%;
+    border:60px solid rgba(255,255,255,.07)}
+  .ai-card::after{right:30px;top:10px;color:#fff;opacity:.07;font-size:108px}
+  .ai-head{padding:18px 22px 12px}.ai-title{font-size:18px}.ai-sub,.ai-note{color:rgba(255,255,255,.7)}
+  .ai-run-btn{background:#fff;color:#4a3aa7;box-shadow:0 8px 22px rgba(25,17,85,.20)}
+  .ai-body{margin:0 9px;padding:14px 17px;border-radius:13px;background:rgba(10,18,56,.24);min-height:54px}
+  .ai-body .ai-h{color:#bfe5ff}.ai-placeholder,.ai-loading{color:rgba(255,255,255,.85)}.ai-note{padding:9px 22px 14px;margin:0}
+  .ai-modal{position:fixed;inset:0;z-index:100;display:none;align-items:center;justify-content:center;padding:20px;
+    background:rgba(5,13,30,.66);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+  .ai-modal.open{display:flex}.ai-dialog{width:min(720px,100%);max-height:min(760px,calc(100vh - 40px));overflow:auto;
+    border:1px solid rgba(255,255,255,.16);border-radius:22px;background:linear-gradient(145deg,#4b36ae,#386fd3);color:#fff;
+    box-shadow:0 32px 90px rgba(0,0,0,.35)}
+  .ai-dialog-head{display:flex;align-items:flex-start;gap:14px;padding:22px 22px 16px;position:relative;overflow:hidden}
+  .ai-dialog-head::after{content:'✦';position:absolute;right:78px;top:8px;color:#ffe58a;font-size:24px;opacity:.72;transform:rotate(12deg)}
+  .ai-dialog-icon{display:grid;place-items:center;width:48px;height:48px;flex:none;border-radius:16px;
+    background:linear-gradient(145deg,#fff7b2,#ffd86b);color:#5941b7;box-shadow:0 8px 20px rgba(25,17,85,.2);transform:rotate(-3deg)}
+  .ai-dialog-icon svg{width:31px;height:31px}.ai-dialog-copy{min-width:0;flex:1}.ai-dialog-copy .ai-title{margin:0}
+  .ai-dialog-copy .ai-title::after{content:'✨';display:inline-block;margin-left:7px;font-size:16px;vertical-align:2px}
+  .ai-close-btn{display:grid;place-items:center;width:36px;height:36px;min-height:36px;padding:0;border-radius:10px;
+    background:rgba(255,255,255,.10);color:#fff;font-size:24px;line-height:1}.ai-close-btn:hover{background:rgba(255,255,255,.18)}
+  .ai-dialog-actions{display:flex;justify-content:flex-end;padding:0 22px 18px}.ai-dialog .ai-body{margin:0 12px 12px;max-height:430px;overflow:auto}
+  .ai-dialog .ai-h{display:flex;align-items:center;gap:9px;color:#fff;margin:18px 0 8px;font-size:16px}
+  .ai-dialog .ai-h:first-child{margin-top:2px}
+  .ai-section-icon{display:grid;place-items:center;width:31px;height:31px;flex:none;border-radius:10px;
+    background:rgba(255,255,255,.14);font-size:17px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+  .ai-dialog .ai-body ul{list-style:none;padding-left:5px;margin-left:0}
+  .ai-dialog .ai-body li{position:relative;padding:3px 0 3px 27px}
+  .ai-dialog .ai-body li::before{content:'✦';position:absolute;left:3px;top:4px;color:#ffe174;font-size:14px}
+  .ai-loading::after{content:'✦';font-size:22px;animation:ai-bob 1.2s ease-in-out infinite alternate}
+  @keyframes ai-bob{to{transform:translateY(-4px) rotate(5deg)}}
+  .ai-dialog .ai-note{padding-bottom:18px}
+  .chart-row{gap:14px}.chart-row .card{min-height:320px;transition:transform .2s,box-shadow .2s}
+  .chart-row .card:hover{transform:translateY(-3px);box-shadow:0 22px 48px rgba(17,36,69,.11)}
+  .sec-title{font-size:14px;margin-bottom:14px}.sec-title::before{width:4px;height:16px;border-radius:99px;background:linear-gradient(var(--blue),var(--accent))}
+  .issue-item{padding:20px 4px}.issue-problem{font-size:15px}.issue-solution{font-size:14px;border-left:3px solid var(--good)}
+  @media(max-width:900px){.hero-content{grid-template-columns:1fr}.health-score{width:max-content}.header-card{min-height:auto}}
+  @media(max-width:640px){.wrap{padding:0 14px 44px}.topbar{margin:0 -14px 14px;padding:11px 14px}.topbar>span{font-size:10.5px}
+    .header-card{padding:22px 20px}.header-card-top{align-items:flex-start}.header-actions{width:100%;justify-content:flex-end}
+    .hero-content{margin-top:18px;gap:18px}.proj-name{font-size:26px}
+    .health-score{width:100%}.filter-card{padding:12px}.filter-bar{display:grid;grid-template-columns:1fr 1fr}.filter-field{display:block;padding:8px 9px}
+    .filter-field label{display:block;margin-bottom:1px}.filter-field select{width:100%;padding-left:0}.filter-clear-btn{grid-column:1/-1;margin:0 0 0 auto}
+    .stat-row{grid-template-columns:1fr 1fr;gap:10px}.stat-card{padding:17px}.stat-card-val{font-size:34px}.stat-row .stat-card:last-child{grid-column:1/-1}
+    .ai-head{padding:22px 20px 16px}.ai-body{margin:0 8px;padding:17px}.ai-note{padding:11px 20px 18px}.chart-row .card{min-height:0}
+    .ai-modal{padding:10px}.ai-dialog{max-height:calc(100vh - 20px);border-radius:18px}.ai-dialog-head{padding:18px 16px 13px}
+    .ai-dialog-actions{padding:0 16px 14px}.ai-dialog-actions .ai-run-btn{width:100%}}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="topbar"><span>Implementation Dashboard · สรุปปัญหา</span></div>
+  <div class="topbar"><span>Implementation Dashboard · สรุปปัญหา</span><div class="theme-control"><label for="theme-select">ธีม</label><select id="theme-select" aria-label="เลือกธีมการแสดงผล"><option value="system">ตามอุปกรณ์</option><option value="light">สว่าง</option><option value="dark">มืด</option></select></div></div>
   <div id="app"><div class="notice">กำลังโหลด...</div></div>
 </div>
 
 <script src="env-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="src/services/ai.service.js"></script>
 <script>
 (function () {
   var app = document.getElementById('app');
+  var themeSelect = document.getElementById('theme-select');
+  function setTheme(theme) {
+    if (theme === 'light' || theme === 'dark') document.documentElement.setAttribute('data-theme', theme);
+    else document.documentElement.removeAttribute('data-theme');
+    try { localStorage.setItem('impl-dashboard-theme', theme); } catch (e) {}
+  }
+  var savedTheme = 'system';
+  try { savedTheme = localStorage.getItem('impl-dashboard-theme') || 'system'; } catch (e) {}
+  themeSelect.value = savedTheme;
+  setTheme(savedTheme);
+  themeSelect.addEventListener('change', function () { setTheme(themeSelect.value); });
   var db;
   try {
     db = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
@@ -186,6 +338,7 @@
     in_progress:  { l:'กำลังดำเนินการ',    v:'--blue' },
     review:       { l:'รอตรวจสอบ',        v:'--warning' },
     done:         { l:'เสร็จแล้ว',         v:'--good' },
+    completed:    { l:'สิ้นสุดโครงการ',     v:'--good' },
     delayed:      { l:'ล่าช้า',            v:'--serious' },
     issue:        { l:'มีปัญหา',           v:'--critical' },
     cancelled:    { l:'ยกเลิก',            v:'--ink3' },
@@ -203,8 +356,26 @@
   };
 
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c] || c; }); }
+  window.esc = window.esc || esc;
   function fd(s){ if(!s) return '-'; var d=new Date(s); if(isNaN(d)) return '-';
     return d.getDate()+'/'+(d.getMonth()+1)+'/'+(d.getFullYear()+543); }
+  function dateOnly(s) {
+    if (!s) return null;
+    var m = String(s).slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return null;
+    var d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    return isNaN(d) ? null : d;
+  }
+  function projectTimelineStatus(proj) {
+    // ป้ายสถานะหน้า Dashboard ยึดช่วงเวลาโครงการ เพื่อไม่ให้ค่าจากฐานข้อมูลที่ไม่ได้อัปเดตทำให้เข้าใจผิด
+    if (proj.status === 'cancelled') return IMPL_STATUS.cancelled;
+    var start = dateOnly(proj.start_date), end = dateOnly(proj.end_date);
+    var today = new Date(); today.setHours(0, 0, 0, 0);
+    if (start && today < start) return IMPL_STATUS.not_started;
+    if (end && today > end) return IMPL_STATUS.completed;
+    if (start || end) return IMPL_STATUS.in_progress;
+    return IMPL_STATUS[proj.status] || IMPL_STATUS.not_started;
+  }
 
   // ── โดนัท (SVG stroke-dasharray) — ไม่ใช้ไลบรารีภายนอก หน้าเบา โหลดไว ── */
   function donutSvg(segments) {
@@ -392,21 +563,33 @@
   }
 
   function render(proj, issues, staffNames) {
-    var st = IMPL_STATUS[proj.status] || IMPL_STATUS.not_started;
+    var st = projectTimelineStatus(proj);
+    var heroTotal = issues.length;
+    var heroResolved = issues.filter(function (i) { return i.status === 'closed'; }).length;
+    var heroRate = heroTotal ? Math.round((heroResolved / heroTotal) * 100) : 0;
+    var heroHealth = heroRate >= 85 ? 'อยู่ในเกณฑ์ดี' : heroRate >= 60 ? 'ควรติดตามต่อเนื่อง' : 'ควรเร่งติดตาม';
 
     // ── ชื่อโครงการ (project_name) คือชื่อที่ระบุ รพ./สถานที่จริงเสมอ (เช่น "ติดตั้ง Inventory
     // โรงพยาบาลทุ่งช้าง จ.น่าน") — ใช้เป็นหัวเรื่องเด่น · PM = เจ้าของไซต์ · ผู้ประสานงาน = ผู้ติดตั้ง ของโครงการต้นทาง ──
     var headerCard = '<div class="card full header-card" style="border-top-color:var(' + st.v + ')">'
       + '<div class="header-card-top">'
-      + '<span class="badge" style="background:var(' + st.v + '-soft,rgba(137,135,129,.14));color:var(' + st.v + ')">' + esc(st.l) + '</span>'
-      + '<button class="link-copy-btn" id="dash-copy-btn" type="button">🔗 แชร์ลิงก์สาธารณะ</button>'
+      + '<span class="badge" title="คำนวณจากวันที่เริ่มและสิ้นสุดโครงการ" style="background:var(' + st.v + '-soft,rgba(137,135,129,.14));color:var(' + st.v + ')">' + esc(st.l) + '</span>'
+      + '<div class="header-actions"><button class="ai-open-btn" id="ai-open-btn" type="button" aria-haspopup="dialog" aria-label="AI วิเคราะห์ปัญหา" title="AI วิเคราะห์ปัญหา">'
+      + '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2l1.5 4.5L18 8l-4.5 1.5L12 14l-1.5-4.5L6 8l4.5-1.5L12 2Z" fill="currentColor"/><path d="m18.5 14 .8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2Z" fill="currentColor"/></svg>'
+      + '</button>'
+      + '<button class="link-copy-btn" id="dash-copy-btn" type="button" aria-label="แชร์ลิงก์สาธารณะ" title="แชร์ลิงก์สาธารณะ">'
+      + '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M10.3 13.7a4 4 0 0 0 5.7 0l2.2-2.2a4 4 0 0 0-5.7-5.7l-1.3 1.3m2.5 3.2a4 4 0 0 0-5.7 0l-2.2 2.2a4 4 0 1 0 5.7 5.7l1.3-1.3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div>'
       + '</div>'
+      + '<div class="hero-content"><div><div class="hero-eyebrow">Implementation Performance Briefing</div>'
       + '<div class="proj-name">' + esc(proj.project_name) + '</div>'
       + '<div class="proj-meta">'
       + (proj.pmName ? '<span>PM <b>' + esc(proj.pmName) + '</b></span>' : '')
       + ((proj.start_date || proj.end_date) ? '<span>' + fd(proj.start_date) + ' – ' + fd(proj.end_date) + '</span>' : '')
       + (proj.coordinatorName ? '<span>ผู้ประสานงาน <b>' + esc(proj.coordinatorName) + '</b></span>' : '')
-      + '</div></div>';
+      + '</div></div><div class="health-score" aria-label="อัตราแก้ไข ' + heroRate + ' เปอร์เซ็นต์">'
+      + '<div class="health-ring" style="--pct:' + heroRate + '"><b>' + heroRate + '%</b></div>'
+      + '<div class="health-copy"><span>Project health</span><strong>' + heroHealth + '</strong></div>'
+      + '</div></div></div>';
 
     // ── ตัวกรอง: ตัวเลือกสร้างจากข้อมูลปัญหาทั้งหมดของโครงการนี้ (ไม่ขึ้นกับตัวกรองที่เลือกอยู่)
     // เปลี่ยนตัวไหนก็ตาม กรองทุกส่วนด้านล่างพร้อมกันหมด (สถิติ/กราฟ/รายการ) ผ่าน applyFilters() ──
@@ -430,10 +613,19 @@
       + '<div class="filter-field"><label>หน่วยงาน</label><select id="filter-department">' + plainOptionsHtml(distinctValues('department')) + '</select></div>'
       + '<div class="filter-field"><label>สถานะ</label><select id="filter-status">' + statusOptionsHtml + '</select></div>'
       + '<div class="filter-field"><label>ผู้แก้ไข</label><select id="filter-fixedby">' + fixedByOptionsHtml() + '</select></div>'
-      + '<button class="filter-clear-btn" id="filter-clear-btn" type="button">ล้างตัวกรองทั้งหมด</button>'
+      + '<button class="filter-clear-btn" id="filter-clear-btn" type="button" aria-label="ล้างตัวกรองทั้งหมด" title="ล้างตัวกรองทั้งหมด">'
+      + '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 5h16l-6.2 7.1v5.2l-3.6 1.8v-7L4 5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m16.5 4.5 4 4m0-4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>'
       + '</div></div>';
 
     var statRowShell = '<div class="stat-row full" id="stat-row-body"></div>';
+    var aiModal = '<div class="ai-modal" id="ai-modal" aria-hidden="true">'
+      + '<section class="ai-dialog" role="dialog" aria-modal="true" aria-labelledby="ai-overview-title">'
+      + '<div class="ai-dialog-head"><div class="ai-dialog-icon"><svg viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M16 5v3" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="16" cy="4" r="2" fill="currentColor"/><rect x="5" y="8" width="22" height="18" rx="7" fill="currentColor"/><rect x="8" y="11" width="16" height="11" rx="5" fill="#fff8c9"/><circle cx="12.5" cy="16.5" r="1.7" fill="currentColor"/><circle cx="19.5" cy="16.5" r="1.7" fill="currentColor"/><path d="M13 20c1.6 1.2 4.4 1.2 6 0" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M5 15H3m26 0h-2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></div>'
+      + '<div class="ai-dialog-copy"><h2 class="ai-title" id="ai-overview-title">AI วิเคราะห์ภาพรวมปัญหา</h2><div class="ai-sub">สรุปประเด็นสำคัญ ความเสี่ยง และข้อเสนอแนะจากข้อมูลที่เลือกอยู่</div></div>'
+      + '<button class="ai-close-btn" id="ai-close-btn" type="button" aria-label="ปิดหน้าต่าง">×</button></div>'
+      + '<div class="ai-body" id="ai-overview-body" aria-live="polite"><div class="ai-placeholder">กำลังเตรียมข้อมูลสำหรับวิเคราะห์…</div></div>'
+      + '<div class="ai-dialog-actions"><button class="ai-run-btn" id="ai-run-btn" type="button">✨ วิเคราะห์ด้วย AI</button></div>'
+      + '<div class="ai-note">🛡️ AI อาจคลาดเคลื่อน โปรดตรวจสอบกับผู้รับผิดชอบก่อนนำไปดำเนินการ</div></section></div>';
     var chartRowShell = '<div class="chart-row full">'
       + '<div class="card"><div class="sec-title">กลุ่มปัญหา</div><div id="cat-donut-body"></div></div>'
       + '<div class="card"><div class="sec-title">สถานะการแก้ไข</div><div id="status-donut-body"></div></div>'
@@ -460,6 +652,78 @@
     // เลขลำดับต่อเนื่องข้ามหน้า (หน้า 2 เริ่มที่ 51 ไม่ใช่ 1 ใหม่) กันรายการยาวเกินไปเวลามีปัญหาสะสมเยอะ ──
     var ISSUE_PAGE_SIZE = 50;
     var sortedIssues = [], totalPages = 1, issuePage = 1;
+    var filteredIssues = issues.slice();
+    var aiResultSignature = '';
+    var lastAiFocus = null;
+
+    function openAiModal() {
+      var modal = document.getElementById('ai-modal');
+      if (!modal) return;
+      lastAiFocus = document.activeElement;
+      modal.classList.add('open');
+      modal.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+      var runBtn = document.getElementById('ai-run-btn');
+      if (runBtn) runBtn.focus();
+      // วิเคราะห์อัตโนมัติเมื่อเปิดครั้งแรก ไม่ต้องกดปุ่มในหน้าต่างซ้ำ
+      if (!aiResultSignature) runAiOverview();
+    }
+    function closeAiModal() {
+      var modal = document.getElementById('ai-modal');
+      if (!modal) return;
+      modal.classList.remove('open');
+      modal.setAttribute('aria-hidden', 'true');
+      document.body.style.overflow = '';
+      if (lastAiFocus && lastAiFocus.focus) lastAiFocus.focus();
+    }
+
+    function issueSummaryForAi(list) {
+      var counts = { open: 0, in_progress: 0, closed: 0 };
+      var cats = {}, depts = {}, severities = {};
+      list.forEach(function (i) {
+        counts[i.status] = (counts[i.status] || 0) + 1;
+        if (i.category) cats[i.category] = (cats[i.category] || 0) + 1;
+        if (i.department) depts[i.department] = (depts[i.department] || 0) + 1;
+        if (i.severity) severities[i.severity] = (severities[i.severity] || 0) + 1;
+      });
+      function top(obj) { return Object.keys(obj).sort(function (a, b) { return obj[b] - obj[a]; }).slice(0, 8).map(function (k) { return k + ': ' + obj[k]; }).join(', ') || '-'; }
+      var details = list.slice(0, 80).map(function (i) {
+        return { date: String(i.created_at || '').slice(0, 10), status: i.status || '', severity: i.severity || '', category: i.category || '', department: i.department || '', problem: String(i.problem || '').slice(0, 500), solution: String(i.solution || '').slice(0, 500) };
+      });
+      return 'โครงการ: ' + (proj.project_name || '-') + '\nจำนวนทั้งหมด: ' + list.length
+        + '\nสถานะ: รอดำเนินการ ' + (counts.open || 0) + ', กำลังดำเนินการ ' + (counts.in_progress || 0) + ', ปิดแล้ว ' + (counts.closed || 0)
+        + '\nกลุ่มปัญหาที่พบ: ' + top(cats) + '\nหน่วยงาน: ' + top(depts) + '\nระดับความรุนแรง: ' + top(severities)
+        + '\nรายละเอียดรายการล่าสุด (ไม่เกิน 80 รายการ):\n' + JSON.stringify(details);
+    }
+
+    async function runAiOverview() {
+      var btn = document.getElementById('ai-run-btn'), body = document.getElementById('ai-overview-body');
+      if (!btn || !body) return;
+      if (!filteredIssues.length) { body.innerHTML = '<div class="ai-placeholder">ไม่มีข้อมูลปัญหาในตัวกรองนี้ให้วิเคราะห์</div>'; return; }
+      btn.disabled = true; btn.textContent = 'กำลังวิเคราะห์…';
+      body.innerHTML = '<div class="ai-loading">AI กำลังอ่านภาพรวมและจัดลำดับสิ่งที่ควรติดตาม</div>';
+      try {
+        if (typeof window.aiChat !== 'function') throw new Error('ยังไม่พร้อมใช้งาน');
+        var answer = await window.aiChat(
+          'คุณเป็นนักวิเคราะห์ระบบสารสนเทศโรงพยาบาล วิเคราะห์จากข้อมูลที่ให้เท่านั้น ห้ามเดาข้อเท็จจริงเพิ่ม เขียนภาษาไทยกระชับและเข้าใจง่ายสำหรับผู้บริหารโรงพยาบาล หลีกเลี่ยงข้อมูลระบุตัวบุคคล ใช้หัวข้อ ## ภาพรวม, ## ประเด็นที่ควรเฝ้าระวัง, ## ข้อเสนอแนะลำดับถัดไป และ bullet ไม่เกินหัวข้อละ 3 ข้อ ถ้าปัญหาปิดครบทั้งหมดให้ชื่นชมพร้อมเสนอการป้องกันการเกิดซ้ำ',
+          issueSummaryForAi(filteredIssues), { maxTokens: 700, temperature: 0.15 }
+        );
+        body.innerHTML = window.aiTextToHtml(answer);
+        var sectionIcons = ['📊', '🔎', '💡'];
+        body.querySelectorAll('.ai-h').forEach(function (heading, index) {
+          var icon = document.createElement('span');
+          icon.className = 'ai-section-icon';
+          icon.setAttribute('aria-hidden', 'true');
+          icon.textContent = sectionIcons[index] || '✨';
+          heading.prepend(icon);
+        });
+        aiResultSignature = filteredIssues.map(function (i) { return i.id || i.created_at || i.problem; }).join('|');
+        btn.textContent = '↻ วิเคราะห์ใหม่';
+      } catch (e) {
+        body.innerHTML = '<div class="notice err">ไม่สามารถวิเคราะห์ด้วย AI ได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง</div>';
+        btn.textContent = '↻ ลองอีกครั้ง';
+      } finally { btn.disabled = false; }
+    }
 
     function renderIssuePage() {
       var body = document.getElementById('issue-list-body');
@@ -502,6 +766,7 @@
     function applyFilters() {
       var f = currentFilters();
       var list = issues.filter(function (i) { return passesFilters(i, f); });
+      filteredIssues = list;
 
       var statBody = document.getElementById('stat-row-body'); if (statBody) statBody.innerHTML = statRowHtml(list);
       var catBody = document.getElementById('cat-donut-body'); if (catBody) catBody.innerHTML = catDonutBody(list);
@@ -517,21 +782,34 @@
       totalPages = Math.max(1, Math.ceil(sortedIssues.length / ISSUE_PAGE_SIZE));
       issuePage = 1;
       renderIssuePage();
+      var newSignature = list.map(function (i) { return i.id || i.created_at || i.problem; }).join('|');
+      if (aiResultSignature && aiResultSignature !== newSignature) {
+        var aiBody = document.getElementById('ai-overview-body');
+        var aiBtn = document.getElementById('ai-run-btn');
+        if (aiBody) aiBody.innerHTML = '<div class="ai-placeholder">ตัวกรองเปลี่ยนแล้ว กดวิเคราะห์อีกครั้งเพื่อดูภาพรวมชุดข้อมูลนี้</div>';
+        if (aiBtn) aiBtn.textContent = '✨ วิเคราะห์ด้วย AI';
+        aiResultSignature = '';
+      }
     }
 
     var issueListCard = '<div class="card full"><div class="sec-title">🩹 รายการปัญหา <span class="n" id="issue-list-count">(0 รายการ)</span></div>'
       + '<div id="issue-list-body"></div></div>';
 
     app.innerHTML = '<div class="dash-grid">' + headerCard + filterBarCard + statRowShell + chartRowShell + issueListCard + '</div>'
-      + '<div class="footnote">ข้อมูล ณ ' + new Date().toLocaleString('th-TH') + ' · บริษัท บางกอก เมดิคอล ซอฟต์แวร์ จำกัด</div>';
+      + '<div class="footnote">ข้อมูล ณ ' + new Date().toLocaleString('th-TH') + ' · บริษัท บางกอก เมดิคอล ซอฟต์แวร์ จำกัด</div>' + aiModal;
 
     // ── ปุ่มคัดลอกลิงก์อยู่ในการ์ดเดียวกับชื่อโครงการ มุมขวาบนของการ์ด ──
     var copyBtn = document.getElementById('dash-copy-btn');
     if (copyBtn) copyBtn.addEventListener('click', function () {
       navigator.clipboard.writeText(location.href).then(function () {
-        copyBtn.textContent = '✓ คัดลอกแล้ว';
         copyBtn.classList.add('copied');
-        setTimeout(function () { copyBtn.textContent = '🔗 แชร์ลิงก์สาธารณะ'; copyBtn.classList.remove('copied'); }, 2000);
+        copyBtn.setAttribute('aria-label', 'คัดลอกลิงก์แล้ว');
+        copyBtn.setAttribute('title', 'คัดลอกลิงก์แล้ว');
+        setTimeout(function () {
+          copyBtn.classList.remove('copied');
+          copyBtn.setAttribute('aria-label', 'แชร์ลิงก์สาธารณะ');
+          copyBtn.setAttribute('title', 'แชร์ลิงก์สาธารณะ');
+        }, 2000);
       });
     });
 
@@ -546,6 +824,17 @@
       });
       applyFilters();
     });
+    var aiBtn = document.getElementById('ai-run-btn');
+    if (aiBtn) aiBtn.addEventListener('click', runAiOverview);
+    var aiOpenBtn = document.getElementById('ai-open-btn');
+    if (aiOpenBtn) aiOpenBtn.addEventListener('click', openAiModal);
+    var aiCloseBtn = document.getElementById('ai-close-btn');
+    if (aiCloseBtn) aiCloseBtn.addEventListener('click', closeAiModal);
+    var aiModalEl = document.getElementById('ai-modal');
+    if (aiModalEl) aiModalEl.addEventListener('click', function (e) { if (e.target === aiModalEl) closeAiModal(); });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && aiModalEl && aiModalEl.classList.contains('open')) closeAiModal();
+    });
 
     applyFilters();
   }
@@ -553,5 +842,6 @@
   load();
 })();
 </script>
+<script src="src/utils/icons.util.js"></script>
 </body>
 </html>

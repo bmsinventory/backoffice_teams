@@ -199,6 +199,11 @@
 #view-helpdesk .hd-field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 10px; margin-bottom: 2px; }
 #view-helpdesk .hd-field-grid .hd-lbl { margin-top: 0; }
 #view-helpdesk .hd-field-grid select.hd-sel-tinted { font-weight: 700; border-width: 1.5px; }
+#view-helpdesk .hd-feedback { margin-top: 14px; padding: 14px; border: 1px solid color-mix(in srgb,var(--violet) 18%,var(--border)); border-radius: 12px; background: linear-gradient(135deg,color-mix(in srgb,var(--violet) 7%,var(--surface)),var(--surface)); }
+#view-helpdesk .hd-feedback-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12px; font-weight: 800; color: var(--txt); }
+#view-helpdesk .hd-feedback-head b { color: #b77900; white-space: nowrap; }
+#view-helpdesk .hd-feedback-comment { margin-top: 9px; padding: 10px 12px; border-radius: 9px; background: var(--surface); color: var(--txt); font-size: 13px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+#view-helpdesk .hd-feedback-meta,#view-helpdesk .hd-feedback-empty,#view-helpdesk .hd-feedback-loading { margin-top: 8px; color: var(--txt3); font-size: 11.5px; }
 
 #view-helpdesk .hd-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 11px 14px; font-size: 12.5px; }
 #view-helpdesk .hd-info-grid .full { grid-column: 1 / -1; }
@@ -370,6 +375,8 @@
 #view-helpdesk .hd-wk-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
 #view-helpdesk .hd-wk-fchip { border: 1px solid var(--border); background: var(--surface); color: var(--txt2); border-radius: 999px; padding: 4px 12px; font-size: 12px; cursor: pointer; font-family: inherit; }
 #view-helpdesk .hd-wk-fchip.on { background: var(--violet); border-color: var(--violet); color: #fff; }
+#view-helpdesk .hd-wk-fchip:disabled { opacity: .45; cursor: default; }
+#view-helpdesk .hd-wk-pager { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
 #view-helpdesk .hd-wk-scroll { overflow-x: auto; }
 #view-helpdesk .hd-wk-tbl { font-size: 12.5px; }
 #view-helpdesk .hd-wk-tbl td { vertical-align: top; }
@@ -494,3 +501,293 @@
   #view-helpdesk .hd-views, #view-helpdesk .hd-q-count { padding-left: 16px; padding-right: 16px; }
   #view-helpdesk .hd-q-count .sort { margin-left: 0; }
 }
+
+/* ── Clean Operations refresh: queue workspace ── */
+#view-helpdesk {
+  --hd-ink: #20253a;
+  --hd-muted: #737c96;
+  --hd-soft: #f7f8fb;
+  --hd-line: #e7eaf1;
+  color: var(--hd-ink);
+}
+body[data-view="helpdesk"] .tp-title { font-weight: 600; letter-spacing: -.25px; }
+body[data-view="helpdesk"] .sb-title { font-weight: 600; }
+body[data-view="helpdesk"] .nav-btn .nl { font-weight: 400; }
+body[data-view="helpdesk"] .nav-btn.on .nl { font-weight: 600; }
+#view-helpdesk .af-tabs {
+  padding: 7px 24px; gap: 5px; background: var(--surface);
+  border-bottom: 1px solid var(--hd-line);
+}
+#view-helpdesk .af-tab {
+  min-height: 34px; padding: 7px 14px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 500; color: var(--hd-muted);
+}
+#view-helpdesk .af-tab.on { font-weight: 600; box-shadow: 0 5px 14px rgba(124, 92, 252, .16); }
+
+#view-helpdesk .hd-q-toolbar {
+  position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap;
+  align-items: center; gap: 9px; padding: 16px 24px;
+  background: var(--surface); border-bottom: 1px solid var(--hd-line);
+  box-shadow: none;
+}
+#view-helpdesk .hd-q-toolbar .t-search { flex: 0 1 280px; min-width: 230px; }
+#view-helpdesk .hd-q-toolbar .t-search input,
+#view-helpdesk .hd-q-toolbar .t-sel,
+#view-helpdesk .hd-q-toolbar .sc-btn {
+  min-height: 40px; border-color: var(--hd-line); border-radius: 11px;
+  background-color: var(--hd-soft); box-shadow: none; color: var(--txt2); font-weight: 400;
+}
+#view-helpdesk .hd-q-toolbar .t-search input:focus,
+#view-helpdesk .hd-q-toolbar .t-sel:focus,
+#view-helpdesk .hd-q-toolbar .sc-btn:focus-within {
+  background-color: var(--surface); border-color: rgba(124, 92, 252, .55);
+  box-shadow: 0 0 0 3px rgba(124, 92, 252, .09);
+}
+#view-helpdesk .hd-q-spacer { flex: 1 1 24px; }
+
+#view-helpdesk .hd-views { gap: 7px; padding: 14px 24px 4px; background: var(--bg); }
+#view-helpdesk .hd-view {
+  min-height: 37px; padding: 7px 12px; border-color: var(--hd-line); border-radius: 10px;
+  background: var(--surface); color: #596179; font-size: 12px; font-weight: 500;
+  transition: border-color .16s, background .16s, color .16s, transform .16s;
+}
+#view-helpdesk .hd-view:hover { transform: translateY(-1px); border-color: #d9ddea; background: #fbfbfd; }
+#view-helpdesk .hd-view .n {
+  min-width: 21px; padding: 1px 6px; border-radius: 6px;
+  background: #f0f2f7; color: #727b94; font-size: 10.5px; font-weight: 600;
+}
+#view-helpdesk .hd-view.hot:not(.on) .n { background: #fff0f1; color: #ef5961; }
+#view-helpdesk .hd-view.on {
+  border-color: #9a7cff; background: #f3efff; color: #7254e9;
+  box-shadow: 0 2px 8px rgba(124, 92, 252, .08); font-weight: 600;
+}
+#view-helpdesk .hd-view.on .n { background: #7c5cfc; color: #fff; }
+#view-helpdesk .hd-view-sep { background: #dfe3eb; margin: 5px 1px; }
+
+#view-helpdesk .hd-q-count {
+  padding: 10px 24px 11px; gap: 10px; color: var(--hd-muted);
+  font-size: 12px; font-weight: 400;
+}
+#view-helpdesk .hd-q-count b { font-size: 16px; font-weight: 600; }
+#view-helpdesk .hd-q-count .bits { font-weight: 500; }
+#view-helpdesk .hd-q-count .sort { font-weight: 400; }
+
+#view-helpdesk .hd-q-wrap {
+  margin: 0 16px 24px; border-color: var(--hd-line); border-radius: 14px;
+  box-shadow: 0 5px 18px rgba(31, 38, 65, .035);
+}
+#view-helpdesk .hd-q { font-size: 12.5px; }
+#view-helpdesk .hd-q thead th {
+  height: 44px; padding-top: 11px; padding-bottom: 11px; background: #fafbfc;
+  color: #929ab0; font-size: 10.5px; font-weight: 600; letter-spacing: .015em;
+  border-bottom-color: var(--hd-line);
+}
+#view-helpdesk .hd-q tbody td {
+  padding-top: 12px; padding-bottom: 12px; border-bottom-color: #eceef4; font-weight: 400;
+}
+#view-helpdesk .hd-q tr.hd-q-row { transition: background .14s, box-shadow .14s; }
+#view-helpdesk .hd-q tr.hd-q-row:hover td { background: #fafbff; }
+#view-helpdesk .hd-q tr.hd-q-row:focus-visible { outline-color: rgba(124, 92, 252, .65); outline-offset: -3px; }
+#view-helpdesk .hd-q tr.hd-q-row td:first-child { box-shadow: inset 3px 0 0 var(--hd-stripe, transparent); }
+#view-helpdesk .hd-q tr.s-breach td { background: rgba(255, 107, 107, .018); }
+#view-helpdesk .hd-q tr.s-breach:hover td { background: rgba(255, 107, 107, .045); }
+
+#view-helpdesk .hd-q-no { color: #9ca4b8; font-weight: 400; }
+#view-helpdesk .hd-q-tk { font-size: 12px; font-weight: 600; letter-spacing: -.02em; }
+#view-helpdesk .hd-q-title { font-size: 12.75px; font-weight: 500; color: var(--hd-ink); }
+#view-helpdesk .hd-q-sub,
+#view-helpdesk .hd-q-line2,
+#view-helpdesk .hd-q-upd { color: #929aaf; font-weight: 400; }
+#view-helpdesk .hd-q-sub.old { color: #ef5d65; font-weight: 500; }
+#view-helpdesk .hd-q-cat {
+  padding: 1px 7px; border-radius: 6px; background: #f0f2f6;
+  color: #70798f; font-weight: 400;
+}
+#view-helpdesk .hd-pill { padding: 3px 9px; font-size: 11px; font-weight: 500; line-height: 1.45; }
+#view-helpdesk .hd-q-wait { font-weight: 500; }
+#view-helpdesk .hd-q-owner { color: #3d445b; font-weight: 400; }
+#view-helpdesk .hd-q-sla { font-size: 11.5px; font-weight: 600; }
+#view-helpdesk .hd-q-bar { width: 104px; height: 4px; margin-top: 5px; background: #eceef3; }
+#view-helpdesk .hd-q-upd b { color: #535c73; font-weight: 500; }
+#view-helpdesk .hd-q-pager {
+  display: flex; justify-content: flex-end; align-items: center;
+  gap: 10px; padding: 0 24px 24px;
+}
+
+@media (max-width: 900px) {
+  #view-helpdesk .af-tabs { padding-left: 16px; padding-right: 16px; }
+  #view-helpdesk .hd-q-toolbar { padding: 12px 16px; }
+  #view-helpdesk .hd-q-toolbar .t-search { flex: 1 1 100%; }
+  #view-helpdesk .hd-q-spacer { display: none; }
+  #view-helpdesk .hd-q-wrap { margin-left: 8px; margin-right: 8px; }
+  #view-helpdesk .hd-q-pager { padding-left: 16px; padding-right: 16px; }
+}
+
+[data-theme="dark"] #view-helpdesk .hd-q-toolbar,
+[data-theme="dark"] #view-helpdesk .hd-q thead th { background: var(--surface); }
+[data-theme="dark"] #view-helpdesk {
+  --hd-ink: var(--txt);
+  --hd-muted: var(--txt2);
+  --hd-soft: var(--surface2);
+  --hd-line: var(--border);
+}
+[data-theme="dark"] #view-helpdesk .hd-q-toolbar .t-search input,
+[data-theme="dark"] #view-helpdesk .hd-q-toolbar .t-sel,
+[data-theme="dark"] #view-helpdesk .hd-q-toolbar .sc-btn { background-color: var(--surface2); }
+[data-theme="dark"] #view-helpdesk .hd-view.on { background: rgba(124, 92, 252, .14); }
+
+/* ── แท็บ "🔁 ปัญหาซ้ำ" — กลุ่มปัญหาที่พบบ่อย + แผนจัดการ ── */
+#view-helpdesk .hd-rc-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+#view-helpdesk .hd-rc-toolbar .hd-dash-h { flex: 0 0 auto; margin-right: 2px; }
+#view-helpdesk .hd-rc-ctrl { display: flex; flex-wrap: nowrap; gap: 6px; align-items: center; margin-left: auto; min-width: 0; }
+#view-helpdesk .hd-rc-ctrl .t-sel { min-height: 34px; width: auto; max-width: 210px; padding-top: 5px; padding-bottom: 5px; font-size: 11.5px; }
+#view-helpdesk .hd-rc-ctrl .hd-rc-days { width: 112px; }
+#view-helpdesk .hd-rc-ctrl .hd-rc-cat { max-width: 150px; }
+#view-helpdesk .hd-rc-ctrl .hd-rc-sort { max-width: 145px; }
+#view-helpdesk .hd-rc-tabs { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 3px; width: fit-content; padding: 3px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface2); }
+#view-helpdesk .hd-rc-tabs button { display: inline-flex; align-items: center; gap: 7px; min-height: 32px; padding: 5px 10px; border: 0; border-radius: 7px; background: transparent; color: var(--txt2); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+#view-helpdesk .hd-rc-tabs button:hover { color: var(--txt); background: var(--surface); }
+#view-helpdesk .hd-rc-tabs button.on { color: var(--violet); background: var(--surface); box-shadow: var(--sh-sm); }
+#view-helpdesk .hd-rc-tabs button b { min-width: 21px; padding: 2px 6px; border-radius: 999px; background: var(--border); color: var(--txt2); font-size: 11px; line-height: 1.4; text-align: center; font-variant-numeric: tabular-nums; }
+#view-helpdesk .hd-rc-tabs button.on b { background: rgba(124, 92, 252, .12); color: var(--violet); }
+#view-helpdesk .hd-rc-plan-filters { margin-left: auto; }
+@media (min-width: 1281px) { #view-helpdesk .hd-rc-kpis { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+#view-helpdesk .hd-rc-list { display: flex; flex-direction: column; gap: 8px; }
+#view-helpdesk .hd-rc-empty { text-align: center; color: var(--txt3); font-size: 13px; padding: 36px 0; border: 1px dashed var(--border); border-radius: 12px; }
+#view-helpdesk .hd-rc-card { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); overflow: hidden; }
+#view-helpdesk .hd-rc-card.open { box-shadow: var(--sh-sm); }
+#view-helpdesk .hd-rc-head { display: flex; gap: 14px; align-items: flex-start; padding: 12px 14px; cursor: pointer; }
+#view-helpdesk .hd-rc-head:hover { background: var(--surface2); }
+#view-helpdesk .hd-rc-n { flex: 0 0 56px; text-align: center; border-radius: 10px; padding: 6px 0; background: rgba(255, 166, 43, .14); color: var(--amber); }
+#view-helpdesk .hd-rc-n b { display: block; font-size: 20px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+#view-helpdesk .hd-rc-n span { font-size: 11px; font-weight: 600; }
+#view-helpdesk .hd-rc-main { flex: 1; min-width: 0; }
+#view-helpdesk .hd-rc-title { font-weight: 700; font-size: 13.5px; color: var(--txt); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+#view-helpdesk .hd-rc-card.open .hd-rc-title { display: block; }
+#view-helpdesk .hd-rc-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; font-size: 12px; color: var(--txt3); margin-top: 4px; }
+#view-helpdesk .hd-rc-meta .warn { color: var(--amber); font-weight: 600; }
+#view-helpdesk .hd-rc-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+#view-helpdesk .hd-rc-chip { font-size: 11.5px; padding: 2px 8px; border-radius: 999px; background: var(--surface2); border: 1px solid var(--border); color: var(--txt2); }
+#view-helpdesk .hd-rc-chip.rep { border-color: rgba(229, 72, 77, .4); background: rgba(229, 72, 77, .08); color: var(--coral); }
+#view-helpdesk .hd-rc-chip.more { color: var(--txt3); }
+#view-helpdesk .hd-rc-side { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 6px; max-width: 280px; }
+#view-helpdesk .hd-rc-body { border-top: 1px solid var(--border); padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 12px; }
+#view-helpdesk .hd-rc-plan { border-left: 3px solid var(--amber); background: rgba(255, 166, 43, .07); border-radius: 0 10px 10px 0; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+#view-helpdesk .hd-rc-plan-h { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; font-size: 12.5px; color: var(--txt2); }
+#view-helpdesk .hd-rc-plan-h .bad { color: var(--coral); font-weight: 700; }
+#view-helpdesk .hd-rc-pf { font-size: 12.5px; }
+#view-helpdesk .hd-rc-pf > span { display: block; font-size: 11.5px; font-weight: 700; color: var(--txt3); margin-bottom: 2px; }
+#view-helpdesk .hd-rc-pf > div { white-space: pre-wrap; color: var(--txt); }
+#view-helpdesk .hd-rc-pf.warn > span, #view-helpdesk .hd-rc-pf.warn > div { color: var(--amber); }
+#view-helpdesk .hd-rc-cols { display: grid; grid-template-columns: minmax(220px, 1fr) 2fr; gap: 16px; }
+#view-helpdesk .hd-rc-sub { font-size: 12px; font-weight: 700; color: var(--txt2); margin-bottom: 6px; }
+#view-helpdesk .hd-rc-tw { overflow-x: auto; max-height: 360px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; }
+#view-helpdesk .hd-rc-tbl { font-size: 12.5px; }
+#view-helpdesk .hd-rc-tbl tbody tr { cursor: pointer; }
+#view-helpdesk .hd-rc-tbl tbody tr.hd-rc-hosp-group { cursor: default; }
+#view-helpdesk .hd-rc-hosp-group th { padding: 8px 12px; text-align: left; background: var(--surface2); color: var(--txt2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+#view-helpdesk .hd-rc-hosp-group:first-child th { border-top: 0; }
+#view-helpdesk .hd-rc-hosp-group th span { font-weight: 700; }
+#view-helpdesk .hd-rc-hosp-group th b { margin-left: 8px; color: var(--violet); font-size: 11.5px; }
+#view-helpdesk .hd-rc-no { font-family: var(--mono); font-size: 12px; white-space: nowrap; }
+#view-helpdesk .hd-rc-plans { padding: 0; overflow: hidden; }
+#view-helpdesk .hd-rc-plans-h { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; padding: 14px 18px; }
+#view-helpdesk .hd-rc-plans-empty { text-align: center; color: var(--txt3); padding: 32px 24px !important; }
+#view-helpdesk .hd-rc-pt { font-weight: 600; color: var(--txt); }
+#view-helpdesk .hd-rc-od { color: var(--coral); font-weight: 700; }
+@media (max-width: 1280px) {
+  #view-helpdesk .hd-rc-ctrl { width: 100%; margin-left: 0; }
+  #view-helpdesk .hd-rc-plan-filters { margin-left: 0; }
+}
+@media (max-width: 900px) {
+  #view-helpdesk .hd-rc-cols { grid-template-columns: 1fr; }
+  #view-helpdesk .hd-rc-ctrl { flex-wrap: wrap; }
+}
+@media (max-width: 640px) {
+  #view-helpdesk .hd-rc-toolbar .hd-dash-h { width: 100%; }
+  #view-helpdesk .hd-rc-tabs { display: flex; width: 100%; }
+  #view-helpdesk .hd-rc-tabs button { flex: 1; justify-content: center; }
+  #view-helpdesk .hd-rc-plan-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+  #view-helpdesk .hd-rc-plan-filters button { min-width: 0; }
+  #view-helpdesk .hd-rc-head { flex-wrap: wrap; gap: 10px; }
+  #view-helpdesk .hd-rc-n { flex-basis: 48px; }
+  #view-helpdesk .hd-rc-main { flex-basis: calc(100% - 62px); }
+  #view-helpdesk .hd-rc-side { max-width: none; width: 100%; justify-content: flex-start; }
+  #view-helpdesk .hd-rc-ctrl .t-sel,
+  #view-helpdesk .hd-rc-ctrl .hd-rc-days,
+  #view-helpdesk .hd-rc-ctrl .hd-rc-cat,
+  #view-helpdesk .hd-rc-ctrl .hd-rc-sort { flex: 1 1 calc(50% - 4px); width: auto; max-width: none; min-height: 42px; }
+}
+
+/* สรุปจาก AI (โหมด 🤖 AI สรุปปัญหาซ้ำ) */
+#view-helpdesk .hd-rc-ai { border: 1px solid var(--border); border-left: 3px solid var(--violet); border-radius: 12px; background: var(--surface); padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+#view-helpdesk .hd-rc-ai.bad { border-left-color: var(--coral); }
+#view-helpdesk .hd-rc-ai-h { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 14px; color: var(--txt); }
+#view-helpdesk .hd-rc-ai-h .btn { margin-left: auto; }
+#view-helpdesk .hd-rc-ai-summary { max-width: 1080px; border-radius: 9px; background: rgba(124, 92, 252, .055); overflow: hidden; }
+#view-helpdesk .hd-rc-ai-summary summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; color: var(--violet); font-size: 11px; font-weight: 800; letter-spacing: .04em; cursor: pointer; list-style: none; user-select: none; }
+#view-helpdesk .hd-rc-ai-summary summary::-webkit-details-marker { display: none; }
+#view-helpdesk .hd-rc-ai-summary summary:hover { background: rgba(124, 92, 252, .06); }
+#view-helpdesk .hd-rc-ai-toggle::after { content: 'ซ่อน ▲'; color: var(--txt3); font-weight: 600; letter-spacing: 0; }
+#view-helpdesk .hd-rc-ai-summary:not([open]) .hd-rc-ai-toggle::after { content: 'แสดง ▼'; }
+#view-helpdesk .hd-rc-ai-o { margin: 0; padding: 0 18px 12px 38px; color: var(--txt); font-size: 13.5px; line-height: 1.65; }
+#view-helpdesk .hd-rc-ai-o li { padding-left: 4px; }
+#view-helpdesk .hd-rc-ai-o li + li { margin-top: 6px; }
+#view-helpdesk .hd-rc-ai-o li::marker { color: var(--violet); font-weight: 800; }
+#view-helpdesk .hd-rc-ai-prevention { background: rgba(34, 197, 94, .055); }
+#view-helpdesk .hd-rc-ai-prevention summary { color: var(--teal); }
+#view-helpdesk .hd-rc-ai-actions { margin: 0; padding: 0 18px 14px 38px; color: var(--txt); font-size: 12.5px; line-height: 1.6; }
+#view-helpdesk .hd-rc-ai-actions > li { padding-left: 4px; }
+#view-helpdesk .hd-rc-ai-actions > li + li { margin-top: 6px; }
+#view-helpdesk .hd-rc-ai-actions > li::marker { color: var(--teal); font-weight: 800; }
+#view-helpdesk .hd-rc-ai-meta { display: flex; flex-wrap: wrap; gap: 7px; }
+#view-helpdesk .hd-rc-ai-stat { display: inline-flex; align-items: center; gap: 4px; padding: 5px 9px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface2); font-size: 11.5px; color: var(--txt3); }
+#view-helpdesk .hd-rc-ai-stat strong { color: var(--txt); font-weight: 700; }
+#view-helpdesk .hd-rc-ai-alert { width: fit-content; padding: 7px 10px; border-radius: 8px; background: rgba(255, 166, 43, .1); color: var(--amber); font-size: 12px; }
+#view-helpdesk .hd-rc-ai-error { padding: 7px 10px; border-radius: 8px; background: rgba(255, 107, 107, .08); color: var(--coral); font-size: 12px; }
+#view-helpdesk .hd-rc-ai-note { padding-top: 9px; border-top: 1px solid var(--border); font-size: 11.5px; color: var(--txt3); }
+#view-helpdesk .hd-rc-ai-m { font-size: 11.5px; color: var(--txt3); }
+#view-helpdesk .hd-rc-ai-m b { color: var(--amber); }
+#view-helpdesk .hd-rc-prev { margin-top: 7px; font-size: 12px; color: var(--txt2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+#view-helpdesk .hd-rc-prev b { color: var(--violet); }
+#view-helpdesk .hd-rc-plan.ai { border-left-color: var(--violet); background: rgba(124, 92, 252, .06); }
+@media (max-width: 640px) {
+  #view-helpdesk .hd-rc-ai { padding: 12px; }
+  #view-helpdesk .hd-rc-ai-h { align-items: flex-start; }
+  #view-helpdesk .hd-rc-ai-h .btn { white-space: nowrap; }
+  #view-helpdesk .hd-rc-ai-summary summary { padding: 9px 11px; }
+  #view-helpdesk .hd-rc-ai-o { padding: 0 12px 10px 32px; }
+  #view-helpdesk .hd-rc-ai-actions { padding: 0 12px 12px 32px; }
+  #view-helpdesk .hd-rc-ai-stat { flex: 1 1 auto; justify-content: center; }
+}
+
+/* หัวข้อแบ่งตามระบบงาน */
+#view-helpdesk .hd-rc-sec { display: flex; align-items: baseline; gap: 10px; margin: 10px 0 2px; padding-bottom: 4px; border-bottom: 2px solid var(--border); }
+#view-helpdesk .hd-rc-sec:first-child { margin-top: 0; }
+#view-helpdesk .hd-rc-sec span { font-weight: 800; font-size: 14px; color: var(--txt); }
+#view-helpdesk .hd-rc-sec em { font-style: normal; font-size: 12px; color: var(--txt3); }
+/* ชิป รพ. กดดูปัญหาที่พบ + รายการปัญหาที่พบ */
+#view-helpdesk button.hd-rc-chip { font: inherit; font-size: 11.5px; cursor: pointer; }
+#view-helpdesk button.hd-rc-chip:hover { border-color: var(--violet); }
+#view-helpdesk .hd-rc-chip.on { background: var(--violet); border-color: var(--violet); color: #fff; }
+#view-helpdesk .hd-rc-hb { cursor: pointer; border-radius: 6px; padding-left: 4px; padding-right: 4px; }
+#view-helpdesk .hd-rc-hb:hover { background: var(--surface2); }
+#view-helpdesk .hd-rc-hb.on { background: rgba(124, 92, 252, .1); }
+#view-helpdesk .hd-rc-hb.on .hd-wk-bar-l { font-weight: 700; color: var(--violet); }
+#view-helpdesk .hd-rc-sub span { font-weight: 500; color: var(--txt3); }
+#view-helpdesk .hd-rc-sub a { color: var(--violet); font-weight: 600; margin-left: 4px; }
+#view-helpdesk .hd-rc-tw { max-height: 460px; }
+#view-helpdesk .hd-rc-ts { font-weight: 600; color: var(--txt); }
+#view-helpdesk .hd-rc-td { font-size: 12px; color: var(--txt3); margin-top: 2px; white-space: pre-wrap; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* ส่วนท้าย: เรื่องที่ข้อความคล้ายกันแต่ AI ไม่นับเป็นปัญหาซ้ำ (พับไว้) */
+#view-helpdesk .hd-rc-rawh { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; width: 100%; text-align: left; font: inherit; font-size: 13px; font-weight: 700; color: var(--txt2); background: var(--surface2); border: 1px dashed var(--border); border-radius: 10px; padding: 10px 14px; margin-top: 10px; cursor: pointer; }
+#view-helpdesk .hd-rc-rawh b { color: var(--txt); }
+#view-helpdesk .hd-rc-rawh em { font-style: normal; font-weight: 500; font-size: 11.5px; color: var(--txt3); }
+#view-helpdesk .hd-rc-rawh:hover { border-color: var(--violet); }
+#view-helpdesk .hd-rc-tsf { font-weight: 500; white-space: pre-wrap; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* หน้าต่างแผนจัดการปัญหา (อยู่นอก #view-helpdesk) */
+#m-hd-prob .hdp-info { font-size: 12.5px; color: var(--txt2); background: var(--surface2); border-radius: 10px; padding: 8px 12px; margin-bottom: 12px; }
+#m-hd-prob .hdp-note { font-size: 11.5px; color: var(--txt3); margin-top: 3px; }
+@media (max-width: 640px) { #m-hd-prob .f-grid { grid-template-columns: 1fr; } #m-hd-prob .f-grid > .f-group { grid-column: auto !important; } }

@@ -16,7 +16,6 @@
       { id: 'track',               icon: '📋', label: 'ตรวจสอบรายชื่อ' },
       { id: 'checkin',             icon: '📷', label: 'เช็คชื่อ' },
       { id: 'admin:registrations', icon: '👥', label: 'ผู้ลงทะเบียน' },
-      { id: 'print',               icon: '🖨️', label: 'พิมพ์เอกสาร' },
     ] },
     { g: 'ติดตามผล', items: [
       { id: 'analytics',           icon: '📊', label: 'Analytics' },
@@ -221,7 +220,6 @@
     if (reuse) w.embedOpenProject(pid);
     else f.setAttribute('src', 'training/?embed=1&admin=1&project=' + encodeURIComponent(pid));
   };
-
   // ── จากภาพรวม (กดแถวโครงการ) → ติดตามสถานะโครงการ › แท็บอบรมของโครงการนั้น ──
   window.trnOpenProject = function (pid) {
     window.imtCurrentProjectId = pid;

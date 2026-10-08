@@ -253,7 +253,7 @@ window.renderAvailability = function() {
         '<div style="font-size:11px;color:var(--txt3);margin-bottom:8px;">'+esc(s.role||'—')+' · '+esc(s.dept||'—')+'</div>' +
         '<div style="display:flex;align-items:center;gap:8px;margin-bottom:'+(bottomRow?'7':'0')+'px;">' +
           '<div style="flex:1;height:6px;background:var(--surface3);border-radius:6px;overflow:hidden;"><div style="height:100%;width:'+freePct+'%;background:'+barColor+';border-radius:6px;transition:width .6s;"></div></div>' +
-          '<span style="font-size:10px;color:var(--txt3);white-space:nowrap;min-width:28px;text-align:right;">'+freePct+'%</span>' +
+          '<span style="font-size:10px;color:var(--txt3);white-space:nowrap;min-width:28px;text-align:right;">'+freePct+'%</span>' + window.calcTip('วันว่าง ÷ วันทำงานในช่วงที่เลือก × 100\nวันทำงาน = จันทร์–ศุกร์ ที่ไม่ใช่วันหยุดบริษัท\nวันว่าง = วันทำงานที่ไม่ติดโครงการ ไม่ลา และไม่มีงานอื่นที่บันทึกไว้') +
         '</div>' +
         (bottomRow ? '<div style="display:flex;flex-wrap:wrap;gap:5px;">'+bottomRow+'</div>' : '') +
       '</div>' +

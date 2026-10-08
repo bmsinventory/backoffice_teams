@@ -202,16 +202,16 @@ window.renderLeave=function(){
 
   var statsHtml='<div class="lv-stats" style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px;">';
   [
-    {icon:'⏳',label:'รออนุมัติ',val:cPending,color:'var(--amber)',bg:'rgba(255,166,43,.1)',urgent:cPending>0},
-    {icon:'✅',label:'อนุมัติแล้ว',val:cApproved,color:'var(--teal)',bg:'rgba(6,214,160,.1)'},
-    {icon:'❌',label:'ไม่อนุมัติ',val:cRejected,color:'var(--coral)',bg:'rgba(255,107,107,.1)'},
-    {icon:'📆',label:'กำลังลา/ใน 7 วัน',val:cUpcoming,color:'var(--sky)',bg:'rgba(76,201,240,.1)'},
-    {icon:'📅',label:'วันลารวม',val:totalDays+' วัน',color:'var(--violet)',bg:'rgba(124,92,252,.1)'},
+    {icon:'⏳',label:'รออนุมัติ',tip:'จำนวนใบลาสถานะ "รออนุมัติ" ตามตัวกรองที่เลือก',val:cPending,color:'var(--amber)',bg:'rgba(255,166,43,.1)',urgent:cPending>0},
+    {icon:'✅',label:'อนุมัติแล้ว',tip:'จำนวนใบลาสถานะ "อนุมัติ" ตามตัวกรองที่เลือก',val:cApproved,color:'var(--teal)',bg:'rgba(6,214,160,.1)'},
+    {icon:'❌',label:'ไม่อนุมัติ',tip:'จำนวนใบลาสถานะ "ไม่อนุมัติ" ตามตัวกรองที่เลือก',val:cRejected,color:'var(--coral)',bg:'rgba(255,107,107,.1)'},
+    {icon:'📆',label:'กำลังลา/ใน 7 วัน',tip:'ใบลาที่ไม่ถูกปฏิเสธ และช่วงวันลาคาบเกี่ยวกับวันนี้ถึงอีก 7 วันข้างหน้า',val:cUpcoming,color:'var(--sky)',bg:'rgba(76,201,240,.1)'},
+    {icon:'📅',label:'วันลารวม',tip:'ผลรวมจำนวนวันของทุกใบลาในรายการ (ทุกสถานะ)\nแต่ละใบ = วันสิ้นสุด − วันเริ่ม + 1 (นับวันหยุดที่อยู่ในช่วงด้วย)',val:totalDays+' วัน',color:'var(--violet)',bg:'rgba(124,92,252,.1)'},
   ].forEach(function(s){
     statsHtml+='<div class="stat-c lv-stat" style="padding:14px 16px;'+(s.urgent?'border-color:var(--amber);':'')+'">'
       +'<div class="lv-stat-top" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
       +'<div class="lv-stat-icon" style="width:32px;height:32px;border-radius:9px;background:'+s.bg+';display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">'+s.icon+'</div>'
-      +'<div class="lv-stat-label" style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;line-height:1.3;">'+s.label+'</div>'
+      +'<div class="lv-stat-label" style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;line-height:1.3;">'+s.label+window.calcTip(s.tip)+'</div>'
       +'</div>'
       +'<div class="lv-stat-val" style="font-size:20px;font-weight:800;color:'+s.color+';">'+s.val+'</div>'
       +'</div>';

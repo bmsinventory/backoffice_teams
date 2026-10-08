@@ -5,9 +5,9 @@ const deleteDoc = (...a) => window.deleteDoc(...a);
 var _ctPendingTxns = [];
 
 var CT_STATUS = [
-  {id:'active',    label:'มีผลบังคับ', color:'#06d6a0'},
-  {id:'completed', label:'สิ้นสุดแล้ว', color:'#4361ee'},
-  {id:'cancelled', label:'ยกเลิก',      color:'#ff6b6b'},
+  {id:'active',    label:'มีผลบังคับ', color:'#06d6a0', icon:'✅'},
+  {id:'completed', label:'สิ้นสุดแล้ว', color:'#4361ee', icon:'🏁'},
+  {id:'cancelled', label:'ยกเลิก',      color:'#ff6b6b', icon:'🚫'},
 ];
 
 function ctSt(id){ return CT_STATUS.find(function(s){return s.id===id;})||CT_STATUS[0]; }
@@ -248,15 +248,15 @@ window.renderContract = function(){
   });
   var bar = document.getElementById('ct-summary-bar');
   if(bar) bar.innerHTML = [
-    {icon:'📄', label:'สัญญาทั้งหมด',          val:rows.length+' ฉบับ',     c:'var(--indigo)'},
-    {icon:'💰', label:'มูลค่ารวม',              val:fca(totalVal),            c:'var(--violet)'},
-    {icon:'✅', label:'ปิดโครงการแล้ว',        val:fca(completedVal),        c:'var(--indigo)'},
-    {icon:'💸', label:'ยังต้องเรียกเก็บ',      val:fca(activeVal),           c:'var(--teal)'},
-    {icon:'⏰', label:'ใกล้หมดอายุ (30 วัน)', val:expiringN+' ฉบับ',       c:expiringN>0?'var(--coral)':'var(--txt3)'},
+    {icon:'📄', label:'สัญญาทั้งหมด', tip:'จำนวนสัญญาตามตัวกรอง',          val:rows.length+' ฉบับ',     c:'var(--indigo)'},
+    {icon:'💰', label:'มูลค่ารวม', tip:'ผลรวม "มูลค่าสัญญา" ของทุกสัญญาตามตัวกรอง',              val:fca(totalVal),            c:'var(--violet)'},
+    {icon:'✅', label:'ปิดโครงการแล้ว', tip:"ผลรวมยอด \"ปิดแล้ว\" ของทุกสัญญา\nถ้าสัญญามีโครงการผูกอยู่: ปิดแล้ว = ผลรวมมูลค่าโครงการที่ปิดโครงการ/เสร็จสิ้น · ค้างเก็บ = มูลค่าโครงการที่ยังไม่ปิด (ไม่นับที่ยกเลิก)\nถ้าไม่มีโครงการผูก: สัญญาสิ้นสุดแล้ว = ปิดแล้วทั้งก้อน · มีผลบังคับ = ค้างเก็บทั้งก้อน\nบวกรายการเรียกเก็บที่บันทึกเองเข้า \"ปิดแล้ว\"",        val:fca(completedVal),        c:'var(--indigo)'},
+    {icon:'💸', label:'ยังต้องเรียกเก็บ', tip:"ผลรวมยอด \"ค้างเก็บ\" ของทุกสัญญา\nถ้าสัญญามีโครงการผูกอยู่: ปิดแล้ว = ผลรวมมูลค่าโครงการที่ปิดโครงการ/เสร็จสิ้น · ค้างเก็บ = มูลค่าโครงการที่ยังไม่ปิด (ไม่นับที่ยกเลิก)\nถ้าไม่มีโครงการผูก: สัญญาสิ้นสุดแล้ว = ปิดแล้วทั้งก้อน · มีผลบังคับ = ค้างเก็บทั้งก้อน\nบวกรายการเรียกเก็บที่บันทึกเองเข้า \"ปิดแล้ว\"",      val:fca(activeVal),           c:'var(--teal)'},
+    {icon:'⏰', label:'ใกล้หมดอายุ (30 วัน)', tip:'สัญญาที่มีผลบังคับ และวันสิ้นสุดอยู่ภายใน 0–30 วันจากวันนี้', val:expiringN+' ฉบับ',       c:expiringN>0?'var(--coral)':'var(--txt3)'},
   ].map(function(s){
     return '<div class="ct-kpi" style="--c:'+s.c+'">'
       +'<div class="ct-kpi-ic">'+s.icon+'</div>'
-      +'<div style="min-width:0;"><div class="ct-kpi-lb">'+s.label+'</div>'
+      +'<div style="min-width:0;"><div class="ct-kpi-lb">'+s.label+window.calcTip(s.tip)+'</div>'
       +'<div class="ct-kpi-v">'+s.val+'</div></div>'
       +'</div>';
   }).join('');
@@ -337,7 +337,7 @@ window.renderContract = function(){
         +'<div class="ct-main">'
         +'<div class="ct-head">'
           +'<span class="ct-id">'+esc(c.id)+'</span>'
-          +'<span class="ct-chip">'+st.label+'</span>'
+          +'<span class="ct-chip">'+st.icon+' '+st.label+'</span>'
           +(fin.linked>0?'<span class="ct-chip" style="--c:var(--violet)">📁 '+fin.linked+' โครงการ</span>':'')
           +(expWarn?'<span class="ct-chip" style="--c:var(--coral)">⏰ อีก '+diff+' วัน</span>':'')
           +(expired?'<span class="ct-chip" style="--c:var(--coral)">⛔ หมดอายุแล้ว</span>':'')
@@ -361,7 +361,7 @@ window.renderContract = function(){
             +'<div class="ct-val">'+fca(c.value)+'</div>'
           +'</div>'
           +'<div style="--pc:'+pctColor+'">'
-            +'<div class="ct-prog-top"><span>เรียกเก็บแล้ว'+(fin.linked>0?' (จาก '+fin.linked+' โครงการ)':'')+'</span><b>'+fin.pct+'%</b></div>'
+            +'<div class="ct-prog-top"><span>เรียกเก็บแล้ว'+(fin.linked>0?' (จาก '+fin.linked+' โครงการ)':'')+window.calcTip("% = ปิดแล้ว ÷ มูลค่าสัญญา × 100 (ถ้าไม่ได้ใส่มูลค่าสัญญา ใช้ ปิดแล้ว + ค้างเก็บ เป็นฐาน)\nถ้าสัญญามีโครงการผูกอยู่: ปิดแล้ว = ผลรวมมูลค่าโครงการที่ปิดโครงการ/เสร็จสิ้น · ค้างเก็บ = มูลค่าโครงการที่ยังไม่ปิด (ไม่นับที่ยกเลิก)\nถ้าไม่มีโครงการผูก: สัญญาสิ้นสุดแล้ว = ปิดแล้วทั้งก้อน · มีผลบังคับ = ค้างเก็บทั้งก้อน\nบวกรายการเรียกเก็บที่บันทึกเองเข้า \"ปิดแล้ว\"")+'</span><b>'+fin.pct+'%</b></div>'
             +'<div class="ct-prog"><div style="width:'+fin.pct+'%"></div></div>'
             +'<div class="ct-prog-leg">'
               +'<span>✅ ปิดแล้ว <b style="color:'+(fin.closed>0?'var(--indigo)':'var(--txt3)')+'">'+fca(fin.closed)+'</b></span>'

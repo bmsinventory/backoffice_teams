@@ -16,7 +16,7 @@ mkdir -p /etc/nginx/snippets
 printf 'set $db_up "%s";\n' "$API_UPSTREAM" > /etc/nginx/snippets/db-upstream.conf
 echo "[entrypoint] API proxy: ${API_PROXY} → ${API_UPSTREAM:-(none)}"
 
-envsubst '${SUPABASE_URL} ${SUPABASE_ANON_KEY} ${API_PROXY}' \
+envsubst '${SUPABASE_URL} ${SUPABASE_ANON_KEY} ${WEB_PUSH_PUBLIC_KEY} ${API_PROXY}' \
   < /usr/share/nginx/html/env-config.template.js \
   > /usr/share/nginx/html/env-config.js
 

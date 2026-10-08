@@ -263,21 +263,21 @@ window.renderWorkload = function() {
     }).join('') + '</div>';
 
   // ── Stats chip ──
-  function chip(icon, label, val, bg, col) {
+  function chip(icon, label, val, bg, col, tip) {
     return '<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;background:'+bg+';border:1px solid '+col+'33;border-radius:10px;">' +
       '<span style="font-size:14px;">'+icon+'</span>' +
-      '<div><div style="font-size:9px;font-weight:700;color:'+col+';letter-spacing:.5px;text-transform:uppercase;">'+label+'</div>' +
+      '<div><div style="font-size:9px;font-weight:700;color:'+col+';letter-spacing:.5px;text-transform:uppercase;">'+label+window.calcTip(tip)+'</div>' +
       '<div style="font-size:16px;font-weight:800;color:'+col+';line-height:1.1;">'+val+' <span style="font-size:10px;font-weight:600;">คน</span></div></div></div>';
   }
 
   if (statsEl) {
     statsEl.innerHTML =
       '<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;flex-wrap:wrap;">' +
-      chip('👥','ทั้งหมด', totalStaff, 'var(--surface2)', 'var(--txt)') +
-      chip('🔥','งานมาก',  cntOverload, 'rgba(255,107,107,.07)', '#ff6b6b') +
-      chip('💼','มีงาน',   cntActive,   'rgba(67,97,238,.07)',   '#4361ee') +
-      chip('✅','ว่าง',     cntAvail,    'rgba(6,214,160,.07)',   '#06d6a0') +
-      (cntOverlap > 0 ? chip('⚠️','ซ้อนกัน', cntOverlap, 'rgba(255,107,107,.07)', '#ff6b6b') : '') +
+      chip('👥','ทั้งหมด', totalStaff, 'var(--surface2)', 'var(--txt)', 'พนักงานที่ใช้งานอยู่ทั้งหมด') +
+      chip('🔥','งานมาก',  cntOverload, 'rgba(255,107,107,.07)', '#ff6b6b', 'คนที่มีโครงการในเดือนนี้มากกว่า 3 โครงการ\nนับโครงการที่ยังไม่ยกเลิก/ไม่เสร็จสิ้น และช่วงที่คนนั้นเข้าไซต์ (รอบเข้าไซต์ หรือช่วงในทีม) คาบเกี่ยวกับเดือนที่เลือก') +
+      chip('💼','มีงาน',   cntActive,   'rgba(67,97,238,.07)',   '#4361ee', 'คนที่มีโครงการในเดือนนี้ 1–3 โครงการ') +
+      chip('✅','ว่าง',     cntAvail,    'rgba(6,214,160,.07)',   '#06d6a0', 'คนที่ไม่มีโครงการเลยในเดือนนี้') +
+      (cntOverlap > 0 ? chip('⚠️','ซ้อนกัน', cntOverlap, 'rgba(255,107,107,.07)', '#ff6b6b', 'คนที่มีอย่างน้อย 1 วันในเดือนนี้ที่อยู่ 2 โครงการขึ้นไปพร้อมกัน') : '') +
       legend +
       '</div>';
   }
@@ -298,7 +298,7 @@ window.renderWorkload = function() {
           '</div>';
         }).join('') +
       '</div>' +
-      '<div class="wl-sum" style="width:'+SUM_W+'px;flex-shrink:0;padding:5px 14px;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;justify-content:flex-end;border-left:1px solid var(--border);">ภาระงาน</div>' +
+      '<div class="wl-sum" style="width:'+SUM_W+'px;flex-shrink:0;padding:5px 14px;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;justify-content:flex-end;border-left:1px solid var(--border);">ภาระงาน'+window.calcTip('จำนวนโครงการของคนนี้ในเดือนที่เลือก\nวันมีงาน/วันทำงาน = วันจันทร์–ศุกร์ที่มีงานอย่างน้อย 1 โครงการ ÷ วันจันทร์–ศุกร์ทั้งเดือน\n% = วันมีงาน ÷ วันทำงาน × 100')+'</div>' +
       '</div>';
   }
 

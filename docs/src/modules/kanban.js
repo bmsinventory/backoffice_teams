@@ -1,18 +1,19 @@
 const { esc, fd, fc, fca, pd, gS, gT, gG, gSt, gC, avC, uid, getFY, getYearBE, getStaffOverlaps, overlapWarnText, getStaffLeaveConflicts, getColRef, getDocRef } = window;
 const setDoc = (...a) => window.setDoc(...a);
+const KB_EXCLUDED_GROUPS = ['GRP17733355541905','GRP17733355541906'];
 // ── KANBAN ──
 // โครงการตามตัวกรองบนบอร์ด (ปี พ.ศ. / ประเภท / กลุ่ม) — ใช้ร่วมกับปุ่ม AI สรุปขออนุมัติ Adv.
 function kbFilteredProjects(){
   var yr=(document.getElementById('kb-yr')||{}).value||'';
   var ty=window.msValues('kb-type');
   var grp=window.msValues('kb-grp');
-  return window.PROJECTS.filter(function(p){return(!yr||getYearBE(p.start)==yr)&&(!ty.length||ty.includes(p.typeId))&&(!grp.length||grp.includes(p.groupId));});
+  return window.PROJECTS.filter(function(p){return!KB_EXCLUDED_GROUPS.includes(p.groupId)&&(!yr||getYearBE(p.start)==yr)&&(!ty.length||ty.includes(p.typeId))&&(!grp.length||grp.includes(p.groupId));});
 }
 window.renderKanban = function(){
   var yf=document.getElementById('kb-yr');
-  if(yf&&yf.options.length<=1){var yrs=[...new Set(window.PROJECTS.map(p=>getYearBE(p.start)).filter(Boolean))].sort((a,b)=>b-a);yrs.forEach(function(y){var o=document.createElement('option');o.value=y;o.textContent='ปี พ.ศ. '+y;yf.appendChild(o);});var _cbe=(new Date().getFullYear()+543).toString();if(!yf.value||yf.value==='')yf.value=_cbe;}
+  if(yf&&yf.options.length<=1){var yrs=[...new Set(window.PROJECTS.filter(function(p){return!KB_EXCLUDED_GROUPS.includes(p.groupId);}).map(p=>getYearBE(p.start)).filter(Boolean))].sort((a,b)=>b-a);yrs.forEach(function(y){var o=document.createElement('option');o.value=y;o.textContent='ปี พ.ศ. '+y;yf.appendChild(o);});var _cbe=(new Date().getFullYear()+543).toString();if(!yf.value||yf.value==='')yf.value=_cbe;}
   window.msFilter('kb-type',window.PTYPES,{placeholder:'ทุกประเภท',onChange:window.renderKanban});
-  window.msFilter('kb-grp',window.PGROUPS,{placeholder:'ทุกกลุ่มโครงการ',onChange:window.renderKanban});
+  window.msFilter('kb-grp',window.PGROUPS.filter(function(g){return!KB_EXCLUDED_GROUPS.includes(g.id);}),{placeholder:'ทุกกลุ่มโครงการ',onChange:window.renderKanban});
   var fProjs=kbFilteredProjects();
   var now=new Date();now.setHours(0,0,0,0);
   var board=document.getElementById('kb-board');
@@ -24,7 +25,7 @@ window.renderKanban = function(){
       var pAdvs=window.ADVANCES.filter(function(a){return a.pid===p.id;});
       var adv=pAdvs.find(function(a){return a.status!=='cleared';})||pAdvs[pAdvs.length-1];
       var advStat=adv?window.AFLW.find(function(x){return x.id===adv.status;}):null;
-      var advBadge=advStat?`<span class="kb-card-type" style="background:${advStat.color}18;color:${advStat.color};margin:0" title="มี Advance — สถานะ: ${esc(advStat.label)}">💰 ${esc(advStat.label)}</span>`:'';
+      var advBadge=advStat?`<span class="kb-card-type" style="background:${advStat.color}18;color:${advStat.color};margin:0" title="มี Advance — สถานะ: ${esc(advStat.label)}">💰 ${advStat.icon} ${esc(advStat.label)}</span>`:'';
       // ── ที่พักรออนุมัติ — เกณฑ์เดียวกับตาราง "สถานะที่พัก" ใน projects.js (ไม่นับกลุ่มโครงการที่ไม่ต้องติดตามที่พัก) ──
       var _exLd=['GRP17733355541905','GRP17733355541906'];
       var ldBadge='';
@@ -71,7 +72,7 @@ window.renderKanban = function(){
       <div class="kb-head" style="border-top:3px solid ${sg.color}">
         <div class="kb-dot" style="background:${sg.color}"></div>
         <div class="kb-htitle">${sg.label}</div>
-        <div class="kb-cnt" style="background:${sg.color}18;color:${sg.color}">${items.length}</div>
+        <div class="kb-cnt" style="background:${sg.color}18;color:${sg.color}">${items.length}</div>${window.calcTip('จำนวนโครงการในขั้นตอนนี้ (ตามตัวกรอง)\nแถบใต้หัวคอลัมน์ = ผลรวมมูลค่าโครงการในขั้นตอนนี้\nแถบความคืบหน้าบนการ์ด: ขั้นตอน "ดำเนินการ" คำนวณจาก (วันนี้ − วันเริ่ม) ÷ (วันสิ้นสุด − วันเริ่ม)')}
       </div>
       ${totalBudget>0?`<div style="padding:6px 14px;font-size:10px;font-weight:700;color:${sg.color};background:${sg.color}08;border-bottom:1px solid ${sg.color}22;">${fc(totalBudget)}</div>`:''}
       <div class="kb-body">

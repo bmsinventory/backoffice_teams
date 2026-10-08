@@ -131,14 +131,14 @@ window.renderCost = function() {
     summaryEl.innerHTML = `
       <div class="stat-card" style="flex:0 0 auto;min-width:180px;">
         <div class="stat-icon" style="background:rgba(6,214,160,.12);color:var(--teal)">💰</div>
-        <div><div class="stat-val">${fc(totalCost)}</div><div class="stat-lbl">ค่าใช้จ่ายรวม</div></div>
+        <div><div class="stat-val">${fc(totalCost)}</div><div class="stat-lbl">ค่าใช้จ่ายรวม${window.calcTip('ผลรวมจำนวนเงินของทุกรายการค่าใช้จ่ายที่ผ่านตัวกรอง (ปี/เดือนของวันที่จ่าย, ประเภท, โครงการ, หมวด, คำค้น)')}</div></div>
       </div>
       ${totalBudget > 0 ? `
       <div class="stat-card" style="flex:0 0 auto;min-width:200px;">
         <div class="stat-icon" style="background:rgba(67,97,238,.12);color:var(--indigo)">📊</div>
         <div>
           <div class="stat-val" style="color:${burnColor}">${burnPct}%</div>
-          <div class="stat-lbl">Burn Rate (vs ${fc(totalBudget)})</div>
+          <div class="stat-lbl">Burn Rate (vs ${fc(totalBudget)})${window.calcTip('ค่าใช้จ่ายรวม ÷ มูลค่าโครงการรวม × 100\nมูลค่าโครงการรวม = ผลรวมมูลค่าของโครงการที่มีรายการค่าใช้จ่ายอยู่ในผลกรอง\nสีส้ม ≥ 70% · สีแดง ≥ 90%')}</div>
           <div style="margin-top:4px;height:4px;background:var(--border);border-radius:4px;overflow:hidden;width:120px;">
             <div style="height:100%;width:${Math.min(burnPct,100)}%;background:${burnColor};border-radius:4px;transition:width .4s;"></div>
           </div>
@@ -146,13 +146,13 @@ window.renderCost = function() {
       </div>` : ''}
       <div class="stat-card" style="flex:0 0 auto;min-width:140px;">
         <div class="stat-icon" style="background:rgba(124,92,252,.12);color:var(--violet)">📋</div>
-        <div><div class="stat-val">${rows.length}</div><div class="stat-lbl">รายการ</div></div>
+        <div><div class="stat-val">${rows.length}</div><div class="stat-lbl">รายการ${window.calcTip('จำนวนรายการค่าใช้จ่ายที่ผ่านตัวกรอง')}</div></div>
       </div>
       ${topCats.map(([c, amt]) => {
         const info = COST_CAT[c] || COST_CAT.other;
         return `<div class="stat-card" style="flex:0 0 auto;min-width:160px;">
           <div class="stat-icon" style="background:${info.color}18;color:${info.color}">${info.icon}</div>
-          <div><div class="stat-val">${fc(amt)}</div><div class="stat-lbl">${info.label}</div></div>
+          <div><div class="stat-val">${fc(amt)}</div><div class="stat-lbl">${info.label}${window.calcTip('หนึ่งใน 3 หมวดที่ใช้เงินมากที่สุด: ผลรวมจำนวนเงินของรายการในหมวดนี้ (ตามตัวกรอง)')}</div></div>
         </div>`;
       }).join('')}`;
   }
@@ -238,7 +238,7 @@ window.renderCost = function() {
           <div style="flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
             <div style="height:100%;width:${pct}%;background:${info.color};border-radius:3px;"></div>
           </div>
-          <span style="font-size:10px;font-weight:700;color:${info.color};min-width:28px;text-align:right;">${pct}%</span>
+          <span style="font-size:10px;font-weight:700;color:${info.color};min-width:28px;text-align:right;">${pct}%</span>${window.calcTip('ยอดหมวดนี้ ÷ ค่าใช้จ่ายรวมของโครงการ × 100')}
         </div>
         ${isAct ? `<div style="position:absolute;bottom:6px;right:8px;font-size:9px;color:${info.color};font-weight:600;opacity:.7;">▲ ดูรายการ</div>` : `<div style="position:absolute;bottom:6px;right:8px;font-size:9px;color:var(--txt3);opacity:.6;">▼ ดูรายการ</div>`}
       </div>`;
@@ -342,7 +342,7 @@ window.renderCost = function() {
 
         <!-- Right: financial summary -->
         <div style="text-align:right;flex-shrink:0;min-width:130px;">
-          <div style="font-size:11px;color:var(--txt3);margin-bottom:2px;">ค่าใช้จ่ายรวม</div>
+          <div style="font-size:11px;color:var(--txt3);margin-bottom:2px;">ค่าใช้จ่ายรวม${window.calcTip('ผลรวมรายการค่าใช้จ่ายของโครงการนี้ (ตามตัวกรอง)\n% = ค่าใช้จ่ายรวม ÷ มูลค่าโครงการ (งบ) × 100')}</div>
           <div style="font-size:20px;font-weight:800;color:var(--teal);font-family:'JetBrains Mono',monospace;line-height:1.1;">${fc(total)}</div>
           ${budget > 0 ? `
             <div style="font-size:10px;color:var(--txt3);margin-top:4px;">งบ ${fc(budget)}</div>

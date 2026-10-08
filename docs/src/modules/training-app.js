@@ -153,7 +153,7 @@ async function _ensureMasterId(type,val,site=currentSite){
 const _isInUse=e=>e&&(e.code==='23001'||e.code==='23503');
 // row mappers: DB → app format
 // sc = แถว trn_site_categories ของโครงการนี้ (ไม่มี = ยังไม่เปิดหลักสูตรนี้ในโครงการ)
-const _mCat=(r,sc)=>({id:r.id,name:r.name,desc:r.description||'',icon:r.icon||'box',color:r.color||'blue',bannerUrl:r.banner_url||null,quizId:r.quiz_id||null,certCode:r.cert_code||'',enabled:!!sc,quizOpen:!!sc&&sc.quiz_open!==false});
+const _mCat=(r,sc)=>({id:r.id,name:r.name,desc:r.description||'',icon:r.icon||'box',color:r.color||'blue',bannerUrl:r.banner_url||null,quizId:r.quiz_id||null,typeId:r.type_id||'',certCode:r.cert_code||'',enabled:!!sc,quizOpen:!!sc&&sc.quiz_open!==false});
 const _mSess=r=>({id:r.id,catId:r.cat_id,name:r.name,date:r.date,timeStart:r.time_start,timeEnd:r.time_end,venueId:r.venue_id??null,venue:_mVal(r.venue_id),trainerId:r.trainer||'',trainer:_staffName(r.trainer),capacity:r.capacity});
 const _mReg=r=>({id:r.id,sessionId:r.session_id,prefixId:r.prefix_id??null,prefix:_mVal(r.prefix_id),fname:r.fname,lname:r.lname,position:r.position||'',deptId:r.dept_id??null,dept:_mVal(r.dept_id),email:r.email||'',regDate:r.reg_date,attended:r.attended||false,attendedTime:r.attended_time||null,isWalkin:r.is_walkin||false});
 // ตรวจสอบสิทธิ์ Login / คีย์ยอดรายแผนก — เก็บ dept_id · dept = ชื่อแผนก (ใช้แสดง/จับคู่กับรายการแผนก)
@@ -1072,11 +1072,11 @@ function updateCheckinHeroStats(){
   const el=document.getElementById('checkin-live-stats');
   if(!el)return;
   el.innerHTML=`
-    <div class="hero-stat"><div class="hero-stat-num">${total}</div><div class="hero-stat-lbl">ลงทะเบียน</div></div>
-    <div class="hero-stat" style="background:rgba(16,185,129,.2);border-color:rgba(16,185,129,.3);"><div class="hero-stat-num" style="color:#6ee7b7;">${present}</div><div class="hero-stat-lbl">เข้าอบรม</div></div>
-    <div class="hero-stat" style="background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.25);"><div class="hero-stat-num" style="color:#fca5a5;">${absent}</div><div class="hero-stat-lbl">ขาด</div></div>
-    <div class="hero-stat" style="background:rgba(245,158,11,.15);border-color:rgba(245,158,11,.25);"><div class="hero-stat-num" style="color:var(--accent);">${pct}%</div><div class="hero-stat-lbl">เข้าร่วม</div></div>
-    ${walkin?`<div class="hero-stat" style="background:rgba(139,92,246,.15);border-color:rgba(139,92,246,.25);"><div class="hero-stat-num" style="color:#c4b5fd;">${walkin}</div><div class="hero-stat-lbl">Walk-in</div></div>`:''}`;
+    <div class="hero-stat"><div class="hero-stat-num">${total}</div><div class="hero-stat-lbl">ลงทะเบียน${calcTip("จำนวนผู้ลงทะเบียนล่วงหน้า (ไม่นับ Walk-in) ของรอบที่เลือก หรือทุกรอบของโครงการ")}</div></div>
+    <div class="hero-stat" style="background:rgba(16,185,129,.2);border-color:rgba(16,185,129,.3);"><div class="hero-stat-num" style="color:#6ee7b7;">${present}</div><div class="hero-stat-lbl">เข้าอบรม${calcTip("ผู้ที่เช็คชื่อเข้าอบรมแล้ว (รวม Walk-in)")}</div></div>
+    <div class="hero-stat" style="background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.25);"><div class="hero-stat-num" style="color:#fca5a5;">${absent}</div><div class="hero-stat-lbl">ขาด${calcTip("ผู้ลงทะเบียนล่วงหน้า − ผู้ลงทะเบียนล่วงหน้าที่เช็คชื่อแล้ว")}</div></div>
+    <div class="hero-stat" style="background:rgba(245,158,11,.15);border-color:rgba(245,158,11,.25);"><div class="hero-stat-num" style="color:var(--accent);">${pct}%</div><div class="hero-stat-lbl">เข้าร่วม${calcTip("ผู้เข้าอบรม ÷ รายชื่อทั้งหมด (รวม Walk-in) × 100")}</div></div>
+    ${walkin?`<div class="hero-stat" style="background:rgba(139,92,246,.15);border-color:rgba(139,92,246,.25);"><div class="hero-stat-num" style="color:#c4b5fd;">${walkin}</div><div class="hero-stat-lbl">Walk-in${calcTip("ผู้ที่ไม่ได้ลงทะเบียนล่วงหน้า แต่มาเพิ่มหน้างาน")}</div></div>`:''}`;
 }
 
 /* ══════════════════ ADMIN TABS ══════════════════ */
@@ -1268,26 +1268,26 @@ async function renderSurveyCharts(){
 
   document.getElementById('svd-kpi').innerHTML=`
     <div class="stat-card blue" style="min-width:0;">
-      <div class="stat-label"><i class="ti ti-clipboard-check" style="margin-right:3px;"></i>ผู้ประเมิน</div>
+      <div class="stat-label"><i class="ti ti-clipboard-check" style="margin-right:3px;"></i>ผู้ประเมิน${calcTip("จำนวนแบบประเมินที่ส่งเข้ามา (ตามตัวกรอง)")}</div>
       <div class="stat-value">${data.length}<span style="font-size:13px;font-weight:400;color:var(--text-muted);"> ราย</span></div>
     </div>
     <div class="stat-card" style="background:${_scoreBg(overallAvg)};border:1px solid var(--border);min-width:0;">
-      <div class="stat-label">คะแนนเฉลี่ยรวม</div>
+      <div class="stat-label">คะแนนเฉลี่ยรวม${calcTip("ค่าเฉลี่ยของคะแนนเฉลี่ยแต่ละด้าน (เต็ม 5)\nแต่ละด้าน = ค่าเฉลี่ยของคะแนนแต่ละข้อในด้านนั้น · ไม่นับข้อที่ไม่ได้ตอบ\nดีมาก ≥ 4.5 · ดี ≥ 4.0 · พอใช้ ≥ 3.0 · ต้องปรับปรุง ≥ 2.0")}</div>
       <div style="font-size:28px;font-weight:700;color:${_scoreColor(overallAvg)};line-height:1.1;margin-top:4px;">${overallAvg.toFixed(2)}<span style="font-size:13px;font-weight:400;color:var(--text-muted);"> /5</span></div>
       <div style="font-size:11px;font-weight:600;color:${_scoreColor(overallAvg)};margin-top:3px;">${_scoreLabel(overallAvg)}</div>
     </div>
     <div class="stat-card green" style="min-width:0;">
-      <div class="stat-label"><i class="ti ti-award"></i> ด้านดีที่สุด</div>
+      <div class="stat-label"><i class="ti ti-award"></i> ด้านดีที่สุด${calcTip("ด้านที่คะแนนเฉลี่ยสูงที่สุด")}</div>
       <div style="font-size:12px;font-weight:600;color:var(--success);margin-top:4px;line-height:1.3;">${bestSec.title}</div>
       <div style="font-size:20px;font-weight:700;color:var(--success);">${bestSec.avg.toFixed(2)}</div>
     </div>
     <div class="stat-card amber" style="min-width:0;">
-      <div class="stat-label"><i class="ti ti-tool"></i> ควรพัฒนา</div>
+      <div class="stat-label"><i class="ti ti-tool"></i> ควรพัฒนา${calcTip("ด้านที่คะแนนเฉลี่ยต่ำที่สุด")}</div>
       <div style="font-size:12px;font-weight:600;color:var(--warn);margin-top:4px;line-height:1.3;">${worstSec.title}</div>
       <div style="font-size:20px;font-weight:700;color:var(--warn);">${worstSec.avg.toFixed(2)}</div>
     </div>
     <div class="stat-card" style="background:var(--card);border:1px solid var(--border);min-width:0;">
-      <div class="stat-label"><i class="ti ti-repeat" style="color:#7c3aed;"></i> ต้องการอบรมเพิ่ม</div>
+      <div class="stat-label"><i class="ti ti-repeat" style="color:#7c3aed;"></i> ต้องการอบรมเพิ่ม${calcTip("ผู้ตอบ \"ต้องการ\" ÷ ผู้ที่ตอบข้อนี้ × 100")}</div>
       <div style="font-size:28px;font-weight:700;color:#7c3aed;line-height:1.1;margin-top:4px;">${ynPct}%</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${ynYes} / ${ynRows.length} ราย</div>
     </div>`;
@@ -2055,11 +2055,11 @@ function renderCatHero(){
   const openSess=cs.filter(s=>getCount(s.id)<s.capacity);
   const seats=cs.reduce((a,s)=>a+Math.max(0,s.capacity-getCount(s.id)),0);
   const next=openSess.filter(s=>s.date>=today).sort((a,b)=>a.date.localeCompare(b.date))[0];
-  const st=(icon,val,lbl)=>`<div class="reg-stat"><i class="ti ti-${icon}"></i><div><div class="reg-stat-num">${val}</div><div class="reg-stat-lbl">${lbl}</div></div></div>`;
+  const st=(icon,val,lbl,tip)=>`<div class="reg-stat"><i class="ti ti-${icon}"></i><div><div class="reg-stat-num">${val}</div><div class="reg-stat-lbl">${lbl}${calcTip(tip)}</div></div></div>`;
   box.innerHTML=st('books',categories.length,'หลักสูตร')
-    +st('calendar-check',openSess.length,'รอบที่เปิดรับ')
-    +st('armchair',seats,'ที่นั่งว่าง')
-    +st('rocket',next?fmtDateShort(next.date):'—','รอบถัดไป');
+    +st('calendar-check',openSess.length,'รอบที่เปิดรับ','รอบอบรมที่จำนวนผู้ลงทะเบียนยังไม่เต็มจำนวนที่นั่ง')
+    +st('armchair',seats,'ที่นั่งว่าง','ผลรวมของ (จำนวนที่นั่ง − ผู้ลงทะเบียน) ทุกรอบ')
+    +st('rocket',next?fmtDateShort(next.date):'—','รอบถัดไป','วันที่ของรอบที่ยังเปิดรับและใกล้วันนี้ที่สุด');
 }
 function selectCategory(catId){
   selectedCatId=catId;setStep(2);
@@ -3083,11 +3083,11 @@ function renderTrackHero(){
   const regs=registrations.filter(r=>!!getSess(r.sessionId));
   const today=new Date().toISOString().split('T')[0];
   const upcoming=sessions.filter(s=>s.date>=today).length;
-  const st=(icon,val,lbl)=>`<div class="reg-stat"><i class="ti ti-${icon}"></i><div><div class="reg-stat-num">${val}</div><div class="reg-stat-lbl">${lbl}</div></div></div>`;
+  const st=(icon,val,lbl,tip)=>`<div class="reg-stat"><i class="ti ti-${icon}"></i><div><div class="reg-stat-num">${val}</div><div class="reg-stat-lbl">${lbl}${calcTip(tip)}</div></div></div>`;
   box.innerHTML=st('users',regs.length,'ผู้ลงทะเบียน')
-    +st('circle-check',regs.filter(r=>r.attended).length,'เข้าอบรมแล้ว')
+    +st('circle-check',regs.filter(r=>r.attended).length,'เข้าอบรมแล้ว','ผู้ลงทะเบียนที่เช็คชื่อเข้าอบรมแล้ว')
     +st('books',categories.length,'หลักสูตร')
-    +st('calendar-time',upcoming,'รอบที่กำลังจะถึง');
+    +st('calendar-time',upcoming,'รอบที่กำลังจะถึง','รอบอบรมที่วันที่ตั้งแต่วันนี้เป็นต้นไป');
 }
 function trackSearch(){
   renderTrackHero();
@@ -3201,7 +3201,7 @@ function renderAdmin(){
   renderAdminCats();
   const catOpts='<option value="">ทุกหลักสูตร</option>'+categories.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
   ['admin-filter-cat','admin-reg-filter-cat'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=catOpts;});
-  document.getElementById('admin-filter-sess').innerHTML='<option value="">ทุกรอบ</option>'+sessions.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+  document.getElementById('admin-filter-sess').innerHTML='<option value="">ทุกรอบ</option>'+sessions.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'','th',{numeric:true,sensitivity:'base'})).map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
   renderAdminSessions();renderMasters();renderAdminRegs();renderLoginVerify();
   _applyAdminTabVisibility();
 }
@@ -4145,16 +4145,19 @@ function applyCrop() {
   cropper = null;
 }
 function openAddCat(){
+  if(window.trnAiCourseReset)window.trnAiCourseReset();
   document.getElementById('nc-edit-id').value='';
   document.getElementById('modal-add-cat-title').innerHTML='<i class="ti ti-category-plus"></i>เพิ่มหลักสูตรอบรม';
   ['nc-name','nc-desc','nc-cert-code'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('nc-color').value='blue';
   selectIcon('box');
   _fillCatQuizSelect(null);
+  _fillCatTypeSelect('');
   clearCatBanner();
   document.getElementById('modal-add-cat').classList.add('open');
 }
 function openEditCat(id){
+  if(window.trnAiCourseReset)window.trnAiCourseReset();
   const c=getCat(id);
   document.getElementById('nc-edit-id').value=id;
   document.getElementById('modal-add-cat-title').innerHTML='<i class="ti ti-edit"></i>แก้ไขหลักสูตรอบรม';
@@ -4164,6 +4167,7 @@ function openEditCat(id){
   document.getElementById('nc-color').value=c.color||'blue';
   selectIcon(c.icon||'box');
   _fillCatQuizSelect(c.quizId);
+  _fillCatTypeSelect(c.typeId);
   clearCatBanner();
   if(c.bannerUrl){
     _setBannerPreview(c.bannerUrl);
@@ -4174,30 +4178,49 @@ function openEditCat(id){
 function toggleIconPicker(){
   const panel=document.getElementById('icon-picker-panel');
   const chev=document.getElementById('icon-picker-chevron');
-  if(panel.style.display!=='none'){
-    panel.style.display='none';chev.style.transform='rotate(0deg)';return;
+  const trigger=document.getElementById('icon-picker-btn');
+  if(!panel.hidden){
+    panel.hidden=true;trigger.setAttribute('aria-expanded','false');chev.style.transform='rotate(0deg)';return;
   }
   renderIconGrid('');
   document.getElementById('icon-search').value='';
-  panel.style.display='block';chev.style.transform='rotate(180deg)';
+  panel.hidden=false;trigger.setAttribute('aria-expanded','true');chev.style.transform='rotate(180deg)';
   setTimeout(()=>document.getElementById('icon-search').focus(),50);
 }
 function filterIcons(){renderIconGrid(document.getElementById('icon-search').value.trim().toLowerCase());}
+function clearIconSearch(){
+  const search=document.getElementById('icon-search');
+  search.value='';renderIconGrid('');search.focus();
+}
 function renderIconGrid(q){
   const cur=document.getElementById('nc-icon').value||'box';
   const list=q?ICON_LIST.filter(n=>n.includes(q)):ICON_LIST;
+  document.getElementById('icon-result-count').textContent=`${list.length} ไอคอน`;
   if(!list.length){
-    document.getElementById('icon-grid').innerHTML='<div style="grid-column:1/-1;text-align:center;padding:16px;color:var(--text-muted);font-size:12px;">ไม่พบไอคอน</div>';
+    document.getElementById('icon-grid').innerHTML='<div class="icon-picker-empty"><i class="ti ti-search-off"></i><b>ไม่พบไอคอน</b><span>ลองค้นหาด้วยคำอื่น เช่น box, user หรือ book</span></div>';
     return;
   }
-  document.getElementById('icon-grid').innerHTML=list.map(n=>`<div onclick="selectIcon('${n}')" title="${n}" class="icon-pick-item${n===cur?' selected':''}"><i class="ti ti-${n}"></i><span>${n}</span></div>`).join('');
+  document.getElementById('icon-grid').innerHTML=list.map(n=>`<button type="button" onclick="selectIcon('${n}')" title="เลือก ${n}" role="option" aria-selected="${n===cur}" class="icon-pick-item${n===cur?' selected':''}"><i class="ti ti-${n}"></i><span>${n}</span>${n===cur?'<i class="ti ti-check icon-pick-check"></i>':''}</button>`).join('');
 }
 function selectIcon(name){
   document.getElementById('nc-icon').value=name;
   document.getElementById('icon-picker-preview').innerHTML=`<i class="ti ti-${name}"></i>`;
   document.getElementById('icon-picker-name').textContent=name;
-  document.getElementById('icon-picker-panel').style.display='none';
+  document.getElementById('icon-picker-panel').hidden=true;
+  document.getElementById('icon-picker-btn').setAttribute('aria-expanded','false');
   document.getElementById('icon-picker-chevron').style.transform='rotate(0deg)';
+  _ncPreview();
+}
+// ตัวอย่างหลักสูตรในฟอร์ม (ไอคอน + สีธีม + ชื่อ + รหัส) — หน้าตาเดียวกับแถวในหน้า "หลักสูตรอบรม"
+function _ncPreview(){
+  const el=document.getElementById('nc-preview');
+  if(!el)return;
+  const cm=CM[document.getElementById('nc-color').value]||CM.blue;
+  const name=document.getElementById('nc-name').value.trim(),code=document.getElementById('nc-cert-code').value.trim();
+  el.style.setProperty('--nc-c',cm.c);
+  el.innerHTML=`<span class="tqa-cat-ic" style="background:${cm.bg};color:${cm.c};"><i class="ti ti-${_esc(document.getElementById('nc-icon').value||'box')}"></i></span>
+    <div style="min-width:0;"><small>ตัวอย่างการแสดงผล</small>
+      <div class="ov-cr-name nc-preview-name${name?'':' empty'}">${name?_esc(name):'ชื่อหลักสูตรอบรม'}${code?`<span class="ov-cr-code">${_esc(code)}</span>`:''}</div></div>`;
 }
 async function submitAddCat(){
   const name=document.getElementById('nc-name').value.trim();
@@ -4216,7 +4239,7 @@ async function submitAddCat(){
     // AI-generated URL or existing URL → use as-is
     bannerUrl=bannerUrlField;
   }
-  const payload={name,description:document.getElementById('nc-desc').value.trim(),icon:document.getElementById('nc-icon').value.trim()||'box',color:document.getElementById('nc-color').value,banner_url:bannerUrl,quiz_id:+document.getElementById('nc-quiz').value||null,cert_code:document.getElementById('nc-cert-code').value.trim().toUpperCase()};
+  const payload={name,description:document.getElementById('nc-desc').value.trim(),icon:document.getElementById('nc-icon').value.trim()||'box',color:document.getElementById('nc-color').value,banner_url:bannerUrl,quiz_id:+document.getElementById('nc-quiz').value||null,cert_code:document.getElementById('nc-cert-code').value.trim().toUpperCase(),type_id:document.getElementById('nc-type').value};
   const editId=document.getElementById('nc-edit-id').value;
   if(allCategories.some(c=>c.name.trim().toLowerCase()===name.toLowerCase()&&String(c.id)!==editId)){showToast(`มีหลักสูตรอบรม "${name}" อยู่แล้ว`,'warn');return;}
   if(editId){
@@ -4358,8 +4381,8 @@ async function embedOpenProject(pid){
 /* ══════════════════ ภาพรวมทุกโครงการ (?view=overview — เมนู "อบรม / แบบทดสอบ" ของ Backoffice) ══════════════════
    โครงการที่ผู้ใช้เห็น (locations กรองตามทีมแล้ว: Admin = ทุกโครงการ · PM/ทีม = ของตัวเอง) · กดแถว → แท็บอบรมของโครงการ */
 const _ymd=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-function _ovStat(label,value,sub,cls){
-  return `<div class="stat-card ${cls||''}"><div class="stat-label">${label}</div><div class="stat-value">${value}</div>${sub?`<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${sub}</div>`:''}</div>`;
+function _ovStat(label,value,sub,cls,tip){
+  return `<div class="stat-card ${cls||''}"><div class="stat-label">${label}${calcTip(tip)}</div><div class="stat-value">${value}</div>${sub?`<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${sub}</div>`:''}</div>`;
 }
 /* ── เมนู "ระบบอบรม" (?view=overview) — แท็บ: ภาพรวมผลการอบรม · หลักสูตรอบรม (กลาง) · คลังแบบทดสอบ · ใบประกาศ & อีเมล
    ?tab= เปิดแท็บนั้นเลย (ลิงก์ "จัดการหลักสูตรกลาง" จากแท็บอบรมของโครงการ — src/modules/training.js trnOpenCentral) ── */
@@ -4386,20 +4409,24 @@ function renderOverview(){
 function _ovRefresh(){if(_ovTab==='overview'||_ovTab==='cats')renderOverview();}
 
 /* ── หลักสูตรอบรม (กลาง) — เพิ่ม/แก้ (รวมผูกแบบทดสอบ) = ฟอร์ม modal-add-cat · การ์ดแสดงอย่างเดียว · แก้ได้เฉพาะสิทธิ์ "แก้ไข" (กระทบทุกโครงการ) ── */
-let _ovCatUse={},_ovQuizzes=[],_ovCatSeq=0;
+let _ovCatUse={},_ovQuizzes=[],_ovPtypes=[],_ovCatSeq=0;
+// แถว ptypes (ประเภทโครงการ) → {id,label,color} เรียงชื่อ — ใช้จัดกลุ่มหน้า หลักสูตรอบรม / คลังแบบทดสอบ
+const _mapPtypes=rows=>(rows||[]).map(t=>({id:t.type_id||t.id,label:t.label_th||t.label||'',color:t.color_hex||'#9ba3b8'})).sort((a,b)=>a.label.localeCompare(b.label,'th'));
 async function _ovCats(){
   const seq=++_ovCatSeq,el=document.getElementById('ov-content');
   if(!el.querySelector('#ov-cat-table'))el.innerHTML='<div class="tqa-empty">กำลังโหลด...</div>';
-  const [cR,scR,sR,qR]=await Promise.all([
+  const [cR,scR,sR,qR,tR]=await Promise.all([
     _sb.from('trn_categories').select('*').order('id'),
     _allRows(()=>_sb.from('trn_site_categories').select('site,cat_id').order('cat_id')),
     _allRows(()=>_sb.from('trn_sessions').select('id,cat_id').order('id')),
     _sb.from('trn_quizzes').select('id,title,is_active').order('title'),
+    _sb.from('ptypes').select('id,type_id,label_th,label,color_hex'), // ประเภทโครงการ (จัดกลุ่มหลักสูตร)
   ]);
   if(seq!==_ovCatSeq)return;
   if(cR.error||scR.error||sR.error||qR.error){el.innerHTML='<div class="tqa-empty">โหลดข้อมูลไม่สำเร็จ</div>';return;}
   allCategories=categories=(cR.data||[]).map(r=>_mCat(r,null));
   _ovQuizzes=qR.data||[];
+  _ovPtypes=_mapPtypes(tR.data);
   _ovCatUse={};
   const use=id=>_ovCatUse[id]||(_ovCatUse[id]={sites:0,sess:0});
   (scR.data||[]).forEach(x=>use(x.cat_id).sites++);
@@ -4436,29 +4463,37 @@ function _ovCatGrid(){
   const list=allCategories.filter(c=>(_ovCatF==='all'||(_ovCatF==='quiz')===!!c.quizId)
     &&(!kw||(c.name+' '+(c.desc||'')+' '+c.certCode).toLowerCase().includes(kw)));
   if(!list.length){el.innerHTML='<div class="tqa-empty">ไม่พบหลักสูตรอบรมที่ตรงกับเงื่อนไข</div>';return;}
-  el.innerHTML='<div class="ov-cat-grid">'+list.map(c=>{
+  // จัดกลุ่มตามประเภทโครงการ (เรียงชื่อประเภท · "ยังไม่ระบุ" ไว้ท้าย) · 1 หลักสูตรต่อ 1 การ์ดยาว
+  const known=new Set(_ovPtypes.map(t=>t.id));
+  const groups=[..._ovPtypes,{id:'',label:'ยังไม่ระบุประเภทโครงการ',color:'var(--text-muted)'}]
+    .map(t=>({t,items:list.filter(c=>t.id?c.typeId===t.id:!known.has(c.typeId)).sort((a,b)=>a.name.localeCompare(b.name,'th'))}))
+    .filter(g=>g.items.length);
+  const row=c=>{
     const cm=CM[c.color]||CM.blue,u=_ovCatUse[c.id]||{sites:0,sess:0},q=_ovQuizzes.find(x=>x.id===c.quizId);
-    return`<div class="ov-cat-card" style="--cat-c:${cm.c};">
-      <div class="ov-cat-head">
-        <span class="tqa-cat-ic" style="background:${cm.bg};color:${cm.c};"><i class="ti ti-${c.icon}"></i></span>
-        <div class="ov-cat-name">${_esc(c.name)}
-          <div class="ov-cat-code${c.certCode?'':' none'}" title="รหัสหลักสูตรในเลขที่ใบประกาศ"><i class="ti ti-certificate"></i>${c.certCode?`รหัสหลักสูตร <b>${_esc(c.certCode)}</b>`:'ยังไม่ได้ตั้งรหัสหลักสูตร'}</div></div>
-        ${edit?`<div class="ov-cat-act">
-          <button class="btn btn-ghost btn-sm" onclick="openEditCat(${c.id})" title="แก้ไข"><i class="ti ti-edit"></i></button>
-          <button class="btn btn-ghost btn-sm" onclick="deleteCat(${c.id})" ${u.sess?'disabled':''} title="${u.sess?'ลบไม่ได้ — มีรอบอบรมใช้อยู่':'ลบ'}"><i class="ti ti-trash" style="color:var(--danger)"></i></button></div>`:''}
+    return`<article class="ov-cr ov-course-card">
+      <span class="tqa-cat-ic" style="background:${cm.bg};color:${cm.c};"><i class="ti ti-${c.icon}"></i></span>
+      <div class="ov-cr-main">
+        <div class="ov-cr-name">${_esc(c.name)}${c.certCode?`<span class="ov-cr-code" title="รหัสหลักสูตรในเลขที่ใบประกาศ">${_esc(c.certCode)}</span>`:''}</div>
+        ${c.desc?`<div class="ov-cr-desc" title="${_esc(c.desc)}">${_esc(c.desc)}</div>`:''}
       </div>
-      ${c.desc?`<div class="ov-cat-desc" title="${_esc(c.desc)}">${_esc(c.desc)}</div>`:''}
-      <div class="ov-cat-stats">
-        <div><i class="ti ti-building-hospital"></i><b>${u.sites}</b> โครงการ</div>
-        <div><i class="ti ti-calendar-event"></i><b>${u.sess}</b> รอบอบรม</div>
+      ${edit?`<div class="ov-cr-act">
+        <button class="btn btn-ghost btn-sm" onclick="openEditCat(${c.id})" title="แก้ไข"><i class="ti ti-edit"></i></button>
+        <button class="btn btn-ghost btn-sm" onclick="deleteCat(${c.id})" ${u.sess?'disabled':''} title="${u.sess?'ลบไม่ได้ — มีรอบอบรมใช้อยู่':'ลบ'}"><i class="ti ti-trash" style="color:var(--danger)"></i></button></div>`:''}
+      <div class="ov-course-meta">
+        <div class="ov-cr-use"><span title="โครงการที่เปิดใช้"><i class="ti ti-building-hospital"></i><b>${u.sites}</b> โครงการ</span><span title="รอบอบรม"><i class="ti ti-calendar-event"></i><b>${u.sess}</b> รอบ</span></div>
+        <div class="ov-cr-quiz${q?'':' none'}" title="${q?'แบบทดสอบ: '+_esc(q.title):'ยังไม่ได้ผูกแบบทดสอบ'}"><i class="ti ti-${q?'circle-check':'alert-triangle'}"></i><span>${q?_esc(q.title):'ยังไม่ผูกแบบทดสอบ'}</span>${q&&!q.is_active?' <span class="badge badge-gray">ปิดใช้งาน</span>':''}</div>
       </div>
-      <div class="ov-cat-quizbox${c.quizId?'':' none'}">
-        <label><i class="ti ti-${c.quizId?'clipboard-check':'alert-triangle'}"></i>${c.quizId?'แบบทดสอบ (จากคลังกลาง)':'ยังไม่ได้ผูกแบบทดสอบ'}</label>
-        ${q?`<div class="ov-cat-quiz-name">${_esc(q.title)}${q.is_active?'':' <span class="badge badge-gray">ปิดใช้งาน</span>'}</div>`
-          :`<div class="ov-cat-quiz-none">${edit?'กด <i class="ti ti-edit"></i> แก้ไข เพื่อเลือกแบบทดสอบ':'ผู้อบรมจะไม่มีแบบทดสอบให้ทำ'}</div>`}
-      </div>
-    </div>`;
-  }).join('')+'</div>';
+    </article>`;
+  };
+  el.innerHTML=groups.map(g=>`<div class="ov-cg">
+      <div class="ov-cg-head"><span class="ov-cg-dot" style="background:${g.t.color};"></span>${_esc(g.t.label)}<b>${g.items.length}</b></div>
+      <div class="ov-cg-list">${g.items.map(row).join('')}</div>
+    </div>`).join('');
+}
+// ตัวเลือกประเภทโครงการในฟอร์มหลักสูตร (modal-add-cat)
+function _fillCatTypeSelect(cur){
+  document.getElementById('nc-type').innerHTML='<option value="">— ไม่ระบุ —</option>'
+    +_ovPtypes.map(t=>`<option value="${_esc(t.id)}"${t.id===cur?' selected':''}>${_esc(t.label)}</option>`).join('');
 }
 // ตัวเลือกแบบทดสอบในฟอร์มหลักสูตร (modal-add-cat)
 function _fillCatQuizSelect(cur){
@@ -4515,11 +4550,11 @@ async function _ovSummary(){
 
   const kpi=`<div class="stats-grid">
     ${_ovStat('โครงการที่เปิดอบรม',rows.length,'','blue')}
-    ${_ovStat('รอบอบรม',sum('n'),`จัดแล้ว ${sum('done')} · รอจัด ${sum('n')-sum('done')}`,'amber')}
-    ${_ovStat('ผู้ลงทะเบียน',sum('regs'),'','green')}
-    ${_ovStat('เข้าอบรมจริง',pct(sum('att'),sum('regs')),`${sum('att')} คน`,'green')}
-    ${_ovStat('คะแนนประเมินเฉลี่ย',allSv!=null?allSv.toFixed(2):'—',`จาก 5 · ${svs.length} แบบประเมิน`,'blue')}
-    ${_ovStat('สอบผ่าน',pct(sum('qPass'),sum('qN')),`${sum('qPass')}/${sum('qN')} ครั้ง`,'amber')}
+    ${_ovStat('รอบอบรม',sum('n'),`จัดแล้ว ${sum('done')} · รอจัด ${sum('n')-sum('done')}`,'amber','รอบอบรมทุกโครงการ · จัดแล้ว = วันที่ก่อนวันนี้ · รอจัด = วันนี้เป็นต้นไป')}
+    ${_ovStat('ผู้ลงทะเบียน',sum('regs'),'','green','ผู้ลงทะเบียนทุกรอบของทุกโครงการ (รวม Walk-in)')}
+    ${_ovStat('เข้าอบรมจริง',pct(sum('att'),sum('regs')),`${sum('att')} คน`,'green','ผู้ที่เช็คชื่อเข้าอบรม ÷ ผู้ลงทะเบียนทั้งหมด × 100')}
+    ${_ovStat('คะแนนประเมินเฉลี่ย',allSv!=null?allSv.toFixed(2):'—',`จาก 5 · ${svs.length} แบบประเมิน`,'blue','ค่าเฉลี่ยของคะแนนทุกข้อ (1–5) จากแบบประเมินทุกฉบับรวมกัน')}
+    ${_ovStat('สอบผ่าน',pct(sum('qPass'),sum('qN')),`${sum('qPass')}/${sum('qN')} ครั้ง`,'amber','ครั้งที่สอบผ่าน ÷ ครั้งที่ส่งคำตอบแล้วทั้งหมด × 100 (นับทุกครั้งที่สอบ ไม่ใช่รายคน)')}
   </div>`;
 
   const badge=r=>!r.n?['ยังไม่มีรอบอบรม','var(--bg-subtle)','var(--text-muted)']:r.next?['กำลังอบรม','#dbeafe','#1d4ed8']:['อบรมครบแล้ว','#dcfce7','#166534'];
@@ -4540,7 +4575,7 @@ async function _ovSummary(){
   const table=`<div class="card"><div class="card-header"><div class="card-title"><i class="ti ti-list-details"></i>รายโครงการ</div>
       <span style="font-size:12px;color:var(--text-muted);">กดแถวเพื่อเปิดการอบรมของโครงการ</span></div>
     <div class="table-wrap table-cards"><table>
-      <thead><tr><th>โครงการ</th><th>สถานะ</th><th>รอบ (จัดแล้ว/ทั้งหมด)</th><th>รอบถัดไป</th><th>ลงทะเบียน</th><th>เข้าอบรม</th><th>ประเมิน (/5)</th><th>สอบผ่าน</th></tr></thead>
+      <thead><tr><th>โครงการ</th><th>สถานะ</th><th>รอบ (จัดแล้ว/ทั้งหมด)</th><th>รอบถัดไป</th><th>ลงทะเบียน</th><th>เข้าอบรม${calcTip("เข้าอบรม ÷ ลงทะเบียน × 100")}</th><th>ประเมิน (/5)${calcTip("ค่าเฉลี่ยคะแนนทุกข้อของแบบประเมินโครงการนี้ · (n) = จำนวนแบบประเมิน")}</th><th>สอบผ่าน${calcTip("ครั้งที่สอบผ่าน / ครั้งที่ส่งคำตอบทั้งหมด")}</th></tr></thead>
       <tbody>${tr}</tbody></table></div></div>`;
 
   const locByCode=Object.fromEntries(locations.map(l=>[l.code,l]));
@@ -5090,7 +5125,7 @@ async function saveKeyEntryImage(){
 /* ══ ADMIN REGS ══ */
 function onAdminCatChange(){
   const cid=parseInt(document.getElementById('admin-reg-filter-cat').value)||0;
-  const filtSess=cid?sessions.filter(s=>s.catId===cid):sessions;
+  const filtSess=(cid?sessions.filter(s=>s.catId===cid):sessions).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'','th',{numeric:true,sensitivity:'base'}));
   document.getElementById('admin-filter-sess').innerHTML='<option value="">ทุกรอบ</option>'+filtSess.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
   renderAdminRegs();
 }
@@ -5106,16 +5141,33 @@ function renderAdminRegs(){
   if(sc)sc.textContent=regs.length;
   if(sa)sa.textContent=regs.filter(r=>r.attended).length;
   const tbody=document.getElementById('admin-reg-tbody');
-  if(!regs.length){tbody.innerHTML='<tr><td colspan="12"><div class="empty"><i class="ti ti-users-minus"></i><p>ไม่พบรายการ</p></div></td></tr>';return;}
-  tbody.innerHTML=regs.map((r,i)=>{
-    const s=getSess(r.sessionId),cat=s?getCat(s.catId):null;
-    return`<tr>
-      <td class="tc-hide" data-label="#" style="color:var(--text-muted);">${i+1}</td>
+  if(!regs.length){tbody.innerHTML='<tr><td colspan="11"><div class="empty"><i class="ti ti-users-minus"></i><p>ไม่พบรายการ</p></div></td></tr>';return;}
+  const collator=new Intl.Collator('th',{numeric:true,sensitivity:'base'});
+  // จัดกลุ่มตามลำดับหลักสูตร และเรียงผู้ลงทะเบียนตามชื่อรอบอบรมภายในแต่ละกลุ่ม
+  const groups=categories.map(cat=>({cat,items:regs.filter(r=>{
+    const s=getSess(r.sessionId);return s&&s.catId===cat.id;
+  })}));
+  const orphan=regs.filter(r=>{const s=getSess(r.sessionId);return s&&!getCat(s.catId);});
+  if(orphan.length)groups.push({cat:null,items:orphan});
+  let rowNo=0;
+  tbody.innerHTML=groups.filter(g=>g.items.length).map(g=>{
+    const items=g.items.slice().sort((a,b)=>{
+      const sa=getSess(a.sessionId),sb=getSess(b.sessionId);
+      return collator.compare(sa?.name||'',sb?.name||'')
+        ||collator.compare(`${a.fname||''} ${a.lname||''}`,`${b.fname||''} ${b.lname||''}`);
+    });
+    const roundCount=new Set(items.map(r=>r.sessionId)).size;
+    const header=`<tr class="sess-grp"><td colspan="11"><i class="ti ti-book"></i>${g.cat?g.cat.name:'ไม่ระบุหลักสูตร'}
+      <span class="sess-grp-meta">${roundCount} รอบ · ${items.length} คน</span></td></tr>`;
+    const rows=items.map(r=>{
+      const s=getSess(r.sessionId);
+      rowNo++;
+      return`<tr>
+      <td class="tc-hide" data-label="#" style="color:var(--text-muted);">${rowNo}</td>
       <td class="tc-full" data-label="คำนำหน้า" style="font-size:12px;">${r.prefix||'-'}</td>
       <td class="tc-title" data-label="ชื่อ-นามสกุล" style="font-weight:600;">${r.fname} ${r.lname}</td>
       <td class="tc-full" data-label="ตำแหน่ง"><span class="badge badge-blue">${r.position||'-'}</span></td>
       <td class="tc-full" data-label="แผนก" style="font-size:12px;">${r.dept}</td>
-      <td class="tc-full" data-label="หลักสูตร" style="font-size:12px;">${cat?cat.name:'-'}</td>
       <td data-label="รอบ" style="font-size:12px;">${s?s.name:'-'}</td>
       <td data-label="วันที่ลง" style="font-size:12px;color:var(--text-muted);">${fmtDateShort(r.regDate)}</td>
       <td data-label="สถานะ">${r.attended?`<span class="badge badge-success"><i class="ti ti-check"></i>${r.attendedTime}</span>`:'<span class="badge badge-gray">ยังไม่เช็ค</span>'}</td>
@@ -5123,6 +5175,8 @@ function renderAdminRegs(){
       <td data-label="แก้ไข"><button class="btn btn-ghost btn-sm" onclick="adminOpenEditReg(${r.id})" title="แก้ไข"><i class="ti ti-edit"></i></button></td>
       <td data-label="ลบ"><button class="btn btn-danger btn-sm" onclick="deleteReg(${r.id})"><i class="ti ti-trash"></i></button></td>
     </tr>`;
+    }).join('');
+    return header+rows;
   }).join('');
 }
 async function deleteReg(id){

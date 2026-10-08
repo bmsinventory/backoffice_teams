@@ -3310,9 +3310,9 @@ window.renderHspAnalysis = function() {
   }, { p: prods[0], miss: -1 });
 
   // ── KPI CARDS ──────────────────────────────────────────────────────────────
-  function kpiCard(label, val, unit, color) {
+  function kpiCard(label, val, unit, color, tip) {
     return '<div style="background:var(--surface);border:1px solid var(--border);border-top:3px solid ' + color + ';border-radius:12px;padding:14px 16px;">' +
-      '<div style="font-size:11px;color:var(--txt-muted);margin-bottom:6px;">' + label + '</div>' +
+      '<div style="font-size:11px;color:var(--txt-muted);margin-bottom:6px;">' + label + window.calcTip(tip) + '</div>' +
       '<div style="font-size:22px;font-weight:800;color:' + color + ';line-height:1.1;">' + val + '</div>' +
       (unit ? '<div style="font-size:11px;color:var(--txt-muted);margin-top:3px;">' + unit + '</div>' : '') +
       '</div>';
@@ -3320,15 +3320,15 @@ window.renderHspAnalysis = function() {
   var pct = totalHosps ? Math.round(withProd / totalHosps * 100) : 0;
   var kpiHtml = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:24px;">' +
     kpiCard('🏥 โรงพยาบาลทั้งหมด', totalHosps, 'รพ.', 'var(--primary)') +
-    kpiCard('✅ มี Product แล้ว', withProd + ' (' + pct + '%)', 'จาก ' + totalHosps + ' รพ.', 'var(--teal)') +
-    kpiCard('❌ ยังไม่มี Product', tier4Count, 'รพ. (Tier 4)', '#dc2626') +
-    kpiCard('📦 Whitespace Slots', whitespace, 'โอกาสการขายรวม', 'var(--violet)') +
-    kpiCard('🎯 Top Whitespace', topWS.p ? esc(topWS.p.name) : '—', topWS.p ? topWS.miss + ' รพ. ยังไม่ใช้' : '', topWS.p ? topWS.p.color : 'var(--txt-muted)') +
+    kpiCard('✅ มี Product แล้ว', withProd + ' (' + pct + '%)', 'จาก ' + totalHosps + ' รพ.', 'var(--teal)', 'รพ. ที่ใช้ Product อย่างน้อย 1 ตัว · % = ÷ รพ. ทั้งหมด × 100') +
+    kpiCard('❌ ยังไม่มี Product', tier4Count, 'รพ. (Tier 4)', '#dc2626', 'รพ. ที่ยังไม่ได้ใช้ Product ใดเลย') +
+    kpiCard('📦 Whitespace Slots', whitespace, 'โอกาสการขายรวม', 'var(--violet)', '(จำนวน รพ. × จำนวน Product) − จำนวนคู่ รพ.–Product ที่ใช้อยู่แล้ว\n= ช่องที่ยังขาย Product ให้ รพ. ได้อีก') +
+    kpiCard('🎯 Top Whitespace', topWS.p ? esc(topWS.p.name) : '—', topWS.p ? topWS.miss + ' รพ. ยังไม่ใช้' : '', topWS.p ? topWS.p.color : 'var(--txt-muted)', 'Product ที่มีจำนวน รพ. ที่ยังไม่ใช้มากที่สุด') +
     '</div>';
 
   // ── PENETRATION BARS ───────────────────────────────────────────────────────
   var penetHtml = '<div style="margin-bottom:24px;">' +
-    '<div style="font-size:13px;font-weight:700;color:var(--txt);margin-bottom:12px;">📊 Product Penetration Rate</div>' +
+    '<div style="font-size:13px;font-weight:700;color:var(--txt);margin-bottom:12px;">📊 Product Penetration Rate' + window.calcTip('รพ. ที่ใช้ Product นั้น ÷ รพ. ทั้งหมด × 100') + '</div>' +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;">';
   HSP_PROD_GROUPS.forEach(function(grp) {
     var grpProds = prods.filter(function(p) { return p.group === grp.id; });
@@ -3983,9 +3983,9 @@ window.renderHspDashboard = function() {
       + '<div style="background:' + color + ';border-radius:3px;height:6px;width:' + w + '%;"></div></div>';
   }
 
-  function kpiCard(icon, label, val, sub, color) {
+  function kpiCard(icon, label, val, sub, color, tip) {
     return '<div style="background:var(--surface);border:1px solid var(--border);border-top:3px solid ' + color + ';border-radius:12px;padding:14px 18px;min-width:0;">'
-      + '<div style="font-size:10px;color:var(--txt-muted);margin-bottom:4px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;">' + icon + ' ' + label + '</div>'
+      + '<div style="font-size:10px;color:var(--txt-muted);margin-bottom:4px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;">' + icon + ' ' + label + window.calcTip(tip) + '</div>'
       + '<div style="font-size:22px;font-weight:800;color:' + color + ';line-height:1.1;">' + val + '</div>'
       + (sub ? '<div style="font-size:11px;color:var(--txt-muted);margin-top:3px;">' + sub + '</div>' : '')
       + '</div>';
@@ -3996,8 +3996,8 @@ window.renderHspDashboard = function() {
   // 1. KPI
   html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:18px;">'
     + kpiCard('🏥','โรงพยาบาลรวม',  hosps.length.toLocaleString(),              'แห่ง',   '#7c5cfc')
-    + kpiCard('📍','ครอบคลุมจังหวัด',provCount + ' / 77',                       'จังหวัด','#4cc9f0')
-    + kpiCard('📦','มี Product',      withProd + ' (' + penetPct + '%)',          'แห่ง',   '#ffa62b')
+    + kpiCard('📍','ครอบคลุมจังหวัด',provCount + ' / 77',                       'จังหวัด','#4cc9f0', 'จำนวนจังหวัด (ไม่ซ้ำ) ที่มี รพ. ในระบบ จากทั้งหมด 77 จังหวัด')
+    + kpiCard('📦','มี Product',      withProd + ' (' + penetPct + '%)',          'แห่ง',   '#ffa62b', 'รพ. ที่ใช้ Product อย่างน้อย 1 ตัว · % = ÷ รพ. ทั้งหมด × 100')
     + kpiCard('👤','มีผู้ติดต่อ',      withContact.toLocaleString(),              'แห่ง',  '#f72585')
     + '</div>';
 

@@ -267,15 +267,15 @@
     if (!list.length) { box.innerHTML = '<div class="as-lib-empty">' + (REPLIES.length ? 'ไม่พบรายการที่ค้นหา' : 'ยังไม่มีคำตอบในคลัง') + '</div>'; return; }
     var groups = {}, order = [];
     list.forEach(function (r) { var g = r.category || 'ไม่ระบุหมวด'; if (!groups[g]) { groups[g] = []; order.push(g); } groups[g].push(r); });
-    box.innerHTML = order.map(function (g) {
-      return '<div class="as-lib-g">' + esc(g) + ' <span>' + groups[g].length + '</span></div>' + groups[g].map(function (r) {
+    box.innerHTML = order.map(function (g, groupIndex) {
+      return '<section class="as-lib-group as-lib-group-' + (groupIndex % 4) + '"><div class="as-lib-g">' + esc(g) + ' <span>' + groups[g].length + '</span></div>' + groups[g].map(function (r) {
         return '<div class="as-lib-i' + (r.active ? '' : ' off') + '" onclick="window.asShow(\'' + esc(r.id) + '\', true)">'
           + '<div class="as-lib-main"><div class="as-lib-t">' + esc(r.title) + (r.active ? '' : ' <small>(ปิดใช้งาน)</small>') + '</div>'
           + (r.command ? '<div class="as-lib-c">' + esc(normCmd(r.command)) + '</div>' : '') + '</div>'
           + (canEd ? '<button type="button" class="as-ib" title="แก้ไข" onclick="event.stopPropagation();window.asEdit(\'' + esc(r.id) + '\')">✏️</button>' : '')
           + (canDl ? '<button type="button" class="as-ib" title="ลบ" onclick="event.stopPropagation();window.asDel(\'' + esc(r.id) + '\')">🗑</button>' : '')
           + '</div>';
-      }).join('');
+      }).join('') + '</section>';
     }).join('');
   }
 
@@ -319,6 +319,11 @@
       + '<div class="m-title" id="as-ed-title">เพิ่มคำตอบ</div>'
       + '<button class="m-x" onclick="window.closeM(\'m-assist-edit\')">✕</button></div>'
       + '<div class="m-body">'
+      + '<div class="as-ai-compose">'
+      + '<div class="as-ai-compose-main"><span class="as-ai-compose-ic">✨</span><div><b>AI ช่วยคิดคำให้ครบ</b>'
+      + '<span>ใส่เนื้อหาคร่าว ๆ แล้วให้ AI ช่วยตั้งหัวข้อ หมวด คำค้น และคำเตือน โดยไม่แก้โค้ดของคุณ</span></div></div>'
+      + '<button type="button" class="btn btn-ghost btn-sm as-ai-compose-btn" id="as-ed-ai" onclick="window.asAiCompose()">✨ ช่วยคิดคำ</button>'
+      + '<div class="as-ai-compose-status" id="as-ed-ai-status" aria-live="polite"></div></div>'
       + '<div class="f-group"><label class="f-label">หัวข้อ <span style="color:var(--coral)">*</span></label>'
       + '<input class="f-input" id="as-ed-t" placeholder="เช่น อัปเดต HOSxP เวอร์ชันล่าสุด"></div>'
       + '<div class="f-grid" style="grid-template-columns:1fr 1fr;">'
@@ -356,6 +361,10 @@
     document.getElementById('as-ed-b').value = r ? r.content : '';
     document.getElementById('as-ed-n').value = r ? r.note : '';
     document.getElementById('as-ed-a').checked = r ? r.active : true;
+    var aiBtn = document.getElementById('as-ed-ai'), aiStatus = document.getElementById('as-ed-ai-status');
+    if (aiBtn) { aiBtn.disabled = false; aiBtn.textContent = '✨ ช่วยคิดคำ'; }
+    if (aiStatus) { aiStatus.textContent = ''; aiStatus.className = 'as-ai-compose-status'; }
+    document.querySelectorAll('#m-assist-edit .ai-flag').forEach(function (x) { x.remove(); });
     var cats = {}; REPLIES.forEach(function (x) { if (x.category) cats[x.category] = true; });
     document.getElementById('as-ed-gl').innerHTML = Object.keys(cats).map(function (c) { return '<option value="' + esc(c) + '">'; }).join('');
     window.openM('m-assist-edit');
@@ -370,6 +379,110 @@
     ta.focus();
     var caret = s + pre.length + 7 + (e - s);
     ta.setSelectionRange(caret, caret);
+  };
+
+  // ── AI ช่วยเรียบเรียงข้อมูลกำกับจากเนื้อหาที่ผู้ใช้เตรียมไว้ ──
+  // ไม่ให้โมเดลส่งโค้ดกลับมา: โค้ดต้นฉบับจึงไม่ถูกแก้แม้แต่ตัวอักษรเดียว
+  function asLooksLikeCode(txt) {
+    var t = String(txt || '').trim();
+    if (!t) return false;
+    if (/^```/.test(t)) return true;
+    return /^(?:SELECT|UPDATE|INSERT|DELETE|ALTER|CREATE|DROP|WITH|EXEC|DECLARE|BEGIN|COMMIT|ROLLBACK|GRANT|REVOKE)\b/i.test(t)
+      || /^(?:curl\s|npm\s|npx\s|docker\s|git\s|powershell\s|python\s|node\s)/i.test(t);
+  }
+  function asCodeLang(txt) {
+    var t = String(txt || '').trim();
+    if (/^(?:SELECT|UPDATE|INSERT|DELETE|ALTER|CREATE|DROP|WITH|EXEC|DECLARE|BEGIN|COMMIT|ROLLBACK|GRANT|REVOKE)\b/i.test(t)) return 'sql';
+    if (/^(?:powershell\s|Get-|Set-|New-|Remove-|Invoke-)/i.test(t)) return 'powershell';
+    if (/^(?:npm\s|npx\s|node\s)/i.test(t)) return 'bash';
+    return '';
+  }
+  function asUniqueKeywords(value) {
+    var src = Array.isArray(value) ? value : String(value || '').split(/[,\n]/);
+    var seen = {};
+    return src.map(function (x) { return String(x || '').trim(); }).filter(function (x) {
+      var k = x.toLowerCase();
+      if (!x || seen[k]) return false;
+      seen[k] = true; return true;
+    }).slice(0, 8).join(', ');
+  }
+  function asSetAiValue(id, value) {
+    var el = document.getElementById(id);
+    value = String(value == null ? '' : value).trim();
+    if (!el || !value || el.value.trim() === value) return false;
+    el.value = value;
+    if (window.aiFlagField) window.aiFlagField(el, true);
+    return true;
+  }
+  window.asAiCompose = async function () {
+    var contentEl = document.getElementById('as-ed-b');
+    var btn = document.getElementById('as-ed-ai');
+    var status = document.getElementById('as-ed-ai-status');
+    if (!contentEl || !btn || btn.disabled) return;
+    var content = contentEl.value.replace(/\s+$/, '');
+    if (!content.trim()) {
+      window.showAlert('ใส่เนื้อหาหรือโค้ดคร่าว ๆ ก่อน แล้ว AI จะช่วยคิดคำให้ครบ', 'warn');
+      contentEl.focus(); return;
+    }
+    var val = function (id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; };
+    var cats = [], cmds = [];
+    REPLIES.forEach(function (r) {
+      if (r.category && cats.indexOf(r.category) < 0) cats.push(r.category);
+      if (r.command && cmds.indexOf(normCmd(r.command)) < 0) cmds.push(normCmd(r.command));
+    });
+    var system = 'คุณเป็นบรรณาธิการคลังความรู้สำหรับทีมสนับสนุนซอฟต์แวร์โรงพยาบาล ช่วยตั้งคำกำกับจากเนื้อหาที่ผู้ใช้ให้มาโดยห้ามแต่งขั้นตอน ข้อเท็จจริง ชื่อตาราง ฟิลด์ หรือคำสั่งใหม่\n'
+      + 'ตอบ JSON เท่านั้น: {"title":"","command":"","category":"","keywords":[""],"introduction":"","note":""}\n'
+      + '- title: ภาษาไทยสั้น ชัดเจน บอกว่าสิ่งนี้ใช้ทำอะไร\n'
+      + '- command: คำอังกฤษตัวเล็กขึ้นต้น / ใช้ขีดกลาง ไม่เกิน 32 ตัวอักษร\n'
+      + '- category: เลือกหมวดเดิมเมื่อเหมาะสม ถ้าไม่เหมาะจึงเสนอหมวดใหม่สั้น ๆ\n'
+      + '- keywords: คำค้น 5-8 แบบ ทั้งคำไทย คำอังกฤษ และรูปแบบที่คนมักพิมพ์ ห้ามใส่ข้อมูลอ่อนไหว\n'
+      + '- introduction: 1-2 ประโยค อธิบายเฉพาะสิ่งที่เห็นชัดจากเนื้อหา ห้ามคัดลอกโค้ดกลับมา\n'
+      + '- note: คำเตือนสั้น ๆ เฉพาะเมื่อจำเป็น เช่น คำสั่งแก้ไขหรือลบข้อมูล ถ้าไม่จำเป็นให้เป็นค่าว่าง\n'
+      + 'สำคัญ: ห้ามส่งโค้ด SQL คำสั่ง หรือเนื้อหาต้นฉบับกลับมาในทุกฟิลด์';
+    var user = 'ข้อมูลเดิม:\n' + JSON.stringify({
+      title: val('as-ed-t'), command: val('as-ed-c'), category: val('as-ed-g'),
+      keywords: val('as-ed-k'), note: val('as-ed-n'), content: content,
+      existingCategories: cats.slice(0, 40), unavailableCommands: cmds.slice(0, 100),
+    });
+    btn.disabled = true; btn.textContent = '⏳ กำลังช่วยคิด...';
+    if (status) { status.textContent = 'AI กำลังอ่านเนื้อหาและเตรียมคำแนะนำ…'; status.className = 'as-ai-compose-status working'; }
+    try {
+      var out = await window.aiChatJson(system, user, { maxTokens: 650, temperature: 0.2 });
+      var changed = 0;
+      changed += asSetAiValue('as-ed-t', out.title) ? 1 : 0;
+      var command = String(out.command || '').trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9_\/-]/g, '');
+      if (command) {
+        command = normCmd(command).slice(0, 33);
+        var duplicate = REPLIES.some(function (r) { return r.id !== _editId && r.command && normCmd(r.command) === command; });
+        if (!duplicate) changed += asSetAiValue('as-ed-c', command) ? 1 : 0;
+      }
+      changed += asSetAiValue('as-ed-g', out.category) ? 1 : 0;
+      changed += asSetAiValue('as-ed-k', asUniqueKeywords(out.keywords)) ? 1 : 0;
+      changed += asSetAiValue('as-ed-n', out.note) ? 1 : 0;
+
+      // เพิ่มเพียงคำอธิบาย/กรอบ code ภายนอก ตัวโค้ด content เดิมนำมาต่อโดยตรง ไม่ผ่านผลลัพธ์จาก AI
+      var intro = String(out.introduction || '').trim().replace(/```[\s\S]*?```/g, '').trim();
+      var trimmed = content.trim();
+      var nextContent = content;
+      if (intro && asLooksLikeCode(trimmed)) {
+        if (/^```/.test(trimmed)) nextContent = intro + '\n\n' + content;
+        else nextContent = intro + '\n\n```' + asCodeLang(trimmed) + '\n' + content + '\n```';
+      }
+      if (nextContent !== contentEl.value) {
+        contentEl.value = nextContent;
+        if (window.aiFlagField) window.aiFlagField(contentEl, true);
+        changed++;
+      }
+      if (status) {
+        status.textContent = changed ? 'เติมคำแนะนำแล้ว — ตรวจทานและแก้ไขได้ก่อนบันทึก' : 'ข้อมูลเดิมครบแล้ว AI ไม่มีคำที่ต้องปรับเพิ่ม';
+        status.className = 'as-ai-compose-status done';
+      }
+    } catch (e) {
+      if (status) { status.textContent = 'AI ยังช่วยคิดคำไม่สำเร็จ ลองใหม่อีกครั้ง'; status.className = 'as-ai-compose-status error'; }
+      window.showAlert('AI ช่วยคิดคำไม่สำเร็จ: ' + (e.message || e), 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = '✨ ช่วยคิดใหม่';
+    }
   };
   window.asSave = async function () {
     var g = function (id) { return document.getElementById(id).value.trim(); };

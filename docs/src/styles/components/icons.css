@@ -1,0 +1,196 @@
+/* ================================================================
+   ICONS.CSS — Shared Tabler icon treatment
+   Keeps navigation, headings, actions and status surfaces visually aligned.
+================================================================ */
+
+.app-icon,
+.ti {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  line-height: 1;
+  vertical-align: -.12em;
+}
+
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+.icon-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.icon-label > .ti { font-size: 1.08em; }
+
+.tp-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--txt);
+  background: none;
+  -webkit-text-fill-color: currentColor;
+}
+.tp-title .tp-title-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  color: #fff;
+  background: var(--icon-bg, rgba(37,99,235,.14));
+  box-shadow: inset 0 0 0 1px rgba(127,127,127,.08);
+  font-size: 18px;
+  -webkit-text-fill-color: currentColor;
+}
+.tp-title .tp-title-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: linear-gradient(135deg, var(--txt), var(--txt2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* เมนูซ้าย / แถบล่างมือถือ: อีโมจิสีบนกรอบมนสีอ่อนตามโทนของโมดูล · เลือกอยู่ = กรอบขาวยกลอย + ขอบสีโมดูล */
+.nav-btn .ni {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  margin: -5px 0 -5px -5px;
+  border-radius: 9px;
+  background: var(--icon-bg, rgba(124,92,252,.12));
+  font-size: 16px;
+  box-shadow: inset 0 0 0 1px rgba(127,127,127,.08);
+  transition: background .18s, transform .18s, box-shadow .18s;
+}
+.nav-btn:hover .ni { transform: translateY(-1px) scale(1.06); }
+.nav-btn.on {
+  background: linear-gradient(90deg, var(--icon-bg, rgba(124,92,252,.12)), transparent);
+}
+.nav-btn.on .nl { color: var(--icon-color, var(--violet)); }
+.nav-btn.on::before { background: var(--icon-color, var(--violet)); }
+.nav-btn.on .ni {
+  background: var(--surface, #fff);
+  -webkit-background-clip: border-box;
+  background-clip: border-box;
+  -webkit-text-fill-color: initial;
+  box-shadow: 0 0 0 1.5px var(--icon-color, var(--violet)), 0 5px 12px var(--icon-shadow, rgba(124,92,252,.25));
+  transform: scale(1.04);
+}
+
+.bottom-nav-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 29px;
+  height: 29px;
+  border-radius: 9px;
+  background: var(--icon-bg, rgba(124,92,252,.12));
+  font-size: 17px;
+  transition: transform .18s, background .18s, box-shadow .18s;
+}
+.bottom-nav-item.active { color: var(--icon-color, var(--violet)); }
+.bottom-nav-item.active::before { background: var(--icon-color, var(--violet)); }
+.bottom-nav-item.active .bottom-nav-icon {
+  background: var(--surface, #fff);
+  box-shadow: 0 0 0 1.5px var(--icon-color, var(--violet)), 0 4px 10px var(--icon-shadow, rgba(124,92,252,.25));
+  transform: translateY(-1px);
+}
+
+.ui-section-title,
+.ov-card-title,
+.card-title,
+.modal-title,
+.m-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.ui-section-title > .ti,
+.ov-card-title > .ti,
+.card-title > .ti,
+.modal-title > .ti,
+.m-title > .ti {
+  width: 27px;
+  height: 27px;
+  border-radius: 8px;
+  color: var(--glyph-color, var(--violet));
+  background: var(--glyph-bg, rgba(124,92,252,.12));
+  font-size: 16px;
+}
+
+/* Semantic colour families: the same meaning keeps the same colour everywhere. */
+:is(.ti-chart-bar,.ti-chart-line,.ti-chart-donut,.ti-chart-pie,.ti-dashboard,.ti-layout-kanban,.ti-search,.ti-file-import) { --glyph-color:#2563eb; --glyph-bg:rgba(37,99,235,.14); }
+:is(.ti-folder,.ti-folders,.ti-list-details,.ti-file-description,.ti-notes,.ti-books,.ti-edit,.ti-tag,.ti-pin) { --glyph-color:#d97706; --glyph-bg:rgba(217,119,6,.15); }
+:is(.ti-credit-card,.ti-wallet,.ti-cash,.ti-receipt,.ti-receipt-2,.ti-file-spreadsheet) { --glyph-color:#059669; --glyph-bg:rgba(5,150,105,.14); }
+:is(.ti-calendar,.ti-calendar-event,.ti-calendar-month,.ti-calendar-star,.ti-clock-hour-4) { --glyph-color:#0284c7; --glyph-bg:rgba(2,132,199,.14); }
+:is(.ti-calendar-off,.ti-heart-rate-monitor,.ti-bed) { --glyph-color:#db2777; --glyph-bg:rgba(219,39,119,.14); }
+:is(.ti-users-group,.ti-user,.ti-target-arrow,.ti-briefcase,.ti-building) { --glyph-color:#7c3aed; --glyph-bg:rgba(124,58,237,.14); }
+:is(.ti-building-hospital,.ti-headset,.ti-school,.ti-messages,.ti-send) { --glyph-color:#0891b2; --glyph-bg:rgba(8,145,178,.14); }
+:is(.ti-alert-hexagon,.ti-alert-triangle,.ti-clock-exclamation,.ti-trash,.ti-x) { --glyph-color:#dc2626; --glyph-bg:rgba(220,38,38,.13); }
+:is(.ti-timeline-event,.ti-tools,.ti-bolt,.ti-hourglass,.ti-refresh) { --glyph-color:#ea580c; --glyph-bg:rgba(234,88,12,.14); }
+:is(.ti-sparkles,.ti-settings,.ti-shield-lock,.ti-key,.ti-bulb,.ti-plus) { --glyph-color:#8b5cf6; --glyph-bg:rgba(139,92,246,.14); }
+:is(.ti-check,.ti-circle-check,.ti-device-floppy) { --glyph-color:#16a34a; --glyph-bg:rgba(22,163,74,.14); }
+:is(.ti-printer,.ti-paperclip,.ti-address-book) { --glyph-color:#475569; --glyph-bg:rgba(71,85,105,.14); }
+
+.m-icon > .ti { color: var(--glyph-color, currentColor); font-size: 20px; }
+.adm-perm-mod > .ti,
+.adm-tab > .ti,
+.af-tab > .ti {
+  width: 25px;
+  height: 25px;
+  border-radius: 7px;
+  color: var(--glyph-color, var(--violet));
+  background: var(--glyph-bg, rgba(124,92,252,.12));
+}
+
+.btn-ghost > .ti { color: var(--glyph-color, currentColor); }
+.btn-pri > .ti,
+.btn-teal > .ti,
+.btn-red > .ti { color: currentColor; }
+
+#dm-toggle .ti-moon { color:#6366f1; }
+#dm-toggle .ti-sun { color:#d97706; }
+#noti-bell > .ti { color:#ea580c; }
+
+.btn > .ti,
+button > .ti,
+.nm-ic > .ti,
+.adm-perm-mod > .ti {
+  font-size: 1.1em;
+}
+
+.nm-ic {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: var(--violet);
+  background: rgba(124,92,252,.1);
+}
+
+#sidebar.slim .nav-btn .ni {
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .tp-title .tp-title-icon { width: 27px; height: 27px; font-size: 15px; }
+  .bottom-nav-icon { font-size: 21px; }
+}
+

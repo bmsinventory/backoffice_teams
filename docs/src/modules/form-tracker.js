@@ -384,7 +384,7 @@
 
     // ── ความคืบหน้ารวม + ปุ่ม อยู่ท้ายแถวแท็บของโครงการ (imtSetPtabExtra) ไม่มีแถวหัวแยก ──
     var header = '<div class="ftk-header">'
-      + '<div class="ftk-header-pbar" title="ความคืบหน้าแบบฟอร์มของโครงการนี้">'+pbarHtml(overallPct)+'<span>'+overallPct+'%</span></div>'
+      + '<div class="ftk-header-pbar">'+pbarHtml(overallPct)+'<span>'+overallPct+'%</span>'+window.calcTip('ความคืบหน้าแบบฟอร์มของโครงการนี้\n= แบบฟอร์มที่สถานะ "เสร็จแล้ว" ÷ แบบฟอร์มทั้งหมดของโครงการ (ทุกคลัง) × 100')+'</div>'
       + '<button class="btn btn-ghost btn-sm ftk-btn-desktop" onclick="window.openFtkTemplateModal(null)" title="จัดการรายชื่อเอกสารมาตรฐาน">📐 Template</button>'
       + '<button class="btn btn-xls btn-sm ftk-btn-desktop" onclick="window.exportFtkReport()">📥 Excel</button>'
       + '<button class="btn btn-pri btn-sm" onclick="window.exportFtkReportImage()">📷 บันทึกเป็นรูปภาพ</button>'
@@ -427,7 +427,7 @@
         + '<div class="ftk-group-head">'
         +   '<span class="ftk-group-icon">🏬</span>'
         +   '<input class="ftk-group-name-input" value="'+esc(g.name)+'" '+(canEdit?'':'disabled')+' onchange="window.ftkRenameGroup(\''+g.id+'\',this.value)">'
-        +   '<span class="ftk-group-meta">'+gDone+'/'+gAll.length+' เสร็จแล้ว · '+gPct+'%</span>'
+        +   '<span class="ftk-group-meta">'+gDone+'/'+gAll.length+' เสร็จแล้ว · '+gPct+'%'+window.calcTip('แบบฟอร์มที่ "เสร็จแล้ว" ÷ แบบฟอร์มทั้งหมดในคลังนี้ × 100 (ไม่ขึ้นกับตัวกรอง)')+'</span>'
         +   (canDel ? '<button class="m-x" onclick="window.askDel(\'form_group\',\''+g.id+'\',\''+esc(g.name)+'\')" title="ลบคลัง">🗑️</button>' : '')
         + '</div>'
         + '<div class="dtable-inner"><table class="ftk-table"><thead><tr>'

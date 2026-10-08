@@ -152,10 +152,11 @@
     { id:'training',  label:'อบรม',              icon:'🎓' }, // ระบบอบรมของโครงการ (src/modules/training.js — 1 โครงการ = 1 การอบรม)
     { id:'calendar',  label:'Calendar',          icon:'📅' },
     { id:'report',    label:'Report',            icon:'📈' },
+    { id:'print',     label:'พิมพ์เอกสาร',       icon:'🖨️' },
     { id:'templates', label:'Template',          icon:'📐' },
   ];
   // แท็บที่ต้องใช้ project switcher (ทุกแท็บยกเว้น dashboard ซึ่งเป็นมุมมองรวมทุกโครงการอยู่แล้ว)
-  var TABS_NEED_PROJECT = ['workspace','issues','forms','training','calendar','report'];
+  var TABS_NEED_PROJECT = ['workspace','issues','forms','training','calendar','report','print'];
 
   window.imtGoTab = function (tab) {
     window.imtTab = tab;
@@ -226,8 +227,8 @@
       top: '<div class="imt-phead-top">'
         +   '<div class="imt-phead-pick">'+window.projectComboHtml('imt-sw-cmb', 'imt-sw-pid', 'ค้นหาหรือเลือกโครงการ...', 'width:100%;min-width:0;')+'</div>'
         +   '<div class="imt-phead-meta">'
-        +     '<div class="imt-switcher-progress"><div class="imt-switcher-pbar">'+pbarHtml(pct)+'</div><span class="imt-phead-pct">'+pct+'%</span></div>'
-        +     '<span class="imt-phead-badge" style="color:'+h.color+';background:'+h.color+'1a;border-color:'+h.color+'40;">'+h.icon+' '+esc(h.label)+'</span>'
+        +     '<div class="imt-switcher-progress"><div class="imt-switcher-pbar">'+pbarHtml(pct)+'</div><span class="imt-phead-pct">'+pct+'%</span>'+window.calcTip("ความคืบหน้าโครงการ = ค่าเฉลี่ยของทุก Phase\nPhase = ค่าเฉลี่ยของทุกงานใน Phase\nงาน = Checklist ที่ติ๊กแล้ว ÷ Checklist ทั้งหมด (ไม่มี Checklist: เสร็จแล้ว = 100%)")+'</div>'
+        +     '<span class="imt-phead-badge" style="color:'+h.color+';background:'+h.color+'1a;border-color:'+h.color+'40;">'+h.icon+' '+esc(h.label)+'</span>'+(h.score !== null ? window.calcTip('ระดับจากคะแนนสุขภาพ '+h.score+'/100\n'+"คะแนนสุขภาพ 0–100 (สูง = ดี) เริ่มที่ 100 แล้วหัก 4 ด้าน (รวมเต็ม 90 ปรับเป็นสเกล 100):\n• ช้ากว่าแผน สูงสุด 35 (ช้า 30% = หักเต็ม)\n• งานเกินกำหนด สูงสุด 25 (งานละ 4 + วันที่เกินนานสุด ÷ 2)\n• ปัญหาค้าง สูงสุด 20 (น้ำหนักตามความรุนแรง ต่ำ1/กลาง2/สูง4/วิกฤต8, ค้าง ≥14 วัน +1, ×2)\n• ไม่เคลื่อนไหวเกิน 7 วัน สูงสุด 10\nเลยกำหนดจบ = ไม่เกิน 59 · มีงานเกินกำหนด = ไม่เกิน 79\n< 60 ล่าช้า · 60–79 ต้องติดตามพิเศษ · ≥ 80 ปกติ") : '')
         +     hideDoneChk
         +   '</div>'
         + '</div>',
@@ -296,6 +297,7 @@
       dashboard: renderImtDashboard, workspace: renderImtWorkspace, issues: renderImtIssues,
       forms: function (m) { window.renderImtForms && window.renderImtForms(m); },
       training: function (m) { window.renderImtTraining && window.renderImtTraining(m); },
+      print: function (m) { window.renderImtPrintDocuments && window.renderImtPrintDocuments(m); },
       calendar: renderImtCalendar, report: renderImtReport, templates: renderImtTemplates,
     };
     (fns[window.imtTab] || renderImtDashboard)(mount);
@@ -452,7 +454,7 @@
     }
 
     var scoreHtml = h.score !== null
-      ? '<span class="imt-hcard-score" style="color:'+imtScoreColor(h.score)+';border-color:'+imtScoreColor(h.score)+'" title="คะแนนสุขภาพโครงการ (0–100) จากความคืบหน้าเทียบแผน · งานเกินกำหนด · ปัญหาค้าง · ความเคลื่อนไหว">'+h.score+'</span>' : '';
+      ? '<span class="imt-hcard-score" style="color:'+imtScoreColor(h.score)+';border-color:'+imtScoreColor(h.score)+'" >'+h.score+'</span>'+window.calcTip("คะแนนสุขภาพ 0–100 (สูง = ดี) เริ่มที่ 100 แล้วหัก 4 ด้าน (รวมเต็ม 90 ปรับเป็นสเกล 100):\n• ช้ากว่าแผน สูงสุด 35 (ช้า 30% = หักเต็ม)\n• งานเกินกำหนด สูงสุด 25 (งานละ 4 + วันที่เกินนานสุด ÷ 2)\n• ปัญหาค้าง สูงสุด 20 (น้ำหนักตามความรุนแรง ต่ำ1/กลาง2/สูง4/วิกฤต8, ค้าง ≥14 วัน +1, ×2)\n• ไม่เคลื่อนไหวเกิน 7 วัน สูงสุด 10\nเลยกำหนดจบ = ไม่เกิน 59 · มีงานเกินกำหนด = ไม่เกิน 79\n< 60 ล่าช้า · 60–79 ต้องติดตามพิเศษ · ≥ 80 ปกติ") : '';
     var progressTxt = h.expected !== null && h.score !== null
       ? 'ได้จริง '+h.progress+'% · ควรได้ '+h.expected+'%' + (h.gap ? ' <b style="color:'+(h.gap>20?'var(--coral)':h.gap>8?'var(--amber)':'var(--txt2)')+'">(ช้า '+h.gap+'%)</b>' : '')
       : h.progress+'% เสร็จแล้ว';
@@ -676,14 +678,14 @@
     var openIssues = window.IMPL_ISSUES.filter(function (i) { return i.status !== 'closed'; });
     var hiOpenIssues = openIssues.filter(function (i) { return i.severity === 'high' || i.severity === 'critical'; }).length;
     var kpis = [
-      { k:'กำลังดำเนินการ', v:activeHealth.length+' <small>โครงการ</small>', color:'var(--indigo)' },
-      { k:'คะแนนสุขภาพเฉลี่ย', v:avgScore === null ? '—' : avgScore+'<small>/100</small>', color:avgScore === null ? 'var(--txt3)' : imtScoreColor(avgScore) },
-      { k:'งานเกินกำหนด', v:overdueActive+' <small>งาน</small>', color:overdueActive ? 'var(--coral)' : 'var(--teal)' },
-      { k:'ปัญหาที่ยังเปิด', v:openIssues.length+(hiOpenIssues ? ' <small style="color:var(--coral)">สูง/วิกฤต '+hiOpenIssues+'</small>' : ' <small>เรื่อง</small>'), color:openIssues.length ? 'var(--amber)' : 'var(--teal)' },
-      { k:'ไม่เคลื่อนไหว ≥'+IMT_SILENT_DAYS+' วัน', v:silentCount+' <small>โครงการ</small>', color:silentCount ? 'var(--coral)' : 'var(--teal)', go:"window.imtSetDashHealthFilter('silent')" },
+      { k:'กำลังดำเนินการ', tip:'โครงการที่ยังไม่เสร็จและไม่ถูกยกเลิก', v:activeHealth.length+' <small>โครงการ</small>', color:'var(--indigo)' },
+      { k:'คะแนนสุขภาพเฉลี่ย', tip:"ค่าเฉลี่ยคะแนนสุขภาพของโครงการที่กำลังดำเนินการ\nคะแนนสุขภาพ 0–100 (สูง = ดี) เริ่มที่ 100 แล้วหัก 4 ด้าน (รวมเต็ม 90 ปรับเป็นสเกล 100):\n• ช้ากว่าแผน สูงสุด 35 (ช้า 30% = หักเต็ม)\n• งานเกินกำหนด สูงสุด 25 (งานละ 4 + วันที่เกินนานสุด ÷ 2)\n• ปัญหาค้าง สูงสุด 20 (น้ำหนักตามความรุนแรง ต่ำ1/กลาง2/สูง4/วิกฤต8, ค้าง ≥14 วัน +1, ×2)\n• ไม่เคลื่อนไหวเกิน 7 วัน สูงสุด 10\nเลยกำหนดจบ = ไม่เกิน 59 · มีงานเกินกำหนด = ไม่เกิน 79\n< 60 ล่าช้า · 60–79 ต้องติดตามพิเศษ · ≥ 80 ปกติ", v:avgScore === null ? '—' : avgScore+'<small>/100</small>', color:avgScore === null ? 'var(--txt3)' : imtScoreColor(avgScore) },
+      { k:'งานเกินกำหนด', tip:'งานของโครงการที่กำลังดำเนินการ ที่เลยวันครบกำหนดแล้วแต่ยังไม่เสร็จ/ไม่ยกเลิก', v:overdueActive+' <small>งาน</small>', color:overdueActive ? 'var(--coral)' : 'var(--teal)' },
+      { k:'ปัญหาที่ยังเปิด', tip:'ปัญหาทุกโครงการที่สถานะยังไม่ "เสร็จแล้ว" · สูง/วิกฤต = ความรุนแรงระดับสูงหรือวิกฤต', v:openIssues.length+(hiOpenIssues ? ' <small style="color:var(--coral)">สูง/วิกฤต '+hiOpenIssues+'</small>' : ' <small>เรื่อง</small>'), color:openIssues.length ? 'var(--amber)' : 'var(--teal)' },
+      { k:'ไม่เคลื่อนไหว ≥'+IMT_SILENT_DAYS+' วัน', tip:'โครงการที่กำลังดำเนินการ และไม่มีการบันทึก/แก้ไขงาน/ปัญหาใด ๆ มาแล้ว ≥ '+IMT_SILENT_DAYS+' วัน', v:silentCount+' <small>โครงการ</small>', color:silentCount ? 'var(--coral)' : 'var(--teal)', go:"window.imtSetDashHealthFilter('silent')" },
     ];
     var kpiHtml = '<div class="imt-kpis">' + kpis.map(function (s) {
-      return '<div class="imt-kpi" style="--c:'+s.color+(s.go ? ';cursor:pointer;" onclick="'+s.go : '')+'"><div class="imt-kpi-k">'+s.k+'</div><div class="imt-kpi-v">'+s.v+'</div></div>';
+      return '<div class="imt-kpi" style="--c:'+s.color+(s.go ? ';cursor:pointer;" onclick="'+s.go : '')+'"><div class="imt-kpi-k">'+s.k+window.calcTip(s.tip)+'</div><div class="imt-kpi-v">'+s.v+'</div></div>';
     }).join('') + '</div>';
 
     // ── ตัวกรอง + ตารางโครงการ ──
@@ -708,7 +710,7 @@
       : health.filter(function (x) { return x.h.level === filter; });
     if (hideDoneProjects) shown = shown.filter(function (x) { return x.h.level !== 'done'; });
     var tableHtml = '<div class="dtable-inner imt-ptable">'
-      + '<div class="imt-pt-row imt-pt-head"><div>คะแนน</div><div>โครงการ</div><div>ความคืบหน้า (จริง/แผน)</div><div>Phase</div><div>สาเหตุหลัก</div><div>กำหนดจบ</div><div>อัปเดต</div></div>'
+      + '<div class="imt-pt-row imt-pt-head"><div>คะแนน'+window.calcTip("คะแนนสุขภาพ 0–100 (สูง = ดี) เริ่มที่ 100 แล้วหัก 4 ด้าน (รวมเต็ม 90 ปรับเป็นสเกล 100):\n• ช้ากว่าแผน สูงสุด 35 (ช้า 30% = หักเต็ม)\n• งานเกินกำหนด สูงสุด 25 (งานละ 4 + วันที่เกินนานสุด ÷ 2)\n• ปัญหาค้าง สูงสุด 20 (น้ำหนักตามความรุนแรง ต่ำ1/กลาง2/สูง4/วิกฤต8, ค้าง ≥14 วัน +1, ×2)\n• ไม่เคลื่อนไหวเกิน 7 วัน สูงสุด 10\nเลยกำหนดจบ = ไม่เกิน 59 · มีงานเกินกำหนด = ไม่เกิน 79\n< 60 ล่าช้า · 60–79 ต้องติดตามพิเศษ · ≥ 80 ปกติ")+'</div><div>โครงการ</div><div>ความคืบหน้า (จริง/แผน)'+window.calcTip("ความคืบหน้าโครงการ = ค่าเฉลี่ยของทุก Phase\nPhase = ค่าเฉลี่ยของทุกงานใน Phase\nงาน = Checklist ที่ติ๊กแล้ว ÷ Checklist ทั้งหมด (ไม่มี Checklist: เสร็จแล้ว = 100%)\n\nควรได้ (ตามแผน) = คิดจากกำหนดของแต่ละงาน ถ่วงแบบเดียวกับ % จริง: งานที่เลยวันครบกำหนดแล้ว = 100%, งานที่มีวันเริ่ม = ไล่เชิงเส้นจากวันเริ่มถึงวันครบกำหนด\nถ้าไม่มีงานไหนตั้งวันครบกำหนด ใช้สัดส่วนเวลาวันเริ่ม–วันจบโครงการแทน\nช้า = ควรได้ − ได้จริง")+'</div><div>Phase'+window.calcTip('1 ช่อง = 1 Phase · ความยาวแถบ = % ของ Phase · สีแดง = มีงานเกินกำหนด')+'</div><div>สาเหตุหลัก'+window.calcTip('ด้านที่ถูกหักคะแนนมากที่สุด (หรือ เลยกำหนดจบโครงการ)')+'</div><div>กำหนดจบ</div><div>อัปเดต'+window.calcTip('วันที่มีความเคลื่อนไหวล่าสุด: บันทึกกิจกรรม / แก้ไขงาน / ปัญหา')+'</div></div>'
       + (shown.length ? shown.map(function (x) { return imtDashProjectRow(x.p, x.h); }).join('') : imtDashEmpty('ไม่มีโครงการในหมวดนี้'))
       + '</div>';
 
@@ -1367,7 +1369,7 @@
     return '<div class="imt-phase'+(open?' open':'')+'" id="imt-phase-'+ph.id+'" style="border-left:4px solid '+st.color+';">'
       + '<div class="imt-phase-head" onclick="window.imtTogglePhase(\''+ph.id+'\')"'+dragAttrs+'>'
       +   '<span class="imt-phase-caret">▶</span><span class="imt-phase-num">Phase '+(idx+1)+'</span><span class="imt-phase-name">'+esc(ph.name)+'</span>'
-      +   statusTag(st) + '<div class="imt-phase-pbar">'+pbarHtml(pct)+'</div><span style="font-size:11px;font-weight:700;width:34px;text-align:right;">'+pct+'%</span>'
+      +   statusTag(st) + '<div class="imt-phase-pbar">'+pbarHtml(pct)+'</div><span style="font-size:11px;font-weight:700;width:34px;text-align:right;">'+pct+'%</span>'+window.calcTip("ความคืบหน้า Phase = ค่าเฉลี่ยของทุกงานใน Phase\nงาน = Checklist ที่ติ๊กแล้ว ÷ Checklist ทั้งหมด (ไม่มี Checklist: เสร็จแล้ว = 100%)")
       +   (window.canAdd(window.IMPL_MODULE) ? '<button class="btn btn-sec btn-sm" title="เพิ่ม Task" onclick="event.stopPropagation();window.openImtTaskModal(null,\''+ph.id+'\')">+<span class="btn-label"> Task</span></button>' : '')
       +   (window.canDel(window.IMPL_MODULE) ? '<button class="btn btn-red btn-sm" title="ลบ Phase" onclick="event.stopPropagation();window.askDel(\'imt_phase\',\''+ph.id+'\',\''+esc(ph.name)+'\')">🗑️<span class="btn-label"> ลบ</span></button>' : '')
       + '</div>'
@@ -1439,10 +1441,15 @@
       : '';
     return '<div class="imt-tcard'+(overdue?' overdue':'')+'"'+dragAttrs+' style="border-left:3px solid '+st.color+';" onclick="window.openImtTaskModal(\''+t.id+'\')">'
       + '<div class="imt-tcard-head">'+orderBadge+'<div class="imt-tcard-name">'+esc(t.name)+'</div></div>'
-      + statusTag(st)
+      // ── แบบกะทัดรัด: สถานะ / Checklist / ผู้รับผิดชอบ / กำหนดส่ง รวมเป็นบรรทัดเดียว (ตัดขึ้นบรรทัดใหม่เองถ้าการ์ดแคบ)
+      // ผู้รับผิดชอบแสดงเฉพาะเมื่อมีค่า แถบความคืบหน้าบางไว้ท้ายการ์ด ──
+      + '<div class="imt-tcard-meta">'
+      +   statusTag(st)
+      +   (ck.length ? '<span title="Checklist ที่ติ๊กแล้ว / ทั้งหมด">☑ '+doneCk+'/'+ck.length+'</span>' : '')
+      +   (t.owner ? '<span class="imt-tcard-owner" title="ผู้รับผิดชอบ">👤 '+esc(t.owner)+'</span>' : '')
+      +   (t.due ? '<span class="imt-tcard-due" title="กำหนดส่ง">⏰ '+fd(t.due)+'</span>' : '')
+      + '</div>'
       + pbarHtml(pct, st.color)
-      + '<div class="imt-tcard-foot"><span>👤 '+esc(t.owner||'-')+'</span><span>'+(t.due?('⏰ '+fd(t.due)):'')+'</span></div>'
-      + (ck.length ? '<div class="imt-tcard-ck">☑ '+doneCk+'/'+ck.length+' Checklist</div>' : '')
       + '</div>';
   }
 
@@ -2311,7 +2318,7 @@
     var curStaffId = (window.cu && (window.cu.staffId || window.cu.staff_id)) || '';
     var i = id ? imtIssue(id) : { department:'', reportedBy:'', problem:'', category:'', status:'open', solution:'', receivedById:curStaffId, fixedById:'', fixedDate:'', createdAt:new Date().toISOString() };
     var catOpts = '<option value="">--ระบุกลุ่มปัญหา--</option>' + cats.map(function (c) { return '<option value="'+esc(c)+'"'+(i.category===c?' selected':'')+'>'+esc(c)+'</option>'; }).join('');
-    var stOpts = window.IMPL_ISSUE_STATUS.map(function (s) { return '<option value="'+s.id+'"'+(i.status===s.id?' selected':'')+'>'+esc(s.label)+'</option>'; }).join('');
+    var stOpts = window.IMPL_ISSUE_STATUS.map(function (s) { return '<option value="'+s.id+'"'+(i.status===s.id?' selected':'')+'>'+s.icon+' '+esc(s.label)+'</option>'; }).join('');
     // ── "ผู้แก้ไข" เลือกจากทีมงานของโครงการนี้ (imtProjectTeamStaff — แหล่งเดียวกับ "ผู้รับผิดชอบ" ในแท็บ "งาน")
     // ค่าที่เลือก = รหัสพนักงาน ──
     var teamStaff = imtProjectTeamStaff(pid);
@@ -2463,7 +2470,7 @@
         + '<td>'+esc(i.department||'-')+'</td>'
         + '<td>'+esc(i.problem)+'</td>'
         + '<td>'+esc(i.category||'-')+'</td>'
-        + '<td>'+esc(st.label)+'</td>'
+        + '<td>'+st.icon+' '+esc(st.label)+'</td>'
         + '<td>'+esc(i.solution||'—')+'</td>'
         // ผู้รับปัญหา/ผู้แก้ไข: ชื่อ-นามสกุลไม่มีคำนำหน้า (nameKey ตัด นาย/นาง/นางสาว/น.ส.)
         + '<td>'+esc(window.nameKey(window.staffNameByRef(i.receivedById)) || '—')+'</td>'
@@ -2952,21 +2959,21 @@
 
     // ── Hero: ring ความคืบหน้างาน + ตัวเลขเด่น 4 ตัว (งาน/แบบฟอร์ม/ปัญหาค้าง/ล่าช้า) + ชิปสถานะงาน
     // (แทนกราฟสรุปสถานะ/ความคืบหน้าตาม Phase เดิม ที่ซ้ำกับการ์ด Phase ด้านล่าง) · กดแต่ละตัว = ไปแท็บนั้น ──
-    var heroStat = function (val, label, onclick, color) {
-      return '<div class="imt-report-hero-stat" onclick="'+onclick+'"><b'+(color?' style="color:'+color+'"':'')+'>'+val+'</b><span>'+label+'</span></div>';
+    var heroStat = function (val, label, onclick, color, tip) {
+      return '<div class="imt-report-hero-stat" onclick="'+onclick+'"><b'+(color?' style="color:'+color+'"':'')+'>'+val+'</b><span>'+label+window.calcTip(tip)+'</span></div>';
     };
     var statusChips = statusCounts.map(function (x) {
       return '<button type="button" class="imt-iss-chip" style="--c:'+x.st.color+'" title="ดูงานสถานะนี้" onclick="window.imtGoToTaskStatus(\''+x.st.id+'\')">'
         + x.st.icon+' '+esc(x.st.label)+' <b>'+x.n+'</b></button>';
     }).join('');
     var heroHtml = '<div class="imt-report-hero">'
-      + '<div class="imt-report-hero-ring" style="--pct:'+overallPct+'"><span>'+overallPct+'%</span></div>'
+      + '<div class="imt-report-hero-ring" style="--pct:'+overallPct+'"><span>'+overallPct+'%'+window.calcTip("ความคืบหน้าโครงการ = ค่าเฉลี่ยของทุก Phase\nPhase = ค่าเฉลี่ยของทุกงานใน Phase\nงาน = Checklist ที่ติ๊กแล้ว ÷ Checklist ทั้งหมด (ไม่มี Checklist: เสร็จแล้ว = 100%)")+'</span></div>'
       + '<div class="imt-report-hero-body">'
       +   '<div class="imt-report-hero-stats">'
-      +     heroStat(doneCount+'<small>/'+tasks.length+'</small>', '📋 งานเสร็จแล้ว', "window.imtGoTab('workspace')")
-      +     heroStat(formPct+'<small>%</small>', '📄 แบบฟอร์ม ('+formDoneN+'/'+formItems.length+')', "window.imtGoTab('forms')")
-      +     heroStat(openIssueN, '🩹 ปัญหาค้าง', "window.imtIssueFilter={};window.imtGoTab('issues')", openIssueN ? 'var(--coral)' : '')
-      +     heroStat(overdueCount, '⏰ งานล่าช้า', "window.imtGoTab('workspace')", overdueCount ? 'var(--coral)' : '')
+      +     heroStat(doneCount+'<small>/'+tasks.length+'</small>', '📋 งานเสร็จแล้ว', "window.imtGoTab('workspace')", '', 'งานที่สถานะ "เสร็จแล้ว" / งานทั้งหมดของโครงการ')
+      +     heroStat(formPct+'<small>%</small>', '📄 แบบฟอร์ม ('+formDoneN+'/'+formItems.length+')', "window.imtGoTab('forms')", '', 'แบบฟอร์มที่เสร็จแล้ว ÷ แบบฟอร์มทั้งหมดของโครงการ × 100')
+      +     heroStat(openIssueN, '🩹 ปัญหาค้าง', "window.imtIssueFilter={};window.imtGoTab('issues')", openIssueN ? 'var(--coral)' : '', 'ปัญหาของโครงการที่สถานะยังไม่ "เสร็จแล้ว"')
+      +     heroStat(overdueCount, '⏰ งานล่าช้า', "window.imtGoTab('workspace')", overdueCount ? 'var(--coral)' : '', 'งานที่เลยวันครบกำหนดแล้ว แต่ยังไม่เสร็จ/ไม่ยกเลิก')
       +   '</div>'
       +   (statusChips ? '<div class="imt-report-hero-chips">'+statusChips+'</div>' : '')
       + '</div>'
@@ -3042,7 +3049,7 @@
       var riskBadges = (overdueCnt ? '<span class="tag" style="background:'+stDelayed.color+'18;color:'+stDelayed.color+';">'+stDelayed.icon+' ล่าช้า '+overdueCnt+'</span>' : '')
         + (issueCnt ? '<span class="tag" style="background:'+stIssue.color+'18;color:'+stIssue.color+';">'+stIssue.icon+' มีปัญหา '+issueCnt+'</span>' : '');
       return '<div class="imt-report-pcard" onclick="window.imtGoToPhaseTasks(\''+p.id+'\')">'
-        + '<div class="imt-report-pcard-top"><span><span class="imt-phase-num">Phase '+(idx+1)+'</span> <span class="imt-report-pcard-name">'+esc(p.name)+'</span></span><span class="imt-report-pcard-pct" style="color:'+color+'">'+pct+'%</span></div>'
+        + '<div class="imt-report-pcard-top"><span><span class="imt-phase-num">Phase '+(idx+1)+'</span> <span class="imt-report-pcard-name">'+esc(p.name)+'</span></span><span class="imt-report-pcard-pct" style="color:'+color+'">'+pct+'%'+window.calcTip("ความคืบหน้า Phase = ค่าเฉลี่ยของทุกงานใน Phase\nงาน = Checklist ที่ติ๊กแล้ว ÷ Checklist ทั้งหมด (ไม่มี Checklist: เสร็จแล้ว = 100%)")+'</span></div>'
         + pbarHtml(pct, color)
         + '<div class="imt-report-pcard-meta">'+pTasks.length+' งาน'+(ownerCount?' · 👤 '+ownerCount+' คน':'')+(dateRange?' · 📅 '+dateRange:'')+'</div>'
         + (riskBadges ? '<div class="imt-report-pcard-risk">'+riskBadges+'</div>' : '')

@@ -61,7 +61,7 @@ window.renderProjects=function(){
   var showAdv=(gType!=='nonadv');
   var thead=document.getElementById('proj-thead-row');
   if(thead){
-    var cols='<th style="width:48px;text-align:center">ลำดับ</th><th>โครงการ / ทีมงาน</th>';
+    var cols='<th>โครงการ / ทีมงาน</th>';
     if(showParent)cols+='<th>โครงการหลัก</th><th>ครั้งที่</th>';
     cols+='<th>วันเริ่ม / สิ้นสุด</th>';
     if(showRevisit)cols+='<th>Revisit 1 / 2</th>';
@@ -70,7 +70,7 @@ window.renderProjects=function(){
     cols+='<th style="width:80px"></th>';
     thead.innerHTML=cols;
   }
-  var colSpan=5+(showParent?2:0)+(showRevisit?1:0)+(showAdv?2:0);
+  var colSpan=4+(showParent?2:0)+(showRevisit?1:0)+(showAdv?2:0);
   var tb=document.getElementById('proj-rows');if(!tb)return;
   tb.innerHTML=rows.map(function(p,i){
     var sg=gS(p.stage);var pt=gT(p.typeId);var pg=gG(p.groupId);
@@ -79,7 +79,7 @@ window.renderProjects=function(){
     var advRdate=adv&&adv.rdate?fd(adv.rdate):'<span style="color:var(--txt3)">-</span>';
     var advDdate=adv&&adv.ddate?fd(adv.ddate):'<span style="color:var(--txt3)">-</span>';
     var advStat=adv?window.AFLW.find(function(x){return x.id===adv.status;}):null;
-    var advStatHtml=advStat?`<span class="tag" style="background:${advStat.color}18;color:${advStat.color};font-size:10px;">${advStat.label}</span>`:'<span style="color:var(--txt3)">—</span>';
+    var advStatHtml=advStat?`<span class="tag" style="background:${advStat.color}18;color:${advStat.color};font-size:10px;">${advStat.icon} ${advStat.label}</span>`:'<span style="color:var(--txt3)">—</span>';
     var mems=(p.members||p.team.map(function(id){return{sid:id};})).map(function(m){return gSt(m.sid);});
     var nicknames=mems.map(function(m){return m.nickname||m.name.split(' ')[0];}).filter(Boolean).join(', ')||'<span style="color:var(--txt3)">ไม่มีทีม</span>';
     var pgHtml=pg?`<span class="tag" style="background:${pg.color}18;color:${pg.color};font-size:9px;padding:2px 6px">${esc(pg.label)}</span>`:'';
@@ -105,8 +105,7 @@ window.renderProjects=function(){
     if(!_exLd.includes(p.groupId)){var _pLds=window.LODGINGS.filter(function(l){return l.pid===p.id;});if(!_pLds.length){ldStatusCell='<td data-empty="1" style="font-size:11px;color:var(--txt3);">—</td>';}else{var _appD=_pLds.some(function(l){return l.approvedDaily==='yes';});var _appM=_pLds.some(function(l){return l.approvedMonthly==='yes';});if(_appD&&_appM){ldStatusCell='<td><div style="display:flex;flex-direction:column;gap:2px;"><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:#4361ee18;color:var(--indigo);border:1px solid #4361ee30;white-space:nowrap;">✅ รายวัน</span><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:var(--coral)18;color:var(--coral);border:1px solid var(--coral)30;white-space:nowrap;">✅ รายเดือน</span></div></td>';}else if(_appD){ldStatusCell='<td><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:#4361ee18;color:var(--indigo);border:1px solid #4361ee30;white-space:nowrap;">✅ รายวัน</span></td>';}else if(_appM){ldStatusCell='<td><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:var(--coral)18;color:var(--coral);border:1px solid var(--coral)30;white-space:nowrap;">✅ รายเดือน</span></td>';}else{ldStatusCell='<td><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:var(--amber)18;color:var(--amber);border:1px solid var(--amber)30;white-space:nowrap;">⏳ รออนุมัติ</span></td>';}}}
 
     return`<tr class="fade" onclick="window.openProjModal('${p.id}')">
-      <td class="m-rowno" style="text-align:center;font-size:12px;font-weight:600;color:var(--txt3)">${i+1}</td>
-      <td><div style="font-weight:600;font-size:13px">${esc(p.name)}</div>${p.siteOwner?`<div style="font-size:10px;color:var(--txt3);margin-top:2px;">🏢 ${esc(p.siteOwner)}</div>`:''}<div style="display:flex;align-items:center;gap:6px;margin-top:4px;">${pgHtml}<span class="tag" style="background:${pt.color}18;color:${pt.color};font-size:9px;padding:2px 6px">${esc(pt.label)}</span><span class="tag" style="background:${sg.color}18;color:${sg.color};font-size:9px;padding:2px 6px">${sg.label}</span><span style="font-size:10px;font-weight:700;color:${sg.color}">${p.progress}%</span></div><div style="font-size:11px;color:var(--violet);margin-top:6px;font-weight:600;">👥 ${nicknames}</div>${p.note?`<div style="font-size:11px;color:var(--amber);margin-top:4px;">⚠ ${esc(p.note)}</div>`:''}${_ctInfo}</td>
+      <td><div class="proj-title-line"><span class="proj-row-index" aria-label="ลำดับ ${i+1}">${i+1}</span><div class="proj-row-title">${esc(p.name)}</div></div>${p.siteOwner?`<div style="font-size:10px;color:var(--txt3);margin-top:2px;">🏢 ${esc(p.siteOwner)}</div>`:''}<div style="display:flex;align-items:center;gap:6px;margin-top:4px;">${pgHtml}<span class="tag" style="background:${pt.color}18;color:${pt.color};font-size:9px;padding:2px 6px">${esc(pt.label)}</span><span class="tag" style="background:${sg.color}18;color:${sg.color};font-size:9px;padding:2px 6px">${sg.label}</span><span style="font-size:10px;font-weight:700;color:${sg.color}">${p.progress}%</span></div><div style="font-size:11px;color:var(--violet);margin-top:6px;font-weight:600;">👥 ${nicknames}</div>${p.note?`<div style="font-size:11px;color:var(--amber);margin-top:4px;">⚠ ${esc(p.note)}</div>`:''}${_ctInfo}</td>
       ${parentCells}
       <td style="font-size:11px;color:var(--txt2);line-height:1.6">📅 ${p.start?fd(p.start):'<span style="color:var(--txt3)">-</span>'}<br>⏰ ${p.end?fd(p.end):'<span style="color:var(--txt3)">-</span>'}</td>
       ${revisitCell}
@@ -235,6 +234,35 @@ window.pfHospGuess=function(){
   var inp=document.getElementById('pf-hosp-txt');if(!inp||inp.value.trim())return;
   var h=window.HospitalMatch.guess((document.getElementById('pf-name')||{}).value,window.HOSPITALS);
   if(h)inp.value=_pfHospLabel(h);
+  else window.pfHospAi(false); // ชื่อไม่ตรงตัว (สะกดต่าง/ย่อ/อังกฤษ) — ให้ AI แนะนำจากรายชื่อในระบบ ผู้ใช้กดใช้เอง
+};
+// 🤖 AI แนะนำ รพ. — เลือกได้เฉพาะ รพ. ในเมนูรายชื่อ รพ. และต้องอ้างคำในชื่อโครงการได้ (HospitalMatch.aiGuess) · ไม่เติมเอง ต้องกด "ใช้"
+// manual=true (กดปุ่ม) แจ้งผลทุกกรณี · false (อัตโนมัติ) แสดงเฉพาะเมื่อเจอ
+var _pfHospAiSeq=0;
+window.pfHospAi=async function(manual){
+  var box=document.getElementById('pf-hosp-ai'),inp=document.getElementById('pf-hosp-txt');if(!box||!inp)return;
+  var name=((document.getElementById('pf-name')||{}).value||'').trim();
+  if(!name){if(manual)box.innerHTML='<div class="ai-card-note">กรอกชื่อโครงการก่อน</div>';return;}
+  var seq=++_pfHospAiSeq;
+  box.innerHTML='<div class="ai-card-note">🤖 AI กำลังหาโรงพยาบาลจากชื่อโครงการ...</div>';
+  var r;
+  try{r=await window.HospitalMatch.aiGuess(name,window.HOSPITALS);}
+  catch(e){if(seq===_pfHospAiSeq)box.innerHTML=manual?'<div class="ai-card-note" style="color:var(--coral)">'+esc(e.message)+'</div>':'';return;}
+  if(seq!==_pfHospAiSeq)return; // ผลเก่า (แก้ชื่อโครงการระหว่างรอ)
+  if(!r){box.innerHTML=manual?'<div class="ai-card-note">🤖 ไม่พบโรงพยาบาลที่ตรงแน่ชัดจากชื่อโครงการ — เลือกเองจากรายการ (ไม่มีในรายการ เพิ่มได้ที่เมนูรายชื่อ รพ.)</div>':'';return;}
+  var lbl=_pfHospLabel(r.hospital);
+  if(inp.value.trim()===lbl){box.innerHTML=manual?'<div class="ai-card-note">🤖 ตรงกับโรงพยาบาลที่เลือกไว้แล้ว</div>':'';return;}
+  box.innerHTML=window.aiSuggestHtml({
+    title:'แนะนำ รพ.',
+    summary:esc(lbl),
+    actions:'<button type="button" class="btn btn-sm" onclick="window.pfHospAiUse(\''+esc(r.hospital.id)+'\')">ใช้</button><button type="button" class="btn btn-sm" onclick="document.getElementById(\'pf-hosp-ai\').innerHTML=\'\'">ไม่ใช่</button>',
+    body:'<div class="ai-card-note">อ้างอิงจากคำว่า “'+esc(r.evidence)+'” ในชื่อโครงการ'+(r.reason?' · '+esc(r.reason):'')+'<br>ตรวจสอบรหัส/จังหวัดก่อนกดใช้</div>'
+  });
+};
+window.pfHospAiUse=function(hid){
+  var inp=document.getElementById('pf-hosp-txt'),h=_pfHospById(hid);if(!inp||!h)return;
+  inp.value=_pfHospLabel(h);window.aiFlagField(inp,true);
+  var box=document.getElementById('pf-hosp-ai');if(box)box.innerHTML='';
 };
 window.openProjModal=function(id){
   window.editPid=id;
@@ -289,7 +317,7 @@ window.openProjModal=function(id){
   var displayProg=p?p.progress:0;
   if(isExecStg&&p&&p.start&&p.end){var sD=pd(p.start);var eD=pd(p.end);var tMs=eD-sD;if(tMs>0)displayProg=Math.min(100,Math.max(0,Math.round((now2-sD)/tMs*100)));}
   var pVal=p?(isExecStg?displayProg:p.progress):0;
-  var progTabHtml=p?('<div class="pf-tab-prog" style="display:flex;align-items:center;gap:7px;margin-left:auto;padding-left:10px;border-left:1px solid var(--border);white-space:nowrap;"><span style="font-size:11px;color:var(--txt2);">ความคืบหน้า</span><span id="prog-lbl" style="font-size:13px;font-weight:700;color:var(--violet);">'+pVal+'%</span>'+(isExecStg?'<span style="font-size:10px;color:var(--txt3);" title="คำนวนอัตโนมัติ">⚡</span>':'')+(window.canEdit('projects')?'<input type="range" id="pf-prog" min="0" max="100" value="'+pVal+'" style="width:72px;accent-color:var(--violet);cursor:pointer;"'+(isExecStg?' disabled':' oninput="document.getElementById(\'prog-lbl\').textContent=this.value+\'%\'"')+'>':'')+'</div>'):'';
+  var progTabHtml=p?('<div class="pf-tab-prog" style="display:flex;align-items:center;gap:7px;margin-left:auto;padding-left:10px;border-left:1px solid var(--border);white-space:nowrap;"><span style="font-size:11px;color:var(--txt2);">ความคืบหน้า</span><span id="prog-lbl" style="font-size:13px;font-weight:700;color:var(--violet);">'+pVal+'%</span>'+(isExecStg?'<span style="font-size:10px;color:var(--txt3);">⚡</span>'+window.calcTip('ขั้นตอน "ดำเนินการ" คำนวณอัตโนมัติตามเวลา:\n(วันนี้ − วันเริ่ม) ÷ (วันสิ้นสุด − วันเริ่ม) × 100 (0–100%)\nขั้นตอนส่งมอบ/ปิดโครงการ = 100% เสมอ'):'')+(window.canEdit('projects')?'<input type="range" id="pf-prog" min="0" max="100" value="'+pVal+'" style="width:72px;accent-color:var(--violet);cursor:pointer;"'+(isExecStg?' disabled':' oninput="document.getElementById(\'prog-lbl\').textContent=this.value+\'%\'"')+'>':'')+'</div>'):'';
   var memberRows=mems.map(function(m){var st=gSt(m.sid);var j=window.STAFF.findIndex(function(s){return s.id===m.sid;});var overlaps=getStaffOverlaps(m.sid,m.s,m.e,window.editPid);var warnText=overlaps.length>0?overlapWarnText(overlaps):'';return`<div class="m-row" id="mr-${m.id}" data-sid="${m.sid}" style="padding:7px 8px;border-radius:8px;margin-bottom:4px;background:var(--surface2);"><div style="display:flex;align-items:center;gap:7px;"><div style="width:26px;height:26px;border-radius:50%;background:${avC(Math.max(j,0))};color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${st.name.charAt(0)}</div><span style="flex:1;font-size:11px;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${esc(st.name)}${st.nickname?` <span style="color:var(--txt3);font-weight:400;">(${esc(st.nickname)})</span>`:''}</span>${window.canEdit('projects')?`<button class="btn btn-red btn-sm pku-x-btn" style="padding:2px 7px;font-size:11px;" onclick="window.pkuDeselect('${m.id}')">✕</button>`:''}</div>${window.canEdit('projects')?`<input type="hidden" id="msid-${m.id}" value="${m.sid}"><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:5px;padding-left:33px;">${window.beDateField('ms-'+m.id,m.s,{onchange:"window.checkMemOverlap('"+m.id+"')",dispStyle:'padding:4px 6px;font-size:10px;'})}${window.beDateField('me-'+m.id,m.e,{onchange:"window.checkMemOverlap('"+m.id+"')",dispStyle:'padding:4px 6px;font-size:10px;'})}</div><div id="mwarn-${m.id}" style="font-size:10px;color:var(--coral);margin-top:3px;padding-left:33px;display:${warnText?'block':'none'}">${warnText}</div>`:''}</div>`;}).join('');
   var ce=window.canEdit('projects'),ceA=ce?'':'disabled';
   var hasDates=!!(p&&p.start&&p.end)||mems.length>0;
@@ -304,8 +332,9 @@ window.openProjModal=function(id){
     +'</div>';
   var infoPane='<div id="pf-pane-info">'
     +'<div class="f-group"><label class="f-label">ชื่อโครงการ *</label><input class="f-input" id="pf-name" value="'+esc(p?p.name:'')+'" placeholder="ชื่อโครงการ" onchange="window.pfHospGuess()" '+ceA+'></div>'
-    +'<div class="f-group"><label class="f-label">🏥 โรงพยาบาล</label><input class="f-input" id="pf-hosp-txt" list="pf-hosp-list" autocomplete="off" placeholder="พิมพ์ค้นหาชื่อหรือรหัสโรงพยาบาล..." value="'+esc(_pfHospById(p&&p.hospitalId)?_pfHospLabel(_pfHospById(p.hospitalId)):'')+'" '+ceA+'>'
+    +'<div class="f-group"><label class="f-label" style="display:flex;align-items:center;">🏥 โรงพยาบาล'+(ce?'<button type="button" onclick="window.pfHospAi(true)" title="ให้ AI หาโรงพยาบาลจากชื่อโครงการ (เลือกจากรายชื่อ รพ. ในระบบเท่านั้น)" style="margin-left:auto;padding:2px 10px;background:none;border:1px solid var(--violet);color:var(--violet);border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">🤖 AI หา รพ.</button>':'')+'</label><input class="f-input" id="pf-hosp-txt" list="pf-hosp-list" oninput="var b=document.getElementById(\'pf-hosp-ai\');if(b)b.innerHTML=\'\'"autocomplete="off" placeholder="พิมพ์ค้นหาชื่อหรือรหัสโรงพยาบาล..." value="'+esc(_pfHospById(p&&p.hospitalId)?_pfHospLabel(_pfHospById(p.hospitalId)):'')+'" '+ceA+'>'
     +'<datalist id="pf-hosp-list">'+(window.HOSPITALS||[]).slice().sort(function(a,b){return(a.name||'').localeCompare(b.name||'','th');}).map(function(h){return'<option value="'+esc(_pfHospLabel(h))+'">';}).join('')+'</datalist>'
+    +'<div id="pf-hosp-ai"></div>'
     +'<div style="font-size:11px;color:var(--txt3);margin-top:4px;">ใช้ร่วมกับติดตามสถานะโครงการ และเปิดอบรม (🎓) ได้ทันทีโดยไม่ต้องเลือกซ้ำ · ไม่มีในรายการ เพิ่มได้ที่เมนูรายชื่อ รพ.</div></div>'
     +'<input type="hidden" id="pf-stg" value="'+(p?p.stage:(window.STAGES.length?window.STAGES[0].id:''))+'">'
     +'<div class="f-grid">'
@@ -549,7 +578,7 @@ window.pfContractFilter=function(){
     drop.innerHTML='<div style="padding:10px 14px;font-size:12px;color:var(--txt3);">ไม่พบสัญญา</div>';
   } else {
     drop.innerHTML=list.map(function(c){
-      var ctSt=c.status==='active'?'มีผลบังคับ':c.status==='completed'?'สิ้นสุดแล้ว':'ยกเลิก';
+      var ctSt=c.status==='active'?'✅ มีผลบังคับ':c.status==='completed'?'🏁 สิ้นสุดแล้ว':'🚫 ยกเลิก';
       var ctColor=c.status==='active'?'var(--teal)':c.status==='completed'?'var(--indigo)':'var(--coral)';
       return '<div onclick="window.pfContractSelect(this.dataset.cid,this.dataset.cname)" data-cid="'+esc(c.id)+'" data-cname="'+esc(c.name)+'" '
         +'style="padding:9px 14px;cursor:pointer;border-bottom:1px solid var(--border);font-size:12px;" '
@@ -1061,4 +1090,3 @@ window.collectVisits = function(){
   });
   return result;
 };
-

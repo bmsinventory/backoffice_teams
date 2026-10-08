@@ -55,7 +55,7 @@ function _statCard(s){
   return'<div class="stat-card" style="flex:0 0 auto;min-width:180px;">'
     +'<div class="stat-icon" style="background:'+s.color+'1f;color:'+s.color+'">'+s.icon+'</div>'
     +'<div><div class="stat-val" style="color:'+s.color+'">'+s.v+'</div>'
-    +'<div class="stat-lbl">'+s.k+(s.s?' · '+s.s:'')+'</div></div>'
+    +'<div class="stat-lbl">'+s.k+(s.s?' · '+s.s:'')+window.calcTip(s.tip)+'</div></div>'
     +'</div>';
 }
 
@@ -197,11 +197,11 @@ function _renderBudgetTab(){
   // ── 1. KPI ──
   var kpi=document.getElementById('bud-kpi');
   if(kpi)kpi.innerHTML=[
-    {k:'งบประมาณรวม',v:window.fc(T.budget),s:all.length+' โครงการ',icon:'💵',color:'#4361ee'},
-    {k:'ใช้จริง',v:window.fc(T.actual),s:(T.budget>0?Math.round(T.actual/T.budget*100):0)+'% ของงบ',icon:'💰',color:'#e76f51'},
-    {k:'ผูกพัน (Advance ยังไม่เคลียร์)',v:window.fc(T.committed),icon:'💳',color:'#7209b7'},
-    {k:'คงเหลือใช้ได้',v:window.fc(remain),s:pctUsed+'% ใช้แล้ว',icon:'📊',color:remain>=0?'#06d6a0':'#ff6b6b'},
-    {k:'ต้องจับตา',v:(cnt.over+cnt.warn+cnt.burn+cnt.nobudget)+' โครงการ',s:cnt.over+' เกินงบ',icon:'⚠️',color:cnt.over?'#ff6b6b':'#ffa62b'},
+    {k:'งบประมาณรวม',tip:'ผลรวม "มูลค่าโครงการ" ของโครงการตามตัวกรอง ปี (วันเริ่ม) / กลุ่ม / ประเภท / ค้นหา\nไม่รวมโครงการที่ยกเลิก',v:window.fc(T.budget),s:all.length+' โครงการ',icon:'💵',color:'#4361ee'},
+    {k:'ใช้จริง',tip:"ผลรวมรายการค่าใช้จ่าย (หน้า \"รายการค่าใช้จ่าย\") ของโครงการ\nAdvance ที่เคลียร์แล้วแต่ยังไม่ถูกแตกเป็นรายการค่าใช้จ่าย จะใช้ยอดเคลียร์ของ Advance แทน\n% ของงบ = ใช้จริง ÷ งบประมาณรวม × 100",v:window.fc(T.actual),s:(T.budget>0?Math.round(T.actual/T.budget*100):0)+'% ของงบ',icon:'💰',color:'#e76f51'},
+    {k:'ผูกพัน (Advance ยังไม่เคลียร์)',tip:"Advance ที่สถานะ อนุมัติแล้ว / เบิกแล้ว / รอเคลียร์ (เงินออกไปแล้วหรือกำลังจะออก แต่ยังไม่มีรายการค่าใช้จ่ายจริง)\nไม่นับ Advance ที่รออนุมัติ",v:window.fc(T.committed),icon:'💳',color:'#7209b7'},
+    {k:'คงเหลือใช้ได้',tip:'งบประมาณรวม − ใช้จริง − ผูกพัน\n% ใช้แล้ว = (ใช้จริง + ผูกพัน) ÷ งบประมาณรวม × 100',v:window.fc(remain),s:pctUsed+'% ใช้แล้ว',icon:'📊',color:remain>=0?'#06d6a0':'#ff6b6b'},
+    {k:'ต้องจับตา',tip:'จำนวนโครงการที่ เกินงบ + ใกล้เกิน (≥80%) + ไม่ได้ตั้งงบแต่มีค่าใช้จ่าย + ใช้เงินนำหน้างาน\nใช้เงินนำหน้างาน = ยังไม่จบ, ใช้งบ ≥ 30% และ % ใช้งบ − % คืบหน้า ≥ 20 จุด',v:(cnt.over+cnt.warn+cnt.burn+cnt.nobudget)+' โครงการ',s:cnt.over+' เกินงบ',icon:'⚠️',color:cnt.over?'#ff6b6b':'#ffa62b'},
   ].map(_statCard).join('');
 
   // ── 2. สถานะงบ & ช่วงโครงการ ──
@@ -330,15 +330,15 @@ function _renderBudgetTab(){
   var G2='display:grid;grid-template-columns:repeat(auto-fit,minmax(min(440px,100%),1fr));gap:16px;margin-bottom:16px;';
   body.innerHTML=
     '<div style="'+G2+'">'
-      +_card('🩺 สถานะงบ & ช่วงโครงการ',statusHtml)
-      +_card('🏷️ แยกตามประเภทโครงการ',typeHtml)
+      +_card('🩺 สถานะงบ & ช่วงโครงการ'+window.calcTip('แบ่งโครงการที่ตั้งงบไว้เป็น กำลังดำเนินการ / จบแล้ว (คืบหน้า 100% หรือสถานะเสร็จสิ้น)\nใช้งบ % = (ใช้จริง + ผูกพัน + ส่วนเกินงบ) ÷ งบ × 100\nงานเดินไปเฉลี่ย = ความคืบหน้าเฉลี่ยถ่วงน้ำหนักด้วยงบของแต่ละโครงการ\nคงเหลือของโครงการที่จบแล้ว = ประหยัดได้\n\n'+"เกินงบ = ใช้จริง+ผูกพัน มากกว่างบ\nใกล้เกิน = ใช้งบ ≥ 80%\nไม่ได้ตั้งงบ = งบเป็น 0 แต่มีค่าใช้จ่าย\nปกติ = นอกเหนือจากนี้"),statusHtml)
+      +_card('🏷️ แยกตามประเภทโครงการ'+window.calcTip('รวมงบของโครงการที่ตั้งงบไว้ แยกตามประเภท แล้วแบ่งเป็น ใช้จริง / ผูกพัน / คงเหลือ / เกินงบ'),typeHtml)
     +'</div>'
     +'<div style="'+G2+'">'
-      +_card('📅 ค่าใช้จ่ายจริงรายเดือน','<div style="position:relative;height:240px;"><canvas id="bud-c-trend"></canvas></div>')
-      +_card('🧾 ค่าใช้จ่ายตามหมวด',catHtml)
+      +_card('📅 ค่าใช้จ่ายจริงรายเดือน'+window.calcTip('ผลรวมรายการค่าใช้จ่ายของโครงการตามตัวกรอง แยกตามเดือนของวันที่จ่าย'),'<div style="position:relative;height:240px;"><canvas id="bud-c-trend"></canvas></div>')
+      +_card('🧾 ค่าใช้จ่ายตามหมวด'+window.calcTip('ผลรวมรายการค่าใช้จ่ายแยกตามหมวด เรียงมาก→น้อย (เกิน 8 หมวด รวมที่เหลือเป็น "หมวดอื่น ๆ")\n% = ยอดหมวด ÷ ยอดรวมทุกหมวด × 100'),catHtml)
     +'</div>'
-    +'<div style="margin-bottom:16px;">'+_card('⚠️ โครงการที่ต้องจับตา <span style="font-weight:500;color:var(--txt3);">('+watch.length+')</span>',watchHtml)+'</div>'
-    +'<div style="margin-bottom:16px;">'+_card('🗂️ แยกตามกลุ่มโครงการ',groupHtml)+'</div>';
+    +'<div style="margin-bottom:16px;">'+_card('⚠️ โครงการที่ต้องจับตา'+window.calcTip('เรียงตามความรุนแรง: เกินงบ → ไม่ได้ตั้งงบแต่มีค่าใช้จ่าย → ใช้เงินนำหน้างาน → ใกล้เกิน (≥80%)\nใช้เงินนำหน้างาน = ยังไม่จบ, ใช้งบ ≥ 30% และ % ใช้งบ − % คืบหน้า ≥ 20 จุด\nแสดง 10 โครงการแรก')+' <span style="font-weight:500;color:var(--txt3);">('+watch.length+')</span>',watchHtml)+'</div>'
+    +'<div style="margin-bottom:16px;">'+_card('🗂️ แยกตามกลุ่มโครงการ'+window.calcTip('รวมงบ / ใช้จริง / ผูกพัน ของโครงการในแต่ละกลุ่ม\nคงเหลือ = งบ − ใช้จริง − ผูกพัน · % ใช้งบ = (ใช้จริง + ผูกพัน) ÷ งบ × 100'),groupHtml)+'</div>';
 
   _renderBudCharts(costs,PH,TY);
   _renderBudTable(window.budCalcRows(f));
@@ -483,9 +483,9 @@ function _renderOwner(){
   var kpi=document.getElementById('so-kpi');
   if(kpi){
     kpi.innerHTML=[
-      {k:'เจ้าของไซต์',v:owners.length+' ราย',icon:'🏢',color:'#4361ee'},
-      {k:'มูลค่ารวมทั้งหมด',v:window.fc(totalBudget),icon:'💵',color:'#06d6a0'},
-      {k:'โครงการทั้งหมด',v:totalProjects+' โครงการ',icon:'📁',color:'#7c5cfc'},
+      {k:'เจ้าของไซต์',tip:'จำนวนเจ้าของไซต์ (ไม่ซ้ำ) จากโครงการที่ผ่านตัวกรอง ปี / ประเภท / Stage / ค้นหา',v:owners.length+' ราย',icon:'🏢',color:'#4361ee'},
+      {k:'มูลค่ารวมทั้งหมด',tip:'ผลรวมมูลค่าโครงการของเจ้าของไซต์ทุกรายที่แสดง',v:window.fc(totalBudget),icon:'💵',color:'#06d6a0'},
+      {k:'โครงการทั้งหมด',tip:'จำนวนโครงการรวมของเจ้าของไซต์ทุกรายที่แสดง',v:totalProjects+' โครงการ',icon:'📁',color:'#7c5cfc'},
     ].map(_statCard).join('');
   }
 

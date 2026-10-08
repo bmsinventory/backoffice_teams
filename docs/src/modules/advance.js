@@ -21,12 +21,12 @@ window.renderAdvance=function(){
   var yf=document.getElementById('adv-yr');if(yf&&yf.options.length<=1){var yrs=[...new Set(window.PROJECTS.map(p=>getYearBE(p.start)).filter(Boolean))].sort((a,b)=>b-a);yrs.forEach(function(y){var o=document.createElement('option');o.value=y;o.textContent='ปี พ.ศ. '+y;yf.appendChild(o);});var _cbe=(new Date().getFullYear()+543).toString();if(!yf.value||yf.value==='')yf.value=_cbe;}
   // Status tabs
   var tabs=document.getElementById('af-tabs');
-  if(tabs){var all=[{id:'',label:'ทั้งหมด',color:'#7c5cfc'}].concat(window.AFLW);
+  if(tabs){var all=[{id:'',label:'ทั้งหมด',color:'#7c5cfc',icon:'📋'}].concat(window.AFLW);
     tabs.innerHTML=all.map(function(s){var cnt=s.id?window.ADVANCES.filter(function(a){return a.status===s.id;}).length:window.ADVANCES.length;var on=window.advFilter===s.id;
       // ไม่ได้เลือก = โทนสีของสถานะนั้นจาง ๆ (พื้น/ขอบ/ตัวอักษร) · เลือกอยู่ = พื้นสีเต็ม ตัวขาว
       var st=on?'background:'+s.color+';color:#fff':'background:'+s.color+'14;color:'+s.color+';border-color:'+s.color+'40';
       var cst=on?'':' style="background:'+s.color+'22;color:'+s.color+'"';
-      return`<div class="af-tab${on?' on':''}" style="${st}" onclick="window.advFilter='${s.id}';window.renderAdvance()">${s.label}<span class="af-cnt"${cst}>${cnt}</span></div>`;
+      return`<div class="af-tab${on?' on':''}" style="${st}" onclick="window.advFilter='${s.id}';window.renderAdvance()">${s.icon} ${s.label}<span class="af-cnt"${cst}>${cnt}</span></div>`;
     }).join('');}
   var q=(document.getElementById('adv-q')||{}).value||'';
   var grp=window.msValues('adv-grp');
@@ -57,13 +57,13 @@ window.renderAdvance=function(){
   var draftCount=rows.filter(a=>a.status==='draft').length;
   var bar=document.getElementById('adv-summary-bar');
   if(bar)bar.innerHTML=[
-    {icon:'💳',label:'รายการทั้งหมด',val:rows.length+' รายการ',c:'var(--violet)'},
-    {icon:'💰',label:'ยอดเบิกรวม',val:fca(totalAmt),c:'var(--indigo)'},
-    {icon:'✅',label:'จ่ายจริงรวม',val:fca(totalClr),c:'var(--teal)'},
-    {icon:'⚠️',label:'เลยกำหนด',val:overdueCount+' รายการ',c:'var(--coral)'},
+    {icon:'💳',label:'รายการทั้งหมด',tip:'จำนวนใบเบิกล่วงหน้า (Advance) ตามแท็บสถานะ/ตัวกรอง/คำค้นที่เลือก',val:rows.length+' รายการ',c:'var(--violet)'},
+    {icon:'💰',label:'ยอดเบิกรวม',tip:'ผลรวม "จำนวนเบิก" ของทุกรายการที่แสดง',val:fca(totalAmt),c:'var(--indigo)'},
+    {icon:'✅',label:'จ่ายจริงรวม',tip:'ผลรวม "จ่ายจริง" ของทุกรายการที่แสดง\nจ่ายจริงของแต่ละใบ = ผลรวมรายการค่าใช้จ่ายทั่วไปตอนเคลียร์ (ไม่รวมค่าแรง/เบี้ยเลี้ยง)',val:fca(totalClr),c:'var(--teal)'},
+    {icon:'⚠️',label:'เลยกำหนด',tip:'รายการที่ยังไม่เคลียร์ และวันกำหนดเคลียร์ผ่านไปแล้ว',val:overdueCount+' รายการ',c:'var(--coral)'},
   ].map(s=>`<div style="display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 16px;flex:1;min-width:150px;">
     <div style="width:36px;height:36px;border-radius:10px;background:${s.c}18;display:flex;align-items:center;justify-content:center;font-size:18px;">${s.icon}</div>
-    <div><div style="font-size:10px;color:var(--txt3);font-weight:600;text-transform:uppercase;letter-spacing:.5px;">${s.label}</div>
+    <div><div style="font-size:10px;color:var(--txt3);font-weight:600;text-transform:uppercase;letter-spacing:.5px;">${s.label}${window.calcTip(s.tip)}</div>
     <div style="font-size:15px;font-weight:800;color:${s.c};">${s.val}</div></div>
   </div>`).join('');
   // ── Cards ──
@@ -86,41 +86,41 @@ window.renderAdvance=function(){
     // Progress bar for cleared amount
     var pct=a.amount>0?Math.min(100,Math.round((a.cleared||0)/a.amount*100)):0;
     var progColor=pct>=100?'var(--teal)':pct>50?'var(--indigo)':'var(--amber)';
-    return`<div class="fade" style="background:var(--surface);border:2px solid ${ov?'var(--coral)':a.status==='cleared'?'var(--teal)':'var(--border)'};border-radius:16px;overflow:hidden;box-shadow:var(--sh-sm);display:flex;flex-direction:column;cursor:pointer;" onclick="window.openAdvModal('${a.id}')">
+    return`<div class="fade" style="background:var(--surface);border:2px solid ${ov?'var(--coral)':a.status==='cleared'?'var(--teal)':'var(--border)'};border-radius:14px;overflow:hidden;box-shadow:var(--sh-sm);display:flex;flex-direction:column;cursor:pointer;" onclick="window.openAdvModal('${a.id}')">
       <!-- Card Header -->
-      <div style="padding:14px 16px;background:linear-gradient(135deg,${pt.color}10,transparent);border-bottom:1px solid var(--border);">
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px;">
+      <div style="padding:10px 12px;background:linear-gradient(135deg,${pt.color}10,transparent);border-bottom:1px solid var(--border);">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px;margin-bottom:4px;">
           <div style="flex:1;min-width:0;">
-            <div style="font-size:13px;font-weight:800;line-height:1.3;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p?esc(p.name):(a.pid?esc(a.pid):'—')}</div>
-            <div style="display:flex;gap:5px;flex-wrap:wrap;">
-              ${pt.label?`<span style="font-size:10px;font-weight:700;padding:1px 8px;border-radius:20px;background:${pt.color}18;color:${pt.color};">${esc(pt.label)}</span>`:''}
-              ${pg?`<span style="font-size:10px;font-weight:700;padding:1px 8px;border-radius:20px;background:${pg.color}18;color:${pg.color};">${esc(pg.label)}</span>`:''}
+            <div style="font-size:12px;font-weight:800;line-height:1.3;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p?esc(p.name):(a.pid?esc(a.pid):'—')}</div>
+            <div style="display:flex;gap:4px;flex-wrap:wrap;">
+              ${pt.label?`<span style="font-size:9px;font-weight:700;padding:1px 7px;border-radius:20px;background:${pt.color}18;color:${pt.color};">${esc(pt.label)}</span>`:''}
+              ${pg?`<span style="font-size:9px;font-weight:700;padding:1px 7px;border-radius:20px;background:${pg.color}18;color:${pg.color};">${esc(pg.label)}</span>`:''}
             </div>
           </div>
-          <span style="background:${sf.color}18;color:${sf.color};font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;border:1px solid ${sf.color}30;white-space:nowrap;">${ov?'⚠️ ':''}<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${sf.color};margin-right:4px;vertical-align:middle;"></span>${sf.label}</span>
+          <span style="background:${sf.color}18;color:${sf.color};font-size:9px;font-weight:700;padding:2px 8px;border-radius:20px;border:1px solid ${sf.color}30;white-space:nowrap;">${ov?'⚠️ ':''}<span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:${sf.color};margin-right:3px;vertical-align:middle;"></span>${sf.icon} ${sf.label}</span>
         </div>
-        <div style="font-size:12px;color:var(--txt2);font-weight:600;">${esc(a.purpose)}</div>
-        ${a.advno?`<div style="font-size:10px;color:var(--txt3);margin-top:2px;">📋 ${esc(a.advno)}</div>`:''}
+        <div style="font-size:11px;color:var(--txt2);font-weight:600;">${esc(a.purpose)}</div>
+        ${a.advno?`<div style="font-size:9px;color:var(--txt3);margin-top:1px;">📋 ${esc(a.advno)}</div>`:''}
       </div>
       <!-- Amounts section -->
-      <div style="padding:12px 16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;border-bottom:1px solid var(--border);">
+      <div style="padding:8px 12px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;border-bottom:1px solid var(--border);">
         <div style="text-align:center;">
-          <div style="font-size:10px;color:var(--txt3);margin-bottom:2px;">ยอดเบิก</div>
-          <div style="font-size:14px;font-weight:800;color:var(--indigo);">${fca(a.amount)}</div>
+          <div style="font-size:9px;color:var(--txt3);margin-bottom:1px;">ยอดเบิก</div>
+          <div style="font-size:13px;font-weight:800;color:var(--indigo);">${fca(a.amount)}</div>
         </div>
         <div style="text-align:center;border-left:1px solid var(--border);border-right:1px solid var(--border);">
-          <div style="font-size:10px;color:var(--txt3);margin-bottom:2px;">จ่ายจริง</div>
-          <div style="font-size:14px;font-weight:800;color:var(--teal);">${a.cleared?fca(a.cleared):'—'}</div>
+          <div style="font-size:9px;color:var(--txt3);margin-bottom:1px;">จ่ายจริง</div>
+          <div style="font-size:13px;font-weight:800;color:var(--teal);">${a.cleared?fca(a.cleared):'—'}</div>
         </div>
         <div style="text-align:center;">
-          <div style="font-size:10px;color:var(--txt3);margin-bottom:2px;">ส่วนต่าง</div>
-          <div style="font-size:13px;font-weight:800;color:${diff<0?'var(--coral)':(a.status==='cleared'?diffColor:'var(--txt2)')};">${a.status==='cleared'?diffLabel:(diff!==0?diffLabel:'—')}</div>
+          <div style="font-size:9px;color:var(--txt3);margin-bottom:1px;">ส่วนต่าง${window.calcTip('ยอดเบิก − จ่ายจริง\nบวก = เงินเหลือต้องคืน · ติดลบ = จ่ายเกินยอดเบิก')}</div>
+          <div style="font-size:12px;font-weight:800;color:${diff<0?'var(--coral)':(a.status==='cleared'?diffColor:'var(--txt2)')};">${a.status==='cleared'?diffLabel:(diff!==0?diffLabel:'—')}</div>
         </div>
       </div>
       <!-- Progress bar removed -->
       <!-- Dates & actions -->
-      <div style="padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
-        <div style="font-size:11px;color:var(--txt3);">
+      <div style="padding:7px 12px;display:flex;align-items:center;justify-content:space-between;gap:6px;">
+        <div style="font-size:10px;color:var(--txt3);">
           ${a.rdate?`<span>📋 ขอ ${fd(a.rdate)}</span> `:''}
           ${a.ddate?`<span style="${ov?'color:var(--coral);font-weight:700':''}">⏰ ครบ ${fd(a.ddate)}${ov?' ⚠️':''}</span>`:''}
         </div>
@@ -146,23 +146,36 @@ window._initAdvCombobox=function(projects,curPid){
   );
 };
 
+window.advAvailableProjects=function(includeEnded,curPid){
+  var today=new Date();today.setHours(0,0,0,0);
+  var EXCL_GRPS=['GRP17733355541905','GRP17733355541906'];
+  var clearedPids=new Set(window.ADVANCES.filter(function(adv){return adv.status==='cleared';}).map(function(adv){return adv.pid;}));
+  var projects=window.PROJECTS.filter(function(p){
+    if(EXCL_GRPS.includes(p.groupId))return false;
+    if(!p.end)return false;
+    if(!includeEnded&&pd(p.end)<today)return false;
+    if(p.groupId!=='GRP17733355541902'&&clearedPids.has(p.id))return false;
+    return true;
+  });
+  var current=curPid?window.PROJECTS.find(function(p){return p.id===curPid;}):null;
+  if(current&&!projects.find(function(p){return p.id===curPid;}))projects.unshift(current);
+  return projects;
+};
+
+window.advToggleEndedProjects=function(){
+  var showEnded=!!(document.getElementById('af-show-ended')||{}).checked;
+  var curPid=(document.getElementById('af-pid')||{}).value||'';
+  window._initAdvCombobox(window.advAvailableProjects(showEnded,curPid),curPid);
+};
+
 window.openAdvModal=function(id){
   window.editAid=id;var a=id?window.ADVANCES.find(function(x){return x.id===id;}):null;
   document.getElementById('m-adv-title').textContent=a?'แก้ไข Advance':'New Advance';
   var status=a?a.status:'draft';var ai=window.AFLW.findIndex(function(s){return s.id===status;});var isClr=status==='clearing'||status==='cleared';
-  var today=new Date();today.setHours(0,0,0,0);
-  var EXCL_GRPS=['GRP17733355541905','GRP17733355541906'];
-  var clearedPids=new Set(window.ADVANCES.filter(adv=>adv.status==='cleared').map(adv=>adv.pid));
-  var availProjects=window.PROJECTS.filter(function(p){
-    if(EXCL_GRPS.includes(p.groupId))return false;
-    if(!p.end||pd(p.end)<today)return false;
-    if(p.groupId!=='GRP17733355541902'&&clearedPids.has(p.id))return false;
-    return true;
-  });
   var curPid=a?a.pid:'';
   var curP2=curPid?window.PROJECTS.find(x=>x.id===curPid):null;
-  if(curPid&&curP2&&!availProjects.find(x=>x.id===curPid))availProjects.unshift(curP2);
-  var advPidHtml=window.canEdit('advance')?`<div id="adv-cmb-wrap" style="position:relative;"><input id="adv-cmb-input" type="text" class="f-input" placeholder="ค้นหาหรือเลือกโครงการ..." autocomplete="off" spellcheck="false" style="padding-right:28px;cursor:pointer;"><span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:11px;color:var(--txt3);">▼</span><input type="hidden" id="af-pid" value="${esc(curPid)}"><div id="adv-cmb-drop" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:200;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.15);overflow:hidden;"><div id="adv-cmb-list" style="max-height:260px;overflow-y:auto;"></div></div></div>`:`<input class="f-input" value="${esc(curP2?curP2.name:'')}" disabled><input type="hidden" id="af-pid" value="${esc(curPid)}">` ;
+  var availProjects=window.advAvailableProjects(false,curPid);
+  var advPidHtml=window.canEdit('advance')?`<div id="adv-cmb-wrap" style="position:relative;"><input id="adv-cmb-input" type="text" class="f-input" placeholder="ค้นหาหรือเลือกโครงการ..." autocomplete="off" spellcheck="false" style="padding-right:28px;cursor:pointer;"><span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:11px;color:var(--txt3);">▼</span><input type="hidden" id="af-pid" value="${esc(curPid)}"><div id="adv-cmb-drop" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:200;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.15);overflow:hidden;"><div id="adv-cmb-list" style="max-height:260px;overflow-y:auto;"></div></div></div><label style="display:inline-flex;align-items:center;gap:7px;margin-top:8px;font-size:12px;color:var(--txt2);cursor:pointer;user-select:none;"><input type="checkbox" id="af-show-ended" onchange="window.advToggleEndedProjects()" style="width:15px;height:15px;accent-color:var(--violet);cursor:pointer;"> แสดงโครงการที่สิ้นสุดแล้ว</label>`:`<input class="f-input" value="${esc(curP2?curP2.name:'')}" disabled><input type="hidden" id="af-pid" value="${esc(curPid)}">` ;
   var stepHtml=`<div class="adv-stepper">`+window.AFLW.map(function(s,i){var done=i<ai,active=i===ai;return`<div class="adv-s${done?' done':''}${active?' active':''}"><div class="adv-dot">${done?'✓':i+1}</div><div class="adv-lbl" style="color:${active?s.color:done?s.color:'var(--txt3)'}">${s.label}</div></div>`;}).join('')+`</div>`;
   if(a&&window.canEdit('advance')){var diff2=a.amount-(a.cleared||0);if(isClr&&diff2!==0){stepHtml+=`<div style="display:flex;justify-content:space-between;padding:10px 14px;background:${diff2>0?'rgba(255,107,107,.08)':'rgba(255,166,43,.08)'};border:1px solid ${diff2>0?'rgba(255,107,107,.2)':'rgba(255,166,43,.2)'};border-radius:10px;margin-bottom:14px;font-size:13px"><span style="font-weight:600">ส่วนต่าง</span><span style="font-weight:700;color:${diff2>0?'var(--coral)':'var(--amber)'}">${fca(Math.abs(diff2))}</span></div>`;}
   var btnPrev=window.APRV[status]?`<button class="btn btn-ghost btn-sm" onclick="window.advStep('prev')">‹ ย้อนกลับ</button>`:'';var btnNext=window.ANXT[status]?`<button class="btn btn-pri btn-sm" onclick="window.advStep('next')">ขั้นถัดไป ›</button>`:'';stepHtml+=`<div style="display:flex;gap:8px;margin-bottom:18px">${btnPrev}${btnNext}</div>`;}
@@ -531,13 +544,13 @@ window.advCalcTotal = function() {
   if(clEl) clEl.value = expTotal.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
   var sumEl = document.getElementById('adv-cost-summary');
   if(sumEl) sumEl.innerHTML = [
-    {l:'ค่าใช้จ่ายทั่วไป',v:expTotal,c:'var(--indigo)'},
-    {l:'ค่าแรง',v:laborTotal,c:'var(--violet)'},
-    {l:'เบี้ยเลี้ยง',v:allwTotal,c:'var(--teal)'},
-    {l:'รวมทั้งสิ้น',v:grandTotal,c:'var(--txt)',bold:true}
+    {l:'ค่าใช้จ่ายทั่วไป',tip:'ผลรวมจำนวนเงินของรายการค่าใช้จ่ายทั่วไปด้านบน (ใช้เป็นยอด "จ่ายจริง")',v:expTotal,c:'var(--indigo)'},
+    {l:'ค่าแรง',tip:'เฉพาะคนที่ติ๊กรวม: (วันทำงาน + วันหยุดที่ทำงาน) × ค่าแรงต่อวัน',v:laborTotal,c:'var(--violet)'},
+    {l:'เบี้ยเลี้ยง',tip:'เฉพาะคนที่ติ๊กรวม: วันทำงาน × อัตราเบี้ยเลี้ยงวันปกติ + วันหยุด × อัตราเบี้ยเลี้ยงวันหยุด\n(อัตราขึ้นกับว่าเป็นพื้นที่ชายแดนหรือไม่)',v:allwTotal,c:'var(--teal)'},
+    {l:'รวมทั้งสิ้น',tip:'ค่าใช้จ่ายทั่วไป + ค่าแรง + เบี้ยเลี้ยง',v:grandTotal,c:'var(--txt)',bold:true}
   ].map(function(s){
     return`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px;">
-      <span style="color:var(--txt2);font-weight:${s.bold?'700':'500'}">${s.l}</span>
+      <span style="color:var(--txt2);font-weight:${s.bold?'700':'500'}">${s.l}${window.calcTip(s.tip)}</span>
       <span style="font-weight:${s.bold?'800':'700'};color:${s.c};">${fca(s.v)}</span></div>`;
   }).join('');
 };
@@ -638,4 +651,3 @@ window.advOnProjectChange=function(){
   if(!proj||!proj.end)return;
   ddEl.value=window.advCalcDueDate(proj.end);
 };
-

@@ -106,7 +106,7 @@
     if (f) return;
     f = document.createElement('div');
     f.className = 'ai-flag';
-    f.textContent = '🤖 เติมโดย AI — โปรดตรวจสอบก่อนบันทึก';
+    f.textContent = '🤖 เติมโดย AI';
     el.parentNode.appendChild(f);
     var evName = el.tagName === 'SELECT' ? 'change' : 'input';
     el.addEventListener(evName, function onUserEdit(e) {

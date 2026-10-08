@@ -337,6 +337,8 @@
         window.NOTIFY_PROJECT_TOKEN  = d.notify_project_token || '';
         window.NOTIFY_HELPDESK_TOKEN = d.notify_helpdesk_token || '';
         window.NOTIFY_TRAINING_TOKEN = d.notify_training_token || '';
+        window.NOTIFY_SERVER_TOKEN   = d.notify_server_token || '';
+        window.SRV_REQ_CONFIG        = d.srv_req_config || {};
         window._settingsLoaded = true;
         if (window.isDbLoaded && window._pendingDailyCheck && window.checkDailyNotifications) {
           window._pendingDailyCheck = false;

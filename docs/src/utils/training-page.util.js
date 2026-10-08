@@ -16,11 +16,12 @@
   var PAGES = {
     app: {
       title: 'BMS Training System',
-      css: ['../src/styles/modules/training.css'],
+      css: ['../src/styles/modules/training.css', '../src/styles/components/calc-tip.css'],
       js: [LIB.supabase, LIB.env, '../src/utils/session.util.js', '../src/services/bo-auth.service.js', '../src/utils/project-team.util.js',
         'https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js',
         '../src/services/ai.service.js', // ตัวเรียก AI กลางตัวเดียวกับ Backoffice
         '../src/utils/trn-cert.util.js', // ใบประกาศ/ส่งอีเมล — ใช้ร่วมกับหน้าแบบทดสอบ
+        '../src/utils/calc-tip.util.js', // ปุ่ม ⓘ คำนวณจากอะไร
         '../src/modules/training-app.js',
         '../src/modules/training-ai.js',
         '../src/modules/training-quiz.js'], // แบบทดสอบ: ข้อสอบ/ผลสอบ/ตั้งค่าใบประกาศ (แท็บผู้ดูแล) // AI: สรุปผลประเมิน / สรุปการอบรม / ร่างข้อความเชิญ // Excel/กราฟ/สร้างรูป/ครอปรูป/อ่าน QR โหลดเมื่อจะใช้ (_needLib ใน src/modules/training-app.js)
@@ -43,8 +44,8 @@
       js: ['../src/modules/training-manual.js'],
     },
   };
-  // ใช้ร่วมทุกส่วน: แผงตัวเลือกของ <select> หน้าตาเดียวกันทุกเครื่อง (แทน popup ของระบบ)
-  var COMMON = { css: ['../src/styles/components/select-ui.css'], js: ['../src/utils/select-ui.util.js'] };
+  // ใช้ร่วมทุกส่วน: แผงตัวเลือกของ <select> หน้าตาเดียวกันทุกเครื่อง (แทน popup ของระบบ) · แปลงอีโมจิเป็นไอคอน Tabler
+  var COMMON = { css: ['../src/styles/components/select-ui.css', '../src/styles/components/emoji-icons.css'], js: ['../src/utils/select-ui.util.js', '../src/utils/icons.util.js'] };
   var name = new URLSearchParams(location.search).get('page');
   if (!PAGES[name]) name = 'app';
   var page = { title: PAGES[name].title, css: COMMON.css.concat(PAGES[name].css), js: COMMON.js.concat(PAGES[name].js) };

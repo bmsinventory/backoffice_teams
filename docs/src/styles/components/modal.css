@@ -30,6 +30,7 @@
   border: 1px solid var(--border);
   animation: mIn .22s cubic-bezier(.4,0,.2,1);
 }
+.modal.sm { max-width: 460px; }
 .modal.md { max-width: 560px; }
 .modal.lg { max-width: 760px; }
 .modal.xl { max-width: 980px; }

@@ -336,6 +336,6 @@ window.execImport=async function(){
 }
 
 // ── MODALS ──
-window.openM=function(id){document.getElementById(id).classList.add('on');}
-window.closeM=function(id){document.getElementById(id).classList.remove('on');}
+window.openM=function(id){var m=document.getElementById(id);if(m)m.classList.add('on');}
+window.closeM=function(id){var m=document.getElementById(id);if(m)m.classList.remove('on');}
 document.addEventListener('keydown',function(e){if(e.key==='Escape')document.querySelectorAll('.overlay.on').forEach(function(m){if(m.id!=='sys-loader')m.classList.remove('on');});});

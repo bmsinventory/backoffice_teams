@@ -58,11 +58,11 @@
   // ── escape ข้อความอิสระ (เช่นชื่อกลุ่มปัญหา) ก่อนฝังใน onclick="...('...')" กัน apostrophe ตัดสตริงกลางคัน ──
   function aioJsStr(s) { return String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
 
-  function aioStatCard(color, lbl, val, sub, meterPct, clickJs) {
+  function aioStatCard(color, lbl, val, sub, meterPct, clickJs, tip) {
     var styleStr = 'border-top:3px solid ' + color + ';' + (clickJs ? 'cursor:pointer;' : '');
     var clickAttr = clickJs ? ' onclick="' + clickJs + '"' : '';
     return '<div class="stat-c"' + clickAttr + ' style="' + styleStr + '">'
-      + '<div class="stat-k">' + window.esc(lbl) + '</div>'
+      + '<div class="stat-k">' + window.esc(lbl) + window.calcTip(tip) + '</div>'
       + '<div class="stat-v" style="color:' + color + '">' + val + '</div>'
       + (sub ? '<div class="stat-s">' + window.esc(sub) + '</div>' : '')
       + (meterPct != null ? '<div class="pbar" style="margin-top:8px;"><div class="pbar-fill" style="width:' + meterPct + '%;background:' + color + '"></div></div>' : '')
@@ -316,7 +316,7 @@
           + '<td style="text-align:center;">' + (idx + 1) + '</td>'
           + '<td style="min-width:200px;max-width:420px;white-space:normal;overflow-wrap:anywhere;">' + window.esc(i.problem || '') + '</td>'
           + '<td><span class="tag">' + window.esc(i.category || '-') + '</span></td>'
-          + '<td><span class="tag" style="background:' + st.color + '18;color:' + st.color + '">' + window.esc(st.label) + '</span></td>'
+          + '<td><span class="tag" style="background:' + st.color + '18;color:' + st.color + '">' + (st.icon ? st.icon + ' ' : '') + window.esc(st.label) + '</span></td>'
           + '<td style="white-space:nowrap;">' + window.fd(i.createdAt) + '</td>'
           + '</tr>'
           + '<tr class="aio-detail-more" style="display:none;"><td></td><td colspan="4"><div class="aio-detail-kv">'
@@ -502,11 +502,11 @@
       : allProjects.length;
 
     var kpiRow = '<div class="stat-row aio-stat-row" id="aio-stat-row">'
-      + aioStatCard('var(--violet)', 'ปัญหาทั้งหมด', total, 'จาก ' + projectCount + ' โครงการ', null, "window.aioDrillStatus('')")
-      + aioStatCard(stOpen.color, 'รอดำเนินการ', openN, 'ต้องดำเนินการด่วน', null, "window.aioDrillStatus('open')")
-      + aioStatCard(stProg.color, 'กำลังแก้ไข', progN, 'อยู่ระหว่างดำเนินการ', null, "window.aioDrillStatus('in_progress')")
-      + aioStatCard(stClosed.color, 'เสร็จแล้ว', closedN, 'แก้ไขสำเร็จ', null, "window.aioDrillStatus('closed')")
-      + aioStatCard('var(--indigo)', 'อัตราแก้ไข', rate + '%', '', rate)
+      + aioStatCard('var(--violet)', 'ปัญหาทั้งหมด', total, 'จาก ' + projectCount + ' โครงการ', null, "window.aioDrillStatus('')", "นับปัญหา (Impl Tracker) ที่บันทึกในปีที่เลือก (ตามวันที่แจ้ง) และ รพ. ที่เลือก\nโครงการ = จำนวนโครงการทั้งหมดที่ใช้ Impl Tracker (ตาม รพ. ที่เลือก)")
+      + aioStatCard(stOpen.color, 'รอดำเนินการ', openN, 'ต้องดำเนินการด่วน', null, "window.aioDrillStatus('open')", "นับปัญหา (Impl Tracker) ที่บันทึกในปีที่เลือก (ตามวันที่แจ้ง) และ รพ. ที่เลือก ที่สถานะ \"รอดำเนินการ\"")
+      + aioStatCard(stProg.color, 'กำลังแก้ไข', progN, 'อยู่ระหว่างดำเนินการ', null, "window.aioDrillStatus('in_progress')", "นับปัญหา (Impl Tracker) ที่บันทึกในปีที่เลือก (ตามวันที่แจ้ง) และ รพ. ที่เลือก ที่สถานะ \"กำลังแก้ไข\"")
+      + aioStatCard(stClosed.color, 'เสร็จแล้ว', closedN, 'แก้ไขสำเร็จ', null, "window.aioDrillStatus('closed')", "นับปัญหา (Impl Tracker) ที่บันทึกในปีที่เลือก (ตามวันที่แจ้ง) และ รพ. ที่เลือก ที่สถานะ \"เสร็จแล้ว\"")
+      + aioStatCard('var(--indigo)', 'อัตราแก้ไข', rate + '%', '', rate, null, 'ปัญหาที่เสร็จแล้ว ÷ ปัญหาทั้งหมด × 100')
       + '</div>';
 
     // ── การ์ดสรุปต่อ Product ──
@@ -526,7 +526,7 @@
         +   '<div class="aio-prod-mini-item" style="color:' + stClosed.color + ';"><b>' + pClosed + '</b><span>เสร็จ</span></div>'
         + '</div>'
         + '<div class="pbar" style="margin-top:10px;"><div class="pbar-fill" style="width:' + pct + '%;background:' + stClosed.color + ';"></div></div>'
-        + '<div class="aio-prod-pct">' + pct + '%</div>'
+        + '<div class="aio-prod-pct">' + pct + '%' + window.calcTip('ปัญหาที่เสร็จแล้ว ÷ ปัญหาทั้งหมดของประเภทโครงการนี้ × 100') + '</div>'
         + '</div>';
     }).join('') + '</div>' : '<div class="aio-empty">ยังไม่มีข้อมูลปัญหาบันทึกไว้ในระบบ</div>';
 
@@ -637,7 +637,7 @@
       : !shownHosps.length ? '<div class="aio-empty">✓ ทุกโรงพยาบาลแก้ไขปัญหาครบแล้ว</div>'
       : '<div class="dtable-inner aio-mx-wrap"><table class="aio-mx"><thead>' + headHtml + '</thead><tbody>' + bodyHtml + '</tbody></table></div>';
     var hospToolbar = '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px;">'
-      + '<div class="sec-label" style="margin:0;">🏥 สถานะรายโรงพยาบาล × Product <span style="font-weight:600;color:var(--txt3);">— ' + hosps.length + ' รพ. · ค้าง ' + pendingHospN + ' รพ.</span></div>'
+      + '<div class="sec-label" style="margin:0;">🏥 สถานะรายโรงพยาบาล × Product' + window.calcTip('1 แถว = 1 รพ. · 1 คอลัมน์ = ประเภทโครงการ\nตัวเลขในช่อง = จำนวนปัญหาของโครงการ รพ. นั้นในประเภทนั้น แยก รอ/แก้ไข/เสร็จ\nเขียว = แก้ครบ · แดง = ยังค้าง · ส้ม = ยังไม่มีปัญหา · — = รพ. ไม่มีระบบนั้น\nค้าง X รพ. = รพ. ที่ยังมีปัญหาไม่เสร็จอย่างน้อย 1 ข้อ') + ' <span style="font-weight:600;color:var(--txt3);">— ' + hosps.length + ' รพ. · ค้าง ' + pendingHospN + ' รพ.</span></div>'
       + '<label style="display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:var(--txt2);cursor:pointer;">'
       +   '<input type="checkbox"' + (_hideDone ? ' checked' : '') + ' onchange="window.aioSetHideDone(this.checked)"> ซ่อนที่แก้ครบแล้ว</label>'
       + '</div>';
@@ -684,7 +684,7 @@
     };
     var anaHtml = products.length ? '<div class="aio-sec">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px;">'
-      +   '<div class="sec-label">🔍 วิเคราะห์ปัญหาตามประเภทโครงการ — ' + dimLabel + 'ที่พบมากที่สุด</div>'
+      +   '<div class="sec-label">🔍 วิเคราะห์ปัญหาตามประเภทโครงการ — ' + dimLabel + 'ที่พบมากที่สุด' + window.calcTip('แต่ละการ์ด = ประเภทโครงการ นับปัญหาแยกตาม' + dimLabel + ' เรียงมาก→น้อย\n% = จำนวนข้อของ' + dimLabel + 'นั้น ÷ ปัญหาทั้งหมดของประเภทนี้ × 100\nแถบ: ส่วนสีประเภท = แก้เสร็จแล้ว · ส่วนสีแดง = ยังค้าง') + '</div>'
       +   '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">'
       +     '<span class="aio-legend-item"><i style="background:var(--txt3);"></i>แก้เสร็จแล้ว (สีประเภท)</span>'
       +     '<span class="aio-legend-item" style="margin-right:8px;"><i style="background:' + stOpen.color + ';"></i>ยังค้าง</span>'
@@ -708,7 +708,7 @@
     }).join('');
     var trendHtml = '<div class="aio-sec"><div class="dtable-inner aio-box">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:8px;">'
-      +   '<div class="sec-label">📈 แนวโน้มปัญหา — ย้อนหลัง ' + TREND_PERIODS + ' ' + periodLabel + '</div>'
+      +   '<div class="sec-label">📈 แนวโน้มปัญหา — ย้อนหลัง ' + TREND_PERIODS + ' ' + periodLabel + window.calcTip('จำนวนปัญหาที่ "แจ้งเข้ามา" ในแต่ละ' + periodLabel + ' (ตามวันที่บันทึก) แยกตามสถานะปัจจุบันของปัญหานั้น\nไม่ขึ้นกับตัวกรองปี / รพ.') + '</div>'
       +   '<div style="display:flex;gap:6px;">'
       +     '<button class="btn btn-sm" onclick="window.aioSetTrendMode(\'week\')" style="' + (_trendMode === 'week' ? 'background:var(--violet);color:#fff;' : 'background:var(--surface2);color:var(--txt2);') + '">รายสัปดาห์</button>'
       +     '<button class="btn btn-sm" onclick="window.aioSetTrendMode(\'month\')" style="' + (_trendMode === 'month' ? 'background:var(--violet);color:#fff;' : 'background:var(--surface2);color:var(--txt2);') + '">รายเดือน</button>'
@@ -723,8 +723,8 @@
       + aioAiSummaryHtml()
       + productCardsHtml
       + '<div class="aio-chart-grid-2">'
-      +   '<div class="dtable-inner aio-box"><div class="sec-label aio-box-h">📊 สถานะต่อ Product</div>' + statusChartHtml + '</div>'
-      +   '<div class="dtable-inner aio-box"><div class="sec-label aio-box-h">🏷️ กลุ่มปัญหาต่อ Product (Top 7)</div>' + catChartHtml + '</div>'
+      +   '<div class="dtable-inner aio-box"><div class="sec-label aio-box-h">📊 สถานะต่อ Product' + window.calcTip('จำนวนปัญหาของแต่ละประเภทโครงการ แยกตามสถานะ (ตามตัวกรองปี / รพ.)') + '</div>' + statusChartHtml + '</div>'
+      +   '<div class="dtable-inner aio-box"><div class="sec-label aio-box-h">🏷️ กลุ่มปัญหาต่อ Product (Top 7)' + window.calcTip('เลือก 7 กลุ่มปัญหาที่พบมากที่สุดรวมทุกประเภท แล้วนับจำนวนปัญหาของแต่ละกลุ่มในแต่ละประเภทโครงการ') + '</div>' + catChartHtml + '</div>'
       + '</div>'
       + anaHtml
       + trendHtml

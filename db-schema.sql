@@ -1164,3 +1164,270 @@ BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE assist_replies;
   END IF;
 END $$;
+
+-- ================================================================
+-- HELPDESK — แผนจัดการปัญหาที่พบซ้ำ (แท็บ "🔁 ปัญหาซ้ำ" ในศูนย์ช่วยเหลือ)
+-- 1 แถว = 1 กลุ่มปัญหาที่วิเคราะห์แล้ว: สาเหตุ + แผนดำเนินการ + ผู้รับผิดชอบ + ติดตามผล
+-- ผูกกับกลุ่มด้วย group_key และ ticket_ids (Ticket ในกลุ่มตอนบันทึก — ใช้จับคู่กลุ่มเดิมเมื่อช่วงเวลาเลื่อน
+-- และนับ "เกิดซ้ำหลังเริ่มแผน") · idempotent รันซ้ำได้
+-- ================================================================
+CREATE TABLE IF NOT EXISTS helpdesk_problems (
+  id             TEXT PRIMARY KEY,
+  group_key      TEXT DEFAULT '',        -- ai:/sim:<ticket id ตัวแทนกลุ่ม>
+  title          TEXT DEFAULT '',
+  category_id    TEXT DEFAULT '',        -- helpdesk_categories.id
+  source_system  TEXT DEFAULT '',
+  ticket_ids     JSONB DEFAULT '[]',     -- helpdesk_tickets.id
+  hospital_ids   JSONB DEFAULT '[]',     -- hospitals.id
+  root_cause     TEXT DEFAULT '',        -- สาเหตุ / ผลการวิเคราะห์
+  plan_type      TEXT DEFAULT '',        -- fix | config | training | manual | dev | monitor
+  action_plan    TEXT DEFAULT '',
+  owner_id       TEXT DEFAULT '',        -- staff.id
+  due_date       DATE,
+  status         TEXT DEFAULT 'analyzing', -- analyzing | planned | in_progress | done | monitoring
+  result         TEXT DEFAULT '',        -- ผลลัพธ์ / ติดตามผล
+  created_by     TEXT DEFAULT '',        -- users.id
+  updated_by     TEXT DEFAULT '',        -- users.id
+  created_at     TIMESTAMPTZ DEFAULT NOW(),
+  updated_at     TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE helpdesk_problems ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "anon_all_helpdesk_problems" ON helpdesk_problems;
+CREATE POLICY "anon_all_helpdesk_problems" ON helpdesk_problems FOR ALL TO anon USING (true) WITH CHECK (true);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'helpdesk_problems'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE helpdesk_problems;
+  END IF;
+END $$;
+
+-- ================================================================
+-- WEB PUSH — device subscriptions + durable delivery queue
+-- The browser stores only its own endpoint. VAPID private keys remain in
+-- the push-worker container and are never written to this database/frontend.
+-- ================================================================
+CREATE TABLE IF NOT EXISTS web_push_subscriptions (
+  id          TEXT PRIMARY KEY,
+  endpoint    TEXT NOT NULL UNIQUE,
+  p256dh      TEXT NOT NULL,
+  auth        TEXT NOT NULL,
+  user_id     TEXT DEFAULT '',
+  user_name   TEXT DEFAULT '',
+  user_agent  TEXT DEFAULT '',
+  active      BOOLEAN DEFAULT true,
+  created_at  TIMESTAMPTZ DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE web_push_subscriptions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "anon_all_web_push_subscriptions" ON web_push_subscriptions;
+-- No anon table policy: subscriptions contain device endpoints and may only be
+-- read by service_role. Browsers register/unregister through write-only RPCs.
+
+CREATE OR REPLACE FUNCTION register_web_push_subscription(
+  p_id TEXT, p_endpoint TEXT, p_p256dh TEXT, p_auth TEXT,
+  p_user_id TEXT, p_user_name TEXT, p_user_agent TEXT
+) RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  INSERT INTO web_push_subscriptions
+    (id, endpoint, p256dh, auth, user_id, user_name, user_agent, active, updated_at)
+  VALUES
+    (p_id, p_endpoint, p_p256dh, p_auth, p_user_id, p_user_name, p_user_agent, true, NOW())
+  ON CONFLICT (id) DO UPDATE SET
+    endpoint = EXCLUDED.endpoint, p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth,
+    user_id = EXCLUDED.user_id, user_name = EXCLUDED.user_name,
+    user_agent = EXCLUDED.user_agent, active = true, updated_at = NOW();
+END $$;
+
+CREATE OR REPLACE FUNCTION unregister_web_push_subscription(p_id TEXT, p_endpoint TEXT)
+RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  DELETE FROM web_push_subscriptions WHERE id = p_id AND endpoint = p_endpoint;
+END $$;
+
+REVOKE ALL ON FUNCTION register_web_push_subscription(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION unregister_web_push_subscription(TEXT, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION register_web_push_subscription(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) TO anon;
+GRANT EXECUTE ON FUNCTION unregister_web_push_subscription(TEXT, TEXT) TO anon;
+
+CREATE TABLE IF NOT EXISTS web_push_jobs (
+  id               TEXT PRIMARY KEY,
+  source_type      TEXT NOT NULL,
+  source_id        TEXT NOT NULL,
+  payload          JSONB NOT NULL DEFAULT '{}',
+  status           TEXT NOT NULL DEFAULT 'pending',
+  attempts         INTEGER NOT NULL DEFAULT 0,
+  next_attempt_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  processed_at     TIMESTAMPTZ,
+  last_error       TEXT DEFAULT '',
+  created_at       TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (source_type, source_id)
+);
+
+ALTER TABLE web_push_jobs ENABLE ROW LEVEL SECURITY;
+-- No anon policy: only database triggers and the service-role push worker may access jobs.
+
+CREATE OR REPLACE FUNCTION queue_helpdesk_ticket_push()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF COALESCE(NEW.created_by, '') = '' THEN
+    INSERT INTO web_push_jobs (id, source_type, source_id, payload)
+    VALUES (
+      'ticket:' || NEW.id,
+      'ticket', NEW.id,
+      jsonb_build_object(
+        'title', 'Ticket ใหม่ ' || COALESCE(NEW.ticket_no, ''),
+        'body', COALESCE(NULLIF(NEW.reporter_name, ''), 'ผู้แจ้ง') || ': ' || LEFT(COALESCE(NEW.description, NEW.subject, 'แจ้งปัญหาใหม่'), 180),
+        'tag', 'helpdesk-ticket-' || NEW.id,
+        'ticketId', NEW.id
+      )
+    ) ON CONFLICT (source_type, source_id) DO NOTHING;
+  END IF;
+  RETURN NEW;
+END $$;
+
+DROP TRIGGER IF EXISTS trg_helpdesk_ticket_web_push ON helpdesk_tickets;
+CREATE TRIGGER trg_helpdesk_ticket_web_push
+AFTER INSERT ON helpdesk_tickets
+FOR EACH ROW EXECUTE FUNCTION queue_helpdesk_ticket_push();
+
+CREATE OR REPLACE FUNCTION queue_helpdesk_message_push()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  t_no TEXT := '';
+  r_name TEXT := '';
+BEGIN
+  IF NEW.type = 'comment' AND NEW.actor_type = 'reporter' THEN
+    SELECT COALESCE(ticket_no, ''), COALESCE(reporter_name, '')
+      INTO t_no, r_name FROM helpdesk_tickets WHERE id = NEW.ticket_id;
+    INSERT INTO web_push_jobs (id, source_type, source_id, payload)
+    VALUES (
+      'message:' || NEW.id,
+      'message', NEW.id,
+      jsonb_build_object(
+        'title', 'ข้อความใหม่ ' || t_no,
+        'body', COALESCE(NULLIF(r_name, ''), 'ผู้แจ้ง') || ': ' || LEFT(COALESCE(NULLIF(NEW.body, ''), 'ส่งไฟล์แนบ'), 180),
+        'tag', 'helpdesk-ticket-' || NEW.ticket_id,
+        'ticketId', NEW.ticket_id
+      )
+    ) ON CONFLICT (source_type, source_id) DO NOTHING;
+  END IF;
+  RETURN NEW;
+END $$;
+
+DROP TRIGGER IF EXISTS trg_helpdesk_message_web_push ON helpdesk_ticket_events;
+CREATE TRIGGER trg_helpdesk_message_web_push
+AFTER INSERT ON helpdesk_ticket_events
+FOR EACH ROW EXECUTE FUNCTION queue_helpdesk_message_push();
+
+-- ================================================================
+-- SERVER REQUEST — ใบขอใช้งานทีม Server (แทน Google Form เดิม)
+-- หน้า public docs/server-request.html (คนนอกทีมกรอกขอ + ติดตามผ่านลิงก์ token)
+-- โมดูล 'server_request' ในแอป: อนุมัติ (สิทธิ์ approve) → จัดคน/ช่วงวัน → สร้างโครงการให้อัตโนมัติ
+-- idempotent — รันซ้ำได้ทั้งไฟล์
+-- ================================================================
+
+-- ตัวเลือกบนฟอร์ม (เพิ่ม/แก้/ลบ/ปิดใช้งานได้ในแท็บ "ตั้งค่า" ของโมดูล)
+--   kind: work_mode = ประเภทการทำงาน · db_type = ประเภทฐานข้อมูล · task = รายละเอียดงาน (เลือกได้หลายข้อ)
+--         phase = ช่วงที่ต้องการใช้งาน
+CREATE TABLE IF NOT EXISTS server_request_options (
+  id          TEXT PRIMARY KEY,
+  kind        TEXT NOT NULL,
+  label       TEXT DEFAULT '',
+  sort        NUMERIC DEFAULT 0,
+  active      BOOLEAN DEFAULT true,
+  created_at  TIMESTAMPTZ DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS server_requests (
+  id               TEXT PRIMARY KEY,
+  req_no           TEXT UNIQUE,                -- SRV + ปี พ.ศ. 2 หลัก + เดือน + ลำดับ 3 หลัก
+  access_token     TEXT DEFAULT '',            -- ลิงก์ติดตามของผู้ขอ (server-request.html?t=...)
+  requester_name   TEXT DEFAULT '',
+  requester_team   TEXT DEFAULT '',            -- ทีม/หน่วยงานของผู้ขอ
+  hospital_id      TEXT DEFAULT '',            -- hospitals.id (ถ้าเลือกจากรายการ)
+  hospital_name    TEXT DEFAULT '',            -- ชื่อที่ผู้ขอพิมพ์ (กรณีไม่มีในรายการ)
+  it_name          TEXT DEFAULT '',            -- ชื่อ IT ของ รพ. ที่ให้ติดต่อ
+  it_phone         TEXT DEFAULT '',            -- เบอร์โทร IT ของ รพ.
+  work_mode_id     TEXT DEFAULT '',            -- server_request_options.id
+  db_type_id       TEXT DEFAULT '',
+  task_ids         JSONB DEFAULT '[]',
+  task_other       TEXT DEFAULT '',
+  phase_id         TEXT DEFAULT '',
+  start_date       DATE,
+  end_date         DATE,
+  headcount        INTEGER DEFAULT 1,          -- จำนวนคนที่ต้องการ
+  note             TEXT DEFAULT '',
+  status           TEXT DEFAULT 'pending',     -- pending | approved | scheduled | done | rejected | cancelled
+  decided_by       TEXT DEFAULT '',            -- users.id ผู้อนุมัติ/ไม่อนุมัติ
+  decided_at       TIMESTAMPTZ,
+  decision_note    TEXT DEFAULT '',
+  assignees        JSONB DEFAULT '[]',         -- [{ sid: staff.id, s: 'YYYY-MM-DD', e: 'YYYY-MM-DD' }]
+  assigned_by      TEXT DEFAULT '',            -- users.id ผู้จัดคน
+  assigned_at      TIMESTAMPTZ,
+  project_id       TEXT DEFAULT '',            -- projects.id ที่สร้างจากคำขอนี้
+  created_at       TIMESTAMPTZ DEFAULT NOW(),
+  updated_at       TIMESTAMPTZ DEFAULT NOW()
+);
+-- กรณีเคยรันเวอร์ชันแรกแล้ว: แยกช่อง IT เป็นชื่อ/เบอร์ และตัดเบอร์/อีเมลผู้ขอออก
+ALTER TABLE server_requests ADD COLUMN IF NOT EXISTS it_name  TEXT DEFAULT '';
+ALTER TABLE server_requests ADD COLUMN IF NOT EXISTS it_phone TEXT DEFAULT '';
+ALTER TABLE server_requests DROP COLUMN IF EXISTS it_contact;
+ALTER TABLE server_requests DROP COLUMN IF EXISTS requester_phone;
+ALTER TABLE server_requests DROP COLUMN IF EXISTS requester_email;
+CREATE INDEX IF NOT EXISTS idx_srvreq_status     ON server_requests (status);
+CREATE INDEX IF NOT EXISTS idx_srvreq_created_at ON server_requests (created_at);
+CREATE INDEX IF NOT EXISTS idx_srvreq_token      ON server_requests (access_token);
+
+-- ค่าตั้งของโมดูล: { teamDeptIds:[], teamStaffIds:[], groupId, typeId, intro }
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS srv_req_config JSONB DEFAULT '{}';
+-- BMS Notify Token ของคำขอใช้งานทีม Server (ตั้งที่ Admin › ตั้งค่าการแจ้งเตือน)
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS notify_server_token TEXT DEFAULT '';
+
+-- ตัวเลือกเริ่มต้น (ตาม Google Form เดิม) — ใส่ครั้งแรกเท่านั้น แก้ภายหลังในแอปได้
+INSERT INTO server_request_options (id, kind, label, sort) VALUES
+  ('SRO_WM_1', 'work_mode', 'เข้าไซต์งาน', 1),
+  ('SRO_WM_2', 'work_mode', 'ผ่าน Online / Zoom', 2),
+  ('SRO_DB_1', 'db_type', 'MySQL', 1),
+  ('SRO_DB_2', 'db_type', 'PostgreSQL', 2),
+  ('SRO_TK_1', 'task', 'ติดตั้ง Server Master', 1),
+  ('SRO_TK_2', 'task', 'ติดตั้ง Server Slave', 2),
+  ('SRO_TK_3', 'task', 'ติดตั้ง Server Image', 3),
+  ('SRO_TK_4', 'task', 'ติดตั้ง Server Log', 4),
+  ('SRO_TK_5', 'task', 'จัดทำ Slave ใหม่', 5),
+  ('SRO_TK_6', 'task', 'อบรมการดูแล Server', 6),
+  ('SRO_TK_7', 'task', 'กรณีมีปัญหาเรื่องระบบ Backup', 7),
+  ('SRO_PH_1', 'phase', 'ช่วงเข้าไซต์ใหม่', 1),
+  ('SRO_PH_2', 'phase', 'ช่วงอบรม', 2),
+  ('SRO_PH_3', 'phase', 'ช่วงทำ UT / SIT', 3),
+  ('SRO_PH_4', 'phase', 'ช่วงขึ้นระบบ', 4)
+ON CONFLICT (id) DO NOTHING;
+
+ALTER TABLE server_request_options ENABLE ROW LEVEL SECURITY;
+ALTER TABLE server_requests        ENABLE ROW LEVEL SECURITY;
+
+DO $$
+DECLARE
+  tbl TEXT;
+  tbls TEXT[] := ARRAY['server_request_options','server_requests'];
+BEGIN
+  FOREACH tbl IN ARRAY tbls LOOP
+    EXECUTE format('DROP POLICY IF EXISTS "anon_all_%s" ON %I', tbl, tbl);
+    EXECUTE format(
+      'CREATE POLICY "anon_all_%s" ON %I FOR ALL TO anon USING (true) WITH CHECK (true)',
+      tbl, tbl
+    );
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_publication_tables
+      WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = tbl
+    ) THEN
+      EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE %I', tbl);
+    END IF;
+  END LOOP;
+END $$;

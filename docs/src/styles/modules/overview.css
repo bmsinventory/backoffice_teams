@@ -12,3 +12,109 @@
   font-size: 12px; font-weight: 700; color: var(--txt3);
   text-transform: uppercase; letter-spacing: .7px; margin-bottom: 14px;
 }
+
+/* Compact dashboard layout
+   Keep the shared card components untouched: these rules only apply to Overview. */
+#view-overview > div:first-child {
+  padding-top: 14px !important;
+}
+
+#view-overview #stat-row {
+  gap: 10px !important;
+  padding: 12px 24px !important;
+}
+
+#view-overview #stat-row .stat-c {
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+
+#view-overview #stat-row .stat-c > div:first-child {
+  margin-bottom: 2px !important;
+}
+
+#view-overview #stat-row .stat-icon {
+  width: 30px !important;
+  height: 30px !important;
+  border-radius: 9px;
+  margin-bottom: 0;
+  font-size: 15px;
+}
+
+#view-overview #stat-row .stat-k {
+  font-size: 10px;
+  line-height: 1.25;
+  margin-bottom: 0;
+}
+
+#view-overview #stat-row .stat-v {
+  font-size: 22px !important;
+  line-height: 1.15;
+  margin-bottom: 1px;
+}
+
+#view-overview #stat-row .stat-s,
+#view-overview #stat-row .stat-c > div:last-child,
+#view-overview #stat-row .stat-c > div:last-child span {
+  font-size: 10.5px !important;
+  line-height: 1.25;
+}
+
+#view-overview #stat-row .stat-c > div:last-child {
+  margin-top: 1px !important;
+}
+
+#view-overview #annual-target-wrap {
+  padding-bottom: 12px !important;
+}
+
+#view-overview #annual-target-wrap > .ov-card {
+  padding: 12px 16px !important;
+}
+
+#view-overview #annual-target-wrap > .ov-card > div:first-child {
+  margin-bottom: 8px !important;
+}
+
+#view-overview #annual-target-wrap th {
+  padding-top: 5px !important;
+  padding-bottom: 5px !important;
+}
+
+#view-overview #annual-target-wrap td {
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+}
+
+#view-overview .ov-row {
+  gap: 12px !important;
+  padding-bottom: 12px !important;
+}
+
+#view-overview .ov-card {
+  border-radius: 14px;
+}
+
+#view-overview .ov-row > .ov-card {
+  padding: 14px;
+}
+
+#view-overview .ov-card-title {
+  margin-bottom: 9px;
+}
+
+#view-overview .ov-card > div[style*="height:220px"] { height: 180px !important; }
+#view-overview .ov-card > div[style*="height:200px"] { height: 170px !important; }
+#view-overview .ov-card > div[style*="height:180px"] { height: 155px !important; }
+#view-overview .ov-card > div[style*="height:160px"] { height: 140px !important; }
+
+#view-overview #ov-critical { max-height: 180px !important; }
+#view-overview #ov-adv-alerts { max-height: 170px !important; }
+
+@media (max-width: 700px) {
+  #view-overview > div:first-child { padding-top: 12px !important; }
+  #view-overview #stat-row { padding: 10px 12px !important; gap: 8px !important; }
+  #view-overview #stat-row .stat-c { padding: 11px 12px; }
+  #view-overview #annual-target-wrap { padding: 0 12px 10px !important; }
+  #view-overview .ov-row > .ov-card { padding: 12px; }
+}

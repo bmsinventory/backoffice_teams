@@ -1,0 +1,24 @@
+/* ================================================================
+   CALC-TIP.CSS — ปุ่ม ⓘ "คำนวณจากอะไร" + กล่องคำอธิบาย (src/utils/calc-tip.util.js)
+================================================================ */
+.calc-tip {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 14px; height: 14px; margin-left: 4px; vertical-align: middle;
+  border-radius: 50%; border: 1px solid var(--border2); background: var(--surface2);
+  color: var(--txt3); font: italic 700 9px/1 Georgia, 'Times New Roman', serif;
+  -webkit-text-fill-color: var(--txt3);
+  cursor: help; user-select: none; flex-shrink: 0; text-transform: none; letter-spacing: 0;
+}
+.calc-tip:hover, .calc-tip:focus-visible {
+  color: var(--violet); -webkit-text-fill-color: var(--violet); border-color: var(--violet); outline: none;
+}
+.calc-tip-pop {
+  position: fixed; z-index: 100000; max-width: min(320px, calc(100vw - 16px));
+  padding: 9px 12px; border-radius: 10px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--txt); box-shadow: var(--sh-lg);
+  font: 400 12px/1.6 'Plus Jakarta Sans', 'Noto Sans Thai', sans-serif;
+  white-space: pre-line; text-align: left; pointer-events: none;
+  opacity: 0; visibility: hidden; transition: opacity .12s;
+}
+.calc-tip-pop.on { opacity: 1; visibility: visible; }
+@media (pointer: coarse) { .calc-tip { width: 18px; height: 18px; font-size: 11px; } }

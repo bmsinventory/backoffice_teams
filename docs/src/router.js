@@ -39,7 +39,15 @@
     // Update topbar title
     var mod = window.PERM_MODULES && window.PERM_MODULES.find(function (m) { return m.id === moduleId; });
     var titleEl = document.getElementById('tp-title');
-    if (titleEl) titleEl.textContent = mod ? mod.label : moduleId;
+    if (titleEl) {
+      var title = mod ? mod.label : moduleId;
+      var icon = mod && mod.icon ? mod.icon : (window.moduleIcon ? window.moduleIcon(moduleId) : 'layout-grid');
+      if (window.applyModuleTone) window.applyModuleTone(titleEl, moduleId);
+      titleEl.innerHTML = (window.appIcon ? window.appIcon(icon, 'tp-title-icon') : '')
+        + '<span class="tp-title-label"></span>';
+      var labelEl = titleEl.querySelector('.tp-title-label');
+      if (labelEl) labelEl.textContent = title;
+    }
 
     // Update URL hash (deep link)
     if (!opts.silent) {
@@ -102,6 +110,7 @@
         impl_tracker: 'renderImplTracker',
         helpdesk:   'renderHelpdesk',
         assist:     'renderAssist',
+        server_request: 'renderServerRequest',
         all_issues: 'renderAllIssuesOverview',
         training:   'renderTraining',
         admin:      'renderAdminPage',
@@ -122,7 +131,11 @@
       var sb = document.getElementById('sidebar');
       var btn = sb && sb.querySelector('.sb-toggle');
       if (sb) sb.classList.toggle('slim');
-      if (btn) btn.textContent = sb.classList.contains('slim') ? '▶' : '◀';
+      if (btn) {
+        var collapsed = sb.classList.contains('slim');
+        btn.innerHTML = window.appIcon ? window.appIcon(collapsed ? 'chevron-right' : 'chevron-left') : (collapsed ? '▶' : '◀');
+        btn.setAttribute('aria-label', collapsed ? 'ขยายแถบเมนู' : 'ย่อแถบเมนู');
+      }
     }
   };
 
@@ -175,6 +188,8 @@
             var lv = (window.LEAVES || []).find(function (x) { return x.id === itemId; });
             if (lv && lv.status === 'pending') window.approveLeave(itemId);
           }
+          if (module === 'helpdesk' && itemId && window.hdOpen) window.hdOpen(decodeURIComponent(itemId));
+          if (module === 'server_request' && itemId && window.srvOpen) window.srvOpen(decodeURIComponent(itemId));
         }, 350);
       }
     }

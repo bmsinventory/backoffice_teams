@@ -64,7 +64,7 @@
       'overview','kanban','projects','advance','lodging',
       'workload','availability','calendar','leave','timesheet',
       'cost','budget','targets','hospital','contract','worklog','holiday',
-      'impl_tracker','all_issues','helpdesk','assist','training',
+      'impl_tracker','all_issues','helpdesk','assist','training','server_request',
     ];
     navModules.forEach(function (m) {
       var btn = document.querySelector('.nav-btn[onclick*="\'' + m + '\'"]');
@@ -130,11 +130,11 @@
     // กระดิ่งแจ้งเตือนมุมขวาบน — รวมทุกเรื่องข้างบน (เฉพาะหน้าที่ role ดูได้)
     var can = function (m) { return !window.canView || window.canView(m); };
     _notiItems = [
-      { mod: 'advance',  icon: '💳', n: can('advance')  ? ov    : 0, label: 'Advance เกินกำหนด' },
-      { mod: 'leave',    icon: '🏖', n: can('leave')    ? pend  : 0, label: 'การลาของคุณรออนุมัติ' },
-      { mod: 'helpdesk', icon: '🎧', n: can('helpdesk') ? hdNew : 0, label: 'Ticket ใหม่รอรับเรื่อง' },
+      { mod: 'advance',  icon: 'credit-card', n: can('advance')  ? ov    : 0, label: 'Advance เกินกำหนด' },
+      { mod: 'leave',    icon: 'calendar-off', n: can('leave')    ? pend  : 0, label: 'การลาของคุณรออนุมัติ' },
+      { mod: 'helpdesk', icon: 'headset', n: can('helpdesk') ? hdNew : 0, label: 'Ticket ใหม่รอรับเรื่อง' },
       // คำขอจาก "ลืมรหัสผ่าน?" หน้า Login → Admin ตั้งรหัสใหม่ใน Admin Panel › ผู้ใช้งานระบบ
-      { mod: 'pwreset', icon: '🔑', label: 'คำขอรีเซ็ตรหัสผ่าน',
+      { mod: 'pwreset', icon: 'key', label: 'คำขอรีเซ็ตรหัสผ่าน',
         n: window.isAdmin && window.isAdmin() ? (window.USERS || []).filter(function (u) { return u.resetRequestedAt; }).length : 0 },
     ].filter(function (x) { return x.n > 0; });
     var total = _notiItems.reduce(function (s, x) { return s + x.n; }, 0);
@@ -151,14 +151,16 @@
   function _renderNotiMenu() {
     var m = document.getElementById('noti-menu');
     if (!m) return;
-    m.innerHTML = '<div class="nm-head">🔔 การแจ้งเตือน</div>'
+    m.innerHTML = '<div class="nm-head">' + (window.appIcon ? window.appIcon('bell') : '') + ' การแจ้งเตือน</div>'
       + (_notiItems.length
         ? _notiItems.map(function (x) {
-            return '<button type="button" data-mod="' + x.mod + '"><span class="nm-ic">' + x.icon + '</span>'
+            return '<button type="button" data-mod="' + x.mod + '"><span class="nm-ic">' + (window.appIcon ? window.appIcon(x.icon) : '') + '</span>'
               + '<span class="nm-lbl">' + x.label + '</span><span class="nm-n">' + x.n + '</span></button>';
           }).join('')
-        : '<div class="nm-empty">ไม่มีการแจ้งเตือน</div>');
+        : '<div class="nm-empty">ไม่มีการแจ้งเตือน</div>')
+      + (window.webPushMenuHtml ? window.webPushMenuHtml() : '');
   }
+  window.refreshNotiMenu = _renderNotiMenu;
   window.toggleNotiMenu = function (e) {
     if (e) e.stopPropagation();
     if (document.getElementById('noti-menu')) { _closeNotiMenu(); return; }
@@ -170,6 +172,11 @@
     m.style.top = (r.bottom + 6) + 'px';
     m.style.right = Math.max(8, window.innerWidth - r.right) + 'px';
     m.addEventListener('click', function (ev) {
+      var action = ev.target.closest('button[data-action]');
+      if (action) {
+        if (action.getAttribute('data-action') === 'web-push') window.toggleWebPush && window.toggleWebPush();
+        return;
+      }
       var b = ev.target.closest('button[data-mod]');
       if (!b) return;
       var mod = b.getAttribute('data-mod');

@@ -57,6 +57,19 @@
       active: d.active !== false, sort: Number(d.sort) || 0,
     };
   }
+  function tProblem(d) {
+    return {
+      id: d.id, groupKey: d.group_key || '', title: d.title || '',
+      categoryId: d.category_id || '', sourceSystem: d.source_system || '',
+      ticketIds: Array.isArray(d.ticket_ids) ? d.ticket_ids : [],
+      hospitalIds: Array.isArray(d.hospital_ids) ? d.hospital_ids : [],
+      rootCause: d.root_cause || '', planType: d.plan_type || '', actionPlan: d.action_plan || '',
+      ownerId: d.owner_id || '', dueDate: d.due_date || '', status: d.status || 'analyzing', result: d.result || '',
+      createdBy: d.created_by || '', updatedBy: d.updated_by || '',
+      createdAt: d.created_at || '', updatedAt: d.updated_at || '',
+    };
+  }
+  window.hdProbFromRow = tProblem; // ใช้แก้ HELPDESK_PROBLEMS ในเครื่องทันทีหลังบันทึก (realtime ของตัวเองถูกข้าม)
   function tSla(d) {
     return {
       id: d.id, priority: d.priority || '',
@@ -341,6 +354,8 @@
 
   // ── Realtime Subscriptions (background, ไม่ block loader หลัก) ──
   var _renderTimer = null;
+  var _legacyStatusBackfillDone = false;
+  var _legacyStatusBackfillRunning = false;
   function _rerenderIfOpen() {
     if (!window.cu) return;
     clearTimeout(_renderTimer);
@@ -349,6 +364,50 @@
       if (el && el.classList.contains('on') && window.renderHelpdesk) window.renderHelpdesk();
     }, 300);
   }
+
+  // One-time compatibility backfill for tickets created before triage could
+  // advance automatically. Only editors run it; the WHERE clauses make it
+  // safe when several users open the app at the same time.
+  async function _backfillLegacyAssignedStatus(tickets) {
+    if (_legacyStatusBackfillDone || _legacyStatusBackfillRunning) return;
+    var legacy = (tickets || []).filter(function (t) {
+      return t.status === 'triage' && !!t.categoryId && !!t.assigneeId;
+    });
+    if (!legacy.length) { _legacyStatusBackfillDone = true; return; }
+    if (!window.canEdit || !window.canEdit('helpdesk')) return;
+
+    var db = window.getDb && window.getDb();
+    if (!db) return;
+    _legacyStatusBackfillRunning = true;
+    var now = new Date().toISOString();
+    try {
+      if (db.__localMock) {
+        var batch = window.writeBatch();
+        legacy.forEach(function (t) {
+          batch.update(window.getDocRef('HELPDESK_TICKETS', t.id), { status: 'assigned', updated_at: now });
+        });
+        await batch.commit();
+      } else {
+        var res = await db.from('helpdesk_tickets').update({ status: 'assigned', updated_at: now })
+          .eq('status', 'triage')
+          .not('category_id', 'is', null).neq('category_id', '')
+          .not('assignee_id', 'is', null).neq('assignee_id', '');
+        if (res.error) throw res.error;
+      }
+
+      // Reflect the migration immediately; realtime will confirm the same rows.
+      legacy.forEach(function (t) { t.status = 'assigned'; t.updatedAt = now; });
+      _legacyStatusBackfillDone = true;
+      window.updateBadge && window.updateBadge();
+      _rerenderIfOpen();
+      console.info('[helpdesk] updated legacy triage tickets:', legacy.length);
+    } catch (e) {
+      console.warn('[helpdesk] legacy status backfill:', e);
+    } finally {
+      _legacyStatusBackfillRunning = false;
+    }
+  }
+  window.hdBackfillLegacyAssignedStatus = _backfillLegacyAssignedStatus;
 
   window.onSnapshot(window.getColRef('HELPDESK_CATEGORIES'), function (s) {
     window.HELPDESK_CATEGORIES = s.docs.map(function (doc) { return tCategory(doc.data()); })
@@ -379,12 +438,78 @@
     _rerenderIfOpen();
   };
 
+  window.onSnapshot(window.getColRef('HELPDESK_PROBLEMS'), function (s) {
+    window.HELPDESK_PROBLEMS = s.docs.map(function (doc) { return tProblem(doc.data()); })
+      .sort(function (a, b) { return (b.updatedAt || '').localeCompare(a.updatedAt || ''); });
+    if (window._ownWrite && window._ownWrite.HELPDESK_PROBLEMS) return;
+    _rerenderIfOpen();
+  }, function (e) { window.showDbErrorSoft && window.showDbErrorSoft(e, 'แผนจัดการปัญหาซ้ำ'); });
+
   window.onSnapshot(window.getColRef('HELPDESK_TICKETS'), function (s) {
     window.HELPDESK_TICKETS = s.docs.map(function (doc) { return tTicket(doc.data()); })
       .sort(function (a, b) { return (b.createdAt || '').localeCompare(a.createdAt || ''); });
+    _backfillLegacyAssignedStatus(window.HELPDESK_TICKETS);
     window.updateBadge && window.updateBadge();
     if (window._ownWrite && window._ownWrite.HELPDESK_TICKETS) return;
     _rerenderIfOpen();
   }, function (e) { window.showDbErrorSoft && window.showDbErrorSoft(e, 'ศูนย์ช่วยเหลือ'); });
+
+  // ── Incoming-message sound ──
+  // Listen in the background so the alert works from every page in the web app,
+  // not only while the matching ticket is open. Browsers require one user gesture
+  // before Web Audio may play, so unlock it on the first click/key press.
+  var _hdAudio = null;
+  function hdAudioContext() {
+    if (_hdAudio) return _hdAudio;
+    var AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return null;
+    try { _hdAudio = new AudioCtx(); } catch (e) { return null; }
+    return _hdAudio;
+  }
+  function hdUnlockSound() {
+    var ctx = hdAudioContext();
+    if (ctx && ctx.state === 'suspended') ctx.resume().catch(function () {});
+  }
+  document.addEventListener('pointerdown', hdUnlockSound, { once: true, passive: true });
+  document.addEventListener('keydown', hdUnlockSound, { once: true });
+
+  function hdPlayIncomingSound() {
+    var ctx = hdAudioContext();
+    if (!ctx || ctx.state !== 'running') return;
+    var start = ctx.currentTime;
+    [880, 1174.66].forEach(function (hz, i) {
+      var osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.type = 'sine'; osc.frequency.value = hz;
+      gain.gain.setValueAtTime(0.0001, start + i * 0.13);
+      gain.gain.exponentialRampToValueAtTime(0.18, start + i * 0.13 + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + i * 0.13 + 0.18);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(start + i * 0.13); osc.stop(start + i * 0.13 + 0.2);
+    });
+  }
+
+  var _hdNotifyDb = window.getDb && window.getDb();
+  if (_hdNotifyDb && _hdNotifyDb.channel) {
+    _hdNotifyDb.channel('hd-incoming-message-' + Date.now())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'helpdesk_tickets' }, function (payload) {
+        var row = payload && payload.new;
+        // Tickets submitted through the public help page have no internal creator.
+        if (!row || row.created_by) return;
+        hdPlayIncomingSound();
+        var label = row.ticket_no + (row.reporter_name ? ' · ' + row.reporter_name : '');
+        var preview = String(row.description || row.subject || 'แจ้งปัญหาใหม่').replace(/\s+/g, ' ').slice(0, 90);
+        if (window.showToast) window.showToast('🎫 Ticket ใหม่ ' + window.esc(label) + '<br><span style="font-weight:400">' + window.esc(preview) + '</span>', 'info');
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'helpdesk_ticket_events' }, function (payload) {
+        var ev = payload && payload.new;
+        if (!ev || ev.type !== 'comment' || ev.actor_type !== 'reporter') return;
+        hdPlayIncomingSound();
+        var ticket = (window.HELPDESK_TICKETS || []).find(function (t) { return t.id === ev.ticket_id; });
+        var label = ticket ? ticket.ticketNo + (ticket.reporterName ? ' · ' + ticket.reporterName : '') : 'Ticket ใหม่';
+        var preview = String(ev.body || 'ส่งไฟล์แนบ').replace(/\s+/g, ' ').slice(0, 90);
+        if (window.showToast) window.showToast('💬 ' + window.esc(label) + '<br><span style="font-weight:400">' + window.esc(preview) + '</span>', 'info');
+      })
+      .subscribe();
+  }
 
 })();

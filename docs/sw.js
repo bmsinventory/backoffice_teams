@@ -1,5 +1,5 @@
-const CACHE      = 'bms-app-v1791311819';
-const IMG_CACHE  = 'bms-img-v1791311819';
+const CACHE      = 'bms-app-v1791432211';
+const IMG_CACHE  = 'bms-img-v1791432211';
 
 const IMG_EXTS = ['.png', '.jpg', '.jpeg', '.gif', '.ico', '.webp', '.woff', '.woff2'];
 
@@ -71,5 +71,46 @@ self.addEventListener('fetch', (e) => {
         return res;
       })
       .catch(() => caches.match(e.request).then((c) => c || caches.match('./index.html')))
+  );
+});
+
+// Web Push works even when no app window is open. The payload is created by
+// the server-side push worker and contains no credentials.
+self.addEventListener('push', (e) => {
+  let data = {};
+  try { data = e.data ? e.data.json() : {}; } catch (_) {
+    data = { body: e.data ? e.data.text() : 'มีข้อความใหม่' };
+  }
+  const title = data.title || 'BMS Backoffice Teams';
+  const options = {
+    body: data.body || 'มีข้อความใหม่ในศูนย์ช่วยเหลือ',
+    icon: './img/icon_app.png',
+    badge: './img/icon_app.png',
+    tag: data.tag || 'helpdesk-message',
+    renotify: true,
+    vibrate: [180, 80, 180],
+    data: { url: data.url || './#helpdesk' },
+  };
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      // An open app already receives the realtime sound/toast; avoid a duplicate
+      // operating-system notification. Web Push is the closed-app fallback.
+      if (clients.length) return;
+      return self.registration.showNotification(title, options);
+    })
+  );
+});
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const target = new URL((e.notification.data && e.notification.data.url) || './#helpdesk', self.location.origin).href;
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      if (clients.length) {
+        const client = clients[0];
+        return client.navigate(target).then(() => client.focus());
+      }
+      return self.clients.openWindow(target);
+    })
   );
 });

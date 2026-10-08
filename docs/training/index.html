@@ -584,7 +584,7 @@
         <select class="form-control" id="admin-reg-filter-cat" style="width:180px;" onchange="onAdminCatChange()"><option value="">ทุกหลักสูตร</option></select>
         <select class="form-control" id="admin-filter-sess" style="width:200px;" onchange="renderAdminRegs()"><option value="">ทุกรอบ</option></select>
       </div>
-      <div class="table-wrap table-cards table-cards-compact"><table><thead><tr><th>#</th><th>คำนำหน้า</th><th>ชื่อ-นามสกุล</th><th>ตำแหน่ง</th><th>แผนก</th><th>หลักสูตร</th><th>รอบ</th><th>วันที่ลง</th><th>สถานะ</th><th>QR</th><th>แก้ไข</th><th>ลบ</th></tr></thead><tbody id="admin-reg-tbody"></tbody></table></div>
+      <div class="table-wrap table-cards table-cards-compact"><table><thead><tr><th>#</th><th>คำนำหน้า</th><th>ชื่อ-นามสกุล</th><th>ตำแหน่ง</th><th>แผนก</th><th>รอบ</th><th>วันที่ลง</th><th>สถานะ</th><th>QR</th><th>แก้ไข</th><th>ลบ</th></tr></thead><tbody id="admin-reg-tbody"></tbody></table></div>
     </div>
   </div>
 
@@ -1211,45 +1211,66 @@
 <!-- Add/Edit Category -->
 <div class="modal-overlay" id="modal-add-cat">
   <div class="modal modal-form">
-    <div class="modal-title" id="modal-add-cat-title"><i class="ti ti-category-plus"></i>เพิ่มหลักสูตรอบรม</div>
+    <div class="nc-modal-head">
+      <div class="modal-title" id="modal-add-cat-title"><i class="ti ti-category-plus"></i>เพิ่มหลักสูตรอบรม</div>
+      <button type="button" class="btn btn-sm tqa-ai nc-ai-main-btn" id="nc-ai-btn" onclick="trnAiCourseSuggest()"><i class="ti ti-sparkles"></i>AI ช่วยจัดทำ</button>
+    </div>
     <input type="hidden" id="nc-edit-id">
-    <!-- 1) ข้อมูลหลักสูตรอบรม · 2) แบบทดสอบ & ใบประกาศ · 3) รูปลักษณ์ -->
+    <!-- 2 คอลัมน์: ซ้าย = ข้อมูลหลักสูตร + แบบทดสอบ & ใบประกาศ + AI · ขวา = รูปลักษณ์ (มีตัวอย่างการแสดงผล) · จอแคบเรียงเป็นคอลัมน์เดียว -->
+    <div class="nc-layout">
+    <div class="nc-col">
     <div class="tqa-sec" style="margin-top:4px;"><i class="ti ti-info-circle"></i>ข้อมูลหลักสูตรอบรม</div>
-    <div class="form-group"><label class="form-label">ชื่อหลักสูตรอบรม <span>*</span></label><input class="form-control" id="nc-name" placeholder="เช่น ระบบงานคลังสินค้า"></div>
-    <div class="form-group"><label class="form-label">คำอธิบาย</label><textarea class="form-control" id="nc-desc" rows="3" placeholder="หัวข้อที่อบรม เช่น ขั้นตอนการเพิ่มกลุ่มครุภัณฑ์, การรับสินค้า"></textarea></div>
+    <div class="form-group"><label class="form-label">ชื่อหลักสูตรอบรม <span>*</span></label><input class="form-control" id="nc-name" placeholder="เช่น ระบบงานคลังสินค้า" oninput="_ncPreview()"></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">ประเภทโครงการ <span style="font-weight:400;color:var(--text-muted)">(ใช้จัดกลุ่ม)</span></label><select class="form-control" id="nc-type"><option value="">— ไม่ระบุ —</option></select></div>
+      <div class="form-group"><label class="form-label">รหัสหลักสูตร <span style="font-weight:400;color:var(--text-muted)">(ในเลขใบประกาศ)</span></label>
+        <input class="form-control" id="nc-cert-code" maxlength="10" placeholder="เช่น INV" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'');_ncPreview()">
+      </div>
+    </div>
+    <div class="form-group"><label class="form-label">คำอธิบาย</label><textarea class="form-control" id="nc-desc" rows="4" placeholder="หัวข้อที่อบรม เช่น ขั้นตอนการเพิ่มกลุ่มครุภัณฑ์, การรับสินค้า"></textarea></div>
 
-    <div class="tqa-sec"><i class="ti ti-clipboard-check"></i>แบบทดสอบ & ใบประกาศ</div>
-    <div class="form-row nc-row-quiz">
-      <div class="form-group"><label class="form-label">แบบทดสอบ</label>
-        <select class="form-control" id="nc-quiz"><option value="">— ไม่มีแบบทดสอบ —</option></select>
-        <div class="form-hint">ใช้ทุกโครงการที่เปิดหลักสูตรนี้</div></div>
-      <div class="form-group"><label class="form-label">รหัสหลักสูตร</label>
-        <input class="form-control" id="nc-cert-code" maxlength="10" placeholder="เช่น INV" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')">
-        <div class="form-hint">ในเลขใบประกาศ BMS-<b>INV</b>-2569-…</div></div>
+    <div class="tqa-sec"><i class="ti ti-clipboard-check"></i>แบบทดสอบ</div>
+    <div class="form-group"><label class="form-label">แบบทดสอบจากคลังกลาง</label>
+      <select class="form-control" id="nc-quiz"><option value="">— ไม่มีแบบทดสอบ —</option></select>
     </div>
 
-    <div class="tqa-sec"><i class="ti ti-palette"></i>รูปลักษณ์</div>
+    <div class="nc-ai-box" id="nc-ai-box">
+      <div class="nc-ai-head"><span><i class="ti ti-sparkles"></i><b>AI ช่วยจัดทำหลักสูตร</b></span><small>ตรวจทานก่อนนำไปใช้</small></div>
+      <div class="nc-ai-run">
+        <input class="form-control" id="nc-ai-context" placeholder="ข้อมูลเพิ่มเติม (ไม่บังคับ) เช่น กลุ่มผู้เรียน, หัวข้อสำคัญ">
+      </div>
+      <div class="form-hint">AI จะแนะนำคำอธิบาย รหัสหลักสูตร รูปลักษณ์ และเลือกแบบทดสอบที่ตรงกันจากคลังเดิม</div>
+      <div id="nc-ai-result"></div>
+    </div>
+    </div>
+
+    <div class="nc-col nc-col-side">
+    <div class="tqa-sec" style="margin-top:4px;"><i class="ti ti-palette"></i>รูปลักษณ์</div>
+    <div class="nc-preview" id="nc-preview"></div>
     <!-- ไอคอน + สีธีม แถวเดียวกัน · แผงเลือกไอคอนเต็มความกว้างใต้แถว -->
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">ไอคอน</label>
-        <div onclick="toggleIconPicker()" id="icon-picker-btn" style="cursor:pointer;display:flex;align-items:center;gap:10px;padding:7px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);user-select:none;">
-          <span id="icon-picker-preview" style="font-size:22px;line-height:1;color:var(--primary);width:28px;text-align:center;"><i class="ti ti-box"></i></span>
-          <span id="icon-picker-name" style="font-size:14px;color:var(--text);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">box</span>
-          <i class="ti ti-chevron-down" id="icon-picker-chevron" style="margin-left:auto;color:var(--text-muted);font-size:16px;transition:transform .2s;"></i>
-        </div>
+        <button type="button" onclick="toggleIconPicker()" id="icon-picker-btn" class="icon-picker-trigger" aria-expanded="false" aria-controls="icon-picker-panel">
+          <span id="icon-picker-preview" class="icon-picker-preview"><i class="ti ti-box"></i></span>
+          <span class="icon-picker-trigger-copy"><small>ไอคอนที่เลือก</small><span id="icon-picker-name">box</span></span>
+          <i class="ti ti-chevron-down" id="icon-picker-chevron"></i>
+        </button>
       </div>
       <div class="form-group"><label class="form-label">สีธีม</label>
-        <select class="form-control" id="nc-color">
+        <select class="form-control" id="nc-color" onchange="_ncPreview()">
           <option value="blue">น้ำเงิน</option><option value="teal">เขียวมรกต</option>
           <option value="amber">เหลือง</option><option value="red">แดง</option>
           <option value="purple">ม่วง</option><option value="green">เขียว</option>
         </select>
       </div>
     </div>
-    <div id="icon-picker-panel" style="display:none;margin-bottom:12px;border:1px solid var(--border);border-radius:10px;padding:10px;background:var(--card);">
-      <input id="icon-search" class="form-control" placeholder="ค้นหาชื่อไอคอน..." oninput="filterIcons()" style="margin-bottom:10px;font-size:13px;">
-      <div id="icon-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;max-height:210px;overflow-y:auto;"></div>
+    <div id="icon-picker-panel" class="icon-picker-panel" hidden>
+      <div class="icon-picker-toolbar">
+        <div class="icon-picker-search"><i class="ti ti-search"></i><input id="icon-search" aria-label="ค้นหาไอคอน" placeholder="ค้นหา เช่น truck, book, user" oninput="filterIcons()" autocomplete="off"><button type="button" class="icon-search-clear" onclick="clearIconSearch()" aria-label="ล้างคำค้นหา"><i class="ti ti-x"></i></button></div>
+        <span id="icon-result-count" class="icon-result-count"></span>
+      </div>
+      <div id="icon-grid" class="icon-picker-grid" role="listbox" aria-label="เลือกไอคอน"></div>
     </div>
     <input type="hidden" id="nc-icon" value="box">
     <div class="form-group"><label class="form-label">รูปแบนเนอร์ <span style="color:var(--text-muted);font-weight:400;font-size:12px;">(ไม่บังคับ — ไม่ใส่ = ใช้สีธีม)</span></label>
@@ -1268,6 +1289,8 @@
         </button>
       </div>
       <input type="hidden" id="nc-banner-url">
+    </div>
+    </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('modal-add-cat')">ยกเลิก</button>

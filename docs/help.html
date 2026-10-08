@@ -8,11 +8,14 @@
 <link rel="icon" type="image/png" href="img/icon_app.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css">
+<link rel="stylesheet" href="src/styles/components/icons.css">
 <style>
   :root{
     --bg:#f4f6f9; --surface:#ffffff; --ink:#1b2130; --ink2:#5b6377; --ink3:#8a90a0;
     --line:#e2e5ec; --accent:#4361ee; --accent-soft:#eef1fe;
     --ok:#0f9d6e; --warn:#c9820c; --bad:#e5484d;
+    --txt:var(--ink); --txt2:var(--ink2); --violet:var(--accent); --coral:var(--bad);
   }
   @media (prefers-color-scheme:dark){
     :root{
@@ -31,6 +34,10 @@
   header.top b{font-size:16px}
   .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin-bottom:16px}
   .card h2{font-size:15px;margin:0 0 12px}
+  .card h2>.ti,.sec-title>.ti{width:28px;height:28px;border-radius:8px;color:var(--glyph-color,var(--accent));background:var(--glyph-bg,var(--accent-soft));font-size:16px}
+  button>.ti,a>.ti{color:var(--glyph-color,currentColor)}
+  .success-icon>.ti{color:var(--ok);font-size:32px}
+  .att-drop-ic>.ti,.c-av>.ti{color:var(--glyph-color,var(--accent))}
   label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:12px 0 4px}
   label:first-child{margin-top:0}
   input,select,textarea{width:100%;font:inherit;font-size:14px;padding:9px 11px;
@@ -78,8 +85,9 @@
   .success-card .btn-pri{text-decoration:none;display:inline-flex;align-items:center;gap:7px;padding:12px 28px}
 
   /* ── การ์ดสรุปผล — โชว์บนสุดตอนงานเสร็จแล้ว ให้ผู้ประเมินเห็นภาพรวมได้ในแวบเดียว ── */
-  .summary-card{border-color:rgba(15,157,110,.35)}
-  .summary-card h2{color:var(--ok)}
+  .summary-card{position:relative;overflow:hidden;border-color:rgba(15,157,110,.32);box-shadow:0 12px 32px rgba(27,33,48,.06)}
+  .summary-card::before{content:'';position:absolute;inset:0 0 auto;height:4px;background:linear-gradient(90deg,var(--ok),#55c6a0)}
+  .summary-card h2{color:var(--ok);display:flex;align-items:center;gap:8px;font-size:16px}
   .summary-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px 20px}
   @media (max-width:480px){ .summary-grid{grid-template-columns:1fr} }
   .summary-grid .k{font-size:11px;color:var(--ink3);font-weight:600;margin-bottom:2px}
@@ -87,6 +95,9 @@
   .summary-note{margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
   .summary-note .k{font-size:11px;color:var(--ink3);font-weight:600;margin-bottom:6px}
   .summary-note .v{font-size:13.5px;line-height:1.6;background:var(--bg);padding:10px 13px;border-radius:10px;white-space:pre-wrap}
+  .summary-solution{margin-top:16px;padding:15px 16px;border:1px solid rgba(15,157,110,.2);border-radius:12px;background:linear-gradient(135deg,rgba(15,157,110,.09),rgba(67,97,238,.05))}
+  .summary-solution .k{display:flex;align-items:center;gap:6px;color:var(--ok);font-size:12px;font-weight:800;margin-bottom:7px}
+  .summary-solution .v{font-size:14px;line-height:1.75;white-space:pre-wrap;overflow-wrap:anywhere}
 
   /* ── Ticket header: badges + stepper + info grid ── */
   .t-card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px;margin-bottom:16px}
@@ -793,6 +804,21 @@
   var _ticket = null;
   var _ticketHospName = '';
 
+  // ข้อความสาธารณะ + วิธีแก้ที่บันทึกเข้าคลังความรู้
+  // วิธีแก้รุ่นเดิมถูกเก็บเป็น internal จึงต้องดึงแยก แล้วเปิดเผยเฉพาะรายการที่ขึ้นต้นด้วย "วิธีแก้ไข:" เท่านั้น
+  async function fetchPublicEvents(ticketId) {
+    var pub = await db.from('helpdesk_ticket_events').select('*')
+      .eq('ticket_id', ticketId).eq('is_internal', false).order('created_at', { ascending: true });
+    var kb = await db.from('helpdesk_ticket_events').select('*')
+      .eq('ticket_id', ticketId).eq('type', 'comment').like('body', 'วิธีแก้ไข%').order('created_at', { ascending: true });
+    var seen = {}, rows = [];
+    (pub.data || []).concat(kb.data || []).forEach(function (e) {
+      if (!seen[e.id]) { seen[e.id] = true; rows.push(e); }
+    });
+    rows.sort(function (a, b) { return new Date(a.created_at) - new Date(b.created_at); });
+    return rows;
+  }
+
   async function loadTrack() {
     try {
       var tr = await db.from('helpdesk_tickets').select('*').eq('access_token', token).limit(1);
@@ -809,9 +835,7 @@
     }
     var evs = [], atts = [], hospName = '', catName = '';
     try {
-      var er = await db.from('helpdesk_ticket_events').select('*')
-        .eq('ticket_id', _ticket.id).eq('is_internal', false).order('created_at', { ascending: true });
-      evs = er.data || [];
+      evs = await fetchPublicEvents(_ticket.id);
       var ar = await db.from('helpdesk_attachments').select('*').eq('ticket_id', _ticket.id).order('created_at', { ascending: true });
       atts = ar.data || [];
       if (_ticket.hospital_id) {
@@ -853,11 +877,10 @@
       var tr = await db.from('helpdesk_tickets').select('*').eq('id', prev.id).limit(1);
       t = tr.data && tr.data[0];
       if (!t) return;
-      var er = await db.from('helpdesk_ticket_events').select('*')
-        .eq('ticket_id', t.id).eq('is_internal', false).order('created_at', { ascending: true });
+      evs = await fetchPublicEvents(t.id);
       var ar = await db.from('helpdesk_attachments').select('*').eq('ticket_id', t.id).order('created_at', { ascending: true });
-      if (er.error || ar.error) return;
-      evs = er.data || []; atts = ar.data || [];
+      if (ar.error) return;
+      atts = ar.data || [];
     } catch (e) { return; }
     var changed = ['status', 'priority', 'rated_at', 'resolution_due', 'subject', 'description', 'public_view_expires_at']
       .some(function (k) { return String(t[k]) !== String(prev[k]); });
@@ -894,9 +917,15 @@
     var isDone = t.status === 'resolved' || t.status === 'closed'; // งานเสร็จแล้ว (ไม่รวม cancelled ซึ่งไม่มีผลงานให้สรุป)
     var inactive = closedish || t.status === 'resolved'; // ปิดงานแล้วไม่ว่าด้วยเหตุผลใด — ใช้ซ่อนฟีเจอร์ที่ทำได้เฉพาะตอนงานยังเปิดอยู่
 
-    var lastStaffNote = '';
+    var lastStaffNote = '', solution = '';
     (evs || []).slice().reverse().some(function (e) {
-      if (e.type === 'comment' && e.actor_type !== 'reporter') { lastStaffNote = e.body || ''; return true; }
+      if (e.type === 'comment' && e.actor_type !== 'reporter' && !/^วิธีแก้ไข\s*[:：]/.test(e.body || '')) { lastStaffNote = e.body || ''; return true; }
+      return false;
+    });
+    (evs || []).slice().reverse().some(function (e) {
+      if (e.type === 'comment' && /^วิธีแก้ไข\s*[:：]/.test(e.body || '')) {
+        solution = String(e.body).replace(/^วิธีแก้ไข\s*[:：]\s*/, '').trim(); return true;
+      }
       return false;
     });
     function fmtDuration(startIso, endIso) {
@@ -919,6 +948,7 @@
       + '<div><div class="k">' + (t.status === 'closed' ? 'ปิดงานเมื่อ' : 'แก้ไขเสร็จเมื่อ') + '</div><div class="v">' + dt(t.resolved_at || t.closed_at) + '</div></div>'
       + '<div><div class="k">ระยะเวลาดำเนินการ</div><div class="v">' + fmtDuration(t.created_at, t.resolved_at || t.closed_at) + '</div></div>'
       + '</div>'
+      + (solution ? '<div class="summary-solution"><div class="k">💡 วิธีการแก้ไข</div><div class="v">' + esc(solution) + '</div></div>' : '')
       + (lastStaffNote ? '<div class="summary-note"><div class="k">สรุปจากทีมงาน</div><div class="v">' + esc(lastStaffNote) + '</div></div>' : '')
       + '</div>'
     ) : '';
@@ -926,7 +956,7 @@
     var rateCard = canRate ? (
       '<div class="card" id="rate-card"><h2>ให้คะแนนการช่วยเหลือครั้งนี้</h2>'
       + '<div class="stars" id="stars" data-v="0">' + [1,2,3,4,5].map(function(i){ return '<button type="button" class="star" data-i="'+i+'">★</button>'; }).join('') + '</div>'
-      + '<label>ความคิดเห็นเพิ่มเติม (ไม่บังคับ)</label><textarea id="rate-cm" rows="2"></textarea>'
+      + '<label>ความคิดเห็นถึงทีมงาน (ไม่บังคับ)</label><textarea id="rate-cm" rows="3" placeholder="บอกสิ่งที่ประทับใจ หรือสิ่งที่ควรปรับปรุง — ทีมงานจะเห็นข้อความนี้"></textarea>'
       + '<label style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="rate-rec" style="width:auto"> แนะนำบริการนี้ให้เพื่อนร่วมงาน</label>'
       + '<div id="rate-msg" class="hidden" style="margin-top:10px"></div>'
       + '<div style="margin-top:14px"><button class="btn-pri" id="rate-send">ส่งคะแนน</button></div></div>'
@@ -1192,11 +1222,13 @@
       var now = new Date().toISOString();
       var rec = await db.from('helpdesk_ratings').select('id').eq('ticket_id', _ticket.id).limit(1);
       if (rec.data && rec.data.length) { show('รายการนี้ให้คะแนนแล้ว', 'err'); return; }
+      var comment = document.getElementById('rate-cm').value.trim();
+      var recommend = document.getElementById('rate-rec').checked;
       var ir = await db.from('helpdesk_ratings').insert({
         id: 'HDR' + Date.now() + Math.floor(Math.random()*1000),
         ticket_id: _ticket.id, score: n,
-        comment: document.getElementById('rate-cm').value.trim(),
-        would_recommend: document.getElementById('rate-rec').checked,
+        comment: comment,
+        would_recommend: recommend,
         via_token: token, created_at: now, updated_at: now
       });
       if (ir.error) throw ir.error;
@@ -1204,7 +1236,8 @@
       await db.from('helpdesk_ticket_events').insert({
         id: 'HDE' + Date.now() + Math.floor(Math.random()*1000),
         ticket_id: _ticket.id, type: 'rating', actor_type: 'reporter',
-        body: 'ให้คะแนน ' + n + '/5', is_internal: false, created_at: now
+        body: 'ให้คะแนน ' + n + '/5' + (comment ? '\nความคิดเห็น: ' + comment : '')
+          + '\nแนะนำบริการ: ' + (recommend ? 'แนะนำ' : 'ไม่แนะนำ'), is_internal: false, created_at: now
       });
       _ticket.rated_at = now; _ticket.csat_score = n;
       loadTrack();
@@ -1221,10 +1254,11 @@
     '<div class="card" style="text-align:center;">'
     + '<h2 style="margin-bottom:6px;">ศูนย์ช่วยเหลือการใช้งานระบบ</h2>'
     + '<p style="color:var(--ink2);font-size:13.5px;margin:0 0 18px;">แจ้งปัญหาการใช้งานระบบ BMS แล้วติดตามสถานะได้ที่นี่</p>'
-    + '<a class="btn-pri" style="text-decoration:none;display:inline-block;" href="help.html?new=1">+ แจ้งปัญหาใหม่</a>'
+    + '<a class="btn-pri" style="text-decoration:none;display:inline-block;" href="help.html?new=1"><i class="ti ti-plus" aria-hidden="true"></i> แจ้งปัญหาใหม่</a>'
     + '<p class="muted" style="margin-top:16px;">มีเลขที่ Ticket อยู่แล้ว? เปิดจากลิงก์ที่ทีมงานส่งให้ในกลุ่ม LINE</p>'
     + '</div>';
 })();
 </script>
+<script src="src/utils/icons.util.js"></script>
 </body>
 </html>

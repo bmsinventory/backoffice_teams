@@ -314,6 +314,8 @@ alter table trn_categories    add column if not exists quiz_id   integer referen
 -- รหัสหลักสูตรในเลขใบประกาศ (เช่น INV → BMS-INV-2569-000001) · ว่าง = ไม่ใส่ส่วนนี้
 alter table trn_categories    add column if not exists cert_code text not null default '';
 alter table trn_categories    drop column if exists quiz_open;
+-- ประเภทโครงการ (ptypes.type_id) — จัดกลุ่มหน้า "หลักสูตรอบรม" · ว่าง = ยังไม่ระบุ
+alter table trn_categories    add column if not exists type_id   text not null default '';
 alter table trn_quiz_attempts add column if not exists cat_id    integer references trn_categories(id) on delete set null;
 alter table trn_quizzes       drop column if exists cat_id;
 

@@ -90,6 +90,20 @@ window.renderNotifySettings=function(){
         ['📢','มีผู้ลงทะเบียนอบรมใหม่ (ระบุโครงการ ชื่อ หน่วยงาน หัวข้อ และเวลาอบรม)']
       ]
     })
+    +_tokenCard({
+      id:'notify-server-token',
+      title:'🖥 แจ้งเตือนคำขอใช้งานทีม Server',
+      desc:'Token สำหรับแจ้ง DM/PM เมื่อมีคำขอใช้งานทีม Server ใหม่จากฟอร์มภายนอก และเมื่อสถานะคำขอเปลี่ยน',
+      tokenVar:window.NOTIFY_SERVER_TOKEN||'',
+      saveFunc:'saveNotifyServerToken',
+      testFunc:'testNotifyServer',
+      events:[
+        ['🖥','คำขอใหม่ — รออนุมัติ'],
+        ['✅','อนุมัติ / ❌ ไม่อนุมัติ'],
+        ['👥','จัดคนแล้ว (พร้อมรายชื่อและช่วงวัน)'],
+        ['🚫','ผู้ขอยกเลิกคำขอ']
+      ]
+    })
     +'</div>';
 };
 
@@ -120,6 +134,16 @@ window.saveNotifyProjectToken=async function(){
   try{
     await setDoc(getDocRef('SETTINGS','app'),{notify_project_token:val},{merge:true});
     window.NOTIFY_PROJECT_TOKEN=val;
+    if(msg){msg.textContent='✅ บันทึกแล้ว';setTimeout(function(){msg.textContent='';},2500);}
+  }catch(e){window.showDbError(e);}
+};
+
+window.saveNotifyServerToken=async function(){
+  var val=((document.getElementById('notify-server-token-input')||{}).value||'').trim();
+  var msg=document.getElementById('notify-server-token-msg');
+  try{
+    await setDoc(getDocRef('SETTINGS','app'),{notify_server_token:val},{merge:true});
+    window.NOTIFY_SERVER_TOKEN=val;
     if(msg){msg.textContent='✅ บันทึกแล้ว';setTimeout(function(){msg.textContent='';},2500);}
   }catch(e){window.showDbError(e);}
 };
@@ -219,6 +243,14 @@ window.testNotifyTraining = async function() {
   );
 };
 
+window.testNotifyServer = async function() {
+  await _testWithFeedback(
+    window.NOTIFY_SERVER_TOKEN || '',
+    '🖥 **ทดสอบ: คำขอใช้งานทีม Server ใหม่ — รออนุมัติ**\n🧾 เลขที่: **[ทดสอบ]**\n👤 ผู้ขอ: ทดสอบ (ติดตั้งระบบ)\n🏥 โรงพยาบาลทดสอบ\n📅 12 ต.ค. 69 – 14 ต.ค. 69 (2 คน)\n🛠 ติดตั้ง Server Master\n🧑‍💻 IT รพ. : ทดสอบ · 0812345678\n[🔗 เปิดลิงค์เพื่ออนุมัติ](https://backoffice-teams.bmscloud.in.th/#server_request=test)',
+    'notify-server-token-msg'
+  );
+};
+
 // ── PROJECT INFO BLOCK ────────────────────────────────────────────────────────
 function _projNotifyBlock(p){
   return '📌 ชื่อโครงการ: **'+(p.name||'')+'**'
@@ -240,7 +272,7 @@ window.sendAdvanceSavedNotify=async function(adv,isNew){
      +'\n🏦 คงเหลือ: '+fc(remaining)+' บาท'
     :'';
   var content=header+'\n'+_projNotifyBlock(p)
-    +'\n📋 สถานะ: **'+sf.label+'**'
+    +'\n📋 สถานะ: **'+(sf.icon?sf.icon+' ':'')+sf.label+'**'
     +(adv.advno?'\n🔖 เลขที่: '+adv.advno:'')
     +(adv.amount?'\n💰 จำนวน: '+fc(adv.amount)+' บาท':'')
     +clearedBlock;
