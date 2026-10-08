@@ -16,12 +16,19 @@ mkdir -p /etc/nginx/snippets
 printf 'set $db_up "%s";\n' "$API_UPSTREAM" > /etc/nginx/snippets/db-upstream.conf
 echo "[entrypoint] API proxy: ${API_PROXY} → ${API_UPSTREAM:-(none)}"
 
-envsubst '${SUPABASE_URL} ${SUPABASE_ANON_KEY} ${WEB_PUSH_PUBLIC_KEY} ${API_PROXY}' \
+envsubst '${SUPABASE_URL} ${SUPABASE_ANON_KEY} ${API_PROXY}' \
   < /usr/share/nginx/html/env-config.template.js \
   > /usr/share/nginx/html/env-config.js
 
 # ── DNS ให้ proxy_pass $db_up (ตัวแปร → resolve ตอนใช้งาน) หาชื่อโดเมนของ API_UPSTREAM ได้ — ใช้ nameserver ของ container เอง ──
 NS=$(awk '/^nameserver/ { print $2; exit }' /etc/resolv.conf)
 echo "resolver ${NS:-1.1.1.1} valid=300s ipv6=off;" > /etc/nginx/conf.d/00-resolver.conf
+
+# ── ตัวส่ง Web Push (push-worker/index.js) รันเบื้องหลังคู่ nginx · ดับเองก็ start ใหม่ ──
+if [ -f /opt/push-worker/worker.secret ] && command -v node >/dev/null 2>&1; then
+  ( while true; do node /opt/push-worker/index.js; sleep 10; done ) &
+else
+  echo "[entrypoint] Web Push: ไม่มี worker.secret ใน image — ไม่ส่งการแจ้งเตือนตอนปิดแอป"
+fi
 
 exec "$@"

@@ -13,29 +13,8 @@ services:
       # docker-entrypoint.sh เอาค่านี้ไปสร้าง env-config.js ใหม่ทุกครั้งที่ container start
       SUPABASE_URL: "https://backoffice-teams.bmscloud.in.th"
       SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzg2MDY5OTg0LCJleHAiOjE5NDM3NDk5ODR9.87h6yNOOf2UIVLygJp-hap-Y0n37xQ7OzPfv7HTlrbY"
-      WEB_PUSH_PUBLIC_KEY: "${VAPID_PUBLIC_KEY:-}"
       # คำขอข้อมูลของหน้าเว็บวิ่งผ่าน container นี้ (บีบอัด gzip) แล้วต่อ Supabase (Kong) ในเครื่องตรง ๆ
       # ต่อไม่ได้ หน้าเว็บสลับไปต่อ SUPABASE_URL ตรงเอง · ไม่ใส่บรรทัดนี้ = ผ่าน SUPABASE_URL · API_PROXY: "0" = ปิด
       API_UPSTREAM: "http://10.95.10.108:8000"
     ports:
       - "8089:80"
-
-  push-worker:
-    build:
-      context: ../push-worker
-    container_name: backoffice_teams_push_worker
-    restart: always
-    environment:
-      SUPABASE_URL: "http://10.95.10.108:8000"
-      # ใช้ SERVICE_ROLE_KEY เดิมจากไฟล์ .env ของ Supabase ผ่าน --env-file ไม่ต้องคัดลอกคีย์
-      SERVICE_ROLE_KEY: "${SERVICE_ROLE_KEY:?load the existing Supabase .env with --env-file}"
-      APP_URL: "https://backoffice-teams.bmscloud.in.th"
-      VAPID_PUBLIC_KEY: "${VAPID_PUBLIC_KEY:?set VAPID_PUBLIC_KEY in deploy/.env}"
-      VAPID_PRIVATE_KEY: "${VAPID_PRIVATE_KEY:?set VAPID_PRIVATE_KEY in deploy/.env}"
-      VAPID_SUBJECT: "${VAPID_SUBJECT:-mailto:admin@bmscloud.in.th}"
-      PUSH_POLL_MS: "3000"
-    healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8080/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3

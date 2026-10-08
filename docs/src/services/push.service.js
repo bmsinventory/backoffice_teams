@@ -1,13 +1,23 @@
 /**
  * Browser Web Push registration.
- * The private VAPID key never belongs here; only the public key is injected at deploy time.
+ * Public VAPID key มาจาก RPC get_web_push_public_key (ตัวส่งใน frontend container ประกาศไว้)
+ * — private key อยู่ในตัวส่งเท่านั้น
  */
 (function () {
-  var PUBLIC_KEY = String(window.WEB_PUSH_PUBLIC_KEY || '').trim();
+  var PUBLIC_KEY = '';
 
   function supported() {
     return !!(window.isSecureContext && 'serviceWorker' in navigator &&
-      'PushManager' in window && 'Notification' in window && PUBLIC_KEY);
+      'PushManager' in window && 'Notification' in window);
+  }
+
+  async function publicKey() {
+    if (PUBLIC_KEY) return PUBLIC_KEY;
+    var db = window.getDb && window.getDb();
+    if (!db || !db.rpc) return '';
+    var result = await db.rpc('get_web_push_public_key');
+    PUBLIC_KEY = String((!result.error && result.data) || '').trim();
+    return PUBLIC_KEY;
   }
 
   function keyBytes(base64) {
@@ -59,10 +69,15 @@
 
   window.enableWebPush = async function () {
     if (!supported()) {
-      window.showAlert && window.showAlert('อุปกรณ์นี้ไม่รองรับ Web Push หรือระบบยังไม่ได้ตั้งค่า VAPID Public Key', 'warn');
+      window.showAlert && window.showAlert('เบราว์เซอร์/อุปกรณ์นี้ไม่รองรับการแจ้งเตือน (iPhone ต้องเพิ่มแอปลงหน้าจอโฮมก่อน)', 'warn');
       return false;
     }
     try {
+      var key = await publicKey();
+      if (!key) {
+        window.showAlert && window.showAlert('ระบบแจ้งเตือนยังไม่พร้อม กรุณาลองใหม่ภายหลัง', 'warn');
+        return false;
+      }
       var permission = await Notification.requestPermission();
       if (permission !== 'granted') {
         window.showAlert && window.showAlert('ยังไม่ได้รับอนุญาตให้แสดงการแจ้งเตือน กรุณาอนุญาตในการตั้งค่าเบราว์เซอร์', 'warn');
@@ -70,7 +85,13 @@
       }
       var reg = await navigator.serviceWorker.ready;
       var sub = await reg.pushManager.getSubscription();
-      if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(PUBLIC_KEY) });
+      // สมัครไว้ด้วย key เก่า (เปลี่ยน worker.secret) → สมัครใหม่
+      if (sub && sub.options && sub.options.applicationServerKey &&
+          btoa(String.fromCharCode.apply(null, new Uint8Array(sub.options.applicationServerKey))) !==
+          btoa(String.fromCharCode.apply(null, keyBytes(key)))) {
+        await sub.unsubscribe(); sub = null;
+      }
+      if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(key) });
       await saveSubscription(sub);
       window.showAlert && window.showAlert('เปิดแจ้งเตือนแล้ว แม้ปิดหน้า WebApp ก็ยังได้รับข้อความ', 'success');
       refreshMenu(); return true;

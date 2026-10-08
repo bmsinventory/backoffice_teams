@@ -1208,8 +1208,10 @@ END $$;
 
 -- ================================================================
 -- WEB PUSH — device subscriptions + durable delivery queue
--- The browser stores only its own endpoint. VAPID private keys remain in
--- the push-worker container and are never written to this database/frontend.
+-- ตัวส่ง (push-worker) รันอยู่ใน frontend container เดียวกับ nginx — ไม่ต้องตั้งค่าบน server เพิ่ม
+-- VAPID private key คำนวณจากรหัสลับ push-worker/worker.secret (ฝังใน image ตอน build, ไม่อยู่ใน git)
+-- ไม่เคยถูกเขียนลงฐานข้อมูล · ฐานข้อมูลเก็บแค่ public key · RPC ของตัวส่งต้องแนบรหัสลับนั้น
+-- เปลี่ยนรหัสลับ → แก้ hash ใน _web_push_worker_check แล้วรันส่วนนี้ใหม่ (ผู้ใช้ต้องกดเปิดแจ้งเตือนใหม่)
 -- ================================================================
 CREATE TABLE IF NOT EXISTS web_push_subscriptions (
   id          TEXT PRIMARY KEY,
@@ -1270,7 +1272,98 @@ CREATE TABLE IF NOT EXISTS web_push_jobs (
 );
 
 ALTER TABLE web_push_jobs ENABLE ROW LEVEL SECURITY;
--- No anon policy: only database triggers and the service-role push worker may access jobs.
+-- No anon policy: only database triggers and the worker RPCs below may access jobs.
+
+-- เก็บแค่ public key (เปิดเผยได้) — private key อยู่ในตัวส่งเท่านั้น
+CREATE TABLE IF NOT EXISTS web_push_config (
+  id          TEXT PRIMARY KEY DEFAULT 'main',
+  public_key  TEXT NOT NULL,
+  updated_at  TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE web_push_config ENABLE ROW LEVEL SECURITY;
+
+CREATE OR REPLACE FUNCTION get_web_push_public_key()
+RETURNS TEXT LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT public_key FROM web_push_config WHERE id = 'main';
+$$;
+
+-- ตรวจรหัสลับของตัวส่ง (เทียบ SHA-256 ของ push-worker/worker.secret)
+CREATE OR REPLACE FUNCTION _web_push_worker_check(p_secret TEXT)
+RETURNS VOID LANGUAGE plpgsql AS $$
+BEGIN
+  IF encode(sha256(convert_to(COALESCE(p_secret, ''), 'UTF8')), 'hex')
+     <> 'bbfa9a22aa9f28fc5a0730cdf05a8a4fbf34bf9b0f020794fa3dc27b58d55388' THEN
+    RAISE EXCEPTION 'web push worker: forbidden' USING ERRCODE = '42501';
+  END IF;
+END $$;
+
+-- ตัวส่ง: ประกาศ public key ที่ใช้อยู่ ให้หน้าเว็บนำไปขอรับการแจ้งเตือน
+CREATE OR REPLACE FUNCTION web_push_worker_init(p_secret TEXT, p_public TEXT)
+RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  PERFORM _web_push_worker_check(p_secret);
+  INSERT INTO web_push_config (id, public_key) VALUES ('main', p_public)
+  ON CONFLICT (id) DO UPDATE SET public_key = EXCLUDED.public_key, updated_at = NOW()
+  WHERE web_push_config.public_key IS DISTINCT FROM EXCLUDED.public_key;
+END $$;
+
+-- ตัวส่ง: จองงานที่ถึงเวลา (ค้าง processing เกิน 5 นาที = container ดับกลางทาง → คืนเข้าคิว)
+CREATE OR REPLACE FUNCTION web_push_worker_claim(p_secret TEXT, p_limit INTEGER DEFAULT 20)
+RETURNS SETOF web_push_jobs LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  PERFORM _web_push_worker_check(p_secret);
+  UPDATE web_push_jobs SET status = 'pending'
+   WHERE status = 'processing' AND next_attempt_at < NOW() - INTERVAL '5 minutes';
+  RETURN QUERY
+  UPDATE web_push_jobs j SET status = 'processing', attempts = j.attempts + 1, next_attempt_at = NOW()
+   WHERE j.id IN (SELECT q.id FROM web_push_jobs q
+                   WHERE q.status = 'pending' AND q.next_attempt_at <= NOW()
+                   ORDER BY q.created_at LIMIT p_limit FOR UPDATE SKIP LOCKED)
+  RETURNING j.*;
+END $$;
+
+-- ตัวส่ง: ปิดงาน — ล้มเหลวลองใหม่แบบเว้นระยะ (15 วิ → สูงสุด 15 นาที) ครบ 5 ครั้ง = failed
+CREATE OR REPLACE FUNCTION web_push_worker_finish(p_secret TEXT, p_id TEXT, p_ok BOOLEAN, p_error TEXT DEFAULT '')
+RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  PERFORM _web_push_worker_check(p_secret);
+  UPDATE web_push_jobs SET
+    status = CASE WHEN p_ok THEN 'sent' WHEN attempts >= 5 THEN 'failed' ELSE 'pending' END,
+    processed_at = CASE WHEN p_ok THEN NOW() ELSE processed_at END,
+    next_attempt_at = CASE WHEN p_ok THEN next_attempt_at
+      ELSE NOW() + LEAST(INTERVAL '15 minutes', INTERVAL '15 seconds' * POWER(2, GREATEST(attempts - 1, 0))) END,
+    last_error = LEFT(COALESCE(p_error, ''), 1000)
+  WHERE id = p_id;
+END $$;
+
+CREATE OR REPLACE FUNCTION web_push_worker_subscriptions(p_secret TEXT)
+RETURNS TABLE (id TEXT, endpoint TEXT, p256dh TEXT, auth TEXT)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  PERFORM _web_push_worker_check(p_secret);
+  RETURN QUERY SELECT s.id, s.endpoint, s.p256dh, s.auth FROM web_push_subscriptions s WHERE s.active;
+END $$;
+
+-- ตัวส่ง: endpoint หมดอายุ (404/410) → ปิดไว้
+CREATE OR REPLACE FUNCTION web_push_worker_drop(p_secret TEXT, p_id TEXT)
+RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  PERFORM _web_push_worker_check(p_secret);
+  UPDATE web_push_subscriptions SET active = false, updated_at = NOW() WHERE id = p_id;
+END $$;
+
+REVOKE ALL ON FUNCTION get_web_push_public_key() FROM PUBLIC;
+REVOKE ALL ON FUNCTION web_push_worker_init(TEXT, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION web_push_worker_claim(TEXT, INTEGER) FROM PUBLIC;
+REVOKE ALL ON FUNCTION web_push_worker_finish(TEXT, TEXT, BOOLEAN, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION web_push_worker_subscriptions(TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION web_push_worker_drop(TEXT, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION get_web_push_public_key() TO anon;
+GRANT EXECUTE ON FUNCTION web_push_worker_init(TEXT, TEXT) TO anon;
+GRANT EXECUTE ON FUNCTION web_push_worker_claim(TEXT, INTEGER) TO anon;
+GRANT EXECUTE ON FUNCTION web_push_worker_finish(TEXT, TEXT, BOOLEAN, TEXT) TO anon;
+GRANT EXECUTE ON FUNCTION web_push_worker_subscriptions(TEXT) TO anon;
+GRANT EXECUTE ON FUNCTION web_push_worker_drop(TEXT, TEXT) TO anon;
 
 CREATE OR REPLACE FUNCTION queue_helpdesk_ticket_push()
 RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$

@@ -6,3 +6,4 @@ migration/
 db-schema.sql
 db-training.sql
 deploy/
+push-worker/node_modules
