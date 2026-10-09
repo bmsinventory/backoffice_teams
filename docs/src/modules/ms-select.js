@@ -40,7 +40,7 @@
   /**
    * el/id: container element (or its id) — จะถูกแปลงเป็น dropdown ครั้งแรกที่เรียก
    * items: [{value,label,color?}]
-   * opts: {placeholder, onChange(values)}
+   * opts: {placeholder, onChange(values), searchable, searchPlaceholder}
    */
   window.msFilter=function(elOrId,items,opts){
     var el=typeof elOrId==='string'?document.getElementById(elOrId):elOrId;
@@ -50,6 +50,7 @@
     var placeholder=opts.placeholder||'ทั้งหมด';
     el._msPlaceholder=placeholder;
     el._msItems=items;
+    el._msSearchable=!!opts.searchable;
     if(opts.onChange) el._msOnChange=opts.onChange;
 
     var itemValues={};items.forEach(function(it){itemValues[String(itemVal(it))]=true;});
@@ -61,6 +62,7 @@
       el.innerHTML=
         '<button type="button" class="t-sel ms-btn"></button>'+
         '<div class="ms-panel">'+
+          (opts.searchable?'<div class="ms-search-wrap"><input type="search" class="ms-search" placeholder="'+window.esc(opts.searchPlaceholder||'ค้นหา...')+'" autocomplete="off"></div>':'')+
           '<div class="ms-panel-actions"><button type="button" class="ms-clear">ล้างตัวเลือก</button></div>'+
           '<div class="ms-list"></div>'+
         '</div>';
@@ -68,6 +70,13 @@
       var panel=el.querySelector('.ms-panel');
       var list=el.querySelector('.ms-list');
       var clearBtn=el.querySelector('.ms-clear');
+      var search=el.querySelector('.ms-search');
+      function draw(){
+        var q=search?String(search.value||'').trim().toLowerCase():'';
+        var shown=(el._msItems||[]).filter(function(it){return !q||String(it.label||'').toLowerCase().indexOf(q)>=0;});
+        list.innerHTML=renderRows(shown,el._msSelected||[]);
+      }
+      el._msDraw=draw;
 
       btn.addEventListener('click',function(ev){
         ev.stopPropagation();
@@ -78,8 +87,10 @@
           panel.classList.add('open');
           var rect=panel.getBoundingClientRect();
           if(rect.right>window.innerWidth) panel.classList.add('ms-panel-right');
+          if(search){search.value='';draw();setTimeout(function(){search.focus();},0);}
         }
       });
+      if(search) search.addEventListener('input',draw);
       list.addEventListener('change',function(ev){
         var cb=ev.target;
         if(!cb||cb.tagName!=='INPUT') return;
@@ -94,7 +105,7 @@
         ev.stopPropagation();
         if(el._msSelected.length===0) return;
         el._msSelected=[];
-        list.querySelectorAll('input[type=checkbox]').forEach(function(cb){cb.checked=false;});
+        draw();
         btn.textContent=labelFor(el);
         btn.classList.remove('active');
         if(el._msOnChange) el._msOnChange([]);
@@ -105,7 +116,7 @@
     var btn=el.querySelector('.ms-btn'),list=el.querySelector('.ms-list');
     btn.textContent=labelFor(el);
     btn.classList.toggle('active',el._msSelected.length>0);
-    list.innerHTML=renderRows(items,el._msSelected);
+    if(el._msDraw) el._msDraw(); else list.innerHTML=renderRows(items,el._msSelected);
 
     return{getValues:function(){return el._msSelected.slice();}};
   };

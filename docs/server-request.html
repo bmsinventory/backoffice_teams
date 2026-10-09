@@ -202,6 +202,42 @@
   .msg.err{background:rgba(239,68,68,.1);color:var(--bad)}
   .m-bar{display:none}
 
+  /* ── ค้นหาและติดตามคำขอ ── */
+  .track-lookup{grid-column:1/-1;margin:0;padding:12px 14px;position:relative;z-index:3}
+  .lookup-main{display:flex;align-items:center;gap:12px}
+  .lookup-title{display:flex;align-items:center;gap:10px;min-width:205px}
+  .lookup-title>i{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:var(--grad);color:#fff;font-size:18px;box-shadow:0 8px 18px -10px rgba(59,130,246,.8)}
+  .lookup-title span{display:flex;flex-direction:column;line-height:1.35}
+  .lookup-title b{font-family:'Prompt','Noto Sans Thai',sans-serif;font-size:13.5px}
+  .lookup-title small{color:var(--ink3);font-size:11px}
+  .lookup-field{position:relative;display:flex;align-items:center;flex:1;min-width:0}
+  .lookup-field>i{position:absolute;left:12px;color:var(--ink3);font-size:17px;pointer-events:none}
+  .lookup-field input{padding-left:38px;padding-right:42px;background:var(--surface2)}
+  .lookup-clear{position:absolute;right:5px;width:32px;height:32px;border:0;border-radius:8px;background:transparent;color:var(--ink3);cursor:pointer;display:none;place-items:center;font-size:16px}
+  .lookup-clear:hover{background:var(--accent-soft);color:var(--accent)}
+  .lookup-clear.show{display:grid}
+  .lookup-results{display:none;margin-top:10px;border-top:1px solid var(--line);padding-top:10px}
+  .lookup-results.show{display:block}
+  .lookup-state{display:flex;align-items:center;justify-content:center;gap:7px;min-height:46px;color:var(--ink3);font-size:12.5px;text-align:center}
+  .lookup-groups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;align-items:start}
+  .lookup-group{min-width:0;overflow:hidden;border:1px solid var(--line);border-radius:13px;background:var(--surface2)}
+  .lookup-group-head{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:9px;padding:9px 10px;background:var(--surface);border-bottom:1px solid var(--line)}
+  .lookup-group-head>i{width:31px;height:31px;border-radius:9px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);font-size:16px}
+  .lookup-group-head b{min-width:0;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lookup-group-head em{font-style:normal;font-size:10.5px;font-weight:600;white-space:nowrap;color:var(--accent);background:var(--accent-soft);padding:2px 8px;border-radius:999px}
+  .lookup-group-list{display:flex;flex-direction:column}
+  .lookup-item{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;padding:9px 10px;border:1px solid var(--line);border-radius:11px;background:var(--surface2);text-decoration:none;color:var(--ink);transition:.15s}
+  .lookup-item:hover{border-color:var(--accent);background:var(--accent-soft);transform:translateY(-1px)}
+  .lookup-item>i{width:31px;height:31px;border-radius:9px;display:grid;place-items:center;background:var(--surface);color:var(--accent);font-size:16px}
+  .lookup-item>span{display:flex;flex-direction:column;min-width:0;line-height:1.4}
+  .lookup-item b{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lookup-item small{font-size:11px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lookup-item em{font-style:normal;font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap}
+  .lookup-group .lookup-item{border:0;border-radius:0;background:transparent}
+  .lookup-group .lookup-item+.lookup-item{border-top:1px solid var(--line)}
+  .lookup-group .lookup-item:hover{background:var(--accent-soft);transform:none}
+  .lookup-count{margin-bottom:7px;font-size:11.5px;color:var(--ink3)}
+
   @media (max-width:1200px){
     .form-grid{grid-template-columns:1fr;grid-template-areas:"a" "c" "d"}
     #sec-3{margin-bottom:0}
@@ -222,6 +258,9 @@
   @media (max-width:640px){
     .hero{padding-bottom:64px}
     .shell{padding-left:12px;padding-right:12px}
+    #sec-4 .sec-h{flex-wrap:wrap}
+    #sec-4 .sec-h h2{flex:1 1 calc(100% - 46px)}
+    #sec-4 .hc-row{margin-left:46px}
     .card{padding:14px 14px;border-radius:14px}
     .grid2,.manual{grid-template-columns:1fr}
     .qrow{grid-template-columns:1fr;gap:12px}
@@ -231,6 +270,10 @@
     .cal-d{min-height:50px;padding:4px 5px 7px;border-radius:9px}
     .cal-d b{font-size:15px} .cal-d b u{display:none}
     .cal-d.today small::after{display:none}
+    .track-lookup{padding:12px}
+    .lookup-main{align-items:stretch;flex-direction:column;gap:9px}
+    .lookup-title{min-width:0}
+    .lookup-groups{grid-template-columns:1fr}
   }
 
   /* ── Success / tracking ── */
@@ -431,7 +474,7 @@
     var r = rows(await db.from('server_requests').select('*').eq('access_token', token).limit(1))[0];
     if (!r) {
       hero.innerHTML = '<h1>ไม่พบคำขอ</h1><p>ลิงก์อาจไม่ถูกต้อง หรือคำขอถูกลบแล้ว</p>';
-      app.innerHTML = '<div class="card center"><a class="btn btn-pri" href="server-request.html?new=1"><i class="ti ti-plus"></i>ส่งคำขอใหม่</a></div>';
+      app.innerHTML = '<div class="card center"><a class="btn btn-pri" href="server-request.html"><i class="ti ti-plus"></i>ส่งคำขอใหม่</a></div>';
       return;
     }
     var actorIds = [r.decided_by, r.assigned_by].filter(Boolean);
@@ -488,7 +531,7 @@
       + '<div class="trk-head"><span class="no-pill">' + esc(r.req_no) + '</span>'
       + '<span class="st" style="color:' + m.color + ';background:' + m.color + '1f"><i class="ti ti-' + m.icon + '"></i>' + esc(m.label) + '</span>'
       + '<span class="trk-time"><i class="ti ti-clock"></i>ส่งเมื่อ ' + esc(fdt(r.created_at)) + '</span>'
-      + '<a class="btn btn-pri btn-sm" href="server-request.html?new=1"><i class="ti ti-plus"></i>ส่งคำขอใหม่</a></div>'
+      + '<a class="btn btn-pri btn-sm" href="server-request.html"><i class="ti ti-plus"></i>ส่งคำขอใหม่</a></div>'
       + stepsHtml
       + (r.decision_note ? '<div class="banner ' + (r.status === 'rejected' ? 'err' : '') + '"><b>หมายเหตุจากผู้อนุมัติ:</b> ' + esc(r.decision_note) + '</div>' : '')
       + '</section>'
@@ -597,6 +640,84 @@
 
   var STEPS = [['sec-1', 'ผู้ขอ'], ['sec-2', 'โรงพยาบาล'], ['sec-3', 'รายละเอียดงาน'], ['sec-4', 'ช่วงวันที่']];
 
+  function lookupHtml() {
+    return '<section class="card track-lookup" aria-label="ติดตามงาน">'
+      + '<div class="lookup-main"><div class="lookup-title"><i class="ti ti-radar-2"></i><span><b>ติดตามงาน</b><small>ค้นหาคำขอที่เคยส่ง</small></span></div>'
+      + '<div class="lookup-field"><i class="ti ti-search"></i><input id="lookup-q" type="search" autocomplete="off" placeholder="ค้นหาจากชื่อโรงพยาบาล หรือชื่อผู้แจ้ง" aria-label="ค้นหาจากชื่อโรงพยาบาล หรือชื่อผู้แจ้ง">'
+      + '<button class="lookup-clear" id="lookup-clear" type="button" aria-label="ล้างคำค้น"><i class="ti ti-x"></i></button></div></div>'
+      + '<div class="lookup-results" id="lookup-results" aria-live="polite"></div></section>';
+  }
+
+  var _lookupTimer = 0, _lookupSeq = 0;
+  function bindLookup() {
+    var q = $('lookup-q'), clear = $('lookup-clear');
+    if (!q || !clear) return;
+    q.oninput = function () {
+      clear.classList.toggle('show', !!q.value);
+      clearTimeout(_lookupTimer);
+      var term = q.value.trim();
+      if (term.length < 2) { _lookupSeq++; showLookupState(term ? 'พิมพ์อย่างน้อย 2 ตัวอักษรเพื่อค้นหา' : '', false); return; }
+      _lookupTimer = setTimeout(function () { searchRequests(term); }, 320);
+    };
+    clear.onclick = function () { q.value = ''; q.oninput(); q.focus(); };
+  }
+  function showLookupState(message, loading) {
+    var box = $('lookup-results');
+    if (!box) return;
+    box.classList.toggle('show', !!message);
+    box.innerHTML = message ? '<div class="lookup-state">' + (loading ? '<i class="ti ti-loader-2"></i>' : '<i class="ti ti-info-circle"></i>') + esc(message) + '</div>' : '';
+  }
+  async function searchRequests(term) {
+    var seq = ++_lookupSeq;
+    showLookupState('กำลังค้นหาคำขอ...', true);
+    try {
+      var cleaned = term.replace(/[%_*]/g, '').trim();
+      if (cleaned.length < 2) { showLookupState('พิมพ์อย่างน้อย 2 ตัวอักษรเพื่อค้นหา', false); return; }
+      var pattern = '%' + cleaned + '%';
+      var fields = 'req_no,access_token,requester_name,hospital_name,start_date,end_date,status,created_at';
+      var found = await Promise.all([
+        db.from('server_requests').select(fields).neq('access_token', '').ilike('hospital_name', pattern).order('created_at', { ascending: false }).limit(12),
+        db.from('server_requests').select(fields).neq('access_token', '').ilike('requester_name', pattern).order('created_at', { ascending: false }).limit(12),
+      ]);
+      if (seq !== _lookupSeq) return;
+      var byId = {};
+      rows(found[0]).concat(rows(found[1])).forEach(function (r) { byId[r.req_no || r.access_token] = r; });
+      var list = Object.keys(byId).map(function (k) { return byId[k]; }).sort(function (a, b) { return String(b.created_at).localeCompare(String(a.created_at)); }).slice(0, 12);
+      renderLookupResults(list);
+    } catch (e) {
+      console.error(e);
+      if (seq === _lookupSeq) showLookupState('ค้นหาไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', false);
+    }
+  }
+  function renderLookupResults(list) {
+    var box = $('lookup-results');
+    if (!box) return;
+    box.classList.add('show');
+    if (!list.length) { box.innerHTML = '<div class="lookup-state"><i class="ti ti-search-off"></i>ไม่พบคำขอจากชื่อโรงพยาบาลหรือชื่อผู้แจ้งนี้</div>'; return; }
+    var groups = [], byHospital = {};
+    list.forEach(function (r) {
+      var hospital = String(r.hospital_name || '').trim() || 'ไม่ระบุโรงพยาบาล';
+      var key = hospital.toLocaleLowerCase('th-TH');
+      if (!byHospital[key]) {
+        byHospital[key] = { hospital: hospital, requests: [] };
+        groups.push(byHospital[key]);
+      }
+      byHospital[key].requests.push(r);
+    });
+    box.innerHTML = '<div class="lookup-count">พบ ' + list.length + ' คำขอ · ' + groups.length + ' โรงพยาบาล · เลือกรายการเพื่อเปิดหน้าติดตาม</div><div class="lookup-groups">'
+      + groups.map(function (group) {
+        return '<section class="lookup-group"><div class="lookup-group-head"><i class="ti ti-building-hospital"></i><b title="' + esc(group.hospital) + '">' + esc(group.hospital) + '</b>'
+          + '<em>' + group.requests.length + ' คำขอ</em></div><div class="lookup-group-list">'
+          + group.requests.map(function (r) {
+            var st = window.SRV_STATUS[r.status] || { label: r.status || '-', color: '#8a90a0' };
+            var dates = r.start_date && r.end_date ? range(r.start_date, r.end_date) : '-';
+            return '<a class="lookup-item" href="server-request.html?t=' + encodeURIComponent(r.access_token || '') + '"><i class="ti ti-file-description"></i><span>'
+              + '<b>' + esc(r.req_no || '-') + ' · ' + esc(r.requester_name || '-') + '</b><small>' + esc(dates) + '</small></span>'
+              + '<em style="color:' + st.color + ';background:' + st.color + '1f">' + esc(st.label) + '</em></a>';
+          }).join('') + '</div></section>';
+      }).join('') + '</div>';
+  }
+
   function renderForm() {
     document.body.classList.remove('track-page');
     var hasCal = STAFF.length > 0;
@@ -606,7 +727,7 @@
       + (hasCal ? '<span class="badge-live"><i class="dot"></i>ดูวันว่างของทีมแบบเรียลไทม์ แล้วเลือกช่วงที่สะดวกได้เลย</span>' : '') + '</div>'
       + '<nav class="prog" id="prog">' + STEPS.map(function (s, i) { return '<a href="#' + s[0] + '" data-step="' + i + '"><b>' + (i + 1) + '</b>' + s[1] + '</a>'; }).join('') + '</nav></div>';
 
-    app.innerHTML = '<div id="form" class="form-grid"><div class="col col-a">'
+    app.innerHTML = lookupHtml() + '<div id="form" class="form-grid"><div class="col col-a">'
       + '<section class="card" id="sec-1"><div class="sec-h"><div class="sec-n">1</div><h2>ผู้ขอ<small>ผู้ส่งคำขอนี้</small></h2></div>'
       + '<div class="grid2">'
       + field('f-name', 'ชื่อผู้ขอ', { req: 1, icon: 'user', attrs: ' autocomplete="name"', ph: 'ชื่อ-นามสกุล' })
@@ -659,6 +780,7 @@
     $('form').addEventListener('input', clearInv);
     $('form').addEventListener('change', clearInv);
     $('f-send').onclick = submit;
+    bindLookup();
     if (hasCal) { _calMonth = TODAY.slice(0, 7); drawCal(); }
     update();
   }

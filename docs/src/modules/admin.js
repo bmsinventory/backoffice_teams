@@ -19,6 +19,7 @@ var ADM_NAV=[
   {g:'Helpdesk',items:[
     {id:'hsp_products',icon:'📦',label:'Product'},
     {id:'hd_options',icon:'🎧',label:'ตัวเลือกแจ้งปัญหา'},
+    {id:'hd_ai_auto',icon:'🤖',label:'AI ตอบกลับอัตโนมัติ',adminOnly:true},
   ]},
   {g:'ระบบ',items:[
     {id:'notify',icon:'🔔',label:'การแจ้งเตือน'},
@@ -62,6 +63,7 @@ function renderAdm(){
   if(window.admCur==='notify'){window.renderNotifySettings();return;}
   if(window.admCur==='roles'){renderAdmRoles(c,titleEl);return;}
   if(window.admCur==='hd_options'){window.renderHdOptionsAdmin();return;}
+  if(window.admCur==='hd_ai_auto'){window.renderHdAiAutoAdmin();return;}
   if(window.admCur==='staff'){
     var activeStaff=window.STAFF.filter(function(s){return s.active!==false;}).sort(window.sortStaffByDeptRank);
     var inactiveStaff=window.STAFF.filter(function(s){return s.active===false;}).sort(window.sortStaffByDeptRank);
@@ -686,4 +688,3 @@ window.regDeptChange=function(){
   if(sfEl)window.regRefreshStaff(sfEl,dept);
   window.renderLeave();
 };
-

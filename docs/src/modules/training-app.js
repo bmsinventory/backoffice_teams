@@ -349,7 +349,7 @@ const _regsOfSites=(codes,cols='*')=>codes.length
   :Promise.resolve({data:[]});
 const _NONE=Promise.resolve({data:null});
 // คอลัมน์ที่ใช้จริง (เดิม select * — projects มีคอลัมน์อื่นอีกมาก ขนาดเกือบเท่าตัว)
-const PROJ_COLS='id,project_id,project_name,pm_staff_id,team,members,hospital_id';
+const PROJ_COLS='id,project_id,project_name,pm_staff_id,team,members,hospital_id,type_id';
 const _qImpl=()=>_sb.from('impl_projects').select('id,project_name,source_project_id');
 const _qProj=()=>_sb.from('projects').select(PROJ_COLS);
 // ข้อมูลอ้างอิงที่ไม่ค่อยเปลี่ยน — โหลดตอนเปิดหน้า/สั่งโหลดใหม่ ไม่โหลดซ้ำทุกครั้งที่ Realtime แจ้ง (เช่นทุกครั้งที่เช็คชื่อ)
@@ -437,7 +437,21 @@ async function loadAllData(light=false){
    (ทีมตามโครงการต้นทางใน Backoffice — ตรรกะเดียวกับติดตามสถานะโครงการ src/utils/project-team.util.js)
    null = ไม่จำกัด (Admin หรือยังไม่ Login — ผู้เข้าอบรมเปิดตามลิงก์ ?site= ของโครงการตัวเอง) ── */
 // แถว projects (โครงการต้นทาง) → รูปแบบที่ ProjectTeam ใช้ (เหมือน window.PROJECTS ของ Backoffice)
-const _mapProjects=rows=>(rows||[]).map(d=>({id:d.project_id||d.id,name:d.project_name||'',pm:d.pm_staff_id||'',team:d.team||[],members:d.members||[],hospitalId:d.hospital_id||''}));
+const _mapProjects=rows=>(rows||[]).map(d=>({id:d.project_id||d.id,name:d.project_name||'',pm:d.pm_staff_id||'',team:d.team||[],members:d.members||[],hospitalId:d.hospital_id||'',typeId:d.type_id||''}));
+// ประเภทของโครงการที่กำลังเปิด: impl_projects.source_project_id → projects.type_id
+// ใช้กรองรายการหลักสูตรที่เลือกเปิด/สร้างรอบ ไม่ให้ข้ามประเภทโครงการ
+function _currentProjectTypeId(){
+  const pid=PROJECT_ID||locations.find(l=>l.code===currentSite)?.project_id||'';
+  const impl=_implRows.find(p=>String(p.id)===String(pid));
+  if(!impl)return'';
+  const sourceId=String(impl.source_project_id||'');
+  const source=_projRows.find(p=>String(p.id)===sourceId||String(p.project_id||'')===sourceId);
+  return source?.type_id||'';
+}
+function _availableCategories(){
+  const typeId=_currentProjectTypeId();
+  return typeId?allCategories.filter(c=>c.typeId===typeId):[];
+}
 const _teamScoped=()=>isAdminLoggedIn&&!!currentAdminUser&&currentAdminUser.role!=='superadmin';
 // locs = trn_locations · implRows/projRows = impl_projects / projects (โหลดพร้อมกันใน loadAllData)
 function _mySiteCodes(locs,implRows,projRows){
@@ -3214,6 +3228,7 @@ let _analyticsNoRegStats={noRegDepts:[],regCount:0,total:0,regPct:0};
 let _anFacts=null;   // ตัวเลขผลประเมิน/ผลสอบล่าสุด — ใช้ใน AI สรุป (training-ai.js)
 let _anDept=[];      // แถวตารางรายหน่วยงาน (ค้นหา/กรองในหน้าโดยไม่โหลดใหม่)
 let _anTrainers=[];  // แถวตารางรายวิทยากร (กดแถว → รายชื่อ)
+let _anDonut=[];     // [ชื่อสถานะ, รายชื่อ] ของโดนัท (กดรายการใต้กราฟ → รายชื่อ)
 let _anSeq=0;        // Realtime เรียกซ้อนกันได้ — ใช้ผลของครั้งล่าสุดเท่านั้น
 const _AN_CLR={ok:'var(--success)',warn:'var(--warn)',bad:'var(--danger)',na:'var(--text-muted)',info:'var(--primary)'};
 const _AN_LBL={ok:'ดี',warn:'เฝ้าระวัง',bad:'ต้องติดตาม',na:'ไม่มีข้อมูล',info:'ความคืบหน้า'};
@@ -3337,17 +3352,18 @@ async function renderAnalytics(){
   const oc=_anCls(overall);
   document.getElementById('analytics-score-total').innerHTML=overall==null?'':
     `<span class="an-total" title="ค่าเฉลี่ยของทุกมิติที่มีข้อมูล (ไม่รวมความคืบหน้าแผนอบรม)">คะแนนรวม <b style="color:${_AN_CLR[oc]}">${overall}%</b>${_anPill(oc)}</span>`;
-  let lastG='';
-  document.getElementById('analytics-scorecard').innerHTML=dims.map(d=>{
-    const head=d.g!==lastG?`<div style="font-size:11px;font-weight:700;color:var(--text-muted);letter-spacing:.4px;margin:${lastG?'10px':'0'} 0 2px;">${d.g}</div>`:'';
-    lastG=d.g;
-    return head+`<div class="an-sc">
-      <div class="an-sc-name">${d.n}<small>${d.s}</small></div>
+  const groups=[...new Set(dims.map(d=>d.g))];
+  document.getElementById('analytics-scorecard').innerHTML=groups.map(g=>`<div class="an-sc-group">
+    <div class="an-sc-g">${g}</div>
+    ${dims.filter(d=>d.g===g).map(d=>`<div class="an-sc">
+      <div class="an-sc-top">
+        <div class="an-sc-name">${d.n}<small>${d.s}</small></div>
+        <div class="an-sc-val" style="color:${_AN_CLR[d.c]}">${d.p==null?'—':(d.v?d.v+'/5':d.p+'%')}</div>
+        ${_anPill(d.c)}
+      </div>
       ${_anBar(d.p,d.c)}
-      <div class="an-sc-val" style="color:${_AN_CLR[d.c]}">${d.p==null?'—':(d.v?d.v+'/5':d.p+'%')}</div>
-      <div style="text-align:right">${_anPill(d.c)}</div>
-    </div>`;
-  }).join('');
+    </div>`).join('')}
+  </div>`).join('');
 
   // ══ Charts ══
   Object.values(_charts).forEach(c=>{try{c.destroy();}catch(e){}});
@@ -3381,7 +3397,12 @@ async function renderAnalytics(){
     options:{responsive:true,maintainAspectRatio:false,cutout:'72%',animation:{animateRotate:true,duration:700},
       onClick:(e,els)=>{if(!els.length)return;const[l,f]=donutSets[els[0].index];showAnalyticsDetail(l,siteRegs.filter(f));},
       onHover:hover,
-      plugins:{legend:leg,tooltip:{...tip,callbacks:{label:c=>` ${c.label}: ${total?Math.round(c.raw/total*100):0}%`}}}}});
+      plugins:{legend:{display:false},tooltip:{...tip,callbacks:{label:c=>` ${c.label}: ${total?Math.round(c.raw/total*100):0}%`}}}}});
+  _anDonut=donutSets.map(([l,f])=>[l,siteRegs.filter(f)]);
+  const dsEl=document.getElementById('analytics-donut-stats');
+  if(dsEl)dsEl.innerHTML=[P.ok,P.fail,P.wait].map((clr,i)=>{const n=_anDonut[i][1].length;
+    return`<button type="button" class="an-dstat" onclick="_anDonutDetail(${i})"><span class="an-dot" style="background:${clr}"></span>${donutSets[i][0]}<b>${n}</b><small>${total?Math.round(n/total*100):0}%</small></button>`;}).join('')
+    +`<div class="an-dstat-total">ลงทะเบียนทั้งหมด <b>${total}</b> คน</div>`;
 
   // ── แยกตามหลักสูตรอบรม ──
   const tri=rs=>{const h=rs.filter(isHeld);
@@ -3399,12 +3420,15 @@ async function renderAnalytics(){
   ];
   const stackLabel=(d,i)=>[` เข้าอบรม ${d.att} คน${d.pct!=null?` — ${d.pct}%`:''}`,` ขาด ${d.absent} คน`,` รออบรม ${d.wait} คน`][i];
   const ctxC=document.getElementById('chart-by-cat');
-  if(ctxC)_charts.byCat=new Chart(ctxC,{type:'bar',data:{labels:catData.map(d=>d.name),datasets:stackSets(catData)},
+  const catBox=document.getElementById('chart-by-cat-box');
+  if(catBox)catBox.style.height=Math.max(150,catData.length*48+50)+'px'; // แท่งแนวนอน — สูงตามจำนวนหลักสูตร
+  if(ctxC)_charts.byCat=new Chart(ctxC,{type:'bar',data:{labels:catData.map(d=>d.name.length>34?d.name.slice(0,33)+'…':d.name),datasets:stackSets(catData).map(x=>({...x,maxBarThickness:22}))},
     options:{responsive:true,maintainAspectRatio:false,animation:{duration:600},
       onClick:(e,els)=>{if(!els.length)return;const d=catData[els[0].index];if(d)showAnalyticsDetail(d.name,d.rs,`ลงทะเบียน ${d.cnt} · เข้าอบรม ${d.att} คน${d.pct!=null?` (${d.pct}%)`:''}`);},
       onHover:hover,
-      plugins:{legend:leg,tooltip:{...tip,callbacks:{label:c=>stackLabel(catData[c.dataIndex],c.datasetIndex)}}},
-      scales:{x:{...scX,stacked:true},y:{...scY,stacked:true,beginAtZero:true,ticks:{...scY.ticks,precision:0}}}}});
+      indexAxis:'y',
+      plugins:{legend:leg,tooltip:{...tip,callbacks:{title:([c])=>catData[c.dataIndex]?.name||'',label:c=>stackLabel(catData[c.dataIndex],c.datasetIndex)}}},
+      scales:{y:{...scX,stacked:true},x:{...scY,stacked:true,beginAtZero:true,ticks:{...scY.ticks,precision:0}}}}});
 
   // ── ผลประเมินรายด้าน ──
   document.getElementById('analytics-survey-note').textContent=sv.length?`ผู้ตอบ ${sv.length} คน${wantMore!=null?` · ต้องการอบรมเพิ่ม ${wantMore}%`:''}`:'';
@@ -3510,7 +3534,7 @@ async function renderAnalytics(){
         </div>`;
       } else {
         html+=`<div style="font-size:11px;font-weight:600;color:var(--text-muted);letter-spacing:.4px;margin-bottom:8px;">${noRegDepts.length} หน่วยงานที่ยังไม่มีผู้ลงทะเบียน</div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:6px;">
+          <div class="an-noreg">
           ${noRegDepts.map((d,i)=>`
             <div style="display:flex;align-items:center;gap:8px;background:var(--warn-light);border-radius:8px;padding:7px 12px;">
               <span style="font-size:11px;font-weight:700;color:var(--warn);min-width:20px;text-align:right;">${i+1}</span>
@@ -3523,6 +3547,9 @@ async function renderAnalytics(){
   }
 }
 
+function _anDonutDetail(i){
+  const d=_anDonut[i];if(d)showAnalyticsDetail(d[0],d[1]);
+}
 function _anTrainerDetail(i){
   const t=_anTrainers[i];if(!t)return;
   showAnalyticsDetail(t.name,t.rs,`${t.sess} รอบ · ผู้ลงทะเบียน ${t.rs.length} คน`);
@@ -3600,16 +3627,17 @@ function renderAdminCats(){
   if(OVERVIEW){_ovCatsRender();return;}
   const el=document.getElementById('admin-cat-tbody');
   if(!el)return;
-  const central=_canCentral();
+  const central=_canCentral(),available=_availableCategories();
   document.getElementById('btn-central-cats').style.display=central?'':'none';
-  if(!allCategories.length){
-    el.innerHTML=`<div class="cat-empty"><i class="ti ti-category"></i><div>ยังไม่มีหลักสูตรอบรมกลาง</div>${central
+  if(!available.length){
+    const msg=allCategories.length?'ยังไม่มีหลักสูตรอบรมที่ตรงกับประเภทของโครงการนี้':'ยังไม่มีหลักสูตรอบรมกลาง';
+    el.innerHTML=`<div class="cat-empty"><i class="ti ti-category"></i><div>${msg}</div>${central
       ?'<button class="btn btn-primary btn-sm" onclick="goCentralTraining(\x27cats\x27)"><i class="ti ti-arrow-right"></i>ไปเพิ่มที่ระบบอบรม › หลักสูตรอบรม</button>'
       :'<div style="font-size:12px;">ติดต่อ Admin หรือ PM ให้เพิ่มที่เมนูระบบอบรม › หลักสูตรอบรม</div>'}</div>`;
     return;
   }
-  el.innerHTML=`<div class="tqa-note"><i class="ti ti-info-circle"></i>ปกติไม่ต้องเข้ามาหน้านี้ — สร้างรอบอบรมแล้วระบบเปิดหลักสูตรนั้นในโครงการให้เอง (พร้อมแบบทดสอบที่ผูกไว้)</div>
-    <div class="card tqa-use">${allCategories.map(c=>{
+  el.innerHTML=`<div class="tqa-note"><i class="ti ti-info-circle"></i>แสดงเฉพาะหลักสูตรที่ตรงกับประเภทโครงการนี้ — เมื่อสร้างรอบอบรม ระบบจะเปิดหลักสูตรพร้อมแบบทดสอบที่ผูกไว้ให้อัตโนมัติ</div>
+    <div class="card tqa-use">${available.map(c=>{
       const cm=CM[c.color]||CM.blue,ns=sessions.filter(s=>s.catId===c.id).length,qt=_liveQuizTitle[c.quizId];
       const sub=!c.enabled?'ไม่ได้เปิดในโครงการนี้':`แบบทดสอบ: ${qt?_esc(qt):'ไม่มี'} · ${ns} รอบอบรม`;
       return`<div class="tqa-use-row tqa-cat-row${c.enabled?'':' off'}">
@@ -3805,12 +3833,13 @@ function _sessTrainers(keepId){
   return trainerStaff.filter(t=>ids.includes(t.id)||t.id===String(keepId||''));
 }
 function populateSessionDropdowns(keepTrainerId){
-  // หลักสูตรกลางทั้งหมด — เลือกหลักสูตรที่ยังไม่เปิดในโครงการได้ (บันทึกรอบแล้วฐานข้อมูลเปิดให้เอง: trg_trn_session_enable_cat)
+  // เฉพาะหลักสูตรกลางที่ตรงกับประเภทโครงการ — หลักสูตรที่ยังไม่เปิดจะเปิดให้อัตโนมัติเมื่อบันทึกรอบ
   const opt=c=>`<option value="${c.id}">${_esc(c.name)}</option>`;
-  const on=allCategories.filter(c=>c.enabled),off=allCategories.filter(c=>!c.enabled);
-  document.getElementById('ns-cat').innerHTML='<option value="">เลือกหลักสูตร...</option>'
+  const available=_availableCategories();
+  const on=available.filter(c=>c.enabled),off=available.filter(c=>!c.enabled);
+  document.getElementById('ns-cat').innerHTML=`<option value="">${available.length?'เลือกหลักสูตร...':'ไม่พบหลักสูตรที่ตรงกับประเภทโครงการ'}</option>`
     +(on.length?`<optgroup label="เปิดในโครงการนี้แล้ว">${on.map(opt).join('')}</optgroup>`:'')
-    +(off.length?`<optgroup label="หลักสูตรกลางอื่น ๆ (เปิดในโครงการให้เมื่อบันทึก)">${off.map(opt).join('')}</optgroup>`:'');
+    +(off.length?`<optgroup label="หลักสูตรประเภทเดียวกับโครงการ (เปิดให้เมื่อบันทึก)">${off.map(opt).join('')}</optgroup>`:'');
   populateSelect('ns-venue',venues.map((v,i)=>({v:masterIds.venue[i],l:v})),'เลือกสถานที่...',true); // ค่า = รหัสรายการหลัก
   const tr=_sessTrainers(keepTrainerId);
   populateSelect('ns-trainer',tr.map(t=>({v:t.id,l:t.name+(t.nickname?' ('+t.nickname+')':'')})),'เลือกวิทยากร (ทีมโครงการ)...',true);
@@ -3852,31 +3881,9 @@ function populateSelect(id,arr,placeholder='เลือก...',isObj=false){
     // Use div container + button items — buttons reliably fire click in all WebViews
     const opts=document.createElement('div');
     opts.className='csel-options';
-    // Search box for large lists
-    if(arr.length>5){
-      const sw=document.createElement('div');
-      sw.className='csel-search-wrap';
-      const si=document.createElement('input');
-      si.type='text';si.className='csel-search';si.placeholder='ค้นหา...';si.autocomplete='off';
-      sw.appendChild(si);
-      sw.addEventListener('click',e=>e.stopPropagation());
-      si.addEventListener('click',e=>e.stopPropagation());
-      si.addEventListener('input',()=>{
-        const q=si.value.toLowerCase().trim();
-        let found=0;
-        opts.querySelectorAll('.csel-option').forEach(btn=>{
-          const match=!q||btn.dataset.label.toLowerCase().includes(q);
-          btn.style.display=match?'':'none';
-          if(match)found++;
-        });
-        let nr=opts.querySelector('.csel-no-result');
-        if(!found){
-          if(!nr){nr=document.createElement('div');nr.className='csel-no-result';nr.textContent='ไม่พบผลลัพธ์';opts.appendChild(nr);}
-          nr.style.display='';
-        }else if(nr){nr.style.display='none';}
-      });
-      list.appendChild(sw);
-    }
+    // รายการยาว → พิมพ์ค้นหาในช่องได้เลย (combobox) แทนปุ่ม + ช่องค้นหาในรายการ
+    const combo=arr.length>5?cselEnsureCombo(id,btn,placeholder):null;
+    if(combo)combo.value='';
     list.appendChild(opts);
     const addLi=(val,label)=>{
       const btn=document.createElement('button');
@@ -3885,6 +3892,7 @@ function populateSelect(id,arr,placeholder='เลือก...',isObj=false){
       btn.dataset.val=String(val);
       btn.dataset.label=label;
       btn.textContent=label;
+      btn.addEventListener('mousedown',e=>e.preventDefault()); // คงโฟกัสไว้ที่ช่องพิมพ์
       btn.addEventListener('click',()=>cselPick(id,val,label));
       opts.appendChild(btn);
     };
@@ -3899,11 +3907,72 @@ function populateSelect(id,arr,placeholder='เลือก...',isObj=false){
     }
   }
 }
+function cselCombo(id){return document.getElementById('cselc-'+id);}
+function cselEnsureCombo(id,btn,placeholder){
+  let ci=cselCombo(id);
+  if(!ci){
+    ci=document.createElement('input');
+    ci.type='text';ci.id='cselc-'+id;ci.className='form-control csel-combo';ci.autocomplete='off';
+    btn.parentElement.classList.add('csel-combo-on');
+    btn.parentElement.insertBefore(ci,btn);
+    ci.addEventListener('focus',()=>{ci.select();cselOpen(id);});
+    ci.addEventListener('click',()=>cselOpen(id));
+    ci.addEventListener('input',()=>{cselOpen(id);cselFilter(id,ci.value);});
+    ci.addEventListener('keydown',e=>cselComboKey(id,e));
+    ci.addEventListener('blur',()=>setTimeout(()=>{
+      const list=document.getElementById('csell-'+id);
+      if(document.activeElement!==ci&&list&&list.classList.contains('open'))cselCloseList(list);
+    },150));
+  }
+  ci.placeholder=placeholder;
+  return ci;
+}
+function cselFilter(id,q){
+  const list=document.getElementById('csell-'+id);if(!list)return;
+  q=String(q||'').toLowerCase().trim();
+  const vis=[];
+  list.querySelectorAll('.csel-option').forEach(btn=>{
+    const match=!q||btn.dataset.label.toLowerCase().includes(q);
+    btn.style.display=match?'':'none';
+    btn.classList.remove('csel-active');
+    if(match)vis.push(btn);
+  });
+  if(q&&vis.length)vis[0].classList.add('csel-active');
+  const opts=list.querySelector('.csel-options');
+  let nr=list.querySelector('.csel-no-result');
+  if(!vis.length){
+    if(!nr&&opts){nr=document.createElement('div');nr.className='csel-no-result';nr.textContent='ไม่พบผลลัพธ์';opts.appendChild(nr);}
+    if(nr)nr.style.display='';
+  }else if(nr){nr.style.display='none';}
+}
+function cselComboKey(id,e){
+  const list=document.getElementById('csell-'+id);if(!list)return;
+  const open=list.classList.contains('open');
+  const vis=[...list.querySelectorAll('.csel-option')].filter(b=>b.style.display!=='none');
+  let i=vis.findIndex(b=>b.classList.contains('csel-active'));
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+    e.preventDefault();
+    if(!open)cselOpen(id);
+    if(!vis.length)return;
+    if(i>=0)vis[i].classList.remove('csel-active');
+    i=e.key==='ArrowDown'?Math.min(i+1,vis.length-1):Math.max(i-1,0);
+    vis[i].classList.add('csel-active');vis[i].scrollIntoView({block:'nearest'});
+  }else if(e.key==='Enter'&&open){
+    e.preventDefault();
+    const b=vis[i>=0?i:0];if(b)b.click();
+  }else if(e.key==='Escape'&&open){
+    e.preventDefault();e.stopPropagation();cselCloseList(list);
+  }
+}
 function cselResetSearch(list){
-  const si=list.querySelector('.csel-search');if(!si)return;
-  si.value='';
-  list.querySelectorAll('.csel-option').forEach(btn=>btn.style.display='');
+  list.querySelectorAll('.csel-option').forEach(btn=>{btn.style.display='';btn.classList.remove('csel-active');});
   const nr=list.querySelector('.csel-no-result');if(nr)nr.style.display='none';
+  // ช่องพิมพ์ที่พิมพ์ค้างไว้แต่ไม่ได้เลือก → คืนเป็นรายการที่เลือกอยู่
+  const id=list.id.replace(/^csell-/,''),ci=cselCombo(id);
+  if(ci){
+    const btn=document.getElementById('cselb-'+id);
+    ci.value=btn&&btn.dataset.empty!=='1'?(btn.querySelector('.csel-btn-txt')||btn).textContent:'';
+  }
 }
 function cselCloseList(x){
   cselResetSearch(x);
@@ -3922,13 +3991,19 @@ function cselNativePick(id,sel){
     if(val&&lbl){if(span)span.textContent=lbl;btn.dataset.empty='';}
     else{btn.dataset.empty='1';}
   }
+  const ci=cselCombo(id);if(ci)ci.value=val?lbl:'';
+}
+function cselOpen(id){
+  const list=document.getElementById('csell-'+id);
+  if(list&&!list.classList.contains('open'))cselToggle(id);
 }
 function cselToggle(id){
   const isTouch='ontouchstart' in window;
   const isLine=/Line\//.test(navigator.userAgent);
-  if(isTouch&&!isLine)return; // regular touch: native select overlay handles it
+  const combo=cselCombo(id);
+  if(isTouch&&!isLine&&!combo)return; // regular touch: native select overlay handles it
   const list=document.getElementById('csell-'+id);
-  const btn=document.getElementById('cselb-'+id);
+  const btn=combo||document.getElementById('cselb-'+id);
   if(!list||!btn)return;
   const wasOpen=list.classList.contains('open');
   document.querySelectorAll('.csel-list.open').forEach(x=>cselCloseList(x));
@@ -3969,6 +4044,7 @@ function cselPick(id,val,label){
     if(span)span.textContent=label;else btn.firstChild.textContent=label;
     btn.dataset.empty='';
   }
+  const ci=cselCombo(id);if(ci)ci.value=label;
   if(list){
     list.querySelectorAll('.csel-selected').forEach(el=>el.classList.remove('csel-selected'));
     list.querySelectorAll('.csel-option').forEach(li=>{
@@ -3989,6 +4065,7 @@ function cselSetVal(id,val,placeholder){
     if(span)span.textContent=txt;else btn.firstChild.textContent=txt;
     btn.dataset.empty=val?'':'1';
   }
+  const ci=cselCombo(id);if(ci)ci.value=val||'';
   // Sync native select value
   const nat=document.getElementById('cselm-'+id);
   if(nat)nat.value=val||'';
@@ -4038,6 +4115,7 @@ async function submitSession(){
   const trainer=document.getElementById('ns-trainer').value;
   const cap=parseInt(document.getElementById('ns-cap').value);
   if(!catId||!name||!date||!timeStart||!timeEnd||!venueId||!trainer||!cap){showToast('กรุณากรอกข้อมูลให้ครบ','danger');return;}
+  if(!_availableCategories().some(c=>c.id===catId)){showToast('หลักสูตรไม่ตรงกับประเภทของโครงการนี้','danger');return;}
   if(timeEnd<=timeStart){showToast('เวลาสิ้นสุดต้องหลังเวลาเริ่ม','danger');return;}
   if(editId){
     const s=getSess(parseInt(editId));
@@ -4151,8 +4229,8 @@ function openAddCat(){
   ['nc-name','nc-desc','nc-cert-code'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('nc-color').value='blue';
   selectIcon('box');
-  _fillCatQuizSelect(null);
   _fillCatTypeSelect('');
+  _fillCatQuizSelect(null,'');
   clearCatBanner();
   document.getElementById('modal-add-cat').classList.add('open');
 }
@@ -4166,8 +4244,8 @@ function openEditCat(id){
   document.getElementById('nc-cert-code').value=c.certCode||'';
   document.getElementById('nc-color').value=c.color||'blue';
   selectIcon(c.icon||'box');
-  _fillCatQuizSelect(c.quizId);
   _fillCatTypeSelect(c.typeId);
+  _fillCatQuizSelect(c.quizId,c.typeId,c.id);
   clearCatBanner();
   if(c.bannerUrl){
     _setBannerPreview(c.bannerUrl);
@@ -4495,11 +4573,31 @@ function _fillCatTypeSelect(cur){
   document.getElementById('nc-type').innerHTML='<option value="">— ไม่ระบุ —</option>'
     +_ovPtypes.map(t=>`<option value="${_esc(t.id)}"${t.id===cur?' selected':''}>${_esc(t.label)}</option>`).join('');
 }
-// ตัวเลือกแบบทดสอบในฟอร์มหลักสูตร (modal-add-cat)
-function _fillCatQuizSelect(cur){
-  const q=_ovQuizzes.find(x=>x.id===cur);
+// ตัวเลือกแบบทดสอบในฟอร์มหลักสูตร — จัดกลุ่มตามประเภทโครงการของหลักสูตรที่ผูกใช้อยู่
+// ชุดเดียวที่ใช้ข้ามหลายประเภทอยู่กลุ่มกลางเพียงครั้งเดียว (ไม่สร้าง option value ซ้ำ)
+function _fillCatQuizSelect(cur,typeId,editId){
+  const currentId=cur==null?null:Number(cur),currentType=typeId||'';
+  const currentQuiz=_ovQuizzes.find(x=>x.id===currentId);
+  const quizzes=[..._ovQuizzes.filter(x=>x.is_active),...(currentQuiz&&!currentQuiz.is_active?[currentQuiz]:[])];
+  const usage=new Map(quizzes.map(q=>[q.id,new Set()]));
+  allCategories.forEach(c=>{
+    if(String(c.id)===String(editId||''))return; // ใช้ค่าประเภทที่กำลังแก้ในฟอร์มแทนค่าเดิม
+    if(c.quizId&&usage.has(c.quizId))usage.get(c.quizId).add(c.typeId||'');
+  });
+  if(currentId&&usage.has(currentId))usage.get(currentId).add(currentType);
+
+  const known=new Set(_ovPtypes.map(t=>t.id));
+  const groups=[..._ovPtypes.map(t=>({id:t.id,label:t.label,items:[]})),
+    {id:'__multi',label:'ใช้ร่วมหลายประเภทโครงการ',items:[]},
+    {id:'',label:'ยังไม่ระบุประเภทโครงการ',items:[]}];
+  quizzes.forEach(q=>{
+    const types=usage.get(q.id)||new Set(),valid=[...types].filter(id=>known.has(id));
+    const groupId=valid.length>1?'__multi':valid.length===1?valid[0]:'';
+    groups.find(g=>g.id===groupId).items.push(q);
+  });
+  const option=q=>`<option value="${q.id}"${q.id===currentId?' selected':''}>${_esc(q.title)}${q.is_active?'':' (ปิดใช้งาน)'}</option>`;
   document.getElementById('nc-quiz').innerHTML='<option value="">— ไม่มีแบบทดสอบ —</option>'
-    +[..._ovQuizzes.filter(x=>x.is_active),...(q&&!q.is_active?[q]:[])].map(x=>`<option value="${x.id}"${x.id===cur?' selected':''}>${_esc(x.title)}</option>`).join('');
+    +groups.filter(g=>g.items.length).map(g=>`<optgroup label="${_esc(g.label)}">${g.items.sort((a,b)=>a.title.localeCompare(b.title,'th')).map(option).join('')}</optgroup>`).join('');
 }
 
 let _ovSeq=0; // Realtime เรียกซ้อนกันได้ — ใช้ผลของครั้งล่าสุดเท่านั้น
@@ -5467,7 +5565,9 @@ function showConfirm(msg,subMsg='',{okLabel='ตกลง',danger=true}={}){
 function showToast(msg,type='success'){
   const t=document.getElementById('toast');
   t.querySelector('#toast-msg').textContent=msg;
-  t.querySelector('i').className=type==='success'?'ti ti-circle-check':type==='warn'?'ti ti-alert-triangle':'ti ti-alert-circle';
+  // ไอคอน = ลูกตัวแรก — icons.util.js แปลง <i class="ti ..."> เป็น <span class="emo-ic"> แล้ว จึงหาด้วย 'i' ไม่ได้ (เคยพังทุก toast หลังแปลง)
+  const ic=type==='success'?'circle-check':type==='warn'?'alert-triangle':'alert-circle';
+  t.firstElementChild.outerHTML=window.appIcon?appIcon(ic):`<i class="ti ti-${ic}"></i>`;
   t.className=`toast ${type} show`;
   setTimeout(()=>t.classList.remove('show'),3500);
 }

@@ -51,6 +51,12 @@
 }
 .ms-panel.open { display: block; }
 .ms-panel.ms-panel-right { left: auto; right: 0; }
+.ms-search-wrap { position: sticky; top: -6px; z-index: 1; padding: 6px; background: var(--surface); }
+.ms-search {
+  width: 100%; min-height: 34px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--bg); color: var(--txt); font: inherit; font-size: 12px; outline: none;
+}
+.ms-search:focus { border-color: var(--violet); box-shadow: 0 0 0 3px rgba(124,92,252,.1); }
 .ms-panel-actions {
   display: flex; justify-content: flex-end; padding: 2px 6px 6px;
   border-bottom: 1px solid var(--border); margin-bottom: 4px;

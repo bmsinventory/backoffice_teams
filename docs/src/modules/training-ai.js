@@ -3,6 +3,7 @@
      1) สรุปผลประเมิน        — หน้า ผลประเมิน   (trnAiSurvey)
      3) สรุปภาพรวมการอบรม    — หน้า Analytics   (trnAiAnalytics)
      6) ร่างข้อความเชิญอบรม  — หน้า รอบอบรม     (trnAiInvite)
+     7) สรุปยอดเข้าอบรมรายวัน — หน้า เช็คชื่อ    (trnAiDailyAtt) · แยกตามรอบ สำหรับส่ง LINE
    ตัวเรียก AI = src/services/ai.service.js (เซิร์ฟเวอร์ AI ของ BMS) · ตัวเลขทุกตัวโค้ดคำนวณเอง AI แค่เรียบเรียงเป็นข้อความ
    ผลลัพธ์อยู่ในช่องข้อความที่แก้ได้ — ผู้ดูแลตรวจ/แก้ก่อนกดคัดลอกไปใช้เสมอ
 ══════════════════════════════════════════════════════════════════════════ */
@@ -367,6 +368,76 @@ ${open.length?`- มีรอบอบรมที่ยังเปิดรั
         txt=txt.includes('{{รอบอบรม}}')?txt.replace(/\{\{รอบอบรม\}\}/g,sl):`${txt}\n\n${sl}`;
       }else txt=txt.replace(/\{\{รอบอบรม\}\}\n?/g,'');
       return txt;
+    },
+  });
+}
+
+/* ══ สรุปยอดการเข้าร่วมอบรมรายวัน — แยกตามรอบ สำหรับส่ง LINE (หน้าเช็คชื่อ ปุ่ม "สรุปยอด AI")
+   ตัวเลขทุกตัวโค้ดคำนวณเอง: ลงทะเบียน = ลงล่วงหน้า (ไม่ใช่ Walk-in) · ไม่ได้ลงทะเบียน = Walk-in · เข้าร่วม = เช็คชื่อแล้ว (รวม Walk-in)
+   ไม่ได้เข้าร่วม = ลงทะเบียนแต่ไม่มาเช็คชื่อ · "รอบที่ i/n" = ลำดับของรอบในหลักสูตรเดียวกัน (เรียงวันที่+เวลา)
+   ค่าเริ่มต้น = ยอดสรุปล้วน (ไม่เรียก AI) · ติ๊ก "ให้ AI เขียนคำเกริ่น/ปิดท้าย" → AI เขียนเฉพาะถ้อยคำรอบ {{สรุปรายรอบ}} — AI ล่มก็ยังได้ยอดสรุปครบ ══ */
+const _sessOrd=(a,b)=>(_sessIso(a)+(a.timeStart||''))<(_sessIso(b)+(b.timeStart||''))?-1:1;
+function _dailyAttFacts(iso){
+  return sessions.filter(s=>_sessIso(s)===iso).sort(_sessOrd).map(s=>{
+    const cat=getCat(s.catId),same=sessions.filter(x=>x.catId===s.catId).sort(_sessOrd);
+    const rs=registrations.filter(r=>r.sessionId===s.id),pre=rs.filter(r=>!r.isWalkin);
+    return{s,course:cat?cat.name:'',idx:same.indexOf(s)+1,of:same.length,
+      reg:pre.length,walkin:rs.length-pre.length,att:rs.filter(r=>r.attended).length,
+      absent:pre.filter(r=>!r.attended)};
+  });
+}
+function _dailyAttBody(rows,withNames){
+  return rows.map(x=>[
+    `📚 ${x.course} รอบที่ ${x.idx}/${x.of}`,
+    `⏰ ${sessTxt(x.s)}${x.s.venue?` · 📍 ${x.s.venue}`:''}`,
+    `📝 ลงทะเบียนอบรม จำนวน ${x.reg} คน`,
+    `🚶 ไม่ได้ลงทะเบียนอบรม จำนวน ${x.walkin} คน`,
+    `✅ เข้าร่วมการอบรม จำนวน ${x.att} คน`,
+    `❌ ไม่ได้เข้าร่วมอบรม จำนวน ${x.absent.length} คน`,
+    ...(withNames&&x.absent.length?x.absent.map(r=>`   ▫️ ${r.prefix||''}${r.fname} ${r.lname}${r.dept?` (${r.dept})`:''}`):[]),
+  ].join('\n')).join('\n\n');
+}
+function trnAiDailyAtt(){
+  if(!sessions.length){showToast('โครงการนี้ยังไม่มีรอบอบรม','warn');return;}
+  const today=_isoToday();
+  const dates=[...new Set(sessions.map(_sessIso))].sort().reverse();
+  const cur=getSess(parseInt(document.getElementById('att-sess-sel')?.value));
+  const d0=cur?_sessIso(cur):dates.includes(today)?today:(dates.find(d=>d<=today)||dates[dates.length-1]);
+  const label=iso=>{const n=sessions.filter(s=>_sessIso(s)===iso).length;return`${fmtDate(iso)} (${n} รอบ)${iso===today?' — วันนี้':''}`;};
+  const sub=iso=>`${_siteLabel()} · ${label(iso)}`;
+  _aiOpen({
+    title:'สรุปยอดการเข้าร่วมอบรมรายวันด้วย AI',
+    sub:sub(d0),
+    opts:_aiOptBox([
+      `<div style="display:flex;align-items:center;gap:4px 14px;"><b style="font-size:12.5px;min-width:56px;">วันที่</b><select id="ai-day" class="form-control" style="padding:4px 10px;font-size:13px;" onchange="document.getElementById('trn-ai-sub').textContent=this.selectedOptions[0].dataset.sub;_aiRun()">${dates.map(d=>`<option value="${d}" data-sub="${_esc(sub(d))}"${d===d0?' selected':''}>${_esc(label(d))}</option>`).join('')}</select></div>`,
+      `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px 18px;">
+        <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="ai-day-names" onchange="_aiRun()">แนบรายชื่อผู้ที่ไม่ได้เข้าร่วมอบรม</label>
+        <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="ai-day-prose" onchange="_aiRun()">ให้ AI เขียนคำเกริ่น/ปิดท้ายเพิ่ม</label>
+      </div>`,
+    ]),
+    run:async()=>{
+      const iso=document.getElementById('ai-day')?.value||d0;
+      const rows=_dailyAttFacts(iso);
+      if(!rows.length)throw new Error('ไม่มีรอบอบรมในวันที่เลือก');
+      const body=_dailyAttBody(rows,document.getElementById('ai-day-names')?.checked);
+      const sum=k=>rows.reduce((a,x)=>a+(k==='absent'?x.absent.length:x[k]),0);
+      const total=rows.length>1?`\n\n📊 รวมทั้งวัน ${rows.length} รอบ\n👥 เข้าร่วม ${sum('att')} คน · ลงทะเบียน ${sum('reg')} คน · Walk-in ${sum('walkin')} คน · ไม่ได้เข้าร่วม ${sum('absent')} คน`:'';
+      const head=`🎓 สรุปยอดการเข้าร่วมอบรม\n🏥 ${_siteLabel()}\n🗓️ ${fmtDate(iso)}\n━━━━━━━━━━━━━━`;
+      let ai='';
+      if(document.getElementById('ai-day-prose')?.checked)try{
+        ai=_aiPlain(await window.aiChat('คุณเป็นเจ้าหน้าที่ประสานงานการอบรมการใช้งานระบบโปรแกรมในโรงพยาบาล ตอบเป็นภาษาไทย ใช้เฉพาะข้อมูลที่ให้มา ห้ามแต่งตัวเลขเพิ่ม',
+`ข้อมูลการอบรมวันที่ ${fmtDate(iso)} — ${_siteLabel()}
+${rows.map(x=>`- ${x.course} รอบที่ ${x.idx}/${x.of} (${sessTxt(x.s)}): ลงทะเบียน ${x.reg} คน · Walk-in ${x.walkin} คน · เข้าร่วม ${x.att} คน · ลงทะเบียนแต่ไม่ได้เข้าร่วม ${x.absent.length} คน`).join('\n')}
+
+เขียนข้อความส่งกลุ่ม LINE สรุปยอดการเข้าร่วมอบรมของวันนี้ ประกอบด้วย
+1) คำเกริ่น 1 ประโยคสั้น ๆ
+2) บรรทัด {{สรุปรายรอบ}} (ห้ามพิมพ์ตัวเลขรายรอบเอง ระบบจะใส่ให้)
+3) ข้อสังเกต/ปิดท้าย 1–2 ประโยค (เช่น อัตราการเข้าร่วม ขอบคุณผู้เข้าอบรม ชวนผู้ที่ไม่ได้เข้าร่วมมาอบรมรอบถัดไป)
+ใช้อีโมจินำประโยคเล็กน้อย ไม่ต้องมีหัวข้อ ## ตอบเฉพาะตัวข้อความ`,{maxTokens:500,temperature:0.5}));
+      }catch(e){showToast((e.message||'AI ทำงานไม่สำเร็จ')+' — แสดงเฉพาะยอดสรุป','warn');}
+      const main=body+total;
+      const txt=!ai?main:ai.includes('{{สรุปรายรอบ}}')?ai.replace(/\{\{สรุปรายรอบ\}\}/g,`\n${main}\n`):`${ai}\n\n${main}`;
+      return`${head}\n\n${txt.replace(/\n{3,}/g,'\n\n').trim()}`;
     },
   });
 }

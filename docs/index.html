@@ -176,7 +176,7 @@
       <div>
         <div class="sb-title">Backoffice Teams</div>
         <!-- เลขเวอร์ชัน: +0.001 ทุกครั้งที่ปล่อยเวอร์ชัน (deploy) -->
-        <div class="sb-sub">V1.005</div>
+        <div class="sb-sub">V1.006</div>
       </div>
     </div>
     <div class="sb-nav">
@@ -1939,6 +1939,18 @@
   </div>
 </div>
 
+<div class="overlay" id="m-imt-fixer-blog">
+  <div class="modal lg">
+    <div class="m-head">
+      <div class="m-icon" style="background:rgba(124,92,252,.12)">✍️</div>
+      <div class="m-title">AI สรุปปัญหาที่แก้ไข (สำหรับ Blog)</div>
+      <button class="m-x" onclick="window.closeM('m-imt-fixer-blog')">✕</button>
+    </div>
+    <div class="m-body" id="m-imt-fixer-blog-body"></div>
+    <div class="m-foot" id="m-imt-fixer-blog-foot"></div>
+  </div>
+</div>
+
 <div class="overlay" id="m-wl-ai">
   <div class="modal lg">
     <div class="m-head">
@@ -1988,6 +2000,7 @@
       <div class="f-group">
         <label class="f-label">เลือกข้อมูลที่ต้องการนำเข้า</label>
         <select class="f-input" id="import-type" onchange="window.updateImportPreview()">
+          <option value="" selected disabled>--เลือกประเภทข้อมูลนำเข้า--</option>
           <option value="PROJECTS">📁 โครงการ (Projects)</option>
           <option value="STAFF">👥 พนักงาน (Staff)</option>
           <option value="USERS">🔑 ผู้ใช้งานระบบ (Users)</option>
@@ -2002,6 +2015,7 @@
           <option value="HOSPITAL_PRODUCTS">📦 Products ที่ รพ. ใช้งาน (Excel)</option>
           <option value="HELPDESK">🎧 ปัญหาเก่า HelpDesk (Excel)</option>
           <option value="IMPL_ISSUES">🩹 ปัญหาการใช้งานเก่า (Impl Tracker, Excel)</option>
+          <option value="SERVER_REQUESTS">🖥 ขอใช้งานทีม Server (Excel)</option>
         </select>
       </div>
       <div class="f-group" id="import-imt-project-wrap" style="display:none;">

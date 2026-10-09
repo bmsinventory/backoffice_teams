@@ -81,7 +81,7 @@
     'database-export':'📤', 'database-plus':'🗄️', 'database':'🗄️', 'download':'⬇️', 'upload':'⬆️', 'file-certificate':'📜',
     'clipboard-list':'📋', 'clipboard-check':'📋', 'clipboard-off':'📋', 'list-details':'📋', 'list':'📋', 'list-check':'☑️',
     'books':'📚', 'book':'📘', 'bookmark':'🔖', 'paperclip':'📎', 'link':'🔗', 'external-link':'↗️', 'copy':'📑',
-    'printer':'🖨️', 'photo':'🖼️', 'photo-down':'🖼️', 'camera':'📷', 'camera-off':'📷', 'qrcode':'🔳', 'scan':'🔳',
+    'printer':'🖨️', 'photo':'🖼️', 'photo-down':'🖼️', 'camera':'📷', 'camera-off':'📷',
     'signature':'✍️', 'text-caption':'🔤', 'box':'📦', 'category':'🏷️', 'category-plus':'🏷️', 'tag':'🏷️', 'address-book':'📇',
     // การกระทำ
     'plus':'➕', 'circle-plus':'➕', 'edit':'✏️', 'pencil':'✏️', 'pencil-plus':'✏️', 'pencil-check':'✏️', 'edit-off':'✏️',
@@ -141,27 +141,27 @@
   window.appIcon = function (name, className, label) {
     var emo = emojiFor(name), extra = className ? ' ' + className : '';
     return (emo
-        ? '<span class="emo-ic' + extra + '" aria-hidden="true">' + emo + '</span>'
+        ? '<i class="emo-ic' + extra + '" aria-hidden="true">' + emo + '</i>'
         : '<i class="ti ti-' + cleanName(name) + extra + '" aria-hidden="true"></i>')
       + (label ? '<span class="sr-only">' + esc(label) + '</span>' : '');
   };
 
-  // <i class="ti ti-xxx ..."> ใน HTML/เทมเพลตของโมดูล → อีโมจิ (คง class อื่น เช่น ni, tp-title-icon ไว้)
+  // <i class="ti ti-xxx ..."> ใน HTML/เทมเพลตของโมดูล → <i class="emo-ic"> อีโมจิ (คงแท็ก i ไว้ให้ CSS เดิมที่เล็ง "> i" ยังใช้ได้)
   // ใส่ class="no-icon" ที่ตัวแม่เพื่อคงเส้น Tabler ไว้
   var TI_RE = /(?:^|\s)ti-([a-z0-9-]+)/;
   function upgradeEl(el) {
     var cls = el.getAttribute('class') || '', m = cls.match(TI_RE);
     var emo = m && TI_EMOJI[m[1]];
     if (!emo || !el.parentNode || el.closest('.no-icon')) return;
-    var span = document.createElement('span');
-    span.className = ('emo-ic ' + cls.replace(/(?:^|\s)ti(?:-[a-z0-9-]+)?(?=\s|$)/g, ' ')).replace(/\s+/g, ' ').trim();
-    span.setAttribute('aria-hidden', 'true');
-    if (el.id) span.id = el.id;
-    if (el.title) span.title = el.title;
+    var ic = document.createElement('i');
+    ic.className = ('emo-ic ' + cls.replace(/(?:^|\s)ti(?:-[a-z0-9-]+)?(?=\s|$)/g, ' ')).replace(/\s+/g, ' ').trim();
+    ic.setAttribute('aria-hidden', 'true');
+    if (el.id) ic.id = el.id;
+    if (el.title) ic.title = el.title;
     var st = el.getAttribute('style');
-    if (st) span.setAttribute('style', st);
-    span.textContent = emo;
-    el.parentNode.replaceChild(span, el);
+    if (st) ic.setAttribute('style', st);
+    ic.textContent = emo;
+    el.parentNode.replaceChild(ic, el);
   }
   function upgradeTree(root) {
     if (!root || root.nodeType !== 1) return;

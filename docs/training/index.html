@@ -164,6 +164,9 @@
       <div class="att-filter-field"><i class="ti ti-calendar-event"></i>
         <select id="att-sess-sel" onchange="loadAttendance()" title="รอบอบรม"><option value="">เลือกรอบ...</option></select>
       </div>
+      <button class="btn btn-sm" onclick="trnAiDailyAtt()" style="background:linear-gradient(135deg,#7c3aed,#db2777);color:#fff;gap:5px;border:none;" title="ให้ AI สรุปยอดการเข้าร่วมอบรมรายวัน แยกตามรอบ สำหรับส่ง LINE">
+        <i class="ti ti-sparkles"></i>สรุปยอด AI
+      </button>
       <button class="btn btn-ghost btn-sm" onclick="exportAttendance()" title="Export Excel (.xlsx)">
         <i class="ti ti-file-spreadsheet"></i>Excel
       </button>
@@ -289,78 +292,71 @@
   <!-- KPI ทุกมิติ (การจัด · การเข้าร่วม · ความครอบคลุม · คุณภาพ · ความพร้อมใช้งาน) — renderAnalytics() -->
   <div id="analytics-summary" class="an-kpis"></div>
 
-  <!-- Row 1: Scorecard ทุกมิติ + Donut -->
-  <div class="an-row an-row-score">
-    <div class="card an-card">
+  <!-- Grid 12 คอลัมน์ — แถว 1: Scorecard (2 คอลัมน์ในการ์ด) + สถานะผู้ลงทะเบียน -->
+  <div class="an-grid">
+    <div class="card an-card an-span-8">
       <div class="an-card-head">
         <div class="card-title"><i class="ti ti-target-arrow"></i>Scorecard ทุกมิติ</div>
         <span id="analytics-score-total" class="an-head-note"></span>
       </div>
-      <div id="analytics-scorecard"></div>
+      <div id="analytics-scorecard" class="an-sc-groups"></div>
     </div>
-    <div class="card an-card">
+    <div class="card an-card an-span-4">
       <div class="card-title an-title"><i class="ti ti-chart-donut-3"></i>สถานะผู้ลงทะเบียน</div>
-      <div style="position:relative;height:240px;"><canvas id="chart-overall"></canvas></div>
+      <div style="position:relative;height:190px;"><canvas id="chart-overall"></canvas></div>
+      <div id="analytics-donut-stats" class="an-dstats"></div>
     </div>
-  </div>
 
-  <!-- Row 2: หลักสูตรอบรม + ผลประเมินรายด้าน -->
-  <div class="an-row">
-    <div class="card an-card">
+    <!-- แถว 2: หลักสูตรอบรม (แท่งแนวนอน) + ผลประเมินรายด้าน -->
+    <div class="card an-card an-span-6">
       <div class="card-title an-title"><i class="ti ti-category"></i>แยกตามหลักสูตรอบรม</div>
-      <div style="position:relative;height:240px;"><canvas id="chart-by-cat"></canvas></div>
+      <div id="chart-by-cat-box" style="position:relative;height:200px;"><canvas id="chart-by-cat"></canvas></div>
     </div>
-    <div class="card an-card">
+    <div class="card an-card an-span-6">
       <div class="an-card-head">
         <div class="card-title"><i class="ti ti-star"></i>ผลประเมินความพึงพอใจรายด้าน</div>
         <span id="analytics-survey-note" class="an-head-note"></span>
       </div>
       <div id="analytics-survey-sec"></div>
     </div>
-  </div>
 
-  <!-- Row 3: รายหน่วยงาน (ทุกมิติ) -->
-  <div class="card an-card">
-    <div class="an-card-head">
-      <div class="card-title"><i class="ti ti-building"></i>สรุปรายหน่วยงาน (ทุกมิติ)</div>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-        <span id="analytics-dept-total" class="an-head-note"></span>
-        <input class="form-control" id="an-dept-q" placeholder="ค้นหาหน่วยงาน" style="width:170px;height:32px;font-size:12px;" oninput="renderAnalyticsDeptTable()">
-        <select class="form-control" id="an-dept-f" style="width:auto;height:32px;font-size:12px;" onchange="renderAnalyticsDeptTable()">
-          <option value="">ทุกหน่วยงาน</option><option value="issue">เฉพาะที่ต้องติดตาม</option><option value="ok">พร้อมแล้ว</option>
-        </select>
-      </div>
+    <!-- แถว 3: รายรอบอบรม + หน่วยงานที่ยังไม่ลงทะเบียน -->
+    <div class="card an-card an-span-8">
+      <div class="card-title an-title"><i class="ti ti-calendar-stats"></i>ผลแต่ละรอบอบรม (ลงทะเบียน · เข้าอบรม · ที่นั่ง)</div>
+      <div style="position:relative;height:250px;"><canvas id="chart-by-sess"></canvas></div>
     </div>
-    <div id="analytics-dept-table" class="an-table-wrap"></div>
-  </div>
+    <div class="card an-card an-span-4">
+      <div class="card-title an-title"><i class="ti ti-building-community"></i>สถานะการลงทะเบียนตามหน่วยงาน</div>
+      <div id="analytics-noreg-list"></div>
+    </div>
 
-  <!-- Row 4: รายรอบอบรม -->
-  <div class="card an-card">
-    <div class="card-title an-title"><i class="ti ti-calendar-stats"></i>ผลแต่ละรอบอบรม (ลงทะเบียน · เข้าอบรม · ที่นั่ง)</div>
-    <div style="position:relative;height:280px;"><canvas id="chart-by-sess"></canvas></div>
-  </div>
-
-  <!-- Row 5: วิทยากร + ผลสอบ -->
-  <div class="an-row">
-    <div class="card an-card">
+    <!-- แถว 4: วิทยากร + ผลสอบ -->
+    <div class="card an-card an-span-6">
       <div class="card-title an-title"><i class="ti ti-presentation"></i>ผลงานรายวิทยากร</div>
       <div id="analytics-trainer" class="an-table-wrap"></div>
     </div>
-    <div class="card an-card">
+    <div class="card an-card an-span-6">
       <div class="an-card-head">
         <div class="card-title"><i class="ti ti-certificate"></i>ผลการทดสอบหลังอบรม</div>
         <span id="analytics-quiz-note" class="an-head-note"></span>
       </div>
       <div id="analytics-quiz" class="an-table-wrap"></div>
     </div>
-  </div>
 
-  <!-- Row 6: Departments not registered -->
-  <div class="card" style="padding:18px;margin-bottom:16px;">
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
-      <div class="card-title" style="font-size:13px;margin-bottom:0;"><i class="ti ti-building-community"></i>สถานะการลงทะเบียนตามหน่วยงาน</div>
+    <!-- แถว 5: รายหน่วยงาน (ทุกมิติ) -->
+    <div class="card an-card an-span-12">
+      <div class="an-card-head">
+        <div class="card-title"><i class="ti ti-building"></i>สรุปรายหน่วยงาน (ทุกมิติ)</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <span id="analytics-dept-total" class="an-head-note"></span>
+          <input class="form-control" id="an-dept-q" placeholder="ค้นหาหน่วยงาน" style="width:170px;height:32px;font-size:12px;" oninput="renderAnalyticsDeptTable()">
+          <select class="form-control" id="an-dept-f" style="width:auto;height:32px;font-size:12px;" onchange="renderAnalyticsDeptTable()">
+            <option value="">ทุกหน่วยงาน</option><option value="issue">เฉพาะที่ต้องติดตาม</option><option value="ok">พร้อมแล้ว</option>
+          </select>
+        </div>
+      </div>
+      <div id="analytics-dept-table" class="an-table-wrap"></div>
     </div>
-    <div id="analytics-noreg-list"></div>
   </div>
 </div>
 
@@ -769,7 +765,11 @@
     <div class="card">
       <div class="card-header" style="flex-wrap:wrap;">
         <div class="card-title"><i class="ti ti-database-export"></i>ตรวจสอบคีย์ยอดตั้งต้น</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <div class="ke-search-wrap" style="position:relative;width:260px;">
+            <i class="ti ti-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:15px;pointer-events:none;"></i>
+            <input class="form-control" id="ke-search" placeholder="ค้นหาแผนก..." oninput="filterKeyEntry()" style="padding-left:32px;height:32px;">
+          </div>
           <button class="btn btn-ghost btn-sm" onclick="loadKeyEntryStatus()"><i class="ti ti-refresh"></i>รีโหลด</button>
           <button class="btn btn-primary btn-sm" onclick="saveKeyEntryImage()"><i class="ti ti-photo"></i>สรุปเป็นภาพ</button>
         </div>
@@ -795,11 +795,6 @@
       </div>
       <div style="background:var(--bg);border-radius:20px;height:10px;overflow:hidden;margin-bottom:18px;">
         <div id="ke-progress-bar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--success-mid),var(--success));border-radius:20px;transition:width .4s;"></div>
-      </div>
-
-      <div class="ke-search-wrap" style="position:relative;max-width:320px;margin-bottom:14px;">
-        <i class="ti ti-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:15px;pointer-events:none;"></i>
-        <input class="form-control" id="ke-search" placeholder="ค้นหาแผนก..." oninput="filterKeyEntry()" style="padding-left:32px;">
       </div>
 
       <div class="table-wrap ke-table-wrap table-cards">
@@ -1222,7 +1217,7 @@
     <div class="tqa-sec" style="margin-top:4px;"><i class="ti ti-info-circle"></i>ข้อมูลหลักสูตรอบรม</div>
     <div class="form-group"><label class="form-label">ชื่อหลักสูตรอบรม <span>*</span></label><input class="form-control" id="nc-name" placeholder="เช่น ระบบงานคลังสินค้า" oninput="_ncPreview()"></div>
     <div class="form-row">
-      <div class="form-group"><label class="form-label">ประเภทโครงการ <span style="font-weight:400;color:var(--text-muted)">(ใช้จัดกลุ่ม)</span></label><select class="form-control" id="nc-type"><option value="">— ไม่ระบุ —</option></select></div>
+      <div class="form-group"><label class="form-label">ประเภทโครงการ <span style="font-weight:400;color:var(--text-muted)">(ใช้จัดกลุ่ม)</span></label><select class="form-control" id="nc-type" onchange="_fillCatQuizSelect(+document.getElementById('nc-quiz').value||null,this.value,document.getElementById('nc-edit-id').value)"><option value="">— ไม่ระบุ —</option></select></div>
       <div class="form-group"><label class="form-label">รหัสหลักสูตร <span style="font-weight:400;color:var(--text-muted)">(ในเลขใบประกาศ)</span></label>
         <input class="form-control" id="nc-cert-code" maxlength="10" placeholder="เช่น INV" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'');_ncPreview()">
       </div>

@@ -518,25 +518,55 @@
 
 /* ── Report Tab: Hero (ring ความคืบหน้ารวม + สถิติเด่น) ── */
 .imt-report-hero {
-  display: flex; align-items: center; gap: 28px; flex-wrap: wrap;
+  display: flex; align-items: center; gap: 28px;
   margin: 16px 24px 20px; padding: 22px 26px; border-radius: var(--r3);
-  background: linear-gradient(135deg, var(--violet)12, var(--indigo)08 60%, transparent);
-  border: 1px solid var(--border); box-shadow: var(--sh-sm);
+  background: var(--surface); border: 1px solid var(--border); box-shadow: var(--sh-sm);
 }
 .imt-report-hero-ring {
-  width: 96px; height: 96px; border-radius: 50%; flex-shrink: 0; position: relative;
+  width: 148px; height: 148px; border-radius: 50%; flex-shrink: 0; position: relative;
   background: conic-gradient(var(--violet) calc(var(--pct, 0) * 1%), var(--surface3) 0);
 }
-.imt-report-hero-ring::before { content: ''; position: absolute; inset: 8px; border-radius: 50%; background: var(--surface); }
-.imt-report-hero-ring span { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 21px; font-weight: 800; color: var(--txt); }
-.imt-report-hero-body  { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
-.imt-report-hero-stats { display: flex; gap: 28px; flex-wrap: wrap; }
-.imt-report-hero-stat  { display: flex; flex-direction: column; gap: 2px; cursor: pointer; }
-.imt-report-hero-stat:hover span { color: var(--violet); }
-.imt-report-hero-stat b    { font-size: 24px; font-weight: 800; line-height: 1.1; }
-.imt-report-hero-stat small { font-size: 14px; font-weight: 700; color: var(--txt3); }
-.imt-report-hero-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.imt-report-hero-stat span { font-size: 11.5px; color: var(--txt3); font-weight: 600; }
+.imt-report-hero-ring::before { content: ''; position: absolute; inset: 13px; border-radius: 50%; background: var(--surface); }
+.imt-report-hero-ring span { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: var(--txt); }
+.imt-report-hero-ring span b     { font-size: 32px; font-weight: 800; line-height: 1; }
+.imt-report-hero-ring span small { font-size: 11.5px; font-weight: 600; color: var(--txt3); display: inline-flex; align-items: center; gap: 3px; }
+.imt-report-hero-body  { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+
+/* KPI 4 ใบ — แต่ละใบมีหัวข้อชัด ตัวเลขใหญ่ และบรรทัดอธิบาย · แถบสีซ้าย/ตัวเลขใช้สี --c ตามความหมาย */
+.imt-report-hero-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.imt-report-kpi {
+  position: relative; display: flex; flex-direction: column; gap: 6px; min-width: 0;
+  padding: 12px 14px 12px 17px; border-radius: var(--r2, 10px); cursor: pointer;
+  background: var(--surface); border: 1px solid var(--border); overflow: hidden;
+  transition: transform .15s, box-shadow .15s;
+}
+/* พื้นสีอ่อนตาม --c ด้วย opacity (ไม่ใช้ color-mix เพราะ html2canvas ตอน "บันทึกเป็นรูปภาพ" ไม่รองรับ) */
+.imt-report-kpi::after  { content: ''; position: absolute; inset: 0; background: var(--c); opacity: .07; pointer-events: none; }
+.imt-report-kpi::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--c); }
+.imt-report-kpi:hover { transform: translateY(-2px); box-shadow: var(--sh-sm); }
+.imt-report-kpi-lbl { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: var(--txt2); }
+.imt-report-kpi-ic  { font-size: 15px; line-height: 1; }
+.imt-report-kpi-val { font-size: 30px; font-weight: 800; line-height: 1.05; color: var(--c); }
+.imt-report-kpi-val small { font-size: 14px; font-weight: 700; color: var(--txt3); }
+.imt-report-kpi-bar { height: 6px; border-radius: 3px; background: var(--surface3); overflow: hidden; }
+.imt-report-kpi-bar span { display: block; height: 100%; border-radius: 3px; background: var(--c); }
+.imt-report-kpi-sub { font-size: 12px; color: var(--txt3); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* แถบสถานะงานแบบซ้อน + คำอธิบายสี */
+.imt-report-status-head { font-size: 12.5px; font-weight: 700; color: var(--txt2); margin-bottom: 6px; }
+.imt-report-status-bar { display: flex; gap: 2px; height: 12px; border-radius: 6px; overflow: hidden; background: var(--surface3); }
+.imt-report-status-bar span { min-width: 4px; cursor: pointer; transition: opacity .15s; }
+.imt-report-status-bar span:hover { opacity: .75; }
+.imt-report-status-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 8px; }
+.imt-report-status-legend button {
+  display: inline-flex; align-items: center; gap: 6px; padding: 2px 0; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: 12.5px; color: var(--txt2);
+}
+.imt-report-status-legend button:hover { color: var(--violet); }
+.imt-report-status-legend i { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.imt-report-status-legend b { color: var(--txt); }
+.imt-report-status-legend small { color: var(--txt3); }
+@media (max-width: 1200px) { .imt-report-hero-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 /* ── Report Tab: สรุปรวมของโครงการ (งานเกินกำหนด / 14 วันข้างหน้า / ปัญหา / แบบฟอร์มรายคลัง) — 2 คอลัมน์ ── */
 .imt-report-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 0 24px 20px; }
@@ -657,9 +687,8 @@
   .imt-ws-filterbar .t-sel { min-width: 0; font-size: 11px; padding-left: 8px; }
   .imt-ws-filterbar > div[style*="flex:1"] { display: none; }
   .imt-ws-filterbar .btn { grid-column: 1 / -1; }
-  /* แท็บ "ปัญหา" มีแค่ค้นหา + select 2 ตัว (สถานะ/กลุ่มปัญหา) ไม่ใช่ 3 ตัวเหมือนแท็บ "งาน" —
-     ใช้ 3 คอลัมน์เหมือนกันจะเหลือช่องว่างลอย 1 ช่อง แบ่งเป็น 2 คอลัมน์เท่ากันให้เต็มแถวพอดี */
-  .imt-issue-filterbar { grid-template-columns: 1fr 1fr; }
+  /* แท็บ "ปัญหา": ค้นหา / ชิปสถานะ / select กลุ่มปัญหา / ปุ่ม AI — อย่างละแถวเต็มความกว้าง */
+  .imt-issue-filterbar { grid-template-columns: 1fr; }
 
   /* ตารางปัญหาในป๊อปอัปของหน้า "ปัญหาทุกโครงการ" (.imt-issues-tbl): คอลัมน์แรกคือ "ลำดับ" (ตัวเลขล้วน)
      กฎ .m-card-table ทั่วไปจะดันคอลัมน์แรกเป็นหัวการ์ด — ไม่เหมาะกับแค่ตัวเลข จึงทำเป็นแถบเล็กแนวนอนบนสุดของการ์ดแทน ── */
@@ -678,11 +707,13 @@
   .imt-pgrid, .imt-tgrid, .imt-report-phasegrid { grid-template-columns: 1fr; padding: 14px; gap: 10px; }
 
   /* Report hero — ring มาก่อน สถิติต่อแถวด้านล่าง แทนเรียงข้างกันซึ่งจะแคบเกินไป */
-  .imt-report-hero { margin: 12px 12px 14px; padding: 16px 18px; gap: 16px; }
-  .imt-report-hero-ring { width: 76px; height: 76px; }
-  .imt-report-hero-ring span { font-size: 17px; }
-  .imt-report-hero-stats { gap: 16px 22px; }
-  .imt-report-hero-stat b { font-size: 19px; }
+  .imt-report-hero { margin: 12px 12px 14px; padding: 16px 14px; gap: 16px; flex-direction: column; align-items: stretch; }
+  .imt-report-hero-ring { width: 120px; height: 120px; align-self: center; }
+  .imt-report-hero-ring::before { inset: 11px; }
+  .imt-report-hero-ring span b { font-size: 26px; }
+  .imt-report-hero-stats { gap: 10px; }
+  .imt-report-kpi { padding: 10px 12px 10px 15px; }
+  .imt-report-kpi-val { font-size: 24px; }
   .imt-report-grid { grid-template-columns: 1fr; padding: 0 12px 14px; }
 
   /* Inline task list ในการ์ดโครงการ (หน้าเลือกโครงการ) */
@@ -748,7 +779,8 @@
 .imt-iss-txt.clamp:not(.open) { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; } /* ปัญหา: 2 บรรทัด */
 .imt-iss-more { border: none; background: none; padding: 2px 0 0; font: inherit; font-size: 12px; font-weight: 600; color: var(--violet); cursor: pointer; }
 /* ชิปสรุปจำนวนตามสถานะ ท้ายแถวตัวกรอง (กด = กรองสถานะนั้น) */
-.imt-iss-stats { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+.imt-iss-stats { display: flex; flex-wrap: wrap; gap: 6px; }
+.imt-iss-ai { margin-left: auto; }
 .imt-iss-chip { border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 5px 11px; font: inherit; font-size: 12px; color: var(--txt2); cursor: pointer; white-space: nowrap; }
 .imt-iss-chip b { color: var(--c); margin-left: 2px; }
 .imt-iss-chip:hover, .imt-iss-chip.on { border-color: var(--c); background: color-mix(in srgb, var(--c) 10%, transparent); }
@@ -769,3 +801,13 @@
 .imt-ai-choice-t { white-space: pre-wrap; color: var(--txt); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; line-height: 1.55; }
 .imt-ai-choice-b { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .imt-ai-choice-done { margin-top: 6px; font-size: 11.5px; color: var(--txt3); }
+
+/* AI สรุปผู้แก้ไข — วันที่มีการแก้ไข */
+.ifb-days-head { margin-top: 12px; font-size: 12px; color: var(--txt2); }
+.ifb-days-head a { margin-left: 6px; color: var(--violet); }
+.ifb-days { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; max-height: 120px; overflow-y: auto; }
+.ifb-day { border: 1px solid var(--border); background: var(--surface2); color: var(--txt2); border-radius: 999px; padding: 3px 10px; font-size: 12px; font-family: inherit; cursor: pointer; }
+.ifb-day b { color: var(--txt); }
+.ifb-day:hover { border-color: var(--violet); }
+.ifb-day.on { border-color: var(--violet); background: rgba(124,92,252,.10); color: var(--violet); }
+.ifb-day.on b { color: var(--violet); }

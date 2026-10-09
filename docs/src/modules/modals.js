@@ -120,7 +120,25 @@ window.updateImportPreview=function(){
   const imtProjectWrap=document.getElementById('import-imt-project-wrap');
   const clearFirstLabel=document.getElementById('import-clear-first-label');
   const clearFirstCb=document.getElementById('import-clear-first');
+  const clearFirstWrap=clearFirstCb&&clearFirstCb.closest('.f-cb');
+  const execBtn=document.getElementById('import-exec-btn');
   window._importAlert(null);
+  if(clearFirstWrap)clearFirstWrap.style.display='';
+  if(templateBtn)templateBtn.disabled=false;
+  if(execBtn)execBtn.disabled=false;
+  if(!type){
+    if(fileInput)fileInput.accept='.csv,.xlsx,.xls';
+    if(fileLabel)fileLabel.textContent='เลือกไฟล์หลังจากเลือกประเภทข้อมูลนำเข้า';
+    if(msgEl)msgEl.textContent='กรุณาเลือกประเภทข้อมูลนำเข้าก่อนเลือกไฟล์';
+    if(formatBox)formatBox.textContent='กรุณาเลือกประเภทข้อมูลนำเข้า';
+    if(templateBtn){templateBtn.textContent='⬇ ดาวน์โหลดไฟล์ตัวอย่าง';templateBtn.disabled=true;}
+    if(titleEl)titleEl.textContent='นำเข้าข้อมูล';
+    if(imtProjectWrap)imtProjectWrap.style.display='none';
+    if(clearFirstWrap)clearFirstWrap.style.display='none';
+    if(clearFirstCb)clearFirstCb.checked=false;
+    if(execBtn)execBtn.disabled=true;
+    return;
+  }
   // ── ช่องเลือกโครงการปลายทาง (เฉพาะ IMPL_ISSUES) — ซ่อน/รีเซ็ตทุกครั้งที่สลับประเภทออกไปเป็นอย่างอื่น
   // กันค่าที่เลือกไว้ค้างข้ามประเภท ── */
   if(type!=='IMPL_ISSUES'){
@@ -171,6 +189,18 @@ window.updateImportPreview=function(){
     if(clearFirstCb)clearFirstCb.checked=false;
     return;
   }
+  if(type==='SERVER_REQUESTS'){
+    if(fileInput)fileInput.accept='.xlsx,.xls,.csv';
+    if(fileLabel)fileLabel.textContent='เลือกไฟล์ Excel ที่กรอกข้อมูลแล้ว (.xlsx / .xls / .csv)';
+    if(msgEl)msgEl.innerHTML='1 แถว = 1 คำขอ · ระบุชื่อผู้ขอ โรงพยาบาล และช่วงวันที่ · ระบบจับคู่ตัวเลือก/เจ้าหน้าที่จากชื่อหรือรหัส · เลือกช่องด้านล่างเมื่อต้องการลบข้อมูลเก่าที่ซ้ำ';
+    if(formatBox)formatBox.textContent='req_no, requester_name, requester_team, hospital_code, hospital_name, it_name, it_phone, work_mode, db_type, tasks, task_other, phase, start_date, end_date, headcount, note, status, assignees, created_at (ดูคำอธิบายในไฟล์ตัวอย่าง)';
+    if(templateBtn)templateBtn.textContent='⬇ ดาวน์โหลดไฟล์ตัวอย่าง (.xlsx)';
+    if(titleEl)titleEl.textContent='นำเข้าคำขอใช้งานทีม Server (Excel)';
+    if(clearFirstWrap)clearFirstWrap.style.display='';
+    if(clearFirstLabel)clearFirstLabel.textContent='⚠ ลบ Data เก่าที่ซ้ำออกด้วยก่อนนำเข้า (เทียบเลขที่คำขอเป็นหลัก; ถ้าไม่มีเลขที่ จะเทียบผู้ขอ รพ. วันที่ และประเภทงาน)';
+    if(clearFirstCb)clearFirstCb.checked=false;
+    return;
+  }
   if(type==='HOSPITAL_CONTACTS'){
     if(fileInput)fileInput.accept='.xlsx,.xls,.csv';
     if(fileLabel)fileLabel.textContent='เลือกไฟล์ Excel ที่กรอกข้อมูลแล้ว (.xlsx / .xls / .csv)';
@@ -191,10 +221,7 @@ window.updateImportPreview=function(){
 window.openImportModal=function(){
   document.getElementById('import-file').value='';window._importFileChanged();
   window._importProgress(null);
-  var activeView=document.querySelector('.view.on');
-  var viewId=activeView?activeView.id.replace('view-',''):'';
-  var typeMap={hospital:'HOSPITALS',staff:'STAFF',advance:'ADVANCES',contract:'CONTRACTS',helpdesk:'HELPDESK'};
-  document.getElementById('import-type').value=typeMap[viewId]||'PROJECTS';
+  document.getElementById('import-type').value='';
   window.updateImportPreview();
   window.openM('m-import');
 }
@@ -205,6 +232,7 @@ window.downloadTemplate=function(){
   if(type==='HOSPITAL_PRODUCTS'){window.downloadHospitalProductsTemplate();return;}
   if(type==='HELPDESK'){window.hdDownloadImportTemplate&&window.hdDownloadImportTemplate();return;}
   if(type==='IMPL_ISSUES'){window.imtDownloadIssueImportTemplate&&window.imtDownloadIssueImportTemplate();return;}
+  if(type==='SERVER_REQUESTS'){window.srvDownloadImportTemplate&&window.srvDownloadImportTemplate();return;}
   const schema=window.IMPORT_SCHEMAS[type];if(!schema)return;const csvContent="data:text/csv;charset=utf-8,\uFEFF"+schema.headers.join(",")+"\n"+schema.example.join(",");const link=document.createElement("a");link.setAttribute("href",encodeURI(csvContent));link.setAttribute("download",`Template_${type}.csv`);document.body.appendChild(link);link.click();document.body.removeChild(link);
 }
 // ── หลอดความคืบหน้าตอนนำเข้า (บังทั้งกล่อง) — total = จำนวนรายการที่ต้องเขียน (รวมรายการที่ลบก่อนนำเข้า)
@@ -261,7 +289,16 @@ const _IMPORT_REF={
 };
 window.execImport=async function(){
   const fileInput=document.getElementById('import-file');const selType=document.getElementById('import-type').value;const schema=window.IMPORT_SCHEMAS[selType];const isClearFirst=document.getElementById('import-clear-first').checked;
+  if(!selType){window._importAlert('error','กรุณาเลือกประเภทข้อมูลนำเข้าก่อน');return;}
   if(!fileInput.files.length){window._importAlert('error','กรุณาเลือกไฟล์ก่อน');return;}
+  if(selType==='SERVER_REQUESTS'){
+    if(!window.auth.currentUser){window._importAlert('error','กรุณาเชื่อมต่อก่อน');return;}
+    const execBtn=document.getElementById('import-exec-btn');if(execBtn)execBtn.disabled=true;
+    try{if(!window.srvImportFromFile)throw new Error('ยังโหลดโมดูลขอใช้งานทีม Server ไม่สำเร็จ');await window.srvImportFromFile(fileInput.files[0],isClearFirst);}
+    catch(err){console.error(err);window._importAlert('error','นำเข้าไม่สำเร็จ — เกิดข้อผิดพลาด',[err.message||String(err)]);}
+    finally{window._importProgress(null);}
+    return;
+  }
   if(selType==='CONTRACTS'){
     if(!window.auth.currentUser){window._importAlert('error','กรุณาเชื่อมต่อก่อน');return;}
     const file=fileInput.files[0];const reader=new FileReader();

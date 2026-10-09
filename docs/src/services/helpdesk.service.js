@@ -46,6 +46,8 @@
       ratedAt: d.rated_at || '',
       tags: Array.isArray(d.tags) ? d.tags : [],
       createdBy: d.created_by || '',
+      agentLastReadAt: d.agent_last_read_at || '',
+      reporterLastReadAt: d.reporter_last_read_at || '',
       createdAt: d.created_at || '',
       updatedAt: d.updated_at || '',
     };
@@ -337,7 +339,7 @@
   // ── ร่างข้อความตอบผู้แจ้ง (รพ.) จากรายละเอียด Ticket + บทสนทนาทั้งหมด (รวมโน้ตภายในเป็นข้อมูลประกอบ
   // แต่สั่งห้ามเปิดเผยตรง ๆ) — คืนข้อความล้วน ให้เจ้าหน้าที่ตรวจ/แก้ก่อนกดส่งเองเสมอ ──
   window.hdAiDraftReply = async function (t, events, hint) {
-    var who = function (e) { return e.actor_type === 'reporter' ? 'ผู้แจ้ง' : e.actor_type === 'system' ? 'ระบบ' : 'ทีมงาน'; };
+    var who = function (e) { return e.actor_type === 'reporter' ? 'ผู้แจ้ง' : e.actor_type === 'system' ? 'ระบบ' : e.actor_type === 'ai' ? 'AI ผู้ช่วย' : 'ทีมงาน'; };
     var convo = (events || []).filter(function (e) { return e.type === 'comment' && e.body; }).slice(-12).map(function (e) {
       return '[' + who(e) + (e.is_internal ? ' · โน้ตภายใน' : '') + '] ' + String(e.body).slice(0, 500);
     }).join('\n');
@@ -435,6 +437,15 @@
     window.HD_PRIORITY = hdApplyOptionOverrides(window.HD_PRIORITY_DEFAULTS, window._hdOptionOverrides.priority, ['label', 'color']);
     window.HD_STATUS   = hdApplyOptionOverrides(window.HD_STATUS_DEFAULTS,   window._hdOptionOverrides.status,   ['label', 'color', 'icon']);
     window.HD_URGENCY  = hdApplyOptionOverrides(window.HD_URGENCY_DEFAULTS,  window._hdOptionOverrides.urgency,  ['label', 'priority']);
+    var aiBase = window.HD_AI_AUTO_DEFAULTS || {}, aiRaw = d.helpdesk_ai_auto_reply || {};
+    window.HD_AI_AUTO_REPLY = Object.assign({}, aiBase, aiRaw, {
+      schedule: Object.assign({}, aiBase.schedule || {}, aiRaw.schedule || {}),
+      priority_modes: Object.assign({}, aiBase.priority_modes || {}, aiRaw.priority_modes || {}),
+      team_breaks: Array.isArray(aiRaw.team_breaks) ? aiRaw.team_breaks : (aiBase.team_breaks || []),
+      channels: Array.isArray(aiRaw.channels) ? aiRaw.channels : (aiBase.channels || []),
+      allowed_category_ids: Array.isArray(aiRaw.allowed_category_ids) ? aiRaw.allowed_category_ids : [],
+      allowed_hospital_ids: Array.isArray(aiRaw.allowed_hospital_ids) ? aiRaw.allowed_hospital_ids : [],
+    });
     _rerenderIfOpen();
   };
 

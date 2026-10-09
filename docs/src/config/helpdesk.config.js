@@ -76,6 +76,44 @@
   // ── เวลาทำการ (ใช้คำนวณ due date ฝั่ง client — P0 ไม่มีงานเบื้องหลัง) ──
   window.HD_BIZ_HOURS = { startMin: 8 * 60 + 30, endMin: 17 * 60 + 30, days: [1,2,3,4,5] }; // จ–ศ 08:30–17:30
 
+  // ── AI ตอบกลับอัตโนมัติ ──
+  // ค่าใน settings.app.helpdesk_ai_auto_reply จะถูก merge ทับชุดนี้โดย helpdesk.service.js
+  // ปิดไว้เป็นค่าเริ่มต้นเพื่อให้ผู้ดูแลตรวจตาราง/ขอบเขตก่อนเปิดใช้งานจริง
+  window.HD_AI_AUTO_DEFAULTS = {
+    enabled: false,
+    mode: 'all_hours',                 // all_hours | outside_only
+    timezone: 'Asia/Bangkok',
+    business_delay_minutes: 10,
+    off_hours_delay_minutes: 3,
+    holiday_delay_minutes: 3,
+    followup_delay_minutes: 1,         // ลูกค้าถามต่อหลัง AI ตอบแล้ว → รอแค่นี้
+    max_auto_replies: 2,
+    return_after_hours: 24,            // แจ้งรอทีมแล้วทีมยังไม่ตอบครบเท่านี้ → AI กลับมาตอบใหม่ (0 = ไม่กลับมา)
+    kb_similarity_threshold: 0.22,
+    min_confidence: 'high',
+    use_holidays: true,
+    channels: ['web'],
+    allowed_category_ids: [],          // [] = ทุกหมวด
+    allowed_hospital_ids: [],          // [] = ทุกโรงพยาบาล
+    priority_modes: { p1:'ack_only', p2:'ack_only', p3:'guide', p4:'guide' },
+    schedule: {
+      0:{ enabled:false, start:'08:30', end:'17:30' },
+      1:{ enabled:true,  start:'08:30', end:'17:30' },
+      2:{ enabled:true,  start:'08:30', end:'17:30' },
+      3:{ enabled:true,  start:'08:30', end:'17:30' },
+      4:{ enabled:true,  start:'08:30', end:'17:30' },
+      5:{ enabled:true,  start:'08:30', end:'17:30' },
+      6:{ enabled:false, start:'08:30', end:'17:30' },
+    },
+    team_breaks: [],
+    // ส่งครั้งเดียวเมื่อ AI ตอบครบ max_auto_replies แล้วลูกค้ายังถามต่อ (ข้อความเริ่มต้นเดียวกับ push-worker)
+    handoff_message: 'ได้รับข้อความเพิ่มเติมแล้วครับ 🙏 เรื่องนี้ส่งต่อให้ทีมงานตรวจสอบแล้ว รบกวนรอทีมงานเข้ามาตอบกลับสักครู่นะครับ หากมีข้อมูลเพิ่มเติมแจ้งไว้ใน Ticket นี้ได้เลย ทีมงานจะเห็นทั้งหมดครับ 😊',
+    audit_log_days: 180,
+    raw_log_days: 30,
+    technical_log_days: 365,
+  };
+  window.HD_AI_AUTO_REPLY = JSON.parse(JSON.stringify(window.HD_AI_AUTO_DEFAULTS));
+
   // ── AI ช่วยวิเคราะห์ (ตัวเรียก AI กลาง: src/services/ai.service.js) ──
   window.HD_AI_SYSTEM_PROMPT =
     'คุณเป็นผู้ช่วยทีม Helpdesk ของบริษัทซอฟต์แวร์โรงพยาบาล วิเคราะห์ปัญหาที่ผู้ใช้แจ้ง ' +

@@ -1914,20 +1914,17 @@
     var catOpts = ['<option value="">ทุกกลุ่มปัญหา</option>'].concat(imtIssueCategories().map(function (c) {
       return '<option value="'+esc(c)+'"'+(f.category===c?' selected':'')+'>'+esc(c)+'</option>';
     })).join('');
-    var stOpts = ['<option value="">ทุกสถานะ</option>'].concat(window.IMPL_ISSUE_STATUS.map(function (s) {
-      return '<option value="'+s.id+'"'+(f.status===s.id?' selected':'')+'>'+esc(s.label)+'</option>';
-    })).join('');
     var filterBar = '<div class="imt-ws-filterbar imt-issue-filterbar">'
       + '<div class="t-search"><input placeholder="ค้นหาปัญหา/หน่วยงาน..." value="'+esc(f.q||'')+'" oninput="window.imtSetIssueFilter(\'q\',this.value)"></div>'
-      + '<select class="t-sel" onchange="window.imtSetIssueFilter(\'status\',this.value)">'+stOpts+'</select>'
-      + '<select class="t-sel" onchange="window.imtSetIssueFilter(\'category\',this.value)">'+catOpts+'</select>'
-      // ── สรุปจำนวนตามสถานะ เป็นชิปเล็กท้ายแถวตัวกรอง (แทน KPI 4 ใบใหญ่ที่กินพื้นที่) · กดชิป = กรองสถานะนั้น
+      // ── ตัวกรองสถานะ = ชิปพร้อมจำนวน (แทน select "ทุกสถานะ") · กดชิป = กรองสถานะนั้น
       // มือถือเหลือไอคอน+ตัวเลข (ซ่อน .lbl — มี title บอกชื่อเต็ม) ──
       + '<div class="imt-iss-stats">' + [['', '🗂️', 'ทั้งหมด', all.length, 'var(--indigo)'], ['open', '🔴', 'รอดำเนินการ', openN, 'var(--coral)'],
           ['in_progress', '🔵', 'กำลังดำเนินการ', progN, 'var(--indigo)'], ['closed', '✅', 'ดำเนินการแล้ว', doneN, 'var(--teal)']].map(function (c) {
           return '<button type="button" class="imt-iss-chip' + ((f.status || '') === c[0] ? ' on' : '') + '" style="--c:' + c[4] + '" title="' + c[2] + '"'
             + ' onclick="window.imtSetIssueFilter(\'status\',\'' + c[0] + '\')">' + c[1] + '<span class="lbl"> ' + c[2] + '</span> <b>' + c[3] + '</b></button>';
         }).join('') + '</div>'
+      + '<select class="t-sel" onchange="window.imtSetIssueFilter(\'category\',this.value)">'+catOpts+'</select>'
+      + '<button class="btn btn-ghost btn-sm imt-iss-ai" onclick="window.openImtFixerBlogModal()" title="ให้ AI สรุปว่าผู้แก้ไขแต่ละคนแก้ปัญหาอะไรไปบ้าง ในรูปแบบบทความ Blog">✍️ AI สรุปผู้แก้ไข</button>'
       + '</div>';
 
     var rows = imtFilteredIssues(pid);
@@ -2310,8 +2307,37 @@
     });
   }
 
+  // ── แจ้งปัญหาใหม่: สลับแสดงส่วน "การแก้ไข" ตามสถานะ — "ดำเนินการแล้ว" = ใส่เข้า DOM (วันที่แก้ = วันนี้ ถ้ายังว่าง)
+  // สถานะอื่น = เอาออกจาก DOM ทั้งก้อน (saveImtIssue/AI ถือว่าไม่มีช่องนี้) แต่จำค่าที่พิมพ์ไว้ เผื่อสลับกลับมา ──
+  var _imtResolutionHtml = '';
+  var _imtResolutionStash = null;
+  window.imtToggleIssueResolution = function () {
+    var wrap = document.getElementById('imt-is-res-wrap'), statusEl = document.getElementById('imt-is-status');
+    if (!wrap || !statusEl) return;
+    var sol = document.getElementById('imt-is-solution');
+    if (statusEl.value !== 'closed') {
+      if (sol) {
+        _imtResolutionStash = { solution: sol.value, fixedBy: document.getElementById('imt-is-fixed-by').value, fixedDate: document.getElementById('imt-is-fixed-date').value };
+        wrap.innerHTML = '';
+      }
+      return;
+    }
+    if (sol) return;
+    wrap.innerHTML = _imtResolutionHtml;
+    var st = _imtResolutionStash;
+    if (st) {
+      document.getElementById('imt-is-solution').value = st.solution;
+      document.getElementById('imt-is-fixed-by').value = st.fixedBy;
+    }
+    var fdEl = document.getElementById('imt-is-fixed-date');
+    var now = new Date(); // วันที่ตามเวลาเครื่อง (toISOString เป็น UTC — ก่อน 7 โมงเช้าจะได้วันก่อนหน้า)
+    fdEl.value = (st && st.fixedDate) || (now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0'));
+    setTimeout(function () { var el = document.getElementById('imt-is-solution'); if (el) el.focus(); }, 30);
+  };
+
   // ── Add/Edit Modal ──
   window.openImtIssueModal = function (id) {
+    _imtResolutionStash = null;
     window.imtEditIssueId = id;
     var pid = window.imtCurrentProjectId;
     var cats = imtIssueCategories();
@@ -2338,18 +2364,19 @@
       return '<option value="'+esc(o.id)+'"'+(defaultFixedBy===o.id?' selected':'')+'>'+esc(o.label)+'</option>';
     })).join('');
     // ครั้งแรก (แจ้งปัญหาใหม่) แสดงแค่ข้อมูลรับแจ้ง — ส่วน "การแก้ไข" (วิธีแก้/ผู้แก้ไข/วันที่แก้)
-    // ยังไม่มีข้อมูลจริง เลยซ่อนไว้ก่อน มาแสดงตอนกดแก้ไขปัญหาที่บันทึกไว้แล้วเท่านั้น — และเน้นให้เด่น
+    // ยังไม่มีข้อมูลจริง เลยซ่อนไว้ก่อน ยกเว้นเลือกสถานะ "ดำเนินการแล้ว" (แก้จบตั้งแต่ตอนแจ้ง) ให้แสดงทันที
+    // (ดู imtToggleIssueResolution) — ตอนกดแก้ไขปัญหาที่บันทึกไว้แล้วแสดงเสมอ และเน้นให้เด่น
     // เพราะตอนกดแก้ไขส่วนใหญ่ก็เพื่อมาลงรายละเอียดตรงนี้เป็นหลัก ──
-    var resolutionSection = id
-      ? '<div style="border:1.5px solid var(--violet);background:rgba(124,92,252,.06);border-radius:10px;margin-top:14px;padding:12px 14px;">'
+    _imtResolutionHtml =
+      '<div style="border:1.5px solid var(--violet);background:rgba(124,92,252,.06);border-radius:10px;margin-top:14px;padding:12px 14px;">'
         + '<div class="f-label" style="font-weight:700;color:var(--violet);margin-bottom:2px;">🔧 การแก้ไข</div>'
         + '<div class="f-group"><label class="f-label">วิธีการแก้ไข</label><textarea class="f-input" id="imt-is-solution" rows="4" placeholder="พิมพ์รายละเอียดการแก้ไขที่นี่...">'+esc(i.solution)+'</textarea></div>'
         + '<div class="m-stack" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'
         +   '<div class="f-group"><label class="f-label">ผู้แก้ไข</label><select class="f-input" id="imt-is-fixed-by" onchange="window.imtCheckIssueAutoClose()">'+fixedByOpts+'</select></div>'
         +   '<div class="f-group"><label class="f-label">วันที่แก้ไขปัญหา</label><input type="date" class="f-input" id="imt-is-fixed-date" value="'+esc(i.fixedDate||'')+'" onchange="window.imtCheckIssueAutoClose()"></div>'
         + '</div>'
-      + '</div>'
-      : '';
+      + '</div>';
+    var resolutionSection = '<div id="imt-is-res-wrap">' + (id || i.status === 'closed' ? _imtResolutionHtml : '') + '</div>';
     // หน่วยงาน/แผนกที่แจ้ง — แนะนำจากชื่อที่เคยพิมพ์ไว้แล้วในโครงการนี้ผ่าน <datalist> ของเบราว์เซอร์เอง
     // (พิมพ์ค้นแล้วเลือกได้ หรือจะพิมพ์ชื่อใหม่ก็ยังทำได้ตามปกติ) ไม่ต้องมีรายการตายตัวให้ดูแลเพิ่ม
     var deptOpts = imtIssueDepartments(pid).map(function (d) { return '<option value="'+esc(d)+'">'; }).join('');
@@ -2364,7 +2391,7 @@
       +   '<div id="imt-is-ai-out"></div></div>'
       + '<div class="imt-issue-row3" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">'
       +   '<div class="f-group"><label class="f-label">กลุ่มปัญหา <span class="imt-req">*</span></label><select class="f-input" id="imt-is-cat">'+catOpts+'</select></div>'
-      +   '<div class="f-group"><label class="f-label">สถานะ <span class="imt-req">*</span></label><select class="f-input" id="imt-is-status">'+stOpts+'</select></div>'
+      +   '<div class="f-group"><label class="f-label">สถานะ <span class="imt-req">*</span></label><select class="f-input" id="imt-is-status"' + (id ? '' : ' onchange="window.imtToggleIssueResolution()"') + '>'+stOpts+'</select></div>'
       +   '<div class="f-group"><label class="f-label">ผู้รับปัญหา <span class="imt-req">*</span></label><select class="f-input" id="imt-is-received-by">'+imtReceiverOptions(pid, i.receivedById)+'</select></div>'
       + '</div>'
       + resolutionSection;
@@ -2470,7 +2497,7 @@
         + '<td>'+esc(i.department||'-')+'</td>'
         + '<td>'+esc(i.problem)+'</td>'
         + '<td>'+esc(i.category||'-')+'</td>'
-        + '<td>'+st.icon+' '+esc(st.label)+'</td>'
+        + '<td>'+esc(st.label)+'</td>'
         + '<td>'+esc(i.solution||'—')+'</td>'
         // ผู้รับปัญหา/ผู้แก้ไข: ชื่อ-นามสกุลไม่มีคำนำหน้า (nameKey ตัด นาย/นาง/นางสาว/น.ส.)
         + '<td>'+esc(window.nameKey(window.staffNameByRef(i.receivedById)) || '—')+'</td>'
@@ -2873,33 +2900,117 @@
     _imtDoExport(headers, rows, 'ImplTracker_Report');
   };
 
-  // ── Export เป็นรูปภาพ (PNG): ไม่ตัดพื้นที่ตามหน้ากระดาษ A4 เหมือน Print — รูปจะสูงเท่าเนื้อหาจริง
-  // ไม่มีที่ว่างเหลือทิ้ง เหมาะกว่าตอนต้องการส่งไฟล์ให้ผู้บริหารดูทางไลน์/อีเมลโดยไม่ต้องเปิด PDF ──
+  // ── Export เป็นรูปภาพ (PNG): แบ่งเป็นหลายภาพ สัดส่วนประมาณ A4 แนวตั้ง (กว้าง 1000 สูงไม่เกิน IMT_IMG_MAX_H)
+  // เดิมได้ภาพเดียวยาวเหยียดตามเนื้อหา — โครงการที่ Checklist เยอะ ภาพยาวมากจนเปิดในไลน์/มือถือแล้วอ่านไม่ออก
+  // ภาพแรก = หัวเรื่อง + กราฟ + สรุป 3 ช่อง ตามด้วย Phase · ภาพถัดไป = หัวเรื่องย่อ + Phase ที่เหลือ
+  // ไล่เติมทีละแถวลงคอลัมน์ซ้าย → ขวา → ภาพใหม่ วัดความสูงจริงจาก DOM · Phase ที่ถูกตัดข้ามคอลัมน์/ภาพขึ้นหัวว่า "(ต่อ)" ──
+  var IMT_IMG_W = 1000, IMT_IMG_MAX_H = 1414;
+  function imtNextFrame() { return new Promise(function (r) { requestAnimationFrame(function () { requestAnimationFrame(r); }); }); }
+
   window.exportImtReportImage = async function () {
     if (!(await window.LibLoader.need('html2canvas'))) return;
     var src = document.querySelector('.imt-print-page');
     if (!src) { window.showAlert && window.showAlert('ไม่พบข้อมูลสำหรับสร้างรูปภาพ กรุณาเลือกโครงการก่อน', 'error'); return; }
     var proj = imtProject(window.imtCurrentProjectId);
-    var clone = src.cloneNode(true);
-    clone.style.cssText = 'display:block;position:fixed;top:-100000px;left:0;width:1000px;height:auto;max-height:none;overflow:visible;background:#fff;padding:24px;';
-    document.body.appendChild(clone);
-    // รอ 2 เฟรมให้เบราว์เซอร์ layout เนื้อหาที่ clone มาให้เสร็จก่อน ค่อยวัดขนาดจริง (กันวัดขนาดผิดจนภาพถูกตัด)
-    await new Promise(function (r) { requestAnimationFrame(function () { requestAnimationFrame(r); }); });
+    var projName = proj ? proj.name : 'Report';
+    var srcBox = src.querySelector('.imt-print-checklist');
+    var topParts = ['.ppc-header-card', '.ppc-chart', '.ppc-summary']
+      .map(function (s) { return srcBox.querySelector(s); }).filter(Boolean);
+    var groups = Array.prototype.slice.call(srcBox.querySelectorAll('.ppc-group'));
+
+    var pages = [];
+    function newPage() {
+      var page = document.createElement('div');
+      page.className = 'imt-print-page';
+      page.style.cssText = 'display:block;position:fixed;top:-100000px;left:0;width:'+IMT_IMG_W+'px;box-sizing:border-box;height:auto;max-height:none;overflow:visible;background:#fff;padding:24px;';
+      var box = document.createElement('div');
+      box.className = 'imt-print-checklist';
+      if (!pages.length) {
+        topParts.forEach(function (el) { box.appendChild(el.cloneNode(true)); });
+      } else {
+        box.innerHTML = '<div class="ppc-header-card" style="margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #000;">'
+          + '<div class="ppc-title" style="font-size:16px;">'+esc(projName)+'</div></div>';
+      }
+      var pno = document.createElement('div');
+      pno.className = 'ppc-subtitle';
+      pno.style.cssText = 'text-align:right;margin:-6px 0 8px;';
+      pno.textContent = 'ภาพที่ 0/0'; // จองความสูงไว้ตอนวัด เลขจริงใส่ทีหลังเมื่อรู้จำนวนภาพ
+      box.appendChild(pno);
+      var cols = document.createElement('div');
+      cols.className = 'ppc-cols';
+      cols.innerHTML = '<div class="ppc-col"></div><div class="ppc-col"></div>';
+      box.appendChild(cols);
+      page.appendChild(box);
+      document.body.appendChild(page);
+      var p = { el: page, pno: pno, cols: cols.children, colIdx: 0 };
+      pages.push(p);
+      return p;
+    }
+    var over = function (p) { return p.el.scrollHeight > IMT_IMG_MAX_H; };
+
     try {
-      var capW = clone.scrollWidth, capH = clone.scrollHeight;
-      var canvas = await window.html2canvas(clone, {
-        scale: 2, backgroundColor: '#ffffff',
-        width: capW, height: capH, windowWidth: capW, windowHeight: capH,
+      var cur = newPage();
+      groups.forEach(function (g) {
+        var head = g.querySelector('.ppc-phase-head');
+        var rows = Array.prototype.slice.call(g.children).filter(function (c) { return c !== head; });
+        var shell = null, contd = false;
+        function openShell() {
+          shell = document.createElement('div');
+          shell.className = 'ppc-group';
+          var h = head.cloneNode(true);
+          if (contd) h.querySelector('.ppc-phase').textContent += ' (ต่อ)';
+          shell.appendChild(h);
+          cur.cols[cur.colIdx].appendChild(shell);
+        }
+        function nextColumn() {
+          if (cur.colIdx === 0) cur.colIdx = 1; else cur = newPage();
+        }
+        openShell();
+        for (var i = 0; i < rows.length; i++) {
+          var r = rows[i].cloneNode(true);
+          shell.appendChild(r);
+          if (!over(cur)) continue;
+          // คอลัมน์ว่าง (มีแค่หัว Phase + แถวนี้) แต่ยังล้น: ยอมให้เกิน ย้ายไปก็ไม่ดีขึ้น
+          if (shell.parentNode.firstChild === shell && shell.children.length <= 2) continue;
+          shell.removeChild(r);
+          // ไม่ทิ้งหัวข้องาน (ppc-task-row) ค้างไว้ท้ายคอลัมน์โดยไม่มี Checklist ใต้มัน — ยกไปพร้อมกัน
+          var carry = [];
+          while (shell.children.length > 2 && shell.lastChild.classList.contains('ppc-task-row')) carry.unshift(shell.removeChild(shell.lastChild));
+          // หัว Phase ไม่มีแถวติดอยู่เลย → ไม่เหลือหัวเปล่า ๆ ไว้ท้ายคอลัมน์ ย้ายไปทั้งก้อน
+          var placed = shell.children.length > 1;
+          if (!placed) shell.remove();
+          contd = contd || placed;
+          nextColumn();
+          openShell();
+          carry.forEach(function (c) { shell.appendChild(c); });
+          shell.appendChild(r);
+        }
       });
-      var safeName = (proj ? proj.name : 'Report').replace(/[^a-zA-Z0-9ก-๙]+/g, '_');
-      var link = document.createElement('a');
-      link.download = 'ImplTracker_' + safeName + '_' + new Date().toISOString().slice(0,10) + '.png';
-      link.href = canvas.toDataURL('image/png');
-      link.click();
+
+      await imtNextFrame();
+      var n = pages.length;
+      pages.forEach(function (p, i) { if (n > 1) p.pno.textContent = 'ภาพที่ '+(i + 1)+'/'+n; else p.pno.remove(); });
+      var safeName = projName.replace(/[^a-zA-Z0-9ก-๙]+/g, '_');
+      var base = 'ImplTracker_' + safeName + '_' + new Date().toISOString().slice(0,10);
+      for (var pi = 0; pi < n; pi++) {
+        var el = pages[pi].el;
+        var capW = el.scrollWidth, capH = el.scrollHeight;
+        var canvas = await window.html2canvas(el, {
+          scale: 2, backgroundColor: '#ffffff',
+          width: capW, height: capH, windowWidth: capW, windowHeight: capH,
+        });
+        var link = document.createElement('a');
+        link.download = base + (n > 1 ? '_' + (pi + 1) + 'of' + n : '') + '.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        // เว้นจังหวะระหว่างไฟล์ ไม่ให้เบราว์เซอร์รวบดาวน์โหลดหลายไฟล์ติดกันจนบางไฟล์หาย
+        if (pi < n - 1) await new Promise(function (r) { setTimeout(r, 400); });
+      }
+      if (n > 1) window.showAlert && window.showAlert('บันทึกรูปภาพแล้ว ' + n + ' ภาพ', 'success');
     } catch (e) {
       window.showAlert && window.showAlert('สร้างรูปภาพไม่สำเร็จ: ' + (e.message || e), 'error');
     } finally {
-      document.body.removeChild(clone);
+      pages.forEach(function (p) { p.el.remove(); });
     }
   };
 
@@ -2959,23 +3070,47 @@
 
     // ── Hero: ring ความคืบหน้างาน + ตัวเลขเด่น 4 ตัว (งาน/แบบฟอร์ม/ปัญหาค้าง/ล่าช้า) + ชิปสถานะงาน
     // (แทนกราฟสรุปสถานะ/ความคืบหน้าตาม Phase เดิม ที่ซ้ำกับการ์ด Phase ด้านล่าง) · กดแต่ละตัว = ไปแท็บนั้น ──
-    var heroStat = function (val, label, onclick, color, tip) {
-      return '<div class="imt-report-hero-stat" onclick="'+onclick+'"><b'+(color?' style="color:'+color+'"':'')+'>'+val+'</b><span>'+label+window.calcTip(tip)+'</span></div>';
+    // การ์ด KPI: หัวข้อ + ตัวเลขใหญ่ + คำอธิบายสั้น (+ แถบความคืบหน้าถ้ามี) · สีตามความหมาย (เขียว = ดี, แดง = ต้องดู)
+    var heroStat = function (o) {
+      return '<div class="imt-report-kpi" style="--c:'+o.color+'" onclick="'+o.onclick+'">'
+        + '<div class="imt-report-kpi-lbl"><span class="imt-report-kpi-ic">'+o.icon+'</span>'+o.label+window.calcTip(o.tip)+'</div>'
+        + '<div class="imt-report-kpi-val">'+o.val+'</div>'
+        + (o.bar != null ? '<div class="imt-report-kpi-bar"><span style="width:'+o.bar+'%"></span></div>' : '')
+        + '<div class="imt-report-kpi-sub">'+o.sub+'</div>'
+        + '</div>';
     };
-    var statusChips = statusCounts.map(function (x) {
-      return '<button type="button" class="imt-iss-chip" style="--c:'+x.st.color+'" title="ดูงานสถานะนี้" onclick="window.imtGoToTaskStatus(\''+x.st.id+'\')">'
-        + x.st.icon+' '+esc(x.st.label)+' <b>'+x.n+'</b></button>';
-    }).join('');
+    var donePct = tasks.length ? Math.round(doneCount / tasks.length * 100) : 0;
+    // แถบสถานะงานแบบซ้อน (สัดส่วนทั้งหมด = 100%) + คำอธิบายสีด้านล่าง กดได้ = ไปงานสถานะนั้น
+    var statusBar = statusCounts.length
+      ? '<div class="imt-report-status">'
+        + '<div class="imt-report-status-head"><span>สถานะงานทั้งหมด '+tasks.length+' งาน</span></div>'
+        + '<div class="imt-report-status-bar">' + statusCounts.map(function (x) {
+            return '<span style="flex:'+x.n+';background:'+x.st.color+'" title="'+esc(x.st.label)+' '+x.n+' งาน ('+x.pct+'%)" onclick="window.imtGoToTaskStatus(\''+x.st.id+'\')"></span>';
+          }).join('') + '</div>'
+        + '<div class="imt-report-status-legend">' + statusCounts.map(function (x) {
+            return '<button type="button" title="ดูงานสถานะนี้" onclick="window.imtGoToTaskStatus(\''+x.st.id+'\')">'
+              + '<i style="background:'+x.st.color+'"></i>'+esc(x.st.label)+' <b>'+x.n+'</b> <small>('+x.pct+'%)</small></button>';
+          }).join('') + '</div>'
+        + '</div>'
+      : '';
     var heroHtml = '<div class="imt-report-hero">'
-      + '<div class="imt-report-hero-ring" style="--pct:'+overallPct+'"><span>'+overallPct+'%'+window.calcTip("ความคืบหน้าโครงการ = ค่าเฉลี่ยของทุก Phase\nPhase = ค่าเฉลี่ยของทุกงานใน Phase\nงาน = Checklist ที่ติ๊กแล้ว ÷ Checklist ทั้งหมด (ไม่มี Checklist: เสร็จแล้ว = 100%)")+'</span></div>'
+      + '<div class="imt-report-hero-ring" style="--pct:'+overallPct+'"><span><b>'+overallPct+'%</b><small>ความคืบหน้ารวม'+window.calcTip("ความคืบหน้าโครงการ = ค่าเฉลี่ยของทุก Phase\nPhase = ค่าเฉลี่ยของทุกงานใน Phase\nงาน = Checklist ที่ติ๊กแล้ว ÷ Checklist ทั้งหมด (ไม่มี Checklist: เสร็จแล้ว = 100%)")+'</small></span></div>'
       + '<div class="imt-report-hero-body">'
       +   '<div class="imt-report-hero-stats">'
-      +     heroStat(doneCount+'<small>/'+tasks.length+'</small>', '📋 งานเสร็จแล้ว', "window.imtGoTab('workspace')", '', 'งานที่สถานะ "เสร็จแล้ว" / งานทั้งหมดของโครงการ')
-      +     heroStat(formPct+'<small>%</small>', '📄 แบบฟอร์ม ('+formDoneN+'/'+formItems.length+')', "window.imtGoTab('forms')", '', 'แบบฟอร์มที่เสร็จแล้ว ÷ แบบฟอร์มทั้งหมดของโครงการ × 100')
-      +     heroStat(openIssueN, '🩹 ปัญหาค้าง', "window.imtIssueFilter={};window.imtGoTab('issues')", openIssueN ? 'var(--coral)' : '', 'ปัญหาของโครงการที่สถานะยังไม่ "เสร็จแล้ว"')
-      +     heroStat(overdueCount, '⏰ งานล่าช้า', "window.imtGoTab('workspace')", overdueCount ? 'var(--coral)' : '', 'งานที่เลยวันครบกำหนดแล้ว แต่ยังไม่เสร็จ/ไม่ยกเลิก')
+      +     heroStat({ icon:'📋', label:'งานเสร็จแล้ว', color:'var(--teal)', onclick:"window.imtGoTab('workspace')",
+                       val: doneCount+'<small> / '+tasks.length+'</small>', bar: donePct, sub: 'คิดเป็น '+donePct+'% ของงานทั้งหมด',
+                       tip: 'งานที่สถานะ "เสร็จแล้ว" / งานทั้งหมดของโครงการ' })
+      +     heroStat({ icon:'📄', label:'แบบฟอร์มเสร็จ', color:'var(--sky)', onclick:"window.imtGoTab('forms')",
+                       val: formPct+'<small>%</small>', bar: formPct, sub: formDoneN+' จาก '+formItems.length+' ฉบับ',
+                       tip: 'แบบฟอร์มที่เสร็จแล้ว ÷ แบบฟอร์มทั้งหมดของโครงการ × 100' })
+      +     heroStat({ icon:'🩹', label:'ปัญหาค้าง', color: openIssueN ? 'var(--coral)' : 'var(--teal)', onclick:"window.imtIssueFilter={};window.imtGoTab('issues')",
+                       val: openIssueN+'<small> เรื่อง</small>', sub: openIssueN ? 'จากทั้งหมด '+issues.length+' เรื่อง' : (issues.length ? 'แก้ครบทั้ง '+issues.length+' เรื่อง ✓' : 'ไม่มีปัญหา ✓'),
+                       tip: 'ปัญหาของโครงการที่สถานะยังไม่ "เสร็จแล้ว"' })
+      +     heroStat({ icon:'⏰', label:'งานล่าช้า', color: overdueCount ? 'var(--coral)' : 'var(--teal)', onclick:"window.imtGoTab('workspace')",
+                       val: overdueCount+'<small> งาน</small>', sub: overdueCount ? 'เลยกำหนดแล้ว ต้องติดตาม' : 'ทุกงานอยู่ในกำหนด ✓',
+                       tip: 'งานที่เลยวันครบกำหนดแล้ว แต่ยังไม่เสร็จ/ไม่ยกเลิก' })
       +   '</div>'
-      +   (statusChips ? '<div class="imt-report-hero-chips">'+statusChips+'</div>' : '')
+      +   statusBar
       + '</div>'
       + '</div>';
 
@@ -3257,6 +3392,183 @@
     navigator.clipboard.writeText(text).then(function () {
       window.showAlert && window.showAlert('คัดลอกแล้ว พร้อมวางส่ง LINE', 'success');
     });
+  };
+
+  // ================================================================
+  // AI สรุปผู้แก้ไข → บทความ Blog — เลือกผู้แก้ไข (หรือทุกคน) + ช่วงวันที่แก้ไข แล้วให้ AI เรียบเรียง
+  // ว่าแต่ละคนแก้ปัญหาอะไรไปบ้าง · ใช้เฉพาะปัญหาที่มีผู้แก้ไข (fixedById) · ตัวเลขโค้ดนับเอง AI แค่เรียบเรียง
+  // ทุกคน = เรียก AI ทีละคน (ข้อมูลต่อคนไม่ยาวเกินโมเดลรับไหว) แล้วต่อผลเป็นบทความเดียว ──
+  function imtFixerIssues(pid, from, to) {
+    return imtIssuesOfProject(pid).filter(function (i) {
+      if (!i.fixedById) return false;
+      var d = i.fixedDate || imtLocalDateStr(i.createdAt);
+      return (!from || d >= from) && (!to || d <= to);
+    });
+  }
+  window.openImtFixerBlogModal = function () {
+    var pid = window.imtCurrentProjectId;
+    if (!imtProject(pid)) return;
+    var counts = {};
+    imtFixerIssues(pid).forEach(function (i) { counts[i.fixedById] = (counts[i.fixedById] || 0) + 1; });
+    var ids = Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; });
+    var body = document.getElementById('m-imt-fixer-blog-body');
+    var foot = document.getElementById('m-imt-fixer-blog-foot');
+    if (!ids.length) {
+      body.innerHTML = '<div style="color:var(--txt3);">ยังไม่มีปัญหาที่บันทึก "ผู้แก้ไข" ไว้ในโครงการนี้</div>';
+      foot.innerHTML = '<button class="btn btn-ghost" onclick="window.closeM(\'m-imt-fixer-blog\')">ปิด</button>';
+      window.openM('m-imt-fixer-blog');
+      return;
+    }
+    var today = new Date(), weekAgo = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 7);
+    body.innerHTML =
+      '<div class="f-group"><label class="f-label">ผู้แก้ไข</label><select class="f-input" id="ifb-fixer" onchange="window.imtFixerBlogDays()">'
+      +   '<option value="">ทุกคน (แยกหัวข้อตามผู้แก้ไข) — ' + ids.length + ' คน</option>'
+      +   ids.map(function (id) { return '<option value="' + esc(id) + '">' + esc(window.staffNameByRef(id) || '(ไม่พบชื่อ)') + ' — ' + counts[id] + ' เรื่อง</option>'; }).join('')
+      + '</select></div>'
+      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'
+      +   '<div class="f-group"><label class="f-label">แก้ไขตั้งแต่วันที่</label><input type="date" class="f-input" id="ifb-from" value="' + imtLocalDateStr(weekAgo) + '" onchange="window.imtFixerBlogDays()"></div>'
+      +   '<div class="f-group"><label class="f-label">ถึงวันที่</label><input type="date" class="f-input" id="ifb-to" value="' + imtLocalDateStr(today) + '" onchange="window.imtFixerBlogDays()"></div>'
+      + '</div>'
+      + '<div style="color:var(--txt3);font-size:12px;">เว้นวันที่ว่าง = ทุกช่วงเวลา</div>'
+      + '<div id="ifb-days"></div>'
+      + '<div id="ifb-out" style="margin-top:14px;"></div>';
+    foot.innerHTML = '<button class="btn btn-ghost" onclick="window.closeM(\'m-imt-fixer-blog\')">ปิด</button>'
+      + '<button class="btn btn-ghost" id="ifb-copy" style="display:none;" onclick="window.imtCopyFixerBlog()">📋 คัดลอกบทความ</button>'
+      + '<button class="btn btn-pri" id="ifb-run" onclick="window.imtRunFixerBlog()">✍️ ให้ AI สรุป</button>';
+    window.openM('m-imt-fixer-blog');
+    window.imtFixerBlogDays();
+  };
+  // ── วันที่มีการแก้ไข (ตามผู้แก้ไขที่เลือก) เป็นปุ่มให้กด — ไม่ต้องเดาวันเอง · กด = เลือกวันนั้นวันเดียว
+  // วันที่อยู่ในช่วงที่เลือกไว้จะถูกไฮไลต์ + บอกจำนวนเรื่องในช่วง ──
+  window.imtFixerBlogDays = function () {
+    var box = document.getElementById('ifb-days');
+    if (!box) return;
+    var fixer = document.getElementById('ifb-fixer').value;
+    var from = document.getElementById('ifb-from').value, to = document.getElementById('ifb-to').value;
+    var days = {};
+    imtFixerIssues(window.imtCurrentProjectId).forEach(function (i) {
+      if (fixer && i.fixedById !== fixer) return;
+      var d = i.fixedDate || imtLocalDateStr(i.createdAt);
+      if (d) days[d] = (days[d] || 0) + 1;
+    });
+    var keys = Object.keys(days).sort().reverse();
+    var inRange = 0;
+    var chips = keys.map(function (d) {
+      var on = (!from || d >= from) && (!to || d <= to);
+      if (on) inRange += days[d];
+      var label = new Date(d + 'T00:00:00').toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'short', year: '2-digit' });
+      return '<button type="button" class="ifb-day' + (on ? ' on' : '') + '" onclick="window.imtFixerBlogPickDay(\'' + d + '\')">'
+        + esc(label) + ' <b>' + days[d] + '</b></button>';
+    }).join('');
+    box.innerHTML = '<div class="ifb-days-head">วันที่มีการแก้ไข (' + keys.length + ' วัน) · ในช่วงที่เลือก <b>' + inRange + '</b> เรื่อง'
+      + ' <a href="javascript:void(0)" onclick="window.imtFixerBlogPickDay(\'\')">ทุกวัน</a></div>'
+      + '<div class="ifb-days">' + (chips || '<span style="color:var(--txt3);">—</span>') + '</div>';
+  };
+  window.imtFixerBlogPickDay = function (d) {
+    document.getElementById('ifb-from').value = d;
+    document.getElementById('ifb-to').value = d;
+    window.imtFixerBlogDays();
+  };
+
+  // ── ส่งให้ AI เกลาข้อความทีละชุด (20 เรื่อง) กันคำตอบ JSON ยาวจนถูกตัด · คืน [{problem, solution}] ตามลำดับเดิม
+  // ข้อไหน AI ตอบไม่ครบ → ใช้ข้อความเดิมที่บันทึกไว้แทน (ไม่ให้เรื่องหายจากรายงาน) ──
+  var IMT_FIXER_BLOG_SYS = 'คุณเป็นผู้ช่วยเรียบเรียงรายการปัญหาที่แก้ไขแล้วของทีมติดตั้งระบบซอฟต์แวร์โรงพยาบาล เพื่อนำไปลง Blog '
+    + 'เกลาข้อความ "ปัญหา" และ "วิธีการแก้ไข" ของแต่ละข้อให้เป็นภาษาไทยที่กระชับ อ่านง่าย 1 ประโยค ไม่ต้องขึ้นต้นด้วยคำว่าปัญหา/วิธีแก้ '
+    + 'คงความหมายเดิม ห้ามแต่งเพิ่ม ตัดชื่อบุคคล/ข้อมูลส่วนบุคคลออก ถ้าไม่มีวิธีแก้ให้ตอบ "-"\n'
+    + 'ตอบ JSON เท่านั้น ครบทุกข้อตามลำดับ: {"items":[{"no":1,"problem":"...","solution":"..."}]}';
+  var _cutTxt = function (s, n) { s = String(s || '').replace(/\s+/g, ' ').trim(); return s.length > n ? s.slice(0, n) + '…' : s; };
+  async function imtFixerBlogPolish(list) {
+    var out = [];
+    for (var s = 0; s < list.length; s += 20) {
+      var chunk = list.slice(s, s + 20), got = {};
+      var user = chunk.map(function (i, k) {
+        return (k + 1) + '. ปัญหา: ' + _cutTxt(i.problem, 300) + '\n   วิธีแก้: ' + (_cutTxt(i.solution, 300) || '-');
+      }).join('\n');
+      var res = await window.aiChatJson(IMT_FIXER_BLOG_SYS, user, { maxTokens: 2500, temperature: 0.2 });
+      (res.items || []).forEach(function (x) { if (x && x.no) got[x.no] = x; });
+      chunk.forEach(function (i, k) {
+        var a = got[k + 1] || {};
+        out.push({ problem: String(a.problem || '').trim() || _cutTxt(i.problem, 300), solution: String(a.solution || '').trim() || _cutTxt(i.solution, 300) || '-' });
+      });
+    }
+    return out;
+  }
+  // ── AI เขียนย่อหน้าสรุปงานของผู้แก้ไข 1 คน (ภาพรวมว่าแก้อะไรไปบ้าง) จากรายการที่เกลาแล้ว · ตัวเลขโค้ดนับให้ AI ห้ามนับเอง
+  // AI ล้ม → ไม่มีย่อหน้าสรุป แต่รายการปัญหา/วิธีแก้ยังออกครบ ──
+  var IMT_FIXER_SUMMARY_SYS = 'คุณเป็นผู้ช่วยเขียนสรุปผลงานของเจ้าหน้าที่ทีมติดตั้งระบบซอฟต์แวร์โรงพยาบาล เพื่อนำไปลง Blog '
+    + 'เขียนย่อหน้าสรุปงานภาษาไทย 2-4 ประโยค ในมุมมองบุคคลที่สาม ว่าแก้ไขปัญหาด้านใดไปบ้าง เน้นภาพรวมและกลุ่มงานหลัก '
+    + 'ใช้ตัวเลขตามที่ให้มาเท่านั้น ห้ามแต่งเพิ่ม ไม่ต้องไล่ทุกข้อ ไม่ต้องขึ้นต้นด้วยชื่อหัวข้อ\n'
+    + 'ตอบ JSON เท่านั้น: {"summary":"..."}';
+  async function imtFixerBlogSummary(name, list, polished, period) {
+    var cats = {};
+    list.forEach(function (i) { var c = i.category || 'อื่น ๆ'; cats[c] = (cats[c] || 0) + 1; });
+    var user = 'ผู้แก้ไข: ' + name + '\nช่วงเวลา: ' + period + '\nจำนวนที่แก้ไข: ' + list.length + ' เรื่อง\n'
+      + 'แยกกลุ่ม: ' + Object.keys(cats).map(function (c) { return c + ' ' + cats[c] + ' เรื่อง'; }).join(', ') + '\n'
+      + 'ปัญหาที่แก้:\n' + polished.slice(0, 40).map(function (x, k) { return (k + 1) + '. ' + _cutTxt(x.problem, 120); }).join('\n');
+    try {
+      var res = await window.aiChatJson(IMT_FIXER_SUMMARY_SYS, user, { maxTokens: 800, temperature: 0.3 });
+      return String(res.summary || '').trim();
+    } catch (e) { return ''; }
+  }
+  // ── จัดรูปแบบ: ชื่อกลุ่มปัญหา แล้วตามด้วย "ปัญหา : / วิธีการแก้ไข :" ย่อหน้าเข้า 3 ช่อง · กลุ่มที่มีหลายเรื่องขึ้นก่อน ──
+  function imtFixerBlogFormat(list, polished) {
+    var cats = {}, order = [];
+    list.forEach(function (i, k) {
+      var c = i.category || 'อื่น ๆ';
+      if (!cats[c]) { cats[c] = []; order.push(c); }
+      cats[c].push(polished[k]);
+    });
+    order.sort(function (a, b) { return cats[b].length - cats[a].length; });
+    return order.map(function (c) {
+      return c + '\n' + cats[c].map(function (x) { return '   ปัญหา : ' + x.problem + '\n   วิธีการแก้ไข : ' + x.solution; }).join('\n\n');
+    }).join('\n\n');
+  }
+
+  var _imtFixerBlog = null; // { text } ผลล่าสุด สำหรับคัดลอก
+  window.imtRunFixerBlog = async function () {
+    var pid = window.imtCurrentProjectId, proj = imtProject(pid);
+    var out = document.getElementById('ifb-out'), runBtn = document.getElementById('ifb-run'), copyBtn = document.getElementById('ifb-copy');
+    if (!proj || !out || runBtn.disabled) return;
+    var fixer = document.getElementById('ifb-fixer').value;
+    var from = document.getElementById('ifb-from').value, to = document.getElementById('ifb-to').value;
+    var all = imtFixerIssues(pid, from, to);
+    var groups = {};
+    all.forEach(function (i) { (groups[i.fixedById] = groups[i.fixedById] || []).push(i); });
+    var ids = fixer ? (groups[fixer] ? [fixer] : []) : Object.keys(groups).sort(function (a, b) { return groups[b].length - groups[a].length; });
+    if (!ids.length) { out.innerHTML = '<div style="color:var(--coral);">ไม่มีปัญหาที่แก้ไขในช่วงวันที่เลือก</div>'; return; }
+
+    var thd = function (d) { return new Date(d + 'T00:00:00').toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' }); };
+    var period = from && to ? (from === to ? thd(from) : thd(from) + ' – ' + thd(to)) : from ? 'ตั้งแต่ ' + thd(from) : to ? 'ถึง ' + thd(to) : 'ทุกช่วงเวลา';
+    runBtn.disabled = true; copyBtn.style.display = 'none';
+    var parts = [];
+    var render = function (note) {
+      out.innerHTML = '<div class="ai-card"><div style="white-space:pre-wrap;font-size:13px;line-height:1.7;">' + esc(parts.join('\n\n\n')) + '</div>'
+        + (note ? '<div style="color:var(--txt3);font-size:12.5px;margin-top:8px;">' + note + '</div>' : '') + '</div>';
+    };
+    try {
+      for (var k = 0; k < ids.length; k++) {
+        var list = groups[ids[k]], name = window.staffNameByRef(ids[k]) || '-';
+        render('⏳ AI กำลังสรุปของ ' + esc(name) + (ids.length > 1 ? ' (' + (k + 1) + '/' + ids.length + ')' : '') + '…');
+        var polished = await imtFixerBlogPolish(list);
+        var summary = await imtFixerBlogSummary(name, list, polished, period);
+        // ขึ้นชื่อผู้แก้ไข + ย่อหน้าสรุปงาน นำแต่ละช่วงเสมอ ให้รู้ว่าเป็นผลงานของใคร
+        parts.push('👤 ' + name + ' — แก้ไข ' + list.length + ' เรื่อง (' + period + ')\n\n'
+          + (summary ? summary + '\n\n' : '') + imtFixerBlogFormat(list, polished));
+      }
+      render('* เรียบเรียงโดย AI จากข้อมูลในระบบ — ตรวจสอบก่อนเผยแพร่');
+      _imtFixerBlog = { text: parts.join('\n\n\n') };
+      copyBtn.style.display = '';
+      runBtn.textContent = '🔁 สรุปใหม่';
+    } catch (e) {
+      render('');
+      out.insertAdjacentHTML('beforeend', '<div style="color:var(--coral);margin-top:8px;">' + esc(String(e.message || e)) + '</div>');
+      if (parts.length) { _imtFixerBlog = { text: parts.join('\n\n\n') }; copyBtn.style.display = ''; }
+    }
+    runBtn.disabled = false;
+  };
+  window.imtCopyFixerBlog = function () {
+    if (!_imtFixerBlog || !navigator.clipboard) return;
+    navigator.clipboard.writeText(_imtFixerBlog.text).then(function () { window.showAlert && window.showAlert('คัดลอกแล้ว', 'success'); });
   };
 
   // ================================================================

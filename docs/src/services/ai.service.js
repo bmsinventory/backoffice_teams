@@ -59,13 +59,64 @@
       .replace(/\$\s*\\(?:leftarrow|Leftarrow)\s*\$/g, '←');
   };
 
+  // ซ่อมเฉพาะข้อผิดพลาดที่โมเดลทำบ่อยใน JSON string:
+  //   1) backslash ที่ไม่ได้เป็น JSON escape เช่น \path หรือ LaTeX
+  //   2) อักขระควบคุม/ขึ้นบรรทัดใหม่ที่ไม่ได้ escape
+  // ลอง parse คำตอบเดิมก่อนเสมอ เพื่อไม่เปลี่ยน JSON ที่ถูกต้องอยู่แล้ว
+  function repairAiJsonStrings(src) {
+    var out = '', inString = false;
+    for (var i = 0; i < src.length; i++) {
+      var ch = src.charAt(i);
+      if (!inString) {
+        out += ch;
+        if (ch === '"') inString = true;
+        continue;
+      }
+      if (ch === '"') {
+        out += ch;
+        inString = false;
+        continue;
+      }
+      if (ch === '\\') {
+        var next = src.charAt(i + 1);
+        if (/["\\/bfnrt]/.test(next)) {
+          out += ch + next;
+          i++;
+        } else if (next === 'u' && /^[0-9a-fA-F]{4}$/.test(src.slice(i + 2, i + 6))) {
+          out += src.slice(i, i + 6);
+          i += 5;
+        } else {
+          // รักษา backslash ที่ AI ตั้งใจให้เป็นข้อความ โดย escape ให้ถูกตาม JSON
+          out += '\\\\';
+        }
+        continue;
+      }
+      if (ch.charCodeAt(0) <= 0x1f) {
+        var escapes = { '\b': '\\b', '\t': '\\t', '\n': '\\n', '\f': '\\f', '\r': '\\r' };
+        out += escapes[ch] || ('\\u' + ('000' + ch.charCodeAt(0).toString(16)).slice(-4));
+        continue;
+      }
+      out += ch;
+    }
+    return out;
+  }
+
   // ── ดึง JSON ออกจากคำตอบ (โมเดลมักห่อด้วย ```json ... ``` แม้สั่งว่าไม่ต้อง) ──
   window.aiParseJson = function (txt) {
     var m = String(txt || '').match(/```(?:json)?\s*([\s\S]*?)```/i);
     var body = m ? m[1] : String(txt || '');
     var s = body.indexOf('{'), e = body.lastIndexOf('}');
     if (s < 0 || e < 0) throw new Error('AI ตอบไม่เป็น JSON — ลองใหม่อีกครั้ง');
-    return JSON.parse(body.slice(s, e + 1));
+    var json = body.slice(s, e + 1);
+    try {
+      return JSON.parse(json);
+    } catch (firstError) {
+      try {
+        return JSON.parse(repairAiJsonStrings(json));
+      } catch (repairError) {
+        throw new Error('AI ตอบข้อมูลไม่สมบูรณ์ — กรุณากดให้ AI แยกปัญหาอีกครั้ง');
+      }
+    }
   };
   window.aiChatJson = async function (system, user, opts) {
     return window.aiParseJson(await window.aiChat(system, user, opts));

@@ -12,6 +12,8 @@
 
   var esc = function (s) { return window.esc(s); };
   var REPLIES = [];        // รายการทั้งหมด (รวมที่ปิดใช้งาน) — จาก onSnapshot
+  // read-only snapshot สำหรับ Ask AI — เนื้อหายังคงมาจากคลังคำตอบจริง ไม่ให้ AI แต่งเอง
+  window.askAiAssistReplies = function () { return REPLIES.slice(); };
   var _msgs = [];          // ประวัติแชทของรอบนี้ (ไม่บันทึกลงฐานข้อมูล) — { me: bool, html }
   var _libQ = '';          // คำค้นในแผงคลังคำตอบ
   var _libOpen = false;    // มือถือ: เปิดแผงคลังคำตอบทับหน้าแชท

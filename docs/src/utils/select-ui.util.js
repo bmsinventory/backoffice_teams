@@ -58,8 +58,8 @@
       if (o.hidden) return '';
       n++;
       var on = o.selected;
-      return '<button type="button" class="sui-opt' + (on ? ' on' : '') + (o.disabled ? ' off' : '') + '" data-i="' + o.index + '"' + (o.disabled ? ' disabled' : '') + '>'
-        + '<span>' + esc(o.textContent) + '</span>' + (on ? '<i class="ti ti-check"></i>' : '') + '</button>';
+      return '<button type="button" class="sui-opt' + (on ? ' on' : '') + (o.disabled ? ' off' : '') + '" data-i="' + o.index + '" aria-selected="' + on + '"' + (o.disabled ? ' disabled' : '') + '>'
+        + '<span>' + esc(o.textContent) + '</span></button>';
     };
     [].forEach.call(sel.children, function (c) {
       if (c.tagName === 'OPTGROUP') {

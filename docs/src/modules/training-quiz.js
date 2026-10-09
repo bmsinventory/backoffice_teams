@@ -515,21 +515,30 @@ function _tqaResTable(){
   if(!rows.length){el.innerHTML='<div class="tqa-empty">ยังไม่มีผลสอบ</div>';return;}
   const mail=c=>c.email_status==='sent'?`<span class="badge badge-success" title="${c.emailed_at?new Date(c.emailed_at).toLocaleString('th-TH'):''}"><i class="ti ti-mail-check"></i>ส่งแล้ว</span>`
     :c.email_status==='failed'?`<span class="badge badge-danger" title="${_esc(c.email_error)}"><i class="ti ti-mail-off"></i>ส่งไม่สำเร็จ</span>`:'<span class="badge badge-gray">รอส่ง</span>';
-  el.innerHTML=`<table class="adetail-table"><thead><tr><th>วันที่</th><th>ผู้สอบ</th><th>แบบทดสอบ</th><th class="num">คะแนน</th><th>ผล</th><th>ใบประกาศ</th><th></th></tr></thead><tbody>`+rows.map(a=>{
-    const qz=_tqaQuizzes.find(q=>q.id===a.quiz_id),c=a.cert;
-    return`<tr><td style="white-space:nowrap;font-size:12px;">${a.completed_at?new Date(a.completed_at).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'}):'-'}</td>
-      <td><div style="font-weight:600;">${_esc(a.full_name)}${a.reg_id?'':' <span class="badge badge-gray" title="ไม่อยู่ในรายชื่อผู้ลงทะเบียน">นอกรายชื่อ</span>'}</div>
-        <div style="font-size:11px;color:var(--text-muted);">${_esc([a.dept,a.email].filter(Boolean).join(' · '))}</div></td>
-      <td style="font-size:12px;">${_esc(qz?_tqaName(qz):'-')}</td>
-      <td class="num"><b>${Math.round(a.percent)}%</b><div style="font-size:11px;color:var(--text-muted);">${a.score}/${a.total}</div></td>
+  // จัดกลุ่มตามแบบทดสอบ (เรียงกลุ่มตามลำดับที่สอบล่าสุด) — หัวกลุ่มบอกจำนวนครั้ง/คน/ผ่าน ของชุดนั้น
+  const groups=new Map();
+  rows.forEach(a=>{if(!groups.has(a.quiz_id))groups.set(a.quiz_id,[]);groups.get(a.quiz_id).push(a);});
+  // แถวกะทัดรัด — ทุกช่องอยู่บรรทัดเดียว (หน่วยงาน/อีเมลต่อท้ายชื่อ, คะแนนดิบต่อท้าย %, สถานะอีเมลต่อท้ายเลขใบประกาศ)
+  const row=a=>{
+    const c=a.cert,sub=[a.dept,a.email].filter(Boolean).join(' · ');
+    return`<tr><td class="tqa-dt">${a.completed_at?new Date(a.completed_at).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'}):'-'}</td>
+      <td class="tqa-who" title="${_esc(a.full_name+(sub?' · '+sub:''))}"><b>${_esc(a.full_name)}</b>${a.reg_id?' ':' <span class="badge badge-gray" title="ไม่อยู่ในรายชื่อผู้ลงทะเบียน">นอกรายชื่อ</span> '}<span class="tqa-sub">${_esc(sub)}</span></td>
+      <td class="num"><b>${Math.round(a.percent)}%</b> <span class="tqa-sub">${a.score}/${a.total}</span></td>
       <td>${a.status==='PASS'?'<span class="badge badge-success">ผ่าน</span>':'<span class="badge badge-danger">ไม่ผ่าน</span>'}</td>
-      <td>${c?`<a href="?page=quiz&cert=${encodeURIComponent(c.cert_id)}" target="_blank" style="font-size:12px;font-weight:600;color:var(--primary);">${_esc(c.cert_id)}</a>
-        <div style="margin-top:3px;">${c.is_revoked?'<span class="badge badge-danger">ยกเลิกแล้ว</span>':mail(c)}</div>`:'<span style="color:var(--text-muted)">—</span>'}</td>
-      <td style="white-space:nowrap;text-align:right;">
-        ${c&&!c.is_revoked?`<button class="btn btn-ghost btn-sm" title="ส่งอีเมลอีกครั้ง" onclick="_tqaResend('${_esc(c.cert_id)}')"><i class="ti ti-mail-forward"></i></button>`:''}
-        ${c?`<button class="btn btn-ghost btn-sm" title="${c.is_revoked?'คืนสถานะใบประกาศ':'ยกเลิกใบประกาศ'}" onclick="_tqaRevoke('${_esc(c.cert_id)}',${!c.is_revoked})"><i class="ti ti-${c.is_revoked?'rotate-clockwise':'certificate-off'}"></i></button>`:''}
-        <button class="btn btn-ghost btn-sm" title="ลบผลสอบ" onclick="_tqaDelAttempt('${a.id}')"><i class="ti ti-trash" style="color:var(--danger)"></i></button></td></tr>`;
-  }).join('')+'</tbody></table>';
+      <td class="tqa-cert">${c?`<a href="?page=quiz&cert=${encodeURIComponent(c.cert_id)}" target="_blank">${_esc(c.cert_id)}</a> ${c.is_revoked?'<span class="badge badge-danger">ยกเลิกแล้ว</span>':mail(c)}`:'<span style="color:var(--text-muted)">—</span>'}</td>
+      <td class="tqa-acts">
+        ${c&&!c.is_revoked?`<button class="tqa-act mail" title="ส่งใบประกาศทางอีเมลอีกครั้ง" onclick="_tqaResend('${_esc(c.cert_id)}')"><span class="emo-ic">📩</span></button>`:''}
+        ${c?(c.is_revoked
+          ?`<button class="tqa-act restore" title="คืนสถานะใบประกาศ" onclick="_tqaRevoke('${_esc(c.cert_id)}',false)"><span class="emo-ic">♻️</span></button>`
+          :`<button class="tqa-act revoke" title="ยกเลิกใบประกาศ" onclick="_tqaRevoke('${_esc(c.cert_id)}',true)"><span class="emo-ic">🚫</span></button>`):''}
+        <button class="tqa-act del" title="ลบผลสอบ" onclick="_tqaDelAttempt('${a.id}')"><span class="emo-ic">🗑️</span></button></td></tr>`;
+  };
+  el.innerHTML=`<table class="adetail-table tqa-res"><thead><tr><th>วันที่</th><th>ผู้สอบ</th><th class="num">คะแนน</th><th>ผล</th><th>ใบประกาศ</th><th></th></tr></thead>`+[...groups].map(([qid,list])=>{
+    const qz=_tqaQuizzes.find(q=>q.id===qid),gp=new Set(list.map(a=>a.email)),gpass=new Set(list.filter(a=>a.status==='PASS').map(a=>a.email));
+    return`<tbody><tr class="tqa-grp"><td colspan="6"><i class="ti ti-clipboard-check"></i><span class="tqa-grp-name">${_esc(qz?_tqaName(qz):'-')}</span>
+      <span class="tqa-grp-stat">สอบ <b>${list.length}</b> ครั้ง · ผู้สอบ <b>${gp.size}</b> คน · ผ่าน <b>${gpass.size}</b> คน (${gp.size?Math.round(gpass.size/gp.size*100):0}%)</span></td></tr>`
+      +list.map(row).join('')+'</tbody>';
+  }).join('')+'</table>';
 }
 function _tqaPendingTable(){
   const el=document.getElementById('tqa-p-table');

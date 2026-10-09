@@ -122,8 +122,11 @@
     var lvNb = document.getElementById('leave-nb');
     if (lvNb) { lvNb.textContent = pend; lvNb.style.display = pend ? '' : 'none'; }
 
-    // Sync new-helpdesk-ticket badge (นับ ticket ที่ยังไม่ได้ triage/assign)
-    var hdNew = (window.HELPDESK_TICKETS || []).filter(function (t) { return t.status === 'new'; }).length;
+    // Sync new-helpdesk-ticket badge — แจ้งเฉพาะ Ticket ใหม่ที่ทีมยังไม่ได้ตอบลูกค้า
+    // การตอบภายนอกครั้งแรกจะบันทึก firstResponseAt; โน้ตภายในจะไม่ถือว่าเป็นการตอบ
+    var hdNew = (window.HELPDESK_TICKETS || []).filter(function (t) {
+      return t.status === 'new' && !t.firstResponseAt;
+    }).length;
     var hdNb = document.getElementById('hd-nb');
     if (hdNb) { hdNb.textContent = hdNew; hdNb.style.display = hdNew ? '' : 'none'; }
 
@@ -132,7 +135,7 @@
     _notiItems = [
       { mod: 'advance',  icon: 'credit-card', n: can('advance')  ? ov    : 0, label: 'Advance เกินกำหนด' },
       { mod: 'leave',    icon: 'calendar-off', n: can('leave')    ? pend  : 0, label: 'การลาของคุณรออนุมัติ' },
-      { mod: 'helpdesk', icon: 'headset', n: can('helpdesk') ? hdNew : 0, label: 'Ticket ใหม่รอรับเรื่อง' },
+      { mod: 'helpdesk', icon: 'headset', n: can('helpdesk') ? hdNew : 0, label: 'Ticket ใหม่ที่ยังไม่ได้ตอบ' },
       // คำขอจาก "ลืมรหัสผ่าน?" หน้า Login → Admin ตั้งรหัสใหม่ใน Admin Panel › ผู้ใช้งานระบบ
       { mod: 'pwreset', icon: 'key', label: 'คำขอรีเซ็ตรหัสผ่าน',
         n: window.isAdmin && window.isAdmin() ? (window.USERS || []).filter(function (u) { return u.resetRequestedAt; }).length : 0 },

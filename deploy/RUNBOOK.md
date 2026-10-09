@@ -133,7 +133,8 @@ environment:
   SUPABASE_ANON_KEY: "<ANON_KEY จาก Phase 2>"
 ```
 
-- ปุ่ม AI ช่วยวิเคราะห์ (HelpDesk) เรียก `https://vllm-gemma.bmscloud.in.th` ตรงจากเบราว์เซอร์ (ไม่ใช้คีย์, เซิร์ฟเวอร์ AI เปิด CORS) — ไม่ต้องตั้งค่าอะไรใน container
+- ปุ่ม AI ช่วยวิเคราะห์เรียก `https://vllm-gemma.bmscloud.in.th` จากเบราว์เซอร์ และ worker ตอบกลับอัตโนมัติใช้ปลายทางเดียวกัน (ไม่ใช้คีย์) ค่าเริ่มต้นจึงไม่ต้องตั้งเพิ่ม หากต้องเปลี่ยนปลายทางให้กำหนด `AI_BASE` ใน environment ของ frontend container
+- หลังอัปเดตเวอร์ชันที่มี AI ตอบกลับอัตโนมัติ ต้องรัน `db-schema.sql` ก่อน restart/rebuild frontend เพื่อสร้างคิว, Audit Log, trigger และ RPC ของ worker
 
 ```bash
 docker compose up -d   # ไม่ต้อง rebuild image — env var อ่านใหม่ตอน container start
@@ -163,6 +164,8 @@ certbot --nginx -d api.<DOMAIN>
 - [ ] เปิดไฟล์แนบเก่า (จาก IMPL_ATTACHMENTS) เปิดได้จริง
 - [ ] อัปโหลดไฟล์แนบใหม่สำเร็จ
 - [ ] เปิด 2 browser พร้อมกัน แก้ข้อมูล เช็คว่า realtime sync เห็นการเปลี่ยนแปลงแบบ live
+- [ ] ตั้ง AI Auto Reply เป็นเวลารอ 1 นาทีในระบบทดสอบ: ยืนยันว่า AI ตอบเพียงครั้งเดียว และยกเลิกทันทีเมื่อเจ้าหน้าที่ตอบก่อนครบเวลา
+- [ ] ทดสอบวันหยุด/ช่วงทีมพัก, P1/P2 แบบรับเรื่องเท่านั้น และปิด AI กลับก่อนนำขึ้น production หากยังไม่พร้อมใช้งานจริง
 - [ ] ทดสอบบนมือถือ + ลอง install PWA
 
 ---
