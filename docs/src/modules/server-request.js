@@ -58,11 +58,30 @@
 
   // ── Helpers ──
   function cfg() { return window.SRV_REQ_CONFIG || {}; }
+  // ดัชนี id → ตำแหน่ง (OPTS / HOSPITALS) สร้างครั้งเดียวต่อรอบ render แทน .find ทุกแถว (ค้นหา/รายการ เดิม O(คำขอ × รพ.))
+  // ล้างทิ้งเองเมื่อจบงาน sync รอบนี้ + เช็กความยาว/ตรวจ id กันข้อมูลเปลี่ยนกลางรอบ · ผลเหมือน .find (ตัวแรกที่ id ตรง)
+  var _idx = null;
+  function findById(arr, id) {
+    if (!_idx) { _idx = new Map(); Promise.resolve().then(function () { _idx = null; }); }
+    var c = _idx.get(arr);
+    if (!c || c.len !== arr.length) {
+      var pos = new Map();
+      for (var i = 0; i < arr.length; i++) if (!pos.has(arr[i].id)) pos.set(arr[i].id, i);
+      c = { len: arr.length, pos: pos };
+      _idx.set(arr, c);
+    }
+    var p = c.pos.get(id);
+    if (p === undefined) return undefined;
+    var x = arr[p];
+    if (x && x.id === id) return x;
+    _idx.delete(arr);
+    return arr.find(function (y) { return y.id === id; });
+  }
   function byId(id) { return REQS.find(function (r) { return r.id === id; }); }
-  function optLabel(id) { var o = OPTS.find(function (x) { return x.id === id; }); return o ? o.label : ''; }
+  function optLabel(id) { var o = findById(OPTS, id); return o ? o.label : ''; }
   function optsOf(kind) { return OPTS.filter(function (o) { return o.kind === kind; }); }
   function hospLabel(r) {
-    var h = r.hospitalId && (window.HOSPITALS || []).find(function (x) { return x.id === r.hospitalId; });
+    var h = r.hospitalId && findById(window.HOSPITALS || [], r.hospitalId);
     return h ? h.name : (r.hospitalName || '-');
   }
   function tasksText(r) {
@@ -899,9 +918,11 @@
     var r = byId(_asg.id);
     var list = document.getElementById('srv-asg-list');
     // คนว่างตลอดช่วงขึ้นก่อน แล้วตามด้วยคนที่ถูกเลือกไว้
-    var rows = _asg.rows.slice().sort(function (a, b) {
-      return (b.on - a.on) || (busyScore(a, r) - busyScore(b, r)) || staffShort(a.sid).localeCompare(staffShort(b.sid), 'th');
-    });
+    // คำนวณคะแนนติดงาน/ชื่อไว้ก่อนเรียง — เดิมเรียก busyScore (ไล่โครงการ+ลาทั้งหมด) ซ้ำทุกครั้งที่เทียบ
+    var thColl = new Intl.Collator('th');
+    var rows = _asg.rows.map(function (x) { return { x: x, busy: busyScore(x, r), name: staffShort(x.sid) }; }).sort(function (a, b) {
+      return (b.x.on - a.x.on) || (a.busy - b.busy) || thColl.compare(a.name, b.name);
+    }).map(function (k) { return k.x; });
     list.innerHTML = rows.map(function (x) {
       var s = window.staffByRef(x.sid) || {};
       var i = _asg.rows.indexOf(x);
@@ -1005,6 +1026,7 @@
   // ══ ปฏิทินวันว่างของทีม — ตารางรายคน × รายวัน 1 เดือน (แบบปฏิทินทีม) ══
   var _calMonth = null, _calQ = '';
   var CAL_REQ_ST = ['pending', 'approved', 'scheduled'];
+  var LEAVE_LABEL = { sick: '🤒 ลาป่วย', vacation: '🏖 ลาพักร้อน', personal: '📋 ลากิจ', maternity: '🤱 ลาคลอด', ordain: '🙏 ลาบวช', other: '📝 ลางาน' };
   function renderCalendar() {
     var body = document.getElementById('srv-body');
     if (!_calMonth) _calMonth = window.srvIso(new Date()).slice(0, 7);
@@ -1060,14 +1082,46 @@
         return '<i class="srv-dot" style="background:' + window.SRV_STATUS[r.status].color + '" title="' + esc(r.reqNo + ' ' + hospLabel(r) + ' · ' + window.SRV_STATUS[r.status].label) + '" onclick="window.srvOpen(\'' + r.id + '\')"></i>';
       }).join('') + (rs.length > 3 ? '<em>+' + (rs.length - 3) + '</em>' : '') + '</div>';
     }).join(''));
-    // แถวรายคน
+    // แถวรายคน: พื้นหลังรายวัน (ว่าง/วันหยุด) + แถบชื่อโครงการ/ลางานคร่อมช่วงวัน (แบบปฏิทินทีม) ซ้อนกันได้หลายเลน
+    var first = days[0], last = days[days.length - 1];
+    var clip = function (sd, ed) {
+      if (!sd || !ed || ed < first || sd > last) return null;
+      return { a: days.indexOf(sd < first ? first : sd), b: days.indexOf(ed > last ? last : ed) };
+    };
     html += shown.map(function (s) {
       var nFree = days.filter(function (d) { var x = map[d]; return !x.busy[s.id] && !x.holiday && !x.weekend; }).length;
-      return row('', '<b>' + esc(staffShort(s.id)) + '</b><small>' + esc(s.name || '') + ' · ว่าง ' + nFree + ' วัน</small>', days.map(function (d) {
-        var x = map[d], k = x.busy[s.id] || (x.holiday || x.weekend ? 'off' : 'free');
-        var tip = staffShort(s.id) + ' · ' + fd(d) + ' · ' + (k === 'free' ? 'ว่าง' : k === 'off' ? 'วันหยุด' : (x.why[s.id] || []).join(', '));
-        return '<div class="srv-tl-c ' + k + (d === today ? ' today' : '') + '" title="' + esc(tip) + '"></div>';
-      }).join(''));
+      var evs = [];
+      (window.PROJECTS || []).forEach(function (p, pi) {
+        if (p.status === 'cancelled' || p.status === 'completed') return;
+        var mems = (p.members && p.members.length) ? p.members
+          : (p.team || []).map(function (sid) { return { sid: sid, s: p.start, e: p.end }; });
+        var mine = mems.filter(function (m) { return m.sid === s.id && m.s && m.e; });
+        if (!mine.length) return;
+        var r = clip(mine.map(function (m) { return m.s; }).sort()[0], mine.map(function (m) { return m.e; }).sort().slice(-1)[0]);
+        if (r) evs.push({ a: r.a, b: r.b, t: p.name || '', color: window.gC(pi), click: 'window.openProjModal(\'' + p.id + '\')' });
+      });
+      (window.LEAVES || []).forEach(function (lv) {
+        if (lv.staffId !== s.id || lv.status === 'rejected') return;
+        var r = clip(lv.startDate, lv.endDate);
+        if (r) evs.push({ a: r.a, b: r.b, t: LEAVE_LABEL[lv.leaveType] || 'ลางาน', leave: true, click: 'window.openLeaveDetail(\'' + lv.id + '\')' });
+      });
+      evs.sort(function (x, y) { return x.a - y.a; });
+      var lanes = [];
+      evs.forEach(function (ev) { var l = 0; while (l < lanes.length && lanes[l] >= ev.a) l++; ev.lane = l; lanes[l] = ev.b; });
+      var nl = Math.max(1, lanes.length);
+      var cells = days.map(function (d, i) {
+        var x = map[d], k = x.holiday || x.weekend ? 'off' : x.busy[s.id] ? 'busy' : 'free';
+        var tip = staffShort(s.id) + ' · ' + fd(d) + ' · ' + (x.busy[s.id] ? (x.why[s.id] || []).join(', ') : k === 'off' ? 'วันหยุด' : 'ว่าง');
+        return '<div class="srv-tl-c ' + k + (d === today ? ' today' : '') + '" style="grid-column:' + (i + 2) + ';grid-row:1/-1;" title="' + esc(tip) + '"></div>';
+      }).join('');
+      var bars = evs.map(function (ev) {
+        var tip = ev.t + ' | ' + fd(days[ev.a]) + (ev.a !== ev.b ? ' – ' + fd(days[ev.b]) : '');
+        return '<div class="srv-tl-bar' + (ev.leave ? ' leave' : '') + '" style="grid-column:' + (ev.a + 2) + '/' + (ev.b + 3) + ';grid-row:' + (ev.lane + 2) + ';'
+          + (ev.leave ? '' : 'background:' + ev.color + ';') + '" title="' + esc(tip) + '" onclick="' + ev.click + '">' + esc(ev.t) + '</div>';
+      }).join('');
+      return '<div class="srv-tl-row srv-tl-pr" style="' + cols + 'grid-template-rows:4px repeat(' + nl + ',28px) 4px;">'
+        + '<div class="srv-tl-l" style="grid-column:1;grid-row:1/-1;"><b>' + esc(staffShort(s.id)) + '</b><small>' + esc(s.name || '') + ' · ว่าง ' + nFree + ' วัน</small></div>'
+        + cells + bars + '</div>';
     }).join('');
     grid.innerHTML = '<div class="srv-tl">' + html + '</div>'
       + (q && !shown.length ? '<div class="srv-empty">ไม่พบชื่อ "' + esc(_calQ) + '" ในทีม Server</div>' : '');

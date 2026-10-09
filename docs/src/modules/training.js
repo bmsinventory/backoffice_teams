@@ -172,7 +172,35 @@
     syncHeadBtns();
   };
 
-  // ── 1) เมนู "ระบบอบรม" — เปิดครั้งแรกค่อยโหลด iframe (ไม่ถ่วงการเปิด Backoffice) ──
+  // ── 0) เตรียมเมนู "ระบบอบรม" ไว้เบื้องหลัง — เข้าแอปแล้วรอเครื่องว่างค่อยโหลด iframe (ไม่ถ่วงการเปิด Backoffice)
+  // กดเมนูแล้วเปิดได้ทันที ไม่ต้องรอโหลดทั้งหน้า · เรียกจาก _enterApp (auth.service.js) · ประหยัดเน็ต (Data Saver) = ไม่โหลดล่วงหน้า ──
+  var _preloadTimer = null;
+  window.preloadTraining = function () {
+    clearTimeout(_preloadTimer);
+    if (navigator.connection && navigator.connection.saveData) return;
+    _preloadTimer = setTimeout(function () {
+      var idle = window.requestIdleCallback || function (fn) { return setTimeout(fn, 0); };
+      idle(function () {
+        if (!window.cu) return;
+        if (!window.isDbLoaded) { window.preloadTraining(); return; } // ข้อมูล Backoffice ยังโหลดไม่เสร็จ — รอรอบถัดไป
+        if (window.canView('training')) window.renderTraining();
+      }, { timeout: 5000 });
+    }, 3000);
+  };
+  // ออกจากระบบ → ล้างหน้าอบรมที่โหลดค้างไว้ (เป็นของผู้ใช้เดิม) ให้คนที่เข้าต่อโหลดใหม่ด้วย session ของตัวเอง
+  window.resetTraining = function () {
+    clearTimeout(_preloadTimer);
+    ['trn-frame', 'imt-trn-frame'].forEach(function (id) {
+      var f = $(id);
+      if (!f) return;
+      f.removeAttribute('src');
+      delete f.dataset.pid;
+      try { f.contentWindow.location.replace('about:blank'); } catch (e) {}
+    });
+    states = {};
+  };
+
+  // ── 1) เมนู "ระบบอบรม" — เปิดครั้งแรกค่อยโหลด iframe (ถ้ายังไม่ได้เตรียมไว้เบื้องหลัง) ──
   window.renderTraining = function () {
     var f = $('trn-frame');
     if (f && !f.getAttribute('src')) f.setAttribute('src', 'training/?embed=1&admin=1&view=overview');

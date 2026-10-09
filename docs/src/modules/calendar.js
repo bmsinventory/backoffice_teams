@@ -79,10 +79,10 @@ function getColIndices(startDt,endDt,tCols){let viewStart=tCols[0].s;let viewEnd
 
 // ── Agenda view (มือถือ/iPad): การ์ดแนวตั้งต่อคน/โครงการ/ประเภท แทน Gantt แนวนอน — ใช้ข้อมูลชุดเดียวกับ
 // .tl-container (activeRowsData) ไม่ต้องคำนวณซ้ำ สลับแสดง/ซ่อนด้วย CSS media query (ดู timeline.css) ──
-function buildCalAgendaHtml(activeRowsData,tCols){
+function buildCalAgendaHtml(activeRowsData,tCols,_stPos){
   return '<div class="cal-agenda-list">'+activeRowsData.map(function(rowData){
     let r=rowData.rInfo;
-    let avatar='';if(r.type==='staff')avatar=`<div class="av" style="background:${avC(window.STAFF.findIndex(s=>s.id===r.id))}">${r.name.charAt(0)}</div>`;else if(r.type==='ptype')avatar=`<div class="av" style="background:${r.obj.color}">🏷</div>`;else avatar=`<div class="av" style="background:${gS(r.obj.stage).color}">📁</div>`;
+    let avatar='';if(r.type==='staff')avatar=`<div class="av" style="background:${avC(_stPos.has(r.id)?_stPos.get(r.id):-1)}">${r.name.charAt(0)}</div>`;else if(r.type==='ptype')avatar=`<div class="av" style="background:${r.obj.color}">🏷</div>`;else avatar=`<div class="av" style="background:${gS(r.obj.stage).color}">📁</div>`;
     let projEvts=rowData.events.filter(ev=>!ev.isLeave&&!ev.isWorkLog).length;let leaveEvts=rowData.events.filter(ev=>ev.isLeave).length;let wlEvts=rowData.events.filter(ev=>ev.isWorkLog).length;
     let workloadText=r.type==='staff'?((projEvts>0?projEvts+' โครงการ':'')+(projEvts>0&&(leaveEvts>0||wlEvts>0)?' · ':'')+( leaveEvts>0?leaveEvts+' วันลา':'')+((leaveEvts>0&&wlEvts>0)?' · ':'')+( wlEvts>0?wlEvts+' บันทึกงาน':'')):(r.type==='project'?rowData.eventCount+' ทีมงาน':rowData.eventCount+' โครงการ');
     let eventsHtml=rowData.events.length
@@ -97,6 +97,17 @@ function buildCalAgendaHtml(activeRowsData,tCols){
   }).join('')+'</div>';
 }
 
+// สมาชิกของ visit แบบไม่ซ้ำคน → [{sid, vm}] — vm ตรงกับ window._vtMember(v.team, sid, v.start, v.end) ทุกประการ
+function _calVisitMembers(v){
+  var team=v.team,out=[];if(!team||!team.length)return out;
+  var obj=typeof team[0]==='object',seen=new Set();
+  team.forEach(function(t){var sid=obj?t.sid:t;if(seen.has(sid))return;seen.add(sid);out.push({sid:sid,vm:{sid:sid,s:(obj?t.s:'')||v.start||'',e:(obj?t.e:'')||v.end||''}});});
+  return out;
+}
+// index id → แถวแรก (เทียบเท่า .find) และ id → ตำแหน่งแรก (เทียบเท่า .findIndex)
+function _calIdIdx(arr){var m=new Map();(arr||[]).forEach(function(x){if(!m.has(x.id))m.set(x.id,x);});return m;}
+function _calPosIdx(arr){var m=new Map();(arr||[]).forEach(function(x,i){if(!m.has(x.id))m.set(x.id,i);});return m;}
+
 function _calInitProjCombo(cur){
   var list=window.PROJECTS||[];
   if(cur&&!list.some(function(p){return p.id===cur;}))cur='';
@@ -109,7 +120,7 @@ window.renderCalendar=function(){
   var cfProj=document.getElementById('cal-filter-proj');
   var filt=isPtypeView?window.msValues('cal-filter-ptype'):window.calView==='project'?((cfProj&&cfProj.value)||''):((cf&&cf.value)||'');
   var tCols=[];var y=window.calY;
-  if(window.calTime==='month'){var dim=new Date(y,window.calM+1,0).getDate();for(var d=1;d<=dim;d++){var dt=new Date(y,window.calM,d);var _ds=y+'-'+String(window.calM+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');var _hol=window.HOLIDAYS.find(function(h){return h.date===_ds;});tCols.push({label:d,sub:window.DNAMES[dt.getDay()],s:dt,e:new Date(y,window.calM,d,23,59,59),isWk:dt.getDay()===0||dt.getDay()===6,isHol:!!_hol,holName:_hol?_hol.name:''});}var _monLbl=(window.matchMedia&&window.matchMedia('(max-width:768px)').matches)?window.THMON_SHORT[window.calM]:window.THMON[window.calM];document.getElementById('cal-lbl').textContent=_monLbl+' '+(y+543);}
+  if(window.calTime==='month'){var _holIdx=new Map();window.HOLIDAYS.forEach(function(h){if(!_holIdx.has(h.date))_holIdx.set(h.date,h);});var dim=new Date(y,window.calM+1,0).getDate();for(var d=1;d<=dim;d++){var dt=new Date(y,window.calM,d);var _ds=y+'-'+String(window.calM+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');var _hol=_holIdx.get(_ds);tCols.push({label:d,sub:window.DNAMES[dt.getDay()],s:dt,e:new Date(y,window.calM,d,23,59,59),isWk:dt.getDay()===0||dt.getDay()===6,isHol:!!_hol,holName:_hol?_hol.name:''});}var _monLbl=(window.matchMedia&&window.matchMedia('(max-width:768px)').matches)?window.THMON_SHORT[window.calM]:window.THMON[window.calM];document.getElementById('cal-lbl').textContent=_monLbl+' '+(y+543);}
   else if(window.calTime==='year'){for(var m=0;m<12;m++){var dt=new Date(y,m,1);tCols.push({label:window.THMON[m].slice(0,3),sub:'',s:dt,e:new Date(y,m+1,0,23,59,59),isWk:false});}document.getElementById('cal-lbl').textContent='ปี '+(y+543);}
   else if(window.calTime==='fiscal'){for(var i=0;i<12;i++){var m=(i+9)%12;var cy=i<3?y-1:y;var dt=new Date(cy,m,1);tCols.push({label:window.THMON[m].slice(0,3),sub:String(cy+543).slice(-2),s:dt,e:new Date(cy,m+1,0,23,59,59),isWk:false});}document.getElementById('cal-lbl').textContent='ปีงบฯ '+(y+543);}
   var deptFilt=(document.getElementById('cal-dept-filter')||{value:''}).value||'';
@@ -122,16 +133,15 @@ window.renderCalendar=function(){
       return true;
     }).map(s=>({id:s.id,name:s.name,sub:s.dept||'ไม่ระบุแผนก',type:'staff',obj:s}));
     // Sort by dept → earliest project start date
-    var _eSt={};
-    window.STAFF.forEach(function(s){
-      var mn=null;
-      (window.PROJECTS||[]).forEach(function(p){
-        if(p.status==='cancelled')return;
-        if(p.visits&&p.visits.length>0){p.visits.forEach(function(v){var vm=window._vtMember(v.team,s.id,v.start,v.end);if(vm&&vm.s&&(!mn||vm.s<mn))mn=vm.s;});}
-        else{var ms=(p.members&&p.members.length>0?p.members:p.team.map(function(id){return{sid:id,s:p.start};})).filter(function(m){return m.sid===s.id&&m.s;});ms.forEach(function(m){if(!mn||m.s<mn)mn=m.s;});}
-      });
-      _eSt[s.id]=mn||'9999-99';
+    // หาวันเริ่มงานแรกสุดต่อคนในรอบเดียว (เดิม ทุกคน × ทุกโครงการ × ทุก visit)
+    var _mnBy=new Map();var _mnSet=function(sid,v){var c=_mnBy.get(sid);if(!c||v<c)_mnBy.set(sid,v);};
+    (window.PROJECTS||[]).forEach(function(p){
+      if(p.status==='cancelled')return;
+      if(p.visits&&p.visits.length>0){p.visits.forEach(function(v){_calVisitMembers(v).forEach(function(x){if(x.vm.s)_mnSet(x.sid,x.vm.s);});});}
+      else{(p.members&&p.members.length>0?p.members:p.team.map(function(id){return{sid:id,s:p.start};})).forEach(function(m){if(m.s)_mnSet(m.sid,m.s);});}
     });
+    var _eSt={};
+    window.STAFF.forEach(function(s){_eSt[s.id]=_mnBy.get(s.id)||'9999-99';});
     baseRows.sort(function(a,b){var da=a.obj.dept||'zzz',db=b.obj.dept||'zzz';if(da!==db)return da.localeCompare(db,'th');return(_eSt[a.id]||'9999-99').localeCompare(_eSt[b.id]||'9999-99');});
     // Filter to staff with events in range if "แสดงเฉพาะคนที่มีงาน" is checked
     var _onlyCb=document.getElementById('cal-only-active');
@@ -157,33 +167,49 @@ window.renderCalendar=function(){
   }
   const BAR_HEIGHT=26;const BAR_GAP=6;const ROW_PAD=12;
   var activeRowsData=[];
+  // index ครั้งเดียวต่อการ render (เดิม find/indexOf/filter ทั้งตารางในทุกแถว/ทุก event)
+  var _stIdx=_calIdIdx(window.STAFF),_stPos=_calPosIdx(window.STAFF),_pPos=new Map();
+  window.PROJECTS.forEach(function(p,i){if(!_pPos.has(p))_pPos.set(p,i);});
+  var _pColor=function(p){return gC(_pPos.has(p)?_pPos.get(p):-1);};
+  // มุมมองรายคน: แหล่ง event ต่อคน (sid → [...]) เรียงตามลำดับเดิม (โครงการ → visit / LEAVES / WORK_LOGS)
+  var _srcBySid=new Map(),_lvBySid=new Map(),_wlBySid=new Map();
+  var _push=function(m,k,v){var l=m.get(k);if(!l){l=[];m.set(k,l);}l.push(v);};
+  if(window.calView==='staff'){
+    window.PROJECTS.forEach(p=>{if(p.status==='cancelled'||p.status==='completed')return;
+      if(p.visits&&p.visits.length>0){p.visits.forEach((v,vi)=>{_calVisitMembers(v).forEach(x=>{_push(_srcBySid,x.sid,{p:p,v:v,vi:vi,vm:x.vm});});});}
+      else{let mems=p.members&&p.members.length>0?p.members:p.team.map(id=>({sid:id,s:p.start,e:p.end}));let bySid=new Map();mems.forEach(m=>{_push(bySid,m.sid,m);});bySid.forEach((mbList,k)=>{_push(_srcBySid,k,{p:p,mbList:mbList});});}
+    });
+    (window.LEAVES||[]).forEach(lv=>{_push(_lvBySid,lv.staffId,lv);});
+    (window.WORK_LOGS||[]).forEach(function(wl){
+      var seen=new Set();
+      (wl.participants||[]).forEach(function(pt){if(seen.has(pt.sid))return;seen.add(pt.sid);_push(_wlBySid,pt.sid,{wl:wl,pt:pt});});
+      if(!seen.has(wl.staffId))_push(_wlBySid,wl.staffId,{wl:wl,pt:null});
+    });
+  }
   baseRows.forEach((r,ri)=>{
     let rawEvents=[];
-    if(window.calView==='staff'){window.PROJECTS.forEach(p=>{if(p.status==='cancelled'||p.status==='completed')return;
+    if(window.calView==='staff'){(_srcBySid.get(r.id)||[]).forEach(src=>{let p=src.p;
       // ถ้ามี visits ใช้ visits แทน members ปกติ
-      if(p.visits&&p.visits.length>0){
-        p.visits.forEach((v,vi)=>{
-          var vm=window._vtMember(v.team,r.id,v.start,v.end);
-          if(!vm)return;
-          let ms=pd(vm.s||v.start),me=pd(vm.e||v.end);me.setHours(23,59,59);
-          let idxs=getColIndices(ms,me,tCols);
-          if(idxs)rawEvents.push({sIdx:idxs.sIdx,eIdx:idxs.eIdx,text:`${p.name} (รอบ${v.no||vi+1})`,color:gC(window.PROJECTS.indexOf(p)),p:p});
-        });
+      if(src.v){
+        let v=src.v,vi=src.vi,vm=src.vm;
+        let ms=pd(vm.s||v.start),me=pd(vm.e||v.end);me.setHours(23,59,59);
+        let idxs=getColIndices(ms,me,tCols);
+        if(idxs)rawEvents.push({sIdx:idxs.sIdx,eIdx:idxs.eIdx,text:`${p.name} (รอบ${v.no||vi+1})`,color:_pColor(p),p:p});
       } else {
-        let mems=p.members&&p.members.length>0?p.members:p.team.map(id=>({sid:id,s:p.start,e:p.end}));let mbList=mems.filter(m=>m.sid===r.id);let validMems=mbList.filter(mb=>mb.s&&mb.e&&!isNaN(pd(mb.s).getTime())&&!isNaN(pd(mb.e).getTime()));if(validMems.length>0){let ms=new Date(Math.min(...validMems.map(mb=>pd(mb.s).getTime())));let me=new Date(Math.max(...validMems.map(mb=>{let d=pd(mb.e);d.setHours(23,59,59);return d.getTime();})));let idxs=getColIndices(ms,me,tCols);if(idxs)rawEvents.push({sIdx:idxs.sIdx,eIdx:idxs.eIdx,text:p.name,color:gC(window.PROJECTS.indexOf(p)),p:p});}
+        let mbList=src.mbList;let validMems=mbList.filter(mb=>mb.s&&mb.e&&!isNaN(pd(mb.s).getTime())&&!isNaN(pd(mb.e).getTime()));if(validMems.length>0){let ms=new Date(Math.min(...validMems.map(mb=>pd(mb.s).getTime())));let me=new Date(Math.max(...validMems.map(mb=>{let d=pd(mb.e);d.setHours(23,59,59);return d.getTime();})));let idxs=getColIndices(ms,me,tCols);if(idxs)rawEvents.push({sIdx:idxs.sIdx,eIdx:idxs.eIdx,text:p.name,color:_pColor(p),p:p});}
       }
     });
     var _LEAVE_EMOJI_CAL={sick:'🤒',vacation:'🏖',personal:'📋',maternity:'🤱',ordain:'🙏',other:'📝'};
     var _LEAVE_LABEL_CAL={sick:'ลาป่วย',vacation:'ลาพักร้อน',personal:'ลากิจ',maternity:'ลาคลอด',ordain:'ลาบวช',other:'อื่นๆ'};
-    (window.LEAVES||[]).filter(lv=>lv.staffId===r.id&&lv.startDate&&lv.endDate&&lv.status!=='rejected').forEach(lv=>{
+    (_lvBySid.get(r.id)||[]).filter(lv=>lv.startDate&&lv.endDate&&lv.status!=='rejected').forEach(lv=>{
       let ls=pd(lv.startDate),le=pd(lv.endDate);le.setHours(23,59,59);
       let idxs=getColIndices(ls,le,tCols);
       if(idxs){let emoji=_LEAVE_EMOJI_CAL[lv.leaveType]||'📝';let label=_LEAVE_LABEL_CAL[lv.leaveType]||lv.leaveType;rawEvents.push({sIdx:idxs.sIdx,eIdx:idxs.eIdx,text:emoji+' '+label,color:'rgba(255,107,107,0.75)',isLeave:true,lv:lv,p:null});}
     });
     // Work Logs
-    (window.WORK_LOGS||[]).forEach(function(wl){
-      var wlStart,wlEnd;
-      var pt=(wl.participants||[]).find(function(p){return p.sid===r.id;});
+    (_wlBySid.get(r.id)||[]).forEach(function(x){
+      var wl=x.wl,wlStart,wlEnd;
+      var pt=x.pt;
       if(pt){
         wlStart=pt.s||(wl.type==='daily'?wl.date:wl.startDate);
         wlEnd=pt.e||(wl.type==='daily'?wl.date:wl.endDate);
@@ -205,7 +231,7 @@ window.renderCalendar=function(){
         p.visits.forEach((v,vi)=>{
           if(!v.start||!v.end)return;
           let ms=pd(v.start),me=pd(v.end);me.setHours(23,59,59);
-          let team=v.team&&v.team.length>0?window._vtMembers(v.team,v.start,v.end).map(m=>{let st=window.STAFF.find(s=>s.id===m.sid);return st?(st.nickname||st.name.split(' ')[0]):'';}).filter(Boolean):[];
+          let team=v.team&&v.team.length>0?window._vtMembers(v.team,v.start,v.end).map(m=>{let st=_stIdx.get(m.sid);return st?(st.nickname||st.name.split(' ')[0]):'';}).filter(Boolean):[];
           let label=(team.length>0?team.join(', '):'ยังไม่มีทีม')+` (รอบ${v.no||vi+1})`;
           let idxs=getColIndices(ms,me,tCols);
           let vColor={'planned':gS(p.stage).color,'ongoing':'#7c5cfc','done':'#06d6a0'}[v.status]||gS(p.stage).color;
@@ -219,7 +245,7 @@ window.renderCalendar=function(){
           let ms=new Date(Math.min(...validMems.map(mb=>pd(mb.s).getTime())));
           let me=new Date(Math.max(...validMems.map(mb=>{let d=pd(mb.e);d.setHours(23,59,59);return d.getTime();})));
           let idxs=getColIndices(ms,me,tCols);
-          let staffNames=[...new Set(validMems.map(mb=>{let st=window.STAFF.find(s=>s.id===mb.sid);return st?st.nickname:'';}).filter(n=>n))];
+          let staffNames=[...new Set(validMems.map(mb=>{let st=_stIdx.get(mb.sid);return st?st.nickname:'';}).filter(n=>n))];
           if(idxs)rawEvents.push({sIdx:idxs.sIdx,eIdx:idxs.eIdx,text:staffNames.join(', ')||'ยังไม่มีทีมงาน',color:gS(p.stage).color,p:p});
         } else if(p.start&&p.end){
           let idxs=getColIndices(pd(p.start),new Date(pd(p.end).setHours(23,59,59)),tCols);
@@ -234,10 +260,10 @@ window.renderCalendar=function(){
         p.visits.forEach((v,vi)=>{
           if(!v.start||!v.end)return;
           let ms=pd(v.start),me=pd(v.end);me.setHours(23,59,59);
-          let team=v.team&&v.team.length>0?window._vtMembers(v.team,v.start,v.end).map(m=>{let st=window.STAFF.find(s=>s.id===m.sid);return st?(st.nickname||st.name.split(' ')[0]):'';}).filter(Boolean):[];
+          let team=v.team&&v.team.length>0?window._vtMembers(v.team,v.start,v.end).map(m=>{let st=_stIdx.get(m.sid);return st?(st.nickname||st.name.split(' ')[0]):'';}).filter(Boolean):[];
           let label=`${team.join(', ')||'ไม่มีทีม'} (${p.name} รอบ${v.no||vi+1})`;
           let idxs=getColIndices(ms,me,tCols);
-          if(idxs)rawEvents.push({sIdx:idxs.sIdx,eIdx:idxs.eIdx,text:label,color:gC(window.PROJECTS.indexOf(p)),p:p});
+          if(idxs)rawEvents.push({sIdx:idxs.sIdx,eIdx:idxs.eIdx,text:label,color:_pColor(p),p:p});
         });
       } else {
         let mems=p.members&&p.members.length>0?p.members:p.team.map(id=>({sid:id,s:p.start,e:p.end}));
@@ -246,9 +272,9 @@ window.renderCalendar=function(){
         if(!isNaN(me.getTime()))me.setHours(23,59,59);
         if(validMems.length>0){ms=new Date(Math.min(...validMems.map(mb=>pd(mb.s).getTime())));me=new Date(Math.max(...validMems.map(mb=>{let d=pd(mb.e);d.setHours(23,59,59);return d.getTime();})));}
         if(!isNaN(ms.getTime())&&!isNaN(me.getTime())){
-          let staffNames=[...new Set(validMems.map(mb=>{let st=window.STAFF.find(s=>s.id===mb.sid);return st?st.nickname:'';}).filter(n=>n))];
+          let staffNames=[...new Set(validMems.map(mb=>{let st=_stIdx.get(mb.sid);return st?st.nickname:'';}).filter(n=>n))];
           let idxs=getColIndices(ms,me,tCols);
-          if(idxs)rawEvents.push({sIdx:idxs.sIdx,eIdx:idxs.eIdx,text:`${staffNames.join(', ')||'ไม่มีทีม'} (${p.name})`,color:gC(window.PROJECTS.indexOf(p)),p:p});
+          if(idxs)rawEvents.push({sIdx:idxs.sIdx,eIdx:idxs.eIdx,text:`${staffNames.join(', ')||'ไม่มีทีม'} (${p.name})`,color:_pColor(p),p:p});
         }
       }
     });}
@@ -262,7 +288,7 @@ window.renderCalendar=function(){
     return;
   }
   var agendaEl=document.getElementById('cal-agenda');
-  if(agendaEl)agendaEl.innerHTML=buildCalAgendaHtml(activeRowsData,tCols);
+  if(agendaEl)agendaEl.innerHTML=buildCalAgendaHtml(activeRowsData,tCols,_stPos);
   const dayCount=tCols.length;
   const gridCols=`repeat(${dayCount},minmax(0,1fr))`;
   const _canAdd=window.canEdit('projects');const _ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
@@ -271,7 +297,7 @@ window.renderCalendar=function(){
   html+=`</div></div>`;
   activeRowsData.forEach(rowData=>{
     let r=rowData.rInfo;let rh=rowData.height;
-    let avatar='';if(r.type==='staff')avatar=`<div class="av" style="background:${avC(window.STAFF.findIndex(s=>s.id===r.id))}">${r.name.charAt(0)}</div>`;else if(r.type==='ptype')avatar=`<div class="av" style="background:${r.obj.color}">🏷</div>`;else avatar=`<div class="av" style="background:${gS(r.obj.stage).color}">📁</div>`;
+    let avatar='';if(r.type==='staff')avatar=`<div class="av" style="background:${avC(_stPos.has(r.id)?_stPos.get(r.id):-1)}">${r.name.charAt(0)}</div>`;else if(r.type==='ptype')avatar=`<div class="av" style="background:${r.obj.color}">🏷</div>`;else avatar=`<div class="av" style="background:${gS(r.obj.stage).color}">📁</div>`;
     let projEvts=rowData.events.filter(ev=>!ev.isLeave&&!ev.isWorkLog).length;let leaveEvts=rowData.events.filter(ev=>ev.isLeave).length;let wlEvts=rowData.events.filter(ev=>ev.isWorkLog).length;
     let workloadText=r.type==='staff'?((projEvts>0?projEvts+' โครงการ':'')+(projEvts>0&&(leaveEvts>0||wlEvts>0)?' · ':'')+( leaveEvts>0?leaveEvts+' วันลา':'')+((leaveEvts>0&&wlEvts>0)?' · ':'')+( wlEvts>0?wlEvts+' บันทึกงาน':'')):(r.type==='project'?rowData.eventCount+' ทีมงาน':rowData.eventCount+' โครงการ');
     html+=`<div class="tl-row" style="height:${rh}px"><div class="tl-left" style="height:${rh}px">${avatar}<div style="min-width:0;flex:1;display:flex;flex-direction:column;justify-content:center;padding-top:2px;"><div style="font-size:12px;font-weight:600;word-break:break-word;line-height:1.4;">${esc(r.name)}</div><div style="font-size:10px;color:var(--txt3);margin-top:4px;"><div>${esc(r.sub)}</div><div style="color:var(--violet);font-weight:700;">${workloadText}</div></div></div></div><div class="tl-right" style="grid-template-columns:${gridCols};height:${rh}px">`;

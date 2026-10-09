@@ -104,12 +104,14 @@ window.renderWorkLog = function(){
   });
 
   var months  = Object.keys(groups).sort().reverse();
-  var THMON   = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  // ดัชนีพนักงานตาม id (ตัวแรกที่เจอ = ผลเดียวกับ .find) — แทนการสแกน STAFF ต่อผู้เข้าร่วมทุกคน
+  var staffById = new Map();
+  (window.STAFF||[]).forEach(function(s){ if(!staffById.has(s.id)) staffById.set(s.id, s); });
 
   var html = '';
   months.forEach(function(ym){
     var parts = ym.split('-');
-    var mon   = THMON[parseInt(parts[1])-1] + ' ' + (parseInt(parts[0])+543);
+    var mon   = window.THMON_SHORT[parseInt(parts[1])-1] + ' ' + (parseInt(parts[0])+543);
     html += '<div style="font-size:10px;font-weight:700;color:var(--txt-muted);letter-spacing:.5px;padding:14px 0 6px;">'+mon+'</div>';
 
     groups[ym].forEach(function(wl){
@@ -118,11 +120,11 @@ window.renderWorkLog = function(){
       var isCreator = wl.uid === myUid;
 
       var ptNames = (wl.participants||[]).map(function(p){
-        var st = (window.STAFF||[]).find(function(s){ return s.id===p.sid; });
+        var st = staffById.get(p.sid);
         return st ? (st.nickname||st.name.split(' ')[0]) : '';
       }).filter(Boolean);
 
-      var creator = (window.STAFF||[]).find(function(s){ return s.id===wl.staffId; });
+      var creator = staffById.get(wl.staffId);
       var creatorName = creator ? (creator.nickname||creator.name.split(' ')[0]) : '';
 
       var locBadge = wl.locationType!=='local'
@@ -158,7 +160,7 @@ window.openWorkLogModal = function(id){
 
   document.getElementById('m-worklog-title').textContent = wl ? 'แก้ไขบันทึกงาน' : 'เพิ่มบันทึกงาน';
 
-  var today   = new Date().toISOString().slice(0,10);
+  var today   = window.todayStr();
   var type    = wl ? wl.type    : 'daily';
   var locType = wl ? (wl.locationType||'local') : 'local';
   var parts   = wl ? (wl.participants||[]) : [];
@@ -234,15 +236,15 @@ window.openWorkLogModal = function(id){
       +'<label class="f-label" style="margin-bottom:8px;">ผู้เข้าร่วม '
         +'<span id="wl-pt-cnt" style="color:var(--violet);font-weight:400;">'+(parts.length?'('+parts.length+')':'')+'</span>'
       +'</label>'
-      +'<div style="display:flex;gap:12px;">'
+      +'<div class="wl-pt-row" style="display:flex;gap:12px;">'
         // Selected list
         +'<div style="flex:1;min-width:0;">'
           +'<div id="wl-pt-selected" style="border:1px solid var(--border);border-radius:8px;min-height:64px;padding:6px;">'
-            +(ptHtml||'<div style="color:var(--txt-muted);font-size:11px;padding:10px;text-align:center;">กดเลือกจากรายชื่อด้านขวา</div>')
+            +(ptHtml||'<div style="color:var(--txt-muted);font-size:11px;padding:10px;text-align:center;">กดเลือกจากรายชื่อพนักงาน</div>')
           +'</div>'
         +'</div>'
         // Staff flat picker
-        +'<div style="width:200px;flex-shrink:0;">'
+        +'<div class="wl-pt-pick" style="width:200px;flex-shrink:0;">'
           +'<input type="text" class="f-input" placeholder="🔍 ค้นหา..." style="font-size:11px;padding:4px 8px;height:28px;margin-bottom:6px;" oninput="window._wlStaffFilter(this.value)">'
           +'<div id="wl-staff-list" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:4px;">'
             +staffListHtml
@@ -263,7 +265,7 @@ window.openWorkLogModal = function(id){
 
 // ── TOGGLE HELPERS ──
 window._wlTypeToggle = function(t){
-  var today = new Date().toISOString().slice(0,10);
+  var today = window.todayStr();
   document.getElementById('wl-date-section').innerHTML = _dateSectionHtml(t, null, today);
   ['daily','period'].forEach(function(x){
     var b = document.getElementById('wlt-'+x);

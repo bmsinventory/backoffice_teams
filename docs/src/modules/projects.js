@@ -17,13 +17,18 @@ window.isOnsiteGroup=function(groupId){
 };
 window.renderProjects=function(){
   var tabs=document.getElementById('proj-tabs');
+  // isOnsiteGroup ขึ้นกับ groupId อย่างเดียว → cache ต่อ groupId (เดิมเรียก PGROUPS.find ทุกโครงการ)
+  var _onsC=new Map();
+  var isOns=function(gid){if(!_onsC.has(gid))_onsC.set(gid,window.isOnsiteGroup(gid));return _onsC.get(gid);};
   if(tabs){
+    var grpCnt=new Map(),onsCnt=0;
+    window.PROJECTS.forEach(function(p){grpCnt.set(p.groupId,(grpCnt.get(p.groupId)||0)+1);if(isOns(p.groupId))onsCnt++;});
     var allGroups=[{id:'',label:'ทั้งหมด',color:'#7c5cfc'}];
     var onsiteGs=window.PGROUPS.filter(function(g){return window.isOnsiteGroup(g.id);});
     if(onsiteGs.length>0)allGroups.push({id:'__onsite__',label:'ติดตั้งระบบ (Onsite)',color:onsiteGs[0].color});
     window.PGROUPS.filter(function(g){return !window.isOnsiteGroup(g.id);}).forEach(function(g){allGroups.push(g);});
     tabs.innerHTML=allGroups.map(function(g){
-      var cnt=g.id===''?window.PROJECTS.length:g.id==='__onsite__'?window.PROJECTS.filter(function(p){return window.isOnsiteGroup(p.groupId);}).length:window.PROJECTS.filter(function(p){return p.groupId===g.id;}).length;
+      var cnt=g.id===''?window.PROJECTS.length:g.id==='__onsite__'?onsCnt:(grpCnt.get(g.id)||0);
       var on=window.projGrpTab===g.id;
       return`<div class="af-tab${on?' on':''}" style="${on?'background:'+g.color+';color:#fff':''}" onclick="window.projGrpTab='${g.id}';window.renderProjects()">${esc(g.label)}<span class="af-cnt">${cnt}</span></div>`;
     }).join('');
@@ -43,14 +48,18 @@ window.renderProjects=function(){
   var st=(document.getElementById('proj-stg')||{}).value||'';
   var fy=(document.getElementById('proj-fy')||{}).value||'';
   var rows=window.PROJECTS.filter(function(p){
-    var grpMatch=!grp||(grp==='__onsite__'?window.isOnsiteGroup(p.groupId):p.groupId===grp);
+    var grpMatch=!grp||(grp==='__onsite__'?isOns(p.groupId):p.groupId===grp);
     return grpMatch&&(!q||p.name.includes(q))&&(!ty.length||ty.includes(p.typeId))&&(!st||p.stage===st)&&(!fy||getYearBE(p.start)==fy);
   });
   var sortVal=(document.getElementById('proj-sort')||{}).value||'start_asc';
+  // แปลงวันที่ครั้งเดียวต่อแถวก่อน sort (เดิม pd() ซ้ำทุกครั้งที่เปรียบเทียบ)
+  var sKey=new Map();
+  if(sortVal==='start_asc'||sortVal==='start_desc')rows.forEach(function(p){sKey.set(p,p.start?+pd(p.start):0);});
+  else if(sortVal==='end_asc'||sortVal==='end_desc')rows.forEach(function(p){sKey.set(p,p.end?+pd(p.end):0);});
   rows.sort(function(a,b){
     var av,bv;
-    if(sortVal==='start_asc'||sortVal==='start_desc'){av=a.start?pd(a.start):new Date(0);bv=b.start?pd(b.start):new Date(0);return sortVal==='start_asc'?av-bv:bv-av;}
-    if(sortVal==='end_asc'||sortVal==='end_desc'){av=a.end?pd(a.end):new Date(0);bv=b.end?pd(b.end):new Date(0);return sortVal==='end_asc'?av-bv:bv-av;}
+    if(sortVal==='start_asc'||sortVal==='start_desc'){av=sKey.get(a);bv=sKey.get(b);return sortVal==='start_asc'?av-bv:bv-av;}
+    if(sortVal==='end_asc'||sortVal==='end_desc'){av=sKey.get(a);bv=sKey.get(b);return sortVal==='end_asc'?av-bv:bv-av;}
     if(sortVal==='name_asc'||sortVal==='name_desc'){return sortVal==='name_asc'?a.name.localeCompare(b.name,'th'):b.name.localeCompare(a.name,'th');}
     if(sortVal==='progress_asc'||sortVal==='progress_desc'){return sortVal==='progress_desc'?b.progress-a.progress:a.progress-b.progress;}
     return 0;
@@ -72,37 +81,44 @@ window.renderProjects=function(){
   }
   var colSpan=4+(showParent?2:0)+(showRevisit?1:0)+(showAdv?2:0);
   var tb=document.getElementById('proj-rows');if(!tb)return;
+  // index ครั้งเดียวต่อการ render (เดิม filter/find/some ทั้งตารางทุกแถว) — แถวแรกที่เจอ/ลำดับเดิม ตรงกับ .find/.filter
+  var advByPid=new Map(),ldByPid=new Map(),staffIdx=new Map(),projIdx=new Map(),ctIdx=new Map(),revDoneParents=new Set();
+  window.ADVANCES.forEach(function(a){var l=advByPid.get(a.pid);if(!l){l=[];advByPid.set(a.pid,l);}l.push(a);});
+  window.LODGINGS.forEach(function(x){var l=ldByPid.get(x.pid);if(!l){l=[];ldByPid.set(x.pid,l);}l.push(x);});
+  window.STAFF.forEach(function(s){if(!staffIdx.has(s.id))staffIdx.set(s.id,s);});
+  (window.PROJECTS||[]).forEach(function(rp){if(!projIdx.has(rp.id))projIdx.set(rp.id,rp);if(rp.groupId==='GRP17733355541904'&&rp.revisitRound==99)revDoneParents.add(rp.parentProjectId);});
+  (window.CONTRACTS||[]).forEach(function(c){if(!ctIdx.has(c.id))ctIdx.set(c.id,c);});
   tb.innerHTML=rows.map(function(p,i){
     var sg=gS(p.stage);var pt=gT(p.typeId);var pg=gG(p.groupId);
-    var pAdvs=window.ADVANCES.filter(function(a){return a.pid===p.id;});
+    var pAdvs=advByPid.get(p.id)||[];
     var adv=pAdvs.find(function(a){return a.status!=='cleared';})||pAdvs[pAdvs.length-1];
     var advRdate=adv&&adv.rdate?fd(adv.rdate):'<span style="color:var(--txt3)">-</span>';
     var advDdate=adv&&adv.ddate?fd(adv.ddate):'<span style="color:var(--txt3)">-</span>';
     var advStat=adv?window.AFLW.find(function(x){return x.id===adv.status;}):null;
     var advStatHtml=advStat?`<span class="tag" style="background:${advStat.color}18;color:${advStat.color};font-size:10px;">${advStat.icon} ${advStat.label}</span>`:'<span style="color:var(--txt3)">—</span>';
-    var mems=(p.members||p.team.map(function(id){return{sid:id};})).map(function(m){return gSt(m.sid);});
+    var mems=(p.members||p.team.map(function(id){return{sid:id};})).map(function(m){return staffIdx.get(m.sid)||{name:'?',dept:''};});
     var nicknames=mems.map(function(m){return m.nickname||m.name.split(' ')[0];}).filter(Boolean).join(', ')||'<span style="color:var(--txt3)">ไม่มีทีม</span>';
     var pgHtml=pg?`<span class="tag" style="background:${pg.color}18;color:${pg.color};font-size:9px;padding:2px 6px">${esc(pg.label)}</span>`:'';
     var parentCells='';
     if(showParent){
-      var parentProj=p.parentProjectId?window.PROJECTS.find(function(x){return x.id===p.parentProjectId;}):null;
+      var parentProj=p.parentProjectId?projIdx.get(p.parentProjectId):null;
       var parentName=parentProj?esc(parentProj.name):'<span style="color:var(--txt3)">-</span>';
       // data-empty="1" — บนมือถือ (การ์ด) ซ่อนช่องที่ไม่มีข้อมูลเลย กันการ์ดรกไปด้วย "-" ที่ไม่มีความหมาย
       // (ตาราง desktop ยังโชว์ "-" ปกติ เพื่อคงคอลัมน์ให้ตรงแถว ดู responsive.css ที่ซ่อน td[data-empty] เฉพาะ .m-card-table)
       parentCells=`<td${parentProj?'':' data-empty="1"'} style="font-size:11px;color:var(--txt2);">${parentName}</td><td${p.revisitRound?'':' data-empty="1"'} style="font-size:11px;font-weight:600;color:var(--violet);text-align:center;">${p.revisitRound?'ครั้งที่ '+p.revisitRound:'<span style="color:var(--txt3)">-</span>'}</td>`;
     }
     var _ctInfo='';
-    if(p.contractId){var _ctObj=(window.CONTRACTS||[]).find(function(c){return c.id===p.contractId;});if(_ctObj){_ctInfo='<div style="font-size:10px;color:var(--indigo);margin-top:3px;line-height:1.5;">📃 <span style="font-weight:700;">'+esc(_ctObj.id)+'</span> '+esc(_ctObj.name)+(_ctObj.startDate||_ctObj.endDate?' <span style="color:var(--txt3);">'+(_ctObj.startDate?fd(_ctObj.startDate):'?')+'–'+(_ctObj.endDate?fd(_ctObj.endDate):'?')+'</span>':'')+'</div>';}}
+    if(p.contractId){var _ctObj=ctIdx.get(p.contractId);if(_ctObj){_ctInfo='<div style="font-size:10px;color:var(--indigo);margin-top:3px;line-height:1.5;">📃 <span style="font-weight:700;">'+esc(_ctObj.id)+'</span> '+esc(_ctObj.name)+(_ctObj.startDate||_ctObj.endDate?' <span style="color:var(--txt3);">'+(_ctObj.startDate?fd(_ctObj.startDate):'?')+'–'+(_ctObj.endDate?fd(_ctObj.endDate):'?')+'</span>':'')+'</div>';}}
     var _revDone=false;
-    if(showRevisit){var _revKids=(window.PROJECTS||[]).filter(function(rp){return rp.groupId==='GRP17733355541904'&&rp.parentProjectId===p.id;});_revDone=!p.noRevisit&&(_revKids.some(function(rp){return rp.revisitRound==99;})||!!(p.revisit1&&p.revisit2));}
+    if(showRevisit){_revDone=!p.noRevisit&&(revDoneParents.has(p.id)||!!(p.revisit1&&p.revisit2));}
     var _revBadge=p.noRevisit?'<span style="display:inline-block;font-size:9px;background:rgba(255,107,107,.1);color:var(--coral);padding:1px 7px;border-radius:10px;font-weight:700;border:1px solid rgba(255,107,107,.3);margin-bottom:3px;">🚫 ไม่ต้อง Revisit</span><br>':_revDone?'<span style="display:inline-block;font-size:9px;background:rgba(32,201,151,.1);color:var(--teal);padding:1px 7px;border-radius:10px;font-weight:700;border:1px solid rgba(32,201,151,.3);margin-bottom:3px;">✅ Revisit ครบแล้ว</span><br>':'';
     var _revEmpty=!_revBadge&&!p.revisit1&&!p.revisit2;
     var revisitCell=showRevisit?('<td'+(_revEmpty?' data-empty="1"':'')+' style="font-size:11px;color:var(--txt2);line-height:1.6">'+_revBadge+'📅 '+(p.revisit1?fd(p.revisit1):'<span style="color:var(--txt3)">-</span>')+'<br>📅 '+(p.revisit2?fd(p.revisit2):'<span style="color:var(--txt3)">-</span>')+'</td>'):'';
     var advCells=showAdv?`<td${adv?'':' data-empty="1"'} style="font-size:11px;color:var(--txt2);line-height:1.6">📅 ${advRdate}<br>⏰ ${advDdate}</td><td${adv?'':' data-empty="1"'}>${advStatHtml}</td>`:'';
-    var hasLinked=window.ADVANCES.some(function(adv){return adv.pid===p.id;})||window.LODGINGS.some(function(l){return l.pid===p.id;});
+    var hasLinked=advByPid.has(p.id)||ldByPid.has(p.id);
     var _exLd=['GRP17733355541905','GRP17733355541906'];
     var ldStatusCell='<td data-empty="1" style="font-size:11px;color:var(--txt3);">—</td>';
-    if(!_exLd.includes(p.groupId)){var _pLds=window.LODGINGS.filter(function(l){return l.pid===p.id;});if(!_pLds.length){ldStatusCell='<td data-empty="1" style="font-size:11px;color:var(--txt3);">—</td>';}else{var _appD=_pLds.some(function(l){return l.approvedDaily==='yes';});var _appM=_pLds.some(function(l){return l.approvedMonthly==='yes';});if(_appD&&_appM){ldStatusCell='<td><div style="display:flex;flex-direction:column;gap:2px;"><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:#4361ee18;color:var(--indigo);border:1px solid #4361ee30;white-space:nowrap;">✅ รายวัน</span><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:var(--coral)18;color:var(--coral);border:1px solid var(--coral)30;white-space:nowrap;">✅ รายเดือน</span></div></td>';}else if(_appD){ldStatusCell='<td><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:#4361ee18;color:var(--indigo);border:1px solid #4361ee30;white-space:nowrap;">✅ รายวัน</span></td>';}else if(_appM){ldStatusCell='<td><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:var(--coral)18;color:var(--coral);border:1px solid var(--coral)30;white-space:nowrap;">✅ รายเดือน</span></td>';}else{ldStatusCell='<td><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:var(--amber)18;color:var(--amber);border:1px solid var(--amber)30;white-space:nowrap;">⏳ รออนุมัติ</span></td>';}}}
+    if(!_exLd.includes(p.groupId)){var _pLds=ldByPid.get(p.id)||[];if(!_pLds.length){ldStatusCell='<td data-empty="1" style="font-size:11px;color:var(--txt3);">—</td>';}else{var _appD=_pLds.some(function(l){return l.approvedDaily==='yes';});var _appM=_pLds.some(function(l){return l.approvedMonthly==='yes';});if(_appD&&_appM){ldStatusCell='<td><div style="display:flex;flex-direction:column;gap:2px;"><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:#4361ee18;color:var(--indigo);border:1px solid #4361ee30;white-space:nowrap;">✅ รายวัน</span><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:var(--coral)18;color:var(--coral);border:1px solid var(--coral)30;white-space:nowrap;">✅ รายเดือน</span></div></td>';}else if(_appD){ldStatusCell='<td><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:#4361ee18;color:var(--indigo);border:1px solid #4361ee30;white-space:nowrap;">✅ รายวัน</span></td>';}else if(_appM){ldStatusCell='<td><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:var(--coral)18;color:var(--coral);border:1px solid var(--coral)30;white-space:nowrap;">✅ รายเดือน</span></td>';}else{ldStatusCell='<td><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:var(--amber)18;color:var(--amber);border:1px solid var(--amber)30;white-space:nowrap;">⏳ รออนุมัติ</span></td>';}}}
 
     return`<tr class="fade" onclick="window.openProjModal('${p.id}')">
       <td><div class="proj-title-line"><span class="proj-row-index" aria-label="ลำดับ ${i+1}">${i+1}</span><div class="proj-row-title">${esc(p.name)}</div></div>${p.siteOwner?`<div style="font-size:10px;color:var(--txt3);margin-top:2px;">🏢 ${esc(p.siteOwner)}</div>`:''}<div style="display:flex;align-items:center;gap:6px;margin-top:4px;">${pgHtml}<span class="tag" style="background:${pt.color}18;color:${pt.color};font-size:9px;padding:2px 6px">${esc(pt.label)}</span><span class="tag" style="background:${sg.color}18;color:${sg.color};font-size:9px;padding:2px 6px">${sg.label}</span><span style="font-size:10px;font-weight:700;color:${sg.color}">${p.progress}%</span></div><div style="font-size:11px;color:var(--violet);margin-top:6px;font-weight:600;">👥 ${nicknames}</div>${p.note?`<div style="font-size:11px;color:var(--amber);margin-top:4px;">⚠ ${esc(p.note)}</div>`:''}${_ctInfo}</td>
@@ -270,7 +286,6 @@ window.openProjModal=function(id){
   document.getElementById('m-proj-title').textContent=p?'แก้ไขโครงการ':'เพิ่มโครงการใหม่';
   var mems=p?(p.members||p.team.map(function(tid){return{id:'M'+uid(),sid:tid,s:p.start,e:p.end};})):[];
   var grpOpts='<option value="">-- ไม่ระบุกลุ่ม --</option>'+window.PGROUPS.map(function(g){return`<option value="${g.id}"${p&&p.groupId===g.id?' selected':''}>${esc(g.label)}</option>`;}).join('');
-  var stgOpts=window.STAGES.map(function(s){return`<option value="${s.id}"${p&&p.stage===s.id?' selected':''}>${s.label}</option>`;}).join('');
   var typOpts='<option value="">-- เลือกประเภท --</option>'+window.PTYPES.map(function(t){return`<option value="${t.id}"${p&&p.typeId===t.id?' selected':''}>${t.label}</option>`;}).join('');
   var staffSorted=window.STAFF.filter(function(s){return s.active!==false;}).sort(window.sortStaffByDeptRank);
   var ownerStaff=window.STAFF.filter(function(s){return s.active!==false&&s.role&&(s.role.includes('ผู้จัดการ')||s.role.includes('หัวหน้า'));});
@@ -863,7 +878,6 @@ window.saveProject=async function(){
     window.renderAll&&window.renderAll();
     if(typeof window.tsSyncProject==='function') await window.tsSyncProject(pid, members);
     if(_saveGrpId==='GRP17733355541904'&&dbProj.parent_project_id&&dbProj.end_date){
-      var _rvSibs=(window.PROJECTS||[]).filter(function(rp){return rp.groupId==='GRP17733355541904'&&rp.parentProjectId===dbProj.parent_project_id&&rp.id!==pid;});
       var _rvUpd=dbProj.revisit_round===99?{revisit_1:dbProj.end_date,revisit_2:dbProj.end_date}:(dbProj.revisit_round===2?{revisit_2:dbProj.end_date}:{revisit_1:dbProj.end_date});
       await window.updateDoc(getDocRef('PROJECTS',dbProj.parent_project_id),_rvUpd);
     }

@@ -147,6 +147,16 @@
   .ms-filter { max-width: 100%; min-width: 0; flex-shrink: 1; flex: 1 1 120px; }
   .toolbar > [id$="-cmb-wrap"] { flex: 1 1 160px; width: auto !important; min-width: 0; }
   .toolbar > .btn { flex-shrink: 1; min-width: 0; }
+  /* <select> กว้างตามตัวเลือกที่ยาวที่สุดเสมอ (ชื่อแผนก/โครงการยาว) — ดันกลุ่มตัวกรองในแถบเครื่องมือ
+     (Workload / ทีมว่าง ฯลฯ) กว้าง ~600px แล้วถูกตัดขอบ → จำกัดไม่เกินกล่องที่อยู่ */
+  #content select, .modal select { max-width: 100%; }
+  .toolbar > div { min-width: 0; max-width: 100%; }
+
+  /* ── แท็บมุมมอง รพ. (รายชื่อ/สรุปข้อมูลการติดต่อ/วิเคราะห์/Dashboard) เดิมถูกบีบจนตัวหนังสือ
+     ตัดทีละพยางค์เป็นแนวตั้ง → แถวเดียวเลื่อนซ้ายขวา ── */
+  .hsp-vtabs { overflow-x: auto; scrollbar-width: none; padding: 0 8px !important; flex-shrink: 0; }
+  .hsp-vtabs::-webkit-scrollbar { display: none; }
+  .hsp-vtabs > button { flex-shrink: 0; white-space: nowrap; padding: 10px 12px !important; }
   .toolbar .btn { padding: 8px 10px; font-size: 12px; }
 
   /* ── Stat Row ── */
@@ -160,8 +170,22 @@
 
   /* ── Overview ── */
   div[style*="1fr 1fr 280px"] { grid-template-columns: 1fr !important; }
-  .ov-row { grid-template-columns: 1fr !important; padding: 0 12px 12px !important; gap: 12px !important; }
+  /* minmax(0,1fr) ไม่ใช่ 1fr — 1fr เฉย ๆ = minmax(auto,1fr) การ์ดที่มีข้อความยาว/ตาราง (Budget Distribution,
+     Critical Timeline, Project Health …) ยืดคอลัมน์เป็น ~650px แล้วถูกตัดขอบขวาหาย */
+  .ov-row { grid-template-columns: minmax(0, 1fr) !important; padding: 0 12px 12px !important; gap: 12px !important; }
+  .ov-row > *, .ov-card { min-width: 0; }
+  #annual-target-wrap { padding: 0 12px 12px !important; }
   #ov-ai-wrap { padding: 12px 12px 0 !important; }
+
+  /* ── ลูกของกริด inline (JS) ทั้งระบบ: ค่าเริ่มต้น min-width:auto ทำให้ข้อความยาว/nowrap ดันคอลัมน์
+     กว้างเกินจอ — ให้หดได้ แล้วเนื้อหาข้างในตัด/ห่อเอง ── */
+  #content [style*="grid-template-columns"] > *, .modal [style*="grid-template-columns"] > * { min-width: 0; }
+
+  /* ── เป้าหมายทีม: กล่อง padding 24 + ช่องกรอกกว้างตายตัว 180px ล้นจอ ── */
+  #targets-body { padding: 12px !important; min-width: 0; width: 100%; box-sizing: border-box; }
+  #targets-body > div { padding: 16px 14px !important; }
+  #targets-body input[id^="tpg-"] { width: 120px !important; min-width: 0; flex-shrink: 1; }
+  #targets-body span[style*="flex:1"] { min-width: 0; }
 
   /* ── Advance / Lodging card grids: เดิม minmax(340px,1fr) ไม่มี mobile override เลย
      (บั๊กเดียวกับที่เจอใน Leave dept-grid ก่อนหน้านี้) กว้าง 340px ล้นจอมือถือทั่วไปแน่นอน ── */
@@ -173,6 +197,10 @@
   .hsp-card-grid { grid-template-columns: 1fr !important; }
   .hsp-card-grid > div { border-right: none !important; }
   .hsp-card-grid > div + div { border-top: 1px solid var(--border); }
+  /* ที่ตั้ง (ตำบล/อำเภอ/จังหวัด) บนหัวการ์ด nowrap ยาวเกินการ์ด ถูกตัดหายไม่มี … */
+  .hsp-card-loc { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  /* ที่พัก: ป้ายกลุ่ม/ประเภทโครงการ (nowrap) บนการ์ด ยาวเกินการ์ดแล้วถูกตัด → … */
+  .ld-project-sub .ld-tag { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 
   /* ── กริด inline ที่ CSS กลางเข้าไม่ถึง (ฟอร์มใน JS) — ใส่ class เฉพาะจุดที่ควรยุบ
      m-stack = 1 คอลัมน์ (ช่องกรอกที่ label ยาว), m-2col = 3 คอลัมน์ → 2 ── */
@@ -218,11 +246,6 @@
   /* ช่องสั้นครึ่งแถว/ช่องยาวเต็มแถว (mobile.js mCardCell) — dense เติมช่องว่างที่เกิดจากช่องเต็มแถวคั่น */
   table.m-card-table tr { grid-auto-flow: row dense; }
   table.m-card-table td.m-wide { grid-column: 1 / -1; }
-  /* คอลัมน์แรกเป็น "ลำดับ" (td.m-rowno เช่น หน้าโครงการ) — แถบเล็กบนสุดของการ์ด · ช่องถัดไปเป็นหัวการ์ดแทน ── */
-  table.m-card-table td.m-rowno { grid-column: 1 / -1; flex-direction: row; align-items: baseline; gap: 4px; font-size: 10.5px !important; text-align: left !important; padding-bottom: 0; border-bottom: none; margin-bottom: 0; }
-  table.m-card-table td.m-rowno::before { display: inline; }
-  table.m-card-table td.m-rowno + td { grid-column: 1 / -1; font-size: 13.5px; font-weight: 700; color: var(--txt); padding-bottom: 6px; border-bottom: 1px solid var(--border); margin-bottom: 3px; }
-  table.m-card-table td.m-rowno + td::before { display: none; }
   /* ข้อความยาวมาก: ตัดที่ 3 บรรทัด + … · แถวที่กดไม่ได้ แตะเพื่อกาง/พับ */
   .m-clampbox { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
   .m-clampbox.open { display: block; -webkit-line-clamp: unset; line-clamp: unset; }
@@ -255,6 +278,9 @@
 
   /* ── Forms ── */
   .f-grid  { grid-template-columns: 1fr !important; gap: 10px !important; }
+  /* ช่องที่ตั้ง grid-column:span 2/3 ไว้ (เช่น ฟอร์มสัญญา) ในกริดที่ยุบเหลือ 1 คอลัมน์ ทำให้ browser
+     สร้างคอลัมน์แฝงเพิ่ม คอลัมน์แรกถูกบีบจน label/ช่องกรอกเรียงตัวอักษรเป็นแนวตั้ง → เต็มแถวเสมอ */
+  .f-grid > *, .m-stack > * { grid-column: 1 / -1 !important; }
   /* หมายเหตุ: .f-input ไม่ต้องบังคับ font-size ในมือถืออีกแล้ว — base ใน form.css ให้ 13px
      อยู่แล้ว (เท่า desktop, เข้าชุดกับ label/ปุ่มรอบข้าง) เดิมเคยบังคับ 16px !important ที่นี่เพื่อกัน
      iOS auto-zoom แต่ !important ดันไปทับ font-size เล็กที่บางจุดตั้งใจกำหนดเองผ่าน inline style
@@ -304,6 +330,11 @@
      ให้แต่ละแผงกว้างเต็มโมดัล และลด max-height ลงกันสองแผงรวมกันยาวเกินจอ ── */
   .pku-grid { grid-template-columns: 1fr !important; }
   .pku-grid #pku-avail, .pku-grid #mem-list { max-height: 220px !important; }
+
+  /* ── บันทึกงาน: ผู้เข้าร่วม (ที่เลือก | รายชื่อกว้างตายตัว 200px) ชิดกันบนจอแคบ ช่องที่เลือกเหลือ ~20px
+     ข้อความเรียงเป็นแนวตั้ง → สแตก รายชื่อขึ้นก่อน ช่องที่เลือกอยู่ล่าง ── */
+  .wl-pt-row { flex-direction: column-reverse; }
+  .wl-pt-row > .wl-pt-pick { width: 100% !important; }
 
   /* ── Advance Stepper ── */
   .adv-stepper { overflow-x: auto; gap: 0; padding-bottom: 4px; }
@@ -360,6 +391,11 @@
 
   /* Kanban */
   .kb-col { min-width: 160px !important; width: 160px !important; }
+
+  /* Timesheet: แท็บมุมมอง 3 ปุ่ม (nowrap) ล้นขอบที่ 320px → ย่อ/ให้ห่อได้ */
+  .ts-seg button { min-width: 0; padding: 6px 4px; font-size: 11px; white-space: normal; }
+  /* ทีมว่าง: ช่องวันที่ จาก–ถึง กว้าง 130px ×2 + ป้าย เกินจอ 320px */
+  #view-availability .toolbar .be-date, #view-availability .toolbar .be-date-display { width: 100px !important; }
 }
 
 /* ════ PRINT ════ */

@@ -106,7 +106,7 @@ window.teamRenderSubnav = function() {
   var cur = document.body.getAttribute('data-view');
   var tabs = [{id:'workload', label:'📊 ภาระงานรายเดือน'}, {id:'availability', label:'🟢 ทีมว่าง'}]
     .filter(function(t){ return !window.canView || window.canView(t.id); });
-  var html = tabs.map(function(t){ return '<div class="adv-subtab' + (t.id === cur ? ' on' : '') + '" onclick="window.goView(\'' + t.id + '\')">' + t.label + '</div>'; }).join('');
+  var html = tabs.map(function(t){ return '<div class="adv-subtab' + (t.id === cur ? ' on' : '') + '" onclick="window.goView(\'' + t.id + '\',this)">' + t.label + '</div>'; }).join('');
   document.querySelectorAll('[data-team-subnav]').forEach(function(el){ el.innerHTML = html; });
 };
 
@@ -163,28 +163,52 @@ window.renderWorkload = function() {
   var staffRows = [];
   var cntOverload = 0, cntActive = 0, cntAvail = 0, cntOverlap = 0;
 
+  // ── จัดช่วงงานต่อคนครั้งเดียว: sid → [{p, mine}] เรียงตามลำดับโครงการ
+  // (เดิมวน ทุกคน × ทุกโครงการ × ทุก visit) — ผลเท่าเดิมทุกประการ ──
+  var wlBySid = new Map();
+  (window.PROJECTS || []).forEach(function(p) {
+    if (p.status === 'cancelled' || p.status === 'completed') return;
+    // ── periods จาก visits (ถ้ามี) — ตรรกะเดียวกับ window._vtMember (ต่อ visit ใช้แถวแรกของคนนั้น) ──
+    var visitBySid = new Map();
+    if (p.visits && p.visits.length > 0) {
+      p.visits.forEach(function(v) {
+        var team = v.team;
+        if (!team || !team.length) return;
+        var objForm = typeof team[0] === 'object', seen = new Set();
+        team.forEach(function(t) {
+          var sid = objForm ? t.sid : t;
+          if (seen.has(sid)) return;
+          seen.add(sid);
+          var vs = (objForm ? t.s : '') || v.start || '', ve = (objForm ? t.e : '') || v.end || '';
+          if (!vs || !ve) return;
+          var l = visitBySid.get(sid); if (!l) { l = []; visitBySid.set(sid, l); }
+          l.push({ sid: sid, s: vs, e: ve });
+        });
+      });
+    }
+    // ── periods จาก members/team ──
+    var mems = (p.members && p.members.length > 0)
+      ? p.members
+      : (p.team || []).map(function(id) { return { sid: id, s: p.start, e: p.end }; });
+    var memBySid = new Map();
+    mems.forEach(function(m) {
+      if (!(m.s && m.e)) return;
+      var l = memBySid.get(m.sid); if (!l) { l = []; memBySid.set(m.sid, l); }
+      l.push(m);
+    });
+    // ใช้ visitPeriods ถ้ามี ไม่งั้น fallback ไป memberPeriods
+    var addMine = function(sid, mine) {
+      var l = wlBySid.get(sid); if (!l) { l = []; wlBySid.set(sid, l); }
+      l.push({ p: p, mine: mine });
+    };
+    visitBySid.forEach(function(mine, sid) { addMine(sid, mine); });
+    memBySid.forEach(function(mine, sid) { if (!visitBySid.has(sid)) addMine(sid, mine); });
+  });
+
   (window.STAFF || []).filter(function(s) { return s.active !== false; }).forEach(function(s, gi) {
     var projs = [];
-    (window.PROJECTS || []).forEach(function(p) {
-      if (p.status === 'cancelled' || p.status === 'completed') return;
-      // ── periods จาก visits (ถ้ามี) ──
-      var visitPeriods = [];
-      if (p.visits && p.visits.length > 0) {
-        p.visits.forEach(function(v) {
-          var vm = window._vtMember(v.team, s.id, v.start, v.end);
-          if (vm && vm.s && vm.e) {
-            visitPeriods.push({ sid: s.id, s: vm.s, e: vm.e });
-          }
-        });
-      }
-      // ── periods จาก members/team ──
-      var mems = (p.members && p.members.length > 0)
-        ? p.members
-        : (p.team || []).map(function(id) { return { sid: id, s: p.start, e: p.end }; });
-      var memberPeriods = mems.filter(function(m) { return m.sid === s.id && m.s && m.e; });
-      // ใช้ visitPeriods ถ้ามี ไม่งั้น fallback ไป memberPeriods
-      var mine = visitPeriods.length > 0 ? visitPeriods : memberPeriods;
-      if (!mine.length) return;
+    (wlBySid.get(s.id) || []).forEach(function(x) {
+      var p = x.p, mine = x.mine;
       var ms = new Date(Math.min.apply(null, mine.map(function(m) { return pd(m.s).getTime(); })));
       var me = new Date(Math.max.apply(null, mine.map(function(m) { var dt = pd(m.e); dt.setHours(23,59,59); return dt.getTime(); })));
       if (ms <= monthEnd && me >= monthStart) projs.push({ p: p, s: ms, e: me, periods: mine });
@@ -654,7 +678,7 @@ window.wlNotifySaveImg = async function(sid) {
     var canvas = await window.html2canvas(clone, { scale: 2, backgroundColor: '#ffffff', width: capW, height: capH, windowWidth: capW, windowHeight: capH });
     var safeName = (r.staff.name || 'staff').replace(/[^a-zA-Z0-9ก-๙]+/g, '_');
     var link = document.createElement('a');
-    link.download = 'ตารางงาน_' + safeName + '_' + new Date().toISOString().slice(0, 10) + '.png';
+    link.download = 'ตารางงาน_' + safeName + '_' + window.todayStr() + '.png';
     link.href = canvas.toDataURL('image/png');
     link.click();
   } catch (e) {
@@ -709,7 +733,7 @@ window.wlNotifyExportExcel = async function() {
   });
   _wlNotifyExcelSheet(wb, teamHeaders, teamData, 'รายทีม-โครงการ');
 
-  XLSX.writeFile(wb, 'สรุปแจ้งงานเข้าไซต์_' + new Date().toISOString().slice(0, 10) + '.xlsx');
+  XLSX.writeFile(wb, 'สรุปแจ้งงานเข้าไซต์_' + window.todayStr() + '.xlsx');
 };
 
 // ── 🤖 AI วิเคราะห์ภาระงานทีม + แนะนำการวางคน ─────────────────────────────────

@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>คู่มือการใช้งาน — Backoffice Teams</title>
+<meta name="theme-color" content="#1e3a8a">
+<link rel="icon" type="image/png" href="img/icon_app.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css">
+<script>
+  // ใช้ธีมเดียวกับหน้าระบบหลัก (localStorage _bms_dark ตั้งจากปุ่มพระจันทร์ใน index.html)
+  try { var _t = localStorage.getItem('_bms_dark'); if (_t === 'dark' || _t === 'light') document.documentElement.setAttribute('data-theme', _t); } catch (e) {}
+</script>
+<style>
+  :root{
+    --bg:#f4f6f9; --surface:#ffffff; --surface2:#f8f9fc; --ink:#1b2130; --ink2:#5b6377; --ink3:#8a90a0;
+    --line:#e2e5ec; --accent:#4361ee; --accent-soft:#eef1fe;
+    --ok:#0f9d6e; --ok-soft:rgba(15,157,110,.11); --warn:#b7740a; --warn-soft:rgba(201,130,12,.12);
+    --bad:#d93c41; --bad-soft:rgba(229,72,77,.11);
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --bg:#12151d; --surface:#1a1e27; --surface2:#1f2430; --ink:#e7e9f0; --ink2:#a3aabb; --ink3:#6f7686;
+      --line:#2a2f3c; --accent:#8298ff; --accent-soft:#20263b;
+      --ok:#3ecf8e; --ok-soft:rgba(62,207,142,.12); --warn:#e0a94a; --warn-soft:rgba(224,169,74,.13);
+      --bad:#ff6b70; --bad-soft:rgba(255,107,112,.12);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#12151d; --surface:#1a1e27; --surface2:#1f2430; --ink:#e7e9f0; --ink2:#a3aabb; --ink3:#6f7686;
+    --line:#2a2f3c; --accent:#8298ff; --accent-soft:#20263b;
+    --ok:#3ecf8e; --ok-soft:rgba(62,207,142,.12); --warn:#e0a94a; --warn-soft:rgba(224,169,74,.13);
+    --bad:#ff6b70; --bad-soft:rgba(255,107,112,.12);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth;scroll-padding-top:76px}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Noto Sans Thai',system-ui,sans-serif;font-size:15px;line-height:1.75}
+  a{color:var(--accent)}
+
+  /* ── แถบบน ── */
+  .top{position:sticky;top:0;z-index:50;background:var(--surface);border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:12px;padding:10px 20px;height:60px}
+  .top .brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--ink);min-width:0}
+  .top .brand img{width:32px;height:32px;object-fit:contain;background:#fff;border-radius:8px;padding:2px}
+  .top .brand b{font-size:15px;white-space:nowrap}
+  .top .brand span{font-size:12px;color:var(--ink3);white-space:nowrap}
+  .search{flex:1;max-width:420px;margin-left:auto;position:relative}
+  .search input{width:100%;font:inherit;font-size:14px;padding:8px 12px 8px 34px;border:1px solid var(--line);
+    border-radius:10px;background:var(--bg);color:var(--ink)}
+  .search .ti{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--ink3)}
+  .icon-btn{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;gap:6px;height:38px;min-width:38px;
+    padding:0 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink2);
+    font:inherit;font-size:13px;cursor:pointer;text-decoration:none}
+  .icon-btn:hover{color:var(--accent);border-color:var(--accent)}
+  .icon-btn .ti{font-size:18px}
+  #toc-btn{display:none}
+
+  /* ── โครงหน้า ── */
+  .layout{display:grid;grid-template-columns:270px minmax(0,1fr);max-width:1240px;margin:0 auto}
+  nav.toc{position:sticky;top:60px;align-self:start;height:calc(100vh - 60px);overflow-y:auto;
+    padding:18px 12px 40px 20px;border-right:1px solid var(--line)}
+  .toc .grp{font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--ink3);margin:16px 8px 4px;text-transform:uppercase}
+  .toc .grp:first-child{margin-top:0}
+  .toc a{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:8px;color:var(--ink2);
+    text-decoration:none;font-size:13.5px;line-height:1.45}
+  .toc a .ti{font-size:16px;color:var(--ink3)}
+  .toc a:hover{background:var(--surface2);color:var(--ink)}
+  .toc a.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+  .toc a.on .ti{color:var(--accent)}
+  .toc a.hide{display:none}
+  main{padding:28px 36px 80px;min-width:0}
+  .hero{background:linear-gradient(135deg,#1e3a8a,#4361ee 60%,#7c5cfc);color:#fff;border-radius:16px;padding:26px 28px;margin-bottom:24px}
+  .hero h1{margin:0 0 6px;font-size:24px;line-height:1.35}
+  .hero p{margin:0;opacity:.9;font-size:14.5px}
+  .hero .meta{margin-top:12px;font-size:12.5px;opacity:.8}
+
+  /* ── เนื้อหา ── */
+  section.sec{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px 26px;margin-bottom:18px}
+  section.sec.hide{display:none}
+  section.sec h2{display:flex;align-items:center;gap:10px;font-size:19px;margin:0 0 4px;line-height:1.4}
+  section.sec h2 .ti{width:34px;height:34px;border-radius:9px;background:var(--accent-soft);color:var(--accent);
+    display:inline-flex;align-items:center;justify-content:center;font-size:19px;flex:0 0 auto}
+  .where{font-size:12.5px;color:var(--ink3);margin:0 0 14px 44px}
+  section.sec h3{font-size:15.5px;margin:22px 0 6px;padding-top:14px;border-top:1px dashed var(--line)}
+  section.sec h3:first-of-type{border-top:none;padding-top:0}
+  section.sec h4{font-size:14px;margin:14px 0 4px;color:var(--ink2)}
+  p{margin:6px 0}
+  ul,ol{margin:6px 0;padding-left:22px}
+  li{margin:3px 0}
+  li::marker{color:var(--ink3)}
+  ol.steps{list-style:none;counter-reset:s;padding-left:0}
+  ol.steps>li{counter-increment:s;position:relative;padding-left:36px;margin:8px 0}
+  ol.steps>li::before{content:counter(s);position:absolute;left:0;top:2px;width:24px;height:24px;border-radius:50%;
+    background:var(--accent);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center}
+  .ui{display:inline;font-weight:600;color:var(--ink);background:var(--surface2);border:1px solid var(--line);
+    border-radius:6px;padding:0 6px;font-size:.92em;white-space:nowrap}
+  kbd{font-family:ui-monospace,Consolas,monospace;font-size:12px;background:var(--surface2);border:1px solid var(--line);
+    border-bottom-width:2px;border-radius:5px;padding:0 5px}
+  code{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;background:var(--surface2);border-radius:5px;padding:1px 5px}
+  .note{border-radius:10px;padding:10px 14px;margin:12px 0;font-size:14px;display:flex;gap:10px;align-items:flex-start}
+  .note>.ti{font-size:18px;margin-top:3px;flex:0 0 auto}
+  .note.tip{background:var(--accent-soft)} .note.tip>.ti{color:var(--accent)}
+  .note.warn{background:var(--warn-soft)} .note.warn>.ti{color:var(--warn)}
+  .note.ok{background:var(--ok-soft)} .note.ok>.ti{color:var(--ok)}
+  .tag{display:inline-block;font-size:11px;font-weight:700;padding:1px 8px;border-radius:999px;vertical-align:2px;margin-left:6px}
+  .tag.adm{background:var(--bad-soft);color:var(--bad)}
+  .tag.pub{background:var(--ok-soft);color:var(--ok)}
+  .tbl{overflow-x:auto;margin:10px 0}
+  table{border-collapse:collapse;width:100%;font-size:13.5px}
+  th,td{border:1px solid var(--line);padding:7px 10px;text-align:left;vertical-align:top}
+  th{background:var(--surface2);font-weight:600;color:var(--ink2);white-space:nowrap}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;margin:10px 0}
+  .card{border:1px solid var(--line);border-radius:11px;padding:11px 14px;background:var(--surface2);font-size:13.5px}
+  .card b{display:flex;align-items:center;gap:7px;font-size:14px;margin-bottom:2px}
+  .card b .ti{color:var(--accent);font-size:17px}
+  .card a{text-decoration:none;color:inherit}
+  .empty{display:none;text-align:center;color:var(--ink3);padding:40px 10px}
+  .totop{position:fixed;right:18px;bottom:18px;z-index:40;opacity:0;pointer-events:none;transition:opacity .2s}
+  .totop.show{opacity:1;pointer-events:auto}
+  #toc-ov{display:none}
+
+  @media (max-width:900px){
+    .layout{grid-template-columns:1fr}
+    nav.toc{position:fixed;left:0;top:60px;bottom:0;height:auto;width:290px;max-width:85vw;z-index:60;
+      background:var(--surface);transform:translateX(-100%);transition:transform .2s;box-shadow:0 10px 30px rgba(0,0,0,.2)}
+    body.toc-open nav.toc{transform:none}
+    body.toc-open #toc-ov{display:block;position:fixed;inset:60px 0 0 0;background:rgba(0,0,0,.35);z-index:55}
+    #toc-btn{display:inline-flex}
+    main{padding:18px 16px 70px}
+    section.sec{padding:18px 16px}
+    .where{margin-left:0}
+    .top{padding:10px 12px;gap:8px}
+    .top .brand span,.top .lbl{display:none}
+  }
+  @media (max-width:640px){
+    .search input{font-size:16px}
+    .hero{padding:20px}
+    .hero h1{font-size:20px}
+  }
+  @media print{
+    .top,nav.toc,.totop,#toc-ov{display:none!important}
+    .layout{display:block} main{padding:0}
+    section.sec{break-inside:avoid-page;border:none;padding:0 0 10px}
+    section.sec.hide{display:block}
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <button class="icon-btn" id="toc-btn" type="button" aria-label="สารบัญ"><i class="ti ti-menu-2"></i></button>
+  <a class="brand" href="#top">
+    <img src="img/BMS_T.png" alt="">
+    <div style="line-height:1.25;min-width:0"><b>คู่มือการใช้งาน</b><br><span>Backoffice Teams</span></div>
+  </a>
+  <div class="search">
+    <i class="ti ti-search"></i>
+    <input id="q" type="search" placeholder="ค้นหาในคู่มือ เช่น ลางาน, อนุมัติ, Ticket" autocomplete="off">
+  </div>
+  <button class="icon-btn" id="theme-btn" type="button" title="สลับโหมดมืด/สว่าง" aria-label="สลับธีม"><i class="ti ti-moon"></i></button>
+  <a class="icon-btn" href="./" title="กลับเข้าระบบ"><i class="ti ti-arrow-back-up"></i><span class="lbl">กลับเข้าระบบ</span></a>
+</header>
+<div id="toc-ov"></div>
+
+<div class="layout" id="top">
+<nav class="toc" id="toc">
+  <div class="grp">เริ่มต้นใช้งาน</div>
+  <a href="#start"><i class="ti ti-login"></i>เข้าสู่ระบบ &amp; บัญชีผู้ใช้</a>
+  <a href="#screen"><i class="ti ti-layout-sidebar"></i>หน้าจอหลัก &amp; เมนู</a>
+  <a href="#noti"><i class="ti ti-bell"></i>การแจ้งเตือน</a>
+  <a href="#ask-ai"><i class="ti ti-sparkles"></i>ถาม AI</a>
+  <a href="#mobile"><i class="ti ti-device-mobile"></i>ใช้งานบนมือถือ</a>
+  <a href="#perm"><i class="ti ti-shield-lock"></i>สิทธิ์การใช้งาน</a>
+
+  <div class="grp">Workspace</div>
+  <a href="#overview"><i class="ti ti-chart-bar"></i>Overview</a>
+  <a href="#kanban"><i class="ti ti-layout-kanban"></i>Delivery Board</a>
+  <a href="#projects"><i class="ti ti-folder"></i>โครงการ</a>
+  <a href="#advance"><i class="ti ti-credit-card"></i>Advance</a>
+  <a href="#docs-form"><i class="ti ti-receipt-2"></i>เอกสารประกอบ / แบบฟอร์ม</a>
+  <a href="#lodging"><i class="ti ti-bed"></i>จัดหาที่พัก</a>
+  <a href="#impl"><i class="ti ti-timeline-event"></i>ติดตามสถานะโครงการ</a>
+  <a href="#all-issues"><i class="ti ti-alert-hexagon"></i>ภาพรวมปัญหาการใช้งาน</a>
+  <a href="#training"><i class="ti ti-school"></i>ระบบอบรม</a>
+
+  <div class="grp">ต้นทุน</div>
+  <a href="#timesheet"><i class="ti ti-clock-hour-4"></i>Timesheet</a>
+  <a href="#budget"><i class="ti ti-wallet"></i>งบประมาณ &amp; ค่าใช้จ่าย</a>
+
+  <div class="grp">ทีม</div>
+  <a href="#workload"><i class="ti ti-chart-arrows-vertical"></i>ภาระงานทีม &amp; ทีมว่าง</a>
+  <a href="#calendar"><i class="ti ti-calendar-event"></i>ปฏิทินทีม &amp; วันหยุด</a>
+  <a href="#server"><i class="ti ti-server"></i>ขอใช้งานทีม Server</a>
+  <a href="#leave"><i class="ti ti-calendar-off"></i>การลางาน</a>
+  <a href="#worklog"><i class="ti ti-notes"></i>บันทึกงาน</a>
+  <a href="#targets"><i class="ti ti-target-arrow"></i>เป้าหมายทีม</a>
+
+  <div class="grp">ศูนย์ช่วยเหลือ</div>
+  <a href="#helpdesk"><i class="ti ti-headset"></i>ศูนย์ช่วยเหลือ (Helpdesk)</a>
+  <a href="#assist"><i class="ti ti-messages"></i>ผู้ช่วยทีม</a>
+
+  <div class="grp">ข้อมูลอ้างอิง</div>
+  <a href="#hospital"><i class="ti ti-building-hospital"></i>รายชื่อ รพ.</a>
+  <a href="#contract"><i class="ti ti-file-description"></i>ข้อมูลสัญญา</a>
+
+  <div class="grp">ผู้ดูแลระบบ</div>
+  <a href="#admin"><i class="ti ti-settings"></i>Admin Panel</a>
+  <a href="#import"><i class="ti ti-file-import"></i>นำเข้าข้อมูล</a>
+  <a href="#holiday"><i class="ti ti-calendar-star"></i>จัดการวันหยุด</a>
+
+  <div class="grp">หน้าสำหรับบุคคลภายนอก</div>
+  <a href="#public"><i class="ti ti-world"></i>หน้าเว็บที่ไม่ต้องล็อกอิน</a>
+
+  <div class="grp">อื่น ๆ</div>
+  <a href="#faq"><i class="ti ti-help-circle"></i>คำถามที่พบบ่อย</a>
+</nav>
+
+<main>
+  <div class="hero">
+    <h1>คู่มือการใช้งานระบบ Backoffice Teams</h1>
+    <p>รวมวิธีใช้งานทุกเมนูของระบบ ตั้งแต่เข้าสู่ระบบ บริหารโครงการ เบิกจ่าย ลางาน จนถึงศูนย์ช่วยเหลือและการตั้งค่า เลือกหัวข้อจากสารบัญด้านซ้าย หรือพิมพ์ค้นหาที่ช่องด้านบน</p>
+    <div class="meta">ปรับปรุงล่าสุด ตุลาคม 2569 · เมนูที่แต่ละคนเห็นขึ้นกับสิทธิ์ที่ผู้ดูแลระบบกำหนดให้</div>
+  </div>
+  <div class="empty" id="empty"><i class="ti ti-mood-empty" style="font-size:32px"></i><br>ไม่พบหัวข้อที่ตรงกับคำค้น</div>
+
+  <!-- ═════════════ เริ่มต้นใช้งาน ═════════════ -->
+  <section class="sec" id="start">
+    <h2><i class="ti ti-login"></i>เข้าสู่ระบบ &amp; บัญชีผู้ใช้</h2>
+    <h3>เข้าสู่ระบบ</h3>
+    <ol class="steps">
+      <li>กรอก <span class="ui">Username / Email</span> และ <span class="ui">รหัสผ่าน</span> (กดรูปตาเพื่อดูรหัสที่พิมพ์)</li>
+      <li>ติ๊ก <span class="ui">จดจำการเข้าสู่ระบบ</span> หากใช้เครื่องส่วนตัว ครั้งหน้าระบบจะกรอกให้อัตโนมัติ</li>
+      <li>กด <span class="ui">เข้าสู่ระบบ</span> หรือกด <kbd>Enter</kbd> ระบบจะพาไปหน้าแรกที่คุณมีสิทธิ์ดู</li>
+    </ol>
+    <div class="note warn"><i class="ti ti-alert-triangle"></i><div>ไม่ควรติ๊ก “จดจำการเข้าสู่ระบบ” บนเครื่องที่ใช้ร่วมกับผู้อื่น บัญชีที่ถูกปิดใช้งานจะเข้าสู่ระบบไม่ได้</div></div>
+    <p>หลังเข้าสู่ระบบแล้ว รีเฟรชหน้าเว็บก็ยังอยู่ในระบบและกลับมาหน้าเดิม ถ้าเปิดลิงก์จากการแจ้งเตือน (เช่น ลิงก์อนุมัติการลา) ระบบจะพาไปที่รายการนั้นทันทีหลังล็อกอิน</p>
+
+    <h3>ลืมรหัสผ่าน</h3>
+    <ol class="steps">
+      <li>ที่หน้าเข้าสู่ระบบ กด <span class="ui">ลืมรหัสผ่าน?</span></li>
+      <li>กรอก Username แล้วกด <span class="ui">ส่งคำขอ</span></li>
+      <li>ผู้ดูแลระบบจะเห็นคำขอที่กระดิ่งแจ้งเตือน ตั้งรหัสผ่านใหม่ให้ แล้วแจ้งกลับ</li>
+    </ol>
+    <p>ระบบไม่มีการรีเซ็ตรหัสผ่านทางอีเมลด้วยตนเอง</p>
+
+    <h3>เปลี่ยนรหัสผ่าน / ออกจากระบบ</h3>
+    <p>กดชื่อของคุณที่มุมล่างซ้ายของแถบเมนู จะมีเมนู:</p>
+    <ul>
+      <li><span class="ui">🔒 เปลี่ยนรหัสผ่าน</span> — กรอกรหัสผ่านปัจจุบัน, รหัสผ่านใหม่ (อย่างน้อย 4 ตัวอักษร และต้องไม่ซ้ำรหัสเดิม) และยืนยันรหัสผ่านใหม่ แล้วกด <span class="ui">🔒 บันทึก</span></li>
+      <li><span class="ui">🚪 ออกจากระบบ</span> — ล้างข้อมูลการใช้งานบนเครื่อง และปิดการแจ้งเตือนแบบ Push ของเครื่องนั้น</li>
+    </ul>
+  </section>
+
+  <section class="sec" id="screen">
+    <h2><i class="ti ti-layout-sidebar"></i>หน้าจอหลัก &amp; เมนู</h2>
+    <h3>แถบเมนูซ้าย</h3>
+    <p>เมนูแบ่งเป็นหมวด <b>Workspace</b>, <b>ต้นทุน</b>, <b>ทีม</b>, <b>ศูนย์ช่วยเหลือ</b>, <b>ข้อมูลอ้างอิง</b> และ <b>ระบบ</b> เมนูที่ไม่มีสิทธิ์ดูจะถูกซ่อนไว้ ตัวเลขสีแดงข้างเมนูคือจำนวนรายการที่รอคุณจัดการ เช่น Advance เกินกำหนด หรือการลาที่รออนุมัติ</p>
+    <p>ปุ่ม <span class="ui">‹</span> ที่ขอบแถบเมนูใช้ย่อแถบให้เหลือแต่ไอคอน ใต้ชื่อระบบมีเลขเวอร์ชันที่ใช้อยู่ (เช่น V1.006)</p>
+    <h3>แถบด้านบน</h3>
+    <div class="tbl"><table>
+      <tr><th>ปุ่ม</th><th>ใช้ทำอะไร</th></tr>
+      <tr><td><span class="ui">ถาม AI</span></td><td>ค้นข้อมูลทั้งระบบด้วยภาษาพูด (ดูหัวข้อ <a href="#ask-ai">ถาม AI</a>) กดลัด <kbd>Ctrl</kbd>+<kbd>K</kbd></td></tr>
+      <tr><td><span class="ui">นำเข้า</span></td><td>นำเข้าข้อมูลจากไฟล์ (เฉพาะ Admin)</td></tr>
+      <tr><td><i class="ti ti-moon"></i> พระจันทร์/พระอาทิตย์</td><td>สลับโหมดมืด/สว่าง ระบบจำค่าไว้ในเบราว์เซอร์ ถ้าไม่เคยเลือกจะใช้ตามการตั้งค่าของอุปกรณ์</td></tr>
+      <tr><td><i class="ti ti-bell"></i> กระดิ่ง</td><td>รายการแจ้งเตือน (ดูหัวข้อ <a href="#noti">การแจ้งเตือน</a>)</td></tr>
+    </table></div>
+    <h3>รูปแบบที่ใช้ร่วมกันทุกหน้า</h3>
+    <ul>
+      <li><b>ตัวกรอง</b> — ส่วนใหญ่มี ค้นหา, ปี พ.ศ., กลุ่ม/ประเภทโครงการ (เลือกได้หลายค่า) ค่าที่เลือกมีผลกับทั้งหน้า</li>
+      <li><b>ช่องเลือกพนักงาน/โครงการ/แผนก</b> — พิมพ์บางส่วนของชื่อเพื่อค้นหาได้ทันที</li>
+      <li><b>ปุ่ม Excel</b> — ส่งออกข้อมูลตามตัวกรองที่เลือกไว้เป็นไฟล์ <code>.xlsx</code></li>
+      <li><b>ไอคอน “i”</b> ข้างหัวการ์ด — ชี้หรือแตะเพื่อดูว่าตัวเลขนั้นคำนวณอย่างไร</li>
+      <li><b>ปุ่ม AI</b> (มีไอคอน ✨/🤖) — ให้ AI ช่วยสรุปหรือร่างข้อความ ผลลัพธ์ควรตรวจทานก่อนนำไปใช้เสมอ</li>
+    </ul>
+    <div class="note tip"><i class="ti ti-refresh"></i><div>เมื่อมีเวอร์ชันใหม่ ระบบจะโหลดใหม่เองถ้าไม่ได้กรอกฟอร์มค้างอยู่ ถ้ากรอกค้างอยู่จะขึ้นแถบ <span class="ui">🚀 มีอัปเดตเวอร์ชันใหม่ของระบบ</span> ให้บันทึกงานก่อนแล้วจึงกด <span class="ui">โหลดใหม่ตอนนี้</span></div></div>
+  </section>
+
+  <section class="sec" id="noti">
+    <h2><i class="ti ti-bell"></i>การแจ้งเตือน</h2>
+    <h3>กระดิ่งแจ้งเตือนในระบบ</h3>
+    <p>กดกระดิ่งที่มุมขวาบนเพื่อดูรายการ กดแต่ละรายการเพื่อไปยังหน้านั้น จะเห็นเฉพาะเรื่องในเมนูที่คุณมีสิทธิ์</p>
+    <ul>
+      <li><b>Advance เกินกำหนด</b> — ใบเบิกที่เลยกำหนดเคลียร์แล้วแต่ยังไม่เคลียร์</li>
+      <li><b>การลาของคุณรออนุมัติ</b> — ใบลาของคุณที่ยังไม่ได้รับการอนุมัติ</li>
+      <li><b>Ticket ใหม่ที่ยังไม่ได้ตอบ</b> — เรื่องแจ้งปัญหาใหม่ที่ทีมยังไม่ได้ตอบลูกค้า</li>
+      <li><b>คำขอรีเซ็ตรหัสผ่าน</b> — เฉพาะ Admin</li>
+    </ul>
+    <h3>แจ้งเตือนแม้ปิดหน้าเว็บ (Web Push)</h3>
+    <p>สำหรับผู้ที่ดูแล Helpdesk: เปิดกระดิ่งแล้วกด <span class="ui">📳 เปิดแจ้งเตือนเมื่อปิด WebApp</span> และกดอนุญาตเมื่อเบราว์เซอร์ถาม เมื่อลูกค้าแจ้งเรื่องใหม่ผ่านฟอร์มเว็บหรือตอบข้อความใน Ticket เครื่องของคุณจะเด้งแจ้งเตือนแม้ปิดหน้าเว็บอยู่</p>
+    <div class="note warn"><i class="ti ti-brand-apple"></i><div>บน iPhone ต้อง <a href="#mobile">เพิ่มแอปลงหน้าจอโฮม</a> ก่อน จึงจะเปิดการแจ้งเตือนได้ ถ้าปุ่มขึ้น <span class="ui">🚫 เบราว์เซอร์บล็อกการแจ้งเตือน</span> ให้ไปอนุญาตการแจ้งเตือนในการตั้งค่าเบราว์เซอร์ก่อน</div></div>
+    <h3>แจ้งเตือนเข้ากลุ่มแชททีม</h3>
+    <p>ระบบส่งข้อความเข้ากลุ่มแชทของทีมให้อัตโนมัติ (ผู้ดูแลระบบตั้งค่าใน Admin Panel › การแจ้งเตือน) ได้แก่ การลางานใหม่/อนุมัติ/ไม่อนุมัติ (มีลิงก์อนุมัติด่วน), ความเคลื่อนไหวของ Advance, วันเริ่ม/สิ้นสุด/ปิดโครงการ, Ticket ด่วนที่สุดและการโทรด่วนจากลูกค้า, การลงทะเบียนอบรม และคำขอใช้งานทีม Server</p>
+  </section>
+
+  <section class="sec" id="ask-ai">
+    <h2><i class="ti ti-sparkles"></i>ถาม AI</h2>
+    <p class="where">ปุ่ม “ถาม AI” บนแถบด้านบน หรือกด Ctrl+K (Mac: ⌘K) จากหน้าใดก็ได้</p>
+    <p>พิมพ์คำถามเป็นภาษาพูดได้เลย AI จะแปลงคำถามเป็นเงื่อนไขค้นหา แล้วดึง <b>ข้อมูลจริง</b> จากระบบมาแสดง ตัวเลขและรายการทั้งหมดมาจากฐานข้อมูล ไม่ได้มาจาก AI แต่ง</p>
+    <ol class="steps">
+      <li>พิมพ์คำถาม เช่น <i>“รพ.ไหนมีปัญหาค้างเกิน 7 วันมากที่สุด”</i>, <i>“สัปดาห์หน้าใครว่างบ้าง”</i>, <i>“Advance ที่เลยกำหนดเคลียร์”</i> หรือกดตัวอย่างใต้ <span class="ui">💡 ลองถามแบบนี้</span></li>
+      <li>กด <kbd>Enter</kbd> หรือ <span class="ui">ถาม ↵</span></li>
+      <li>ตรวจบรรทัด <span class="ui">🤖 AI เข้าใจว่า: …</span> ว่าเงื่อนไขตรงกับที่ต้องการ</li>
+      <li>กดรายการในผลลัพธ์เพื่อเปิดดูรายละเอียดในหน้านั้น</li>
+    </ol>
+    <p>ค้นได้จากทุกข้อมูลที่คุณมีสิทธิ์ดู เช่น Ticket, ปัญหาโครงการ, โครงการ, การลา, คนว่าง, Advance, ค่าใช้จ่าย, ที่พัก, สัญญา, โรงพยาบาล, คำขอทีม Server และคลังคำตอบผู้ช่วยทีม ถ้าบริการ AI ขัดข้อง ระบบจะค้นด้วยคำสำคัญแทน</p>
+  </section>
+
+  <section class="sec" id="mobile">
+    <h2><i class="ti ti-device-mobile"></i>ใช้งานบนมือถือ &amp; ติดตั้งแอป</h2>
+    <ul>
+      <li>บนจอมือถือจะมี <b>แถบเมนูล่าง</b>: Overview, โครงการ, Advance, รพ. และ <span class="ui">เพิ่มเติม</span> (เปิดเมนูทั้งหมด)</li>
+      <li>ตารางจะแสดงเป็นการ์ด ข้อความยาวที่ถูกตัดด้วย “…” แตะเพื่อดูทั้งหมด</li>
+      <li>ปุ่มบนแถบเครื่องมือจะเหลือแต่ไอคอน กดค้างเพื่อดูชื่อปุ่ม</li>
+    </ul>
+    <h3>ติดตั้งเป็นแอป</h3>
+    <ul>
+      <li><b>Android / Chrome</b> — กด <span class="ui">ติดตั้ง</span> ในการ์ดที่ขึ้นมา หรือเมนู ⋮ › ติดตั้งแอป</li>
+      <li><b>iPhone / iPad (Safari)</b> — กดปุ่ม Share แล้วเลือก <b>Add to Home Screen</b> (เพิ่มลงหน้าจอโฮม)</li>
+    </ul>
+  </section>
+
+  <section class="sec" id="perm">
+    <h2><i class="ti ti-shield-lock"></i>สิทธิ์การใช้งาน</h2>
+    <p>แต่ละบัญชีมีบทบาท (Role) หนึ่งแบบ และแต่ละบทบาทมีสิทธิ์แยกตามเมนูเป็น <b>ดู / เพิ่ม / แก้ / ลบ</b> (บางเมนูมีสิทธิ์ <b>อนุมัติ</b> แยก) ผู้ดูแลระบบปรับได้ที่ Admin Panel › สิทธิ์การใช้งาน</p>
+    <div class="tbl"><table>
+      <tr><th>บทบาท</th><th>ลักษณะโดยทั่วไป</th></tr>
+      <tr><td>🔴 Admin</td><td>ใช้ได้ทุกเมนู ทุกปุ่ม เสมอ</td></tr>
+      <tr><td>🟡 DM/PM</td><td>จัดการโครงการ อนุมัติการลา/คำขอ ดูข้อมูลต้นทุน (ค่าเริ่มต้นส่วนใหญ่ดูได้ บางเมนูแก้ไขได้)</td></tr>
+      <tr><td>🟢 Viewer</td><td>ดูข้อมูลเป็นหลัก ลางานของตนเองได้ (เห็นเฉพาะการลาของตนเอง เมื่อบัญชีผูกกับพนักงาน)</td></tr>
+    </table></div>
+    <div class="note tip"><i class="ti ti-info-circle"></i><div>ถ้าไม่เห็นเมนูหรือปุ่มที่ต้องใช้ แปลว่าบทบาทของคุณยังไม่มีสิทธิ์นั้น ให้ติดต่อผู้ดูแลระบบ</div></div>
+  </section>
+
+  <!-- ═════════════ WORKSPACE ═════════════ -->
+  <section class="sec" id="overview">
+    <h2><i class="ti ti-chart-bar"></i>Overview (แดชบอร์ดภาพรวม)</h2>
+    <p class="where">เมนู Workspace › Overview — หน้าแรกของระบบ</p>
+    <p>สรุปภาพรวมโครงการ งบประมาณ ทีมงาน และใบเบิกไว้ในหน้าเดียว เลือกตัวกรองด้านบนได้ ได้แก่ ปี พ.ศ., กลุ่มโครงการ และประเภทโครงการ</p>
+    <h3>ส่วนประกอบของหน้า</h3>
+    <ul>
+      <li><b>การ์ด KPI</b> — Budget Health (มูลค่าโครงการรวม), Project Velocity (ยังไม่เสร็จ/ทั้งหมด), Resource Efficiency (สัดส่วนคนที่มีงาน), Critical Alerts (โครงการที่จะสิ้นสุดภายใน 30 วัน)</li>
+      <li><b>เป้าหมายประจำปี</b> — เทียบเป้าหมายกับยอดโครงการและยอดปิดโครงการแยกตามประเภท สลับ <span class="ui">รวมกลุ่ม / แยกประเภท</span> ได้ (ตั้งเป้าที่เมนู <a href="#targets">เป้าหมายทีม</a>)</li>
+      <li><b>กราฟ</b> — แนวโน้มภาระงานรายเดือน, สถานะทีม (Overload &gt;3 โครงการ / Active 1–3 / Available), งบตามประเภท, สุขภาพโครงการ, จำนวนโครงการตาม Stage</li>
+      <li><b>Critical Timeline</b> — โครงการใกล้สิ้นสุดหรือล่าช้า กดเพื่อเปิดโครงการ</li>
+      <li><b>Financial Alerts</b> — Advance ที่ยังไม่เคลียร์ / เกินกำหนด กดเพื่อไปหน้า Advance</li>
+      <li><b>รายการโครงการทั้งหมด</b> — ตารางค้นหา/เรียงลำดับได้ กดแถวเพื่อเปิดโครงการ ปุ่ม <span class="ui">Export Excel</span></li>
+    </ul>
+    <h3>สุขภาพโครงการ (Project Health)</h3>
+    <div class="tbl"><table>
+      <tr><th>สถานะ</th><th>เงื่อนไข</th></tr>
+      <tr><td>เสร็จ</td><td>คืบหน้า 100% หรือปิดโครงการแล้ว</td></tr>
+      <tr><td>ล่าช้า</td><td>เลยวันสิ้นสุดแล้ว</td></tr>
+      <tr><td>เสี่ยง</td><td>เหลือไม่เกิน 15 วัน และคืบหน้าต่ำกว่า 80%</td></tr>
+      <tr><td>ปกติ</td><td>กรณีอื่น ๆ</td></tr>
+    </table></div>
+    <h3>AI สรุปประจำวัน</h3>
+    <p>กด <span class="ui">AI สรุปประจำวัน</span> ระบบจะรวบรวมเรื่องค้างจากทุกเมนู เช่น โครงการเริ่ม/จบใน 7 วัน, Advance รออนุมัติหรือเลยกำหนด, ที่พักยังไม่อนุมัติ, Ticket ด่วน, การลาที่รออนุมัติ, งานเกินกำหนด แล้วสรุปเป็นหัวข้อ <b>ต้องทำวันนี้ / ภายในสัปดาห์นี้ / เฝ้าระวัง</b> คัดลอกด้วย <span class="ui">📋 คัดลอก</span> หรือกด <span class="ui">🔁 สรุปใหม่</span> ได้</p>
+  </section>
+
+  <section class="sec" id="kanban">
+    <h2><i class="ti ti-layout-kanban"></i>Delivery Board</h2>
+    <p class="where">เมนู Workspace › Delivery Board</p>
+    <p>บอร์ดแบบ Kanban แสดงโครงการเป็นการ์ดแยกคอลัมน์ตามขั้นตอน (Stage) หัวคอลัมน์บอกจำนวนโครงการและมูลค่ารวม</p>
+    <h3>ข้อมูลบนการ์ด</h3>
+    <ul>
+      <li>ประเภท/กลุ่มโครงการ, เจ้าของไซต์, ความคืบหน้า, ทีมงาน, วันสิ้นสุด และมูลค่า</li>
+      <li>ป้าย <span class="ui">💰 สถานะ Adv.</span> เมื่อโครงการมีใบเบิกแล้ว และ <span class="ui">🏨 ที่พักรออนุมัติ</span> เมื่อยังไม่อนุมัติที่พัก</li>
+      <li>ป้าย <span class="ui">เหลือ Nว</span> / <span class="ui">ล่าช้า Nว</span> เมื่อใกล้ครบกำหนด</li>
+    </ul>
+    <h3>ย้ายขั้นตอน (ต้องมีสิทธิ์แก้ไข)</h3>
+    <ul>
+      <li>ลากการ์ดไปวางในคอลัมน์ใหม่ หรือบนมือถือใช้ดรอปดาวน์ <span class="ui">ย้ายไป →</span> บนการ์ด</li>
+      <li>ย้ายไปขั้นส่งมอบ/ปิดโครงการ ความคืบหน้าจะเป็น 100% อัตโนมัติ</li>
+      <li>เมื่อเข้าขั้นวางแผน/จัดทำ Adv. หรือปิดโครงการ ระบบจะแจ้งเตือนเข้ากลุ่มทีม</li>
+    </ul>
+    <div class="note tip"><i class="ti ti-bolt"></i><div><b>อัปเดต Stage อัตโนมัติ</b> — ระบบย้ายขั้นตอนให้เองตามกฎที่ผู้ดูแลตั้งไว้ (เช่น ก่อนเริ่ม N วัน, วันเริ่ม, วันสิ้นสุด) ทุก ๆ ไม่กี่นาที Admin/PM กดปุ่ม <span class="ui">อัปเดต Stage อัตโนมัติ</span> เพื่อสั่งทันทีได้</div></div>
+    <h3>AI สรุปขออนุมัติ Adv.</h3>
+    <p>กด <span class="ui">AI สรุปขออนุมัติ Adv.</span> ระบบจะรวบรวมโครงการในขั้นวางแผนที่ยังไม่มี Advance หรือยังไม่อนุมัติ แล้วร่างข้อความขออนุมัติพร้อมสถานที่ วันที่ ที่พัก และทีมงาน กด <span class="ui">📋 คัดลอกส่ง LINE</span> เพื่อนำไปส่งต่อ</p>
+  </section>
+
+  <section class="sec" id="projects">
+    <h2><i class="ti ti-folder"></i>โครงการ</h2>
+    <p class="where">เมนู Workspace › โครงการ</p>
+    <p>ทะเบียนโครงการทั้งหมด แยกแท็บตามกลุ่มโครงการ (ทั้งหมด, ติดตั้งระบบ Onsite, Revisit ฯลฯ) ค้นหา กรองตามปี/ประเภท/Stage และส่งออก <span class="ui">Excel</span> ได้</p>
+    <p>ตารางแสดงทีมงาน วันเริ่ม/สิ้นสุด สถานะที่พัก (✅ รายวัน / ✅ รายเดือน / ⏳ รออนุมัติ) สถานะ Advance และวันนัด Revisit</p>
+    <h3>เพิ่ม / แก้ไขโครงการ</h3>
+    <ol class="steps">
+      <li>กด <span class="ui">เพิ่มโครงการ</span> (Admin/PM) หรือกดที่แถวโครงการเพื่อแก้ไข</li>
+      <li>แท็บ <span class="ui">📋 ข้อมูลโครงการ</span> — กรอกช่องที่มี * ให้ครบ: ชื่อโครงการ, กลุ่ม, ประเภท, เจ้าของไซต์, ชื่อผู้ติดตั้ง, วันเริ่ม, วันสิ้นสุด และงบประมาณ เลือกโรงพยาบาลโดยพิมพ์ค้นหา หรือกด <span class="ui">🤖 AI หา รพ.</span></li>
+      <li>แท็บ <span class="ui">👥 ทีมงาน</span> (แสดงเมื่อใส่วันเริ่ม-สิ้นสุดแล้ว) — กด ＋ หน้าชื่อเพื่อเพิ่มคน ปรับวันทำงานของแต่ละคนได้ ถ้าชนกับงานอื่น/วันลา ระบบจะเตือน <span class="ui">⚠️ พบงานซ้อนทับ!</span></li>
+      <li>แท็บ <span class="ui">📍 รอบเข้าไซต์หลายช่วง</span> — ถ้าเข้าไซต์หลายรอบ กด <span class="ui">+ เพิ่มรอบเข้าไซต์</span> ระบุวัน วัตถุประสงค์ สถานะรอบ และทีมของรอบนั้น</li>
+      <li>กด <span class="ui">💾 บันทึก</span></li>
+    </ol>
+    <div class="note ok"><i class="ti ti-link"></i><div>ข้อมูลทีมงานและวันที่ของโครงการถูกนำไปใช้ต่อใน Timesheet, ภาระงานทีม, ปฏิทินทีม, ทีมว่าง และ Advance อัตโนมัติ จึงควรกรอกให้ถูกต้อง</div></div>
+    <h3>ความคืบหน้า</h3>
+    <p>ปรับด้วยแถบเลื่อน <span class="ui">ความคืบหน้า</span> ในหน้าต่างโครงการ ระหว่างขั้น “ดำเนินการ” ระบบคำนวณจากเวลาที่ผ่านไปให้อัตโนมัติ (มีสัญลักษณ์ ⚡)</p>
+    <h3>🤖 จัดงานอัจฉริยะ (โครงการใหม่)</h3>
+    <p>ระบุระยะเวลาโครงการ (สัปดาห์) ช่วงที่ให้ค้นหาล่วงหน้า และแผนกที่ต้องการ แล้วกด <span class="ui">🔍 ค้นหาช่วงเวลาที่ว่าง</span> ระบบเสนอช่วงที่ทีมว่างที่สุด 5 อันดับ กด <span class="ui">✓ เลือก</span> เพื่อเติมวันที่และทีมให้ หรือ <span class="ui">🤖 ให้ AI ช่วยเลือก</span></p>
+    <h3>✉️ ร่าง Email ขออนุมัติตาราง</h3>
+    <p>ในโครงการที่บันทึกแล้ว กดปุ่มนี้เพื่อสร้างหัวเรื่องและเนื้อหาอีเมลขออนุมัติตารางดำเนินงาน ระบุผู้อนุมัติ คำลงท้าย และรายการเอกสารแนบ แล้วกด <span class="ui">📋 คัดลอก</span> หรือ <span class="ui">✉️ เปิดในโปรแกรมอีเมล</span> (แก้ช่องด้านบนจะสร้างข้อความใหม่ ควรแก้ข้อความเองเป็นขั้นตอนสุดท้าย)</p>
+    <h3>ลบโครงการ</h3>
+    <p>ปุ่ม 🗑 แสดงเฉพาะผู้มีสิทธิ์ลบ และลบได้เฉพาะโครงการที่ยังไม่มี Advance และที่พัก</p>
+  </section>
+
+  <section class="sec" id="advance">
+    <h2><i class="ti ti-credit-card"></i>Advance (เบิกเงินทดรองจ่าย)</h2>
+    <p class="where">เมนู Workspace › Advance › แท็บ 💳 รายการเบิก</p>
+    <p>บันทึกและติดตามใบเบิกเงินล่วงหน้าของแต่ละโครงการ ตั้งแต่ร่างจนเคลียร์เงิน ตัวเลขแดงข้างเมนูคือจำนวนใบที่เลยกำหนดเคลียร์</p>
+    <h3>สถานะของใบเบิก</h3>
+    <div class="tbl"><table>
+      <tr><th>สถานะ</th><th>ความหมาย</th></tr>
+      <tr><td>📝 Draft</td><td>ร่าง ยังไม่ส่งขออนุมัติ (ลบได้เฉพาะสถานะนี้)</td></tr>
+      <tr><td>⏳ รออนุมัติ</td><td>ส่งขออนุมัติแล้ว</td></tr>
+      <tr><td>👍 อนุมัติแล้ว</td><td>อนุมัติแล้ว รอจ่ายเงิน</td></tr>
+      <tr><td>💸 เบิกแล้ว</td><td>ได้รับเงินแล้ว (ระบบเปลี่ยนให้อัตโนมัติเมื่อถึงวันเริ่มโครงการ)</td></tr>
+      <tr><td>🧾 รอเคลียร์</td><td>จบงานแล้ว รอส่งค่าใช้จ่ายจริง (ระบบเปลี่ยนให้อัตโนมัติหลังวันสิ้นสุด 3 วัน)</td></tr>
+      <tr><td>✅ เคลียร์แล้ว</td><td>เคลียร์เงินเรียบร้อย ค่าใช้จ่ายถูกส่งเข้าหน้างบประมาณ</td></tr>
+    </table></div>
+    <h3>สร้างใบเบิก</h3>
+    <ol class="steps">
+      <li>กด <span class="ui">New Advance</span></li>
+      <li>เลือกโครงการ (ติ๊ก <span class="ui">แสดงโครงการที่สิ้นสุดแล้ว</span> ถ้าหาไม่เจอ) ระบบตั้ง <b>กำหนดเคลียร์</b> = วันสิ้นสุด + 7 วัน (เลื่อนเป็นวันทำงาน) ให้อัตโนมัติ</li>
+      <li>กรอกเลขที่ Advance, วัตถุประสงค์ (ติดตั้งระบบ / Revisit / MA), จำนวนเบิก, วันที่ขอ และหมายเหตุ</li>
+      <li>กด <span class="ui">💾 บันทึก</span> — ใบใหม่จะเป็นสถานะ Draft</li>
+    </ol>
+    <h3>เลื่อนสถานะ</h3>
+    <p>เปิดใบเบิก (✏️) แล้วกด <span class="ui">ขั้นถัดไป ›</span> หรือ <span class="ui">‹ ย้อนกลับ</span> ระบบบันทึกทันทีและแจ้งเตือนกลุ่มทีม</p>
+    <h3>เคลียร์เงิน</h3>
+    <p>เมื่ออยู่สถานะ <b>รอเคลียร์</b> หรือ <b>เคลียร์แล้ว</b> จะมีส่วนกรอกเพิ่ม:</p>
+    <ul>
+      <li><b>🧾 รายการค่าใช้จ่าย</b> — เลือกหมวด (ค่าเดินทาง, ค่าน้ำมัน, ค่าที่พัก, ค่าอาหาร ฯลฯ) ใส่รายละเอียดและจำนวนเงิน กด <span class="ui">+ เพิ่มรายการ</span></li>
+      <li><b>👷 ค่าแรง + เบี้ยเลี้ยง</b> — ดึงรายชื่อทีมและวันทำงานจากโครงการให้อัตโนมัติ กรอกวันหยุดที่ทำงานเอง ติ๊ก <span class="ui">📍 พื้นที่ชายแดน</span> เพื่อใช้อัตราชายแดน</li>
+      <li><b>💰 สรุปค่าใช้จ่าย</b> — ระบบรวมยอดให้ ช่อง “จ่ายจริง” คือค่าใช้จ่ายทั่วไป (ไม่รวมค่าแรง)</li>
+    </ul>
+    <p>บนการ์ด “ส่วนต่าง” ค่าบวก = ต้องคืนเงิน ค่าลบ = ใช้เกิน ใบที่เลยกำหนดจะมีขอบแดงและ ⚠️</p>
+    <div class="note ok"><i class="ti ti-arrow-right"></i><div>บันทึกเป็น <b>เคลียร์แล้ว</b> เมื่อไร รายการค่าใช้จ่ายจะถูกคัดลอกไปที่ <a href="#budget">งบประมาณ › รายการค่าใช้จ่าย</a> อัตโนมัติ (ไม่ต้องกรอกซ้ำ)</div></div>
+  </section>
+
+  <section class="sec" id="docs-form">
+    <h2><i class="ti ti-receipt-2"></i>เอกสารประกอบ / แบบฟอร์ม</h2>
+    <p class="where">เมนู Advance › แท็บ 🧾 เอกสารประกอบ</p>
+    <p>กรอกแบบฟอร์มทางซ้าย และดูตัวอย่างเอกสารจริงทางขวาแบบทันที เลือกชนิดเอกสารจากดรอปดาวน์ด้านบน:</p>
+    <div class="grid2">
+      <div class="card"><b><i class="ti ti-file-invoice"></i>FM-AC-01</b>เอกสารประกอบ Adv. (ใบเคลียร์ค่าใช้จ่าย) — ค่าเดินทาง ค่าที่พัก ค่าอื่น ๆ และรายชื่อผู้ปฏิบัติงาน (สูงสุด 12 คน) ยอดขอเบิกคำนวณให้อัตโนมัติ</div>
+      <div class="card"><b><i class="ti ti-car"></i>FM-AC-02</b>แบบฟอร์มการออกปฏิบัติงาน — แผนก, สถานที่ (เลือก รพ. แล้วเติมจังหวัด/ผู้ติดต่อให้), งานที่ไป, การเตรียมความพร้อม, ข้อมูลบัญชี</div>
+      <div class="card"><b><i class="ti ti-mail"></i>หนังสือแจ้งออกไซต์</b>หนังสือแจ้งโรงพยาบาลก่อนเข้าปฏิบัติงาน — ระบบ, เรื่องที่ดำเนินการ, วันที่, รายชื่อผู้เข้าปฏิบัติงาน, ช่องทางจัดส่ง</div>
+    </div>
+    <h3>ขั้นตอน</h3>
+    <ol class="steps">
+      <li>เลือกชนิดเอกสาร แล้วกด <span class="ui">+ ฟอร์มใหม่</span> (หรือเลือกฟอร์มที่บันทึกไว้จากดรอปดาวน์)</li>
+      <li>เลือก <b>อ้างอิงโครงการ</b> (ถ้ามี) ระบบจะเติมวันที่ สถานที่ ทีมงาน และข้อมูลที่เกี่ยวข้องให้</li>
+      <li>ตรวจและแก้ไขข้อมูลให้ครบ — ช่องบังคับ: FM-AC-01 ต้องมีชื่อผู้ปฏิบัติงาน, FM-AC-02 และหนังสือแจ้งต้องมีสถานที่</li>
+      <li>กด <span class="ui">💾 บันทึก</span> แล้วกด <span class="ui">🖨️ พิมพ์</span> หรือ <span class="ui">📝 Word</span> เพื่อดาวน์โหลดไฟล์ .doc</li>
+    </ol>
+    <p>ลบฟอร์มที่บันทึกไว้ด้วย <span class="ui">🗑 ลบ</span> (ต้องมีสิทธิ์ลบ ลบแล้วกู้คืนไม่ได้) ถ้าไม่มีสิทธิ์แก้ไข ช่องกรอกทั้งหมดจะถูกล็อกไว้</p>
+  </section>
+
+  <section class="sec" id="lodging">
+    <h2><i class="ti ti-bed"></i>จัดหาที่พัก</h2>
+    <p class="where">เมนู Workspace › จัดหาที่พัก</p>
+    <p>รวบรวมตัวเลือกที่พักของแต่ละโครงการ เปรียบเทียบราคา และอนุมัติ แสดงเฉพาะโครงการที่มีข้อมูลที่พักแล้ว แบ่งกลุ่มตามประเภทโครงการ</p>
+    <h3>เพิ่มที่พัก</h3>
+    <ol class="steps">
+      <li>กด <span class="ui">เพิ่มที่พัก</span> แล้วเลือกโครงการ</li>
+      <li>กด <span class="ui">+ เพิ่มตัวเลือกใหม่</span> กรอกชื่อที่พัก เบอร์ติดต่อ ลิงก์แผนที่ และวัน Check-in/Check-out (ค่าเริ่มต้น = ก่อนวันเริ่ม 1 วัน ถึงวันสิ้นสุด)</li>
+      <li>กรอกราคาได้ทั้ง <b>📅 รายวัน</b> และ <b>📆 รายเดือน</b>: จำนวนห้องเตียงเดี่ยว/เตียงคู่ × ราคา, สิ่งอำนวยความสะดวก, ค่ามัดจำ, ค่าน้ำ-ไฟ ระบบรวมยอดตลอดช่วงให้</li>
+      <li>กด <span class="ui">💾 บันทึกที่พัก</span> — เพิ่มได้หลายตัวเลือกเพื่อเปรียบเทียบ (<span class="ui">+ ตัวเลือก</span>)</li>
+    </ol>
+    <h3>อนุมัติ (ผู้มีสิทธิ์อนุมัติที่พัก)</h3>
+    <ul>
+      <li>กด <span class="ui">✅ อนุมัติ</span> ที่แถวราคารายวันหรือรายเดือนของตัวเลือกที่ต้องการ ยกเลิกด้วย <span class="ui">↩ ยกเลิก</span></li>
+      <li>แต่ละโครงการอนุมัติได้ <b>1 ตัวเลือกต่อแบบ</b> (รายวัน/รายเดือน แยกกัน) อนุมัติตัวใหม่ ตัวเดิมจะถูกยกเลิกให้อัตโนมัติ</li>
+      <li>กด <span class="ui">🤖 AI</span> ให้ AI เปรียบเทียบ (เตียงพอทีมไหม, ราคาต่อคนต่อคืน, ค่าน้ำไฟ, สิ่งอำนวยความสะดวก) แล้วกด <span class="ui">✅ อนุมัติตามคำแนะนำ</span> ได้</li>
+    </ul>
+    <p>สถานะที่พักแสดงต่อใน Delivery Board (🏨 ที่พักรออนุมัติ) หน้าโครงการ และ AI สรุปประจำวัน</p>
+  </section>
+
+  <section class="sec" id="impl">
+    <h2><i class="ti ti-timeline-event"></i>ติดตามสถานะโครงการ (Implementation Tracker)</h2>
+    <p class="where">เมนู Workspace › ติดตามสถานะโครงการ</p>
+    <p>ติดตามงานติดตั้งระบบที่โรงพยาบาลแบบละเอียด โครงสร้าง <b>โครงการ → Phase → งาน (Task) → เช็คลิสต์</b> พร้อมบันทึกปัญหาการใช้งาน แบบฟอร์ม การอบรม และรายงาน</p>
+    <h3>แท็บหลัก</h3>
+    <ul>
+      <li><span class="ui">📊 ทุกโครงการ</span> — แดชบอร์ดคะแนนสุขภาพทุกโครงการ, แผง <b>📌 ต้องจัดการ</b> (เกินกำหนด / 7 วันข้างหน้า / ปัญหาค้าง ≥7 วัน), ภาระงานรายคน และ <span class="ui">🤖 AI สรุปภาพรวม</span></li>
+      <li><span class="ui">🗂️ รายโครงการ</span> — เข้าไปจัดการโครงการเดียว (เลือกโครงการจากช่องค้นหาด้านบน)</li>
+      <li><span class="ui">📐 Template</span> — แม่แบบ Phase/Task/เช็คลิสต์ สำหรับสร้างโครงการใหม่</li>
+    </ul>
+    <h3>คะแนนสุขภาพโครงการ (0–100)</h3>
+    <p>หักคะแนนจาก ความล่าช้าเทียบแผน, งานเกินกำหนด, ปัญหาที่ยังเปิด และไม่มีความเคลื่อนไหวเกิน 7 วัน — 🟢 ปกติ ≥80 · 🟡 ต้องติดตามพิเศษ 60–79 · 🔴 ล่าช้า &lt;60</p>
+    <h3>เพิ่มโครงการเข้าระบบติดตาม</h3>
+    <ol class="steps">
+      <li>กด <span class="ui">+ เพิ่มโครงการ</span> แล้วเลือกโครงการจากเมนูโครงการ</li>
+      <li>เลือก <span class="ui">ใช้ Template Checklist</span> (ถ้ามี) ระบบจะสร้าง Phase/งาน/เช็คลิสต์ และกระจายวันครบกำหนดให้</li>
+      <li>กด <span class="ui">💾 บันทึก</span> — ชื่อ วันที่ เจ้าของไซต์ ผู้ติดตั้ง ดึงจากเมนูโครงการ (แก้ที่เมนูโครงการเท่านั้น)</li>
+    </ol>
+    <h3>แท็บในแต่ละโครงการ</h3>
+    <h4>🗃️ งาน</h4>
+    <ul>
+      <li>มุมมอง <b>Phase</b> (ลากเรียงลำดับได้), <b>List</b> และ <b>Kanban</b> (ลากการ์ดเพื่อเปลี่ยนสถานะ)</li>
+      <li>เมนูซ้าย: <span class="ui">➕ เพิ่ม Phase</span>, <span class="ui">📐 บันทึกเป็น Template</span>, <span class="ui">✏️ แก้ไขโครงการ</span>, <span class="ui">🗑️ ลบโครงการ</span></li>
+      <li>เปิดงานเพื่อกำหนดผู้รับผิดชอบ (จากทีมโครงการ), ความสำคัญ, วันเริ่ม/กำหนดเสร็จ, สถานะ, เช็คลิสต์, ความคิดเห็น และไฟล์แนบ</li>
+      <li><span class="ui">✅ Mark as Done</span> ติ๊กเช็คลิสต์ทั้งหมดและปิดงานในครั้งเดียว</li>
+      <li>ความคืบหน้าคำนวณเอง: งาน = เช็คลิสต์ที่ติ๊ก, Phase = เฉลี่ยงาน, โครงการ = เฉลี่ย Phase</li>
+    </ul>
+    <p>สถานะงาน: ⚪ ยังไม่เริ่ม · 🔵 กำลังดำเนินการ · 🟠 รอตรวจสอบ · ✅ เสร็จแล้ว · ⏰ ล่าช้า · ⚠️ มีปัญหา · 🚫 ยกเลิก</p>
+    <h4>🩹 ปัญหา (บันทึกปัญหาการใช้งานของโรงพยาบาล)</h4>
+    <ol class="steps">
+      <li>กด <span class="ui">+ แจ้งปัญหาใหม่</span> กรอกผู้แจ้ง, หน่วยงาน, รายละเอียด, กลุ่มปัญหา, สถานะ และผู้รับปัญหา</li>
+      <li>กด <span class="ui">🤖 AI แนะนำกลุ่มปัญหา / วิธีแก้</span> เพื่อให้ AI จัดกลุ่ม เรียบเรียงข้อความ และหาปัญหาที่คล้ายกันในอดีต</li>
+      <li>เมื่อแก้แล้ว กรอก <b>วิธีการแก้ไข, ผู้แก้ไข, วันที่แก้ไข</b> — ใส่ผู้แก้ไขและวันที่ครบ สถานะจะเป็น “ดำเนินการแล้ว” เอง</li>
+    </ol>
+    <ul>
+      <li><span class="ui">🤖 วางแชท LINE (AI)</span> — วางข้อความแชทหรือเปิดไฟล์ .txt ให้ AI แยกเป็นรายการปัญหา ตรวจแล้วบันทึกทีเดียว</li>
+      <li><span class="ui">🖨️ พิมพ์รายงาน</span> — รายงานสรุปปัญหาตามช่วงวันที่ พร้อมช่องลงนามบริษัทและโรงพยาบาล (A4 แนวนอน)</li>
+      <li><span class="ui">🖼️ Dashboard</span> — สร้างลิงก์แดชบอร์ดสรุปปัญหาให้โรงพยาบาลดูได้โดยไม่ต้องล็อกอิน</li>
+      <li><span class="ui">✍️ AI สรุปผู้แก้ไข</span> — สรุปผลงานการแก้ปัญหาของแต่ละคนในช่วงเวลา · <span class="ui">📥 Excel</span> ส่งออกรายการ</li>
+    </ul>
+    <h4>📄 แบบฟอร์ม</h4>
+    <p>เช็คลิสต์แบบฟอร์มที่ต้องจัดทำ จัดเป็น “คลัง” แก้ไขในตารางได้ทันที (บันทึกอัตโนมัติ) พิมพ์ชื่อแล้วกด <kbd>Enter</kbd> เพื่อเพิ่ม หรือดึงจาก Template ด้วยปุ่ม 📐 สถานะ: ⚪ รอดำเนินการ · 🔵 กำลังดำเนินการ · ✅ ดำเนินการแล้ว</p>
+    <h4>🎓 อบรม · 📅 Calendar · 📈 Report · 🖨️ พิมพ์เอกสาร</h4>
+    <ul>
+      <li><b>อบรม</b> — จัดการการอบรมของโครงการ (ดู <a href="#training">ระบบอบรม</a>)</li>
+      <li><b>Calendar</b> — ปฏิทินงานตามวันครบกำหนด</li>
+      <li><b>Report</b> — สรุปงานเสร็จ/ล่าช้า/ครบกำหนด 14 วัน/ปัญหา/แบบฟอร์ม พร้อม <span class="ui">✨ สรุปด้วย AI</span>, <span class="ui">📥 Excel</span> และ <span class="ui">📷 บันทึกเป็นรูปภาพ</span></li>
+      <li><b>พิมพ์เอกสาร</b> — พิมพ์ใบลงชื่อ (เช่น Stand by, ประชุมสรุป Flow, SIT) เลือกหัวข้อ วันที่ จำนวนแถว และผู้ลงนาม แล้วกด <span class="ui">🖨️ พิมพ์เอกสาร</span> (ต้องอนุญาต Popup ในเบราว์เซอร์)</li>
+    </ul>
+    <h3>📐 Template</h3>
+    <p>กด <span class="ui">+ สร้าง Template</span> ตั้งชื่อ แล้วเพิ่ม Phase / Task / เช็คลิสต์ และจำนวนวันโดยประมาณของแต่ละงาน ลาก ⠿ เพื่อเรียงลำดับ กด <span class="ui">💾 บันทึก Template</span> หรือสร้างจากโครงการที่มีอยู่ด้วย <span class="ui">📐 บันทึกเป็น Template</span></p>
+  </section>
+
+  <section class="sec" id="all-issues">
+    <h2><i class="ti ti-alert-hexagon"></i>ภาพรวมปัญหาการใช้งาน</h2>
+    <p class="where">เมนู Workspace › ภาพรวมปัญหาการใช้งาน (ดูอย่างเดียว)</p>
+    <p>วิเคราะห์ปัญหาจากแท็บ “ปัญหา” ของทุกโครงการรวมกัน กรองตาม <b>ปี</b> และ <b>โรงพยาบาล</b> ได้ (แก้ไขปัญหาต้องทำในแท็บปัญหาของโครงการนั้น)</p>
+    <ul>
+      <li><b>การ์ด KPI</b> — ปัญหาทั้งหมด, รอดำเนินการ, กำลังแก้ไข, เสร็จแล้ว, อัตราแก้ไข กดการ์ดเพื่อดูรายการ</li>
+      <li><b>การ์ดตาม Product</b> และกราฟ <b>สถานะต่อ Product</b>, <b>กลุ่มปัญหาต่อ Product</b>, <b>วิเคราะห์ตามกลุ่มปัญหา/แผนกที่แจ้ง</b></li>
+      <li><b>แนวโน้มปัญหา</b> รายสัปดาห์/รายเดือน (ไม่ขึ้นกับตัวกรองปีและโรงพยาบาล)</li>
+      <li><b>ตาราง รพ. × Product</b> — เขียว = แก้ครบ, แดง = ยังค้าง, “—” = ไม่ได้ใช้ระบบนั้น ติ๊ก <span class="ui">ซ่อนที่แก้ครบแล้ว</span> ได้</li>
+      <li><span class="ui">🤖 สรุปด้วย AI</span> — สรุปสำหรับผู้บริหาร</li>
+    </ul>
+    <p>ในหน้าต่างรายการ กดแถวเพื่อดูวิธีแก้ และกด <span class="ui">เปิดใน Impl Tracker ↗</span> เพื่อไปยังโครงการ</p>
+  </section>
+
+  <section class="sec" id="training">
+    <h2><i class="ti ti-school"></i>ระบบอบรม</h2>
+    <p class="where">เมนู Workspace › ระบบอบรม (ภาพรวม/ตั้งค่ากลาง) และ ติดตามสถานะโครงการ › แท็บ 🎓 อบรม (รายโครงการ)</p>
+    <h3>เมนูระบบอบรม (ส่วนกลาง)</h3>
+    <ul>
+      <li><b>ภาพรวมผลการอบรม</b> — จำนวนรอบ ผู้ลงทะเบียน ผู้เข้าอบรม คะแนนประเมิน ผลสอบ รายโครงการ และรอบอบรม 14 วันข้างหน้า กดแถวเพื่อเปิดการอบรมของโครงการ</li>
+      <li><b>หลักสูตรอบรม</b>, <b>คลังแบบทดสอบ</b>, <b>ใบประกาศ &amp; อีเมล</b> — ตั้งค่ากลางที่ใช้ทุกโครงการ (เห็นเฉพาะผู้มีสิทธิ์เพิ่ม/แก้/ลบ)</li>
+    </ul>
+    <h3>เปิดอบรมให้โครงการ</h3>
+    <ol class="steps">
+      <li>ไปที่ ติดตามสถานะโครงการ › เลือกโครงการ › แท็บ <span class="ui">🎓 อบรม</span></li>
+      <li>กด <span class="ui">เปิดอบรม</span> (โครงการต้องระบุโรงพยาบาลในเมนูโครงการก่อน) ระบบจะออกรหัสไซต์ให้</li>
+      <li>ที่ <b>📅 รอบอบรม</b> กด <span class="ui">เพิ่มรอบ</span> ระบุหลักสูตร วันที่ เวลา สถานที่ วิทยากร และจำนวนที่นั่ง</li>
+      <li>ที่ <b>🔗 ลงทะเบียน</b> คัดลอกลิงก์หรือบันทึกรูป QR ส่งให้ผู้เข้าอบรม (ปุ่ม <span class="ui">ร่างข้อความเชิญ</span> ให้ AI ร่างข้อความเชิญได้)</li>
+      <li>วันอบรม ใช้ <b>📷 เช็คชื่อ</b> สแกน QR ของผู้เข้าอบรม พิมพ์ชื่อ หรือเพิ่ม Walk-in</li>
+      <li>หลังอบรม ส่งลิงก์ <b>📝 แบบประเมิน</b> และแบบทดสอบ แล้วดูผลที่ ⭐ ผลประเมิน, 📊 Analytics และ ✏️ ผลสอบ &amp; ใบประกาศ</li>
+    </ol>
+    <h3>เมนูอื่นในการอบรมของโครงการ</h3>
+    <ul>
+      <li><b>👥 ผู้ลงทะเบียน</b> — ค้นหา เพิ่ม นำเข้าจาก Excel/CSV และ <span class="ui">พิมพ์แบบฟอร์ม</span> ใบลงชื่อ</li>
+      <li><b>📋 ตรวจสอบรายชื่อ</b>, <b>🛡️ ตรวจสอบสิทธิ์</b> (มี Login แล้ว/ไม่มี Login/ปิดการใช้งาน), <b>🔢 ตรวจสอบคีย์ยอด</b> (คีย์ยอดตั้งต้น BMS-INVENTORY รายแผนก)</li>
+      <li><b>ผลสอบ &amp; ใบประกาศ</b> — ส่งใบประกาศซ้ำ เพิกถอน/คืนสถานะ หรือลบผลสอบ (คืนสิทธิ์สอบ 1 ครั้ง)</li>
+      <li><b>📚 ข้อมูลพื้นฐาน</b> — รายการสถานที่ แผนก คำนำหน้า และวิทยากร · <b>⚙️ ตั้งค่าโครงการ</b></li>
+      <li><b>📖 คู่มือ</b> — คู่มือละเอียดของระบบอบรม</li>
+    </ul>
+    <h3>คลังแบบทดสอบ</h3>
+    <p>สร้างชุดข้อสอบ กำหนดจำนวนข้อ เกณฑ์ผ่าน เวลา และจำนวนครั้งที่สอบได้ เพิ่มข้อสอบเอง ให้ <span class="ui">AI ร่างข้อสอบ</span> หรือนำเข้า Excel ชุดที่มีผลสอบแล้วลบไม่ได้ (ปิดใช้งานแทน) ผู้สอบผ่านจะได้รับใบประกาศทางอีเมลอัตโนมัติ</p>
+  </section>
+
+  <!-- ═════════════ ต้นทุน ═════════════ -->
+  <section class="sec" id="timesheet">
+    <h2><i class="ti ti-clock-hour-4"></i>Timesheet</h2>
+    <p class="where">เมนู ต้นทุน › Timesheet (ดูและวิเคราะห์ ไม่ต้องกรอกเอง)</p>
+    <div class="note ok"><i class="ti ti-refresh"></i><div>ชั่วโมงงานสร้างให้อัตโนมัติจากทีมงาน/รอบเข้าไซต์ของโครงการ = วันทำงาน × 8 ชั่วโมง โดยไม่นับเสาร์-อาทิตย์ วันหยุด และวันลาของคนนั้น เมื่อแก้โครงการ Timesheet จะอัปเดตตามเอง</div></div>
+    <p>ตัวกรอง: ค้นหา, ปี, เดือน, ประเภท, โครงการ, พนักงาน · การ์ดสรุป: ชั่วโมงที่จัดสรร, Utilization ทีม, งานเกินกำลัง/ซ้อน, คนที่มีเวลาว่าง, วันลารวม</p>
+    <h3>3 มุมมอง</h3>
+    <ul>
+      <li><span class="ui">👥 ภาระงานรายคน</span> — % การใช้เวลาของแต่ละคน กดแถวเพื่อดูแยกโครงการและช่วงที่ถูกจัดงานซ้อน</li>
+      <li><span class="ui">🗓 Heatmap รายเดือน</span> — ตาราง คน × 12 เดือน กดช่องเพื่อกรองเดือน/คน</li>
+      <li><span class="ui">📁 ตามโครงการ</span> — ชั่วโมงและคน-วันของแต่ละโครงการ</li>
+    </ul>
+    <p>ระดับการใช้เวลา: ใช้งานต่ำ &lt;50% · ปานกลาง 50–84% · เหมาะสม 85–105% · เกินกำลัง &gt;105% · ปุ่ม <span class="ui">Excel</span> ส่งออกตามมุมมองที่เปิดอยู่</p>
+    <p>ถ้าเห็นป้าย <span class="ui">⚠ วันที่ลงเป็น พ.ศ.</span> แปลว่าบางโครงการกรอกปีเป็น พ.ศ. ระบบแปลงให้แล้ว แต่ควรแก้ที่ตัวโครงการ</p>
+  </section>
+
+  <section class="sec" id="budget">
+    <h2><i class="ti ti-wallet"></i>งบประมาณ &amp; ค่าใช้จ่าย</h2>
+    <p class="where">เมนู ต้นทุน › งบประมาณ &amp; ค่าใช้จ่าย</p>
+    <h3>📊 ภาพรวมงบ</h3>
+    <p>เทียบงบประมาณกับการใช้จริงของทุกโครงการ (ไม่รวมโครงการที่ยกเลิก) การ์ด: งบประมาณรวม, ใช้จริง, ผูกพัน, คงเหลือใช้ได้, ต้องจับตา</p>
+    <div class="tbl"><table>
+      <tr><th>คำ</th><th>ความหมาย</th></tr>
+      <tr><td>ใช้จริง</td><td>ผลรวมรายการค่าใช้จ่าย (มาจาก Advance ที่เคลียร์แล้ว)</td></tr>
+      <tr><td>ผูกพัน</td><td>Advance ที่อนุมัติ/เบิกแล้ว/รอเคลียร์ (ยังไม่นับใบที่รออนุมัติ)</td></tr>
+      <tr><td>คงเหลือ</td><td>งบ − (ใช้จริง + ผูกพัน)</td></tr>
+      <tr><td>🔴 เกินงบ</td><td>ใช้จริง + ผูกพัน มากกว่างบ</td></tr>
+      <tr><td>🟡 ใกล้เกิน</td><td>ใช้ไปแล้วตั้งแต่ 80% ของงบ</td></tr>
+      <tr><td>🔥 ใช้เงินนำหน้างาน</td><td>ยังไม่จบ ใช้เงินแล้ว ≥30% และ % ใช้เงินสูงกว่า % ความคืบหน้าตั้งแต่ 20 จุด</td></tr>
+      <tr><td>⚪ ไม่ได้ตั้งงบ</td><td>งบเป็น 0 แต่มีค่าใช้จ่าย</td></tr>
+    </table></div>
+    <p>กดแถวในตาราง “รายโครงการ” เพื่อเปิดโครงการ · ปุ่ม <span class="ui">Excel</span> ส่งออกตามตัวกรองและการเรียงลำดับ</p>
+    <h3>💰 รายการค่าใช้จ่าย</h3>
+    <p>ดูอย่างเดียว — รายการมาจาก Advance ที่ <b>เคลียร์แล้ว</b> (ป้าย 📋 จากเบิก) แสดงตามโครงการ › หมวด › รายการ กรองตามปี/เดือน/โครงการ/หมวดได้ การ์ด Burn Rate เทียบกับงบ (เหลือง ≥70% แดง ≥90%) ถ้าวันที่ของรายการตรงกับวันหยุดหรือวันลาของผู้เบิก จะมีป้ายแจ้งไว้</p>
+    <div class="note tip"><i class="ti ti-info-circle"></i><div>ต้องการแก้ไขรายการค่าใช้จ่าย ให้แก้ที่ใบ Advance ของโครงการนั้น แล้วบันทึกเป็น “เคลียร์แล้ว” อีกครั้ง</div></div>
+    <h3>🏢 เจ้าของไซต์</h3>
+    <p>สรุปมูลค่าและจำนวนโครงการแยกตามเจ้าของไซต์ กดเพื่อดูโครงการภายใต้แต่ละคน</p>
+  </section>
+
+  <!-- ═════════════ ทีม ═════════════ -->
+  <section class="sec" id="workload">
+    <h2><i class="ti ti-chart-arrows-vertical"></i>ภาระงานทีม &amp; ทีมว่าง</h2>
+    <p class="where">เมนู ทีม › ภาระงานทีม</p>
+    <h3>📊 ภาระงานรายเดือน</h3>
+    <p>ตารางรายวันของพนักงานแต่ละคนในเดือนที่เลือก จัดกลุ่มตามแผนก — <b>เขียว</b> = ว่าง, <b>น้ำเงิน</b> = มีงาน 1 โครงการ, <b>แดง</b> = งานซ้อน, <b>เทา</b> = เสาร์-อาทิตย์</p>
+    <ul>
+      <li>กดช่องวันเพื่อดูว่าวันนั้นติดโครงการอะไร · กดชื่อเพื่อดูสรุปภาระงานของคนนั้น</li>
+      <li><span class="ui">AI วิเคราะห์ภาระงาน</span> — สรุปคนที่งานหนัก/ว่าง และแนะนำการวางคนให้โครงการที่ยังขาดคน</li>
+      <li><span class="ui">สรุปแจ้งงาน</span> (Admin/PM) — รายการเข้าไซต์ที่กำลังจะมาถึง รายคนหรือรายโครงการ กด <span class="ui">📋 คัดลอกข้อความ</span> เพื่อส่ง LINE, <span class="ui">🖼 บันทึกภาพ</span> หรือ <span class="ui">📊 Export Excel</span> (ระบบไม่ส่งให้อัตโนมัติ)</li>
+    </ul>
+    <h3>🟢 ทีมว่าง</h3>
+    <p>เลือกช่วงวันที่ (หรือกดปุ่มลัด 7 วัน / 2 สัปดาห์ / 1 เดือน / 3 เดือน) และแผนก ระบบจัดพนักงานเป็น 3 กลุ่ม: <b>ว่างทั้งช่วง</b>, <b>ว่างบางส่วน</b>, <b>ไม่ว่าง</b> แสดงช่วงวันที่ว่าง และสิ่งที่ทำให้ไม่ว่าง (โครงการ 📁, การลา 🏖, บันทึกงาน 📝) ใช้หาคนลงงานใหม่ได้รวดเร็ว</p>
+  </section>
+
+  <section class="sec" id="calendar">
+    <h2><i class="ti ti-calendar-event"></i>ปฏิทินทีม &amp; วันหยุด</h2>
+    <p class="where">เมนู ทีม › ปฏิทินทีม</p>
+    <p>ปฏิทินแบบแถบเวลา (Gantt) แสดงงาน การลา และบันทึกงานของทีม</p>
+    <ul>
+      <li><b>มุมมอง</b>: <span class="ui">👤 ดูแบบรายคน</span> / <span class="ui">🏷 ดูแบบประเภทโครงการ</span> / <span class="ui">📁 ดูแบบรายโครงการ</span></li>
+      <li><b>ช่วงเวลา</b>: <span class="ui">📅 รายเดือน</span> / <span class="ui">🗓 รายปี</span> / <span class="ui">🏛 ปีงบประมาณ</span> (ต.ค.–ก.ย.) เลื่อนด้วยปุ่ม ‹ ›</li>
+      <li>แถบสีแดงเส้นประ = การลา, สีส้มเส้นประ = บันทึกงาน, คอลัมน์ 🎌 = วันหยุด · กดแถบเพื่อดูรายละเอียด</li>
+      <li>ผู้มีสิทธิ์แก้ไขโครงการ <b>กดช่องว่าง</b> เพื่อสร้างโครงการใหม่ โดยเติมวันเริ่ม (และคน ในมุมมองรายคน) ให้</li>
+      <li><span class="ui">เต็มจอ</span> ขยายปฏิทิน (กด <kbd>Esc</kbd> เพื่อออก) · บนมือถือแสดงเป็นรายการแทน</li>
+    </ul>
+    <h3>ดูวันหยุด</h3>
+    <p>กดปุ่ม <span class="ui">วันหยุด</span> เพื่อดูรายการวันหยุดของปี (วันหยุดถัดไปมีป้าย “ถัดไป”) ผู้มีสิทธิ์จัดการจะเห็นปุ่ม <span class="ui">⚙️ จัดการวันหยุด</span> (ดู <a href="#holiday">จัดการวันหยุด</a>)</p>
+  </section>
+
+  <section class="sec" id="server">
+    <h2><i class="ti ti-server"></i>ขอใช้งานทีม Server</h2>
+    <p class="where">เมนู ทีม › ขอใช้งานทีม Server</p>
+    <p>รับคำขอให้ทีม Server เข้าไปทำงานที่โรงพยาบาล ผู้ขอกรอกผ่าน <a href="#public">ฟอร์มสาธารณะ</a> → DM/PM อนุมัติ → จัดคน (ระบบสร้างโครงการให้อัตโนมัติ งานจึงขึ้นในปฏิทินทีมและภาระงานทันที)</p>
+    <h3>สถานะคำขอ</h3>
+    <p>รออนุมัติ → อนุมัติแล้ว · รอจัดคน → จัดคนแล้ว → เสร็จสิ้น (หรือ ไม่อนุมัติ / ยกเลิก) เลขที่คำขอรูปแบบ <code>SRV6910001</code></p>
+    <h3>แท็บ</h3>
+    <ul>
+      <li><b>ภาพรวม</b> — สถิติคำขอรายสัปดาห์/เดือน/ปี</li>
+      <li><b>คำขอ</b> — รายการพร้อมตัวกรองสถานะ “กำลังดำเนินการวันนี้”, “เริ่มภายใน 7 วัน” และ <span class="ui">ส่งออก Excel</span></li>
+      <li><b>วันว่างของทีม</b> — จำนวนคนว่างรายวันของทั้งเดือน</li>
+      <li><b>ตั้งค่า</b> — สมาชิกทีม Server, กลุ่ม/ประเภทโครงการที่จะสร้างให้, ข้อความหัวฟอร์ม และตัวเลือกบนฟอร์ม (บันทึกอัตโนมัติ)</li>
+    </ul>
+    <h3>อนุมัติและจัดคน</h3>
+    <ol class="steps">
+      <li>เปิดคำขอ กด <span class="ui">✓ อนุมัติ</span> (ใส่หมายเหตุได้) หรือ <span class="ui">✕ ไม่อนุมัติ</span> (ต้องใส่เหตุผล)</li>
+      <li>ติ๊ก <span class="ui">จัดคนต่อทันทีหลังอนุมัติ</span> หรือกด <span class="ui">จัดคน</span> ภายหลัง</li>
+      <li>เลือกพนักงานและวันทำงาน ระบบแสดงว่าใครว่าง/ติดงาน/ลา และตัวนับ “เลือกแล้ว N / ขอ M คน”</li>
+      <li>กด <span class="ui">บันทึก &amp; สร้างโครงการ</span> — ระบบสร้าง/อัปเดตโครงการและแจ้งเตือนทีม</li>
+      <li>เมื่องานจบ กด <span class="ui">🏁 ปิดงาน (เสร็จสิ้น)</span></li>
+    </ol>
+    <p>ปุ่มอื่น: <span class="ui">คัดลอกลิงก์ฟอร์มขอ</span>, <span class="ui">📝 กรอกคำขอแทน</span>, <span class="ui">↩️ กลับไปรออนุมัติ</span>, <span class="ui">ยกเลิกคำขอ</span> (ยกเลิกโครงการที่ผูกด้วย)</p>
+    <div class="note warn"><i class="ti ti-alert-triangle"></i><div><span class="ui">🗑 ลบ</span> คำขอ จะลบโครงการที่ผูกไว้รวมถึง Advance ที่พัก และ Timesheet ของโครงการนั้นด้วย ใช้ “ยกเลิกคำขอ” แทนถ้าต้องการเก็บประวัติ</div></div>
+  </section>
+
+  <section class="sec" id="leave">
+    <h2><i class="ti ti-calendar-off"></i>การลางาน</h2>
+    <p class="where">เมนู ทีม › การลางาน — ตัวเลขข้างเมนู = ใบลาของคุณที่ยังรออนุมัติ</p>
+    <h3>ยื่นใบลา</h3>
+    <ol class="steps">
+      <li>กด <span class="ui">เพิ่มการลางาน</span></li>
+      <li>เลือกประเภท: 🤒 ลาป่วย, 🏖 ลาพักร้อน, 📋 ลากิจ, 🤱 ลาคลอด, 🙏 ลาบวช, 📝 อื่นๆ</li>
+      <li>เลือกพนักงาน (Viewer จะเป็นชื่อตนเองอัตโนมัติ), วันที่เริ่ม-สิ้นสุด และ <b>ผู้ทำงานแทน</b> (บังคับสำหรับลาพักร้อน)</li>
+      <li>กรอกรายละเอียดการลา แล้วกด <span class="ui">💾 บันทึก</span> — ใบลาจะเป็น <b>⏳ รออนุมัติ</b> และแจ้งเตือนเข้ากลุ่มทีม</li>
+    </ol>
+    <h3>อนุมัติ / ไม่อนุมัติ (DM/PM)</h3>
+    <ul>
+      <li>ค่าเริ่มต้นของ DM/PM จะเห็นเฉพาะใบที่รออนุมัติ (ติ๊ก <span class="ui">แสดงทั้งหมด</span> เพื่อดูทุกใบ)</li>
+      <li>กด <span class="ui">✅ อนุมัติ</span> บนการ์ด แล้วยืนยัน — หรือกดลิงก์อนุมัติจากข้อความแจ้งเตือนในกลุ่ม ระบบจะพาไปที่ใบลานั้นและถามยืนยัน</li>
+      <li>ไม่อนุมัติ: แก้ไขใบลา (✏️) แล้วเปลี่ยน <span class="ui">สถานะ</span> เป็น <b>❌ ไม่อนุมัติ</b></li>
+    </ul>
+    <div class="tbl"><table>
+      <tr><th>สถานะใบลา</th><th>แก้ไขได้โดย</th><th>ลบได้โดย</th></tr>
+      <tr><td>⏳ รออนุมัติ</td><td>ทุกคนที่เห็นใบลา</td><td>ผู้มีสิทธิ์ลบ</td></tr>
+      <tr><td>❌ ไม่อนุมัติ</td><td>ผู้มีสิทธิ์แก้ไขการลา</td><td>ผู้มีสิทธิ์ลบ</td></tr>
+      <tr><td>✅ อนุมัติ 🔒</td><td>Admin เท่านั้น</td><td>Admin เท่านั้น</td></tr>
+    </table></div>
+    <p>การ์ดจัดกลุ่มตามแผนก จุดเขียว = กำลังลาอยู่, จุดเหลือง = จะลาภายใน 7 วัน การลาที่อนุมัติ/รออนุมัติจะแสดงในปฏิทินทีม ทีมว่าง และหักออกจาก Timesheet อัตโนมัติ</p>
+  </section>
+
+  <section class="sec" id="worklog">
+    <h2><i class="ti ti-notes"></i>บันทึกงาน</h2>
+    <p class="where">เมนู ทีม › บันทึกงาน</p>
+    <p>บันทึกงานที่ไม่ใช่โครงการ เช่น ประชุม อบรม สัมมนา ลงพื้นที่ต่างจังหวัด ดูงานต่างประเทศ บันทึกงานจะแสดงในปฏิทินทีม (แถบสีส้ม) และนับเป็น “ไม่ว่าง” ในหน้าทีมว่าง</p>
+    <ol class="steps">
+      <li>กด <span class="ui">เพิ่มบันทึก</span></li>
+      <li>เลือก <span class="ui">📅 รายวัน</span> หรือ <span class="ui">📆 ช่วงเวลา</span> แล้วใส่วันที่</li>
+      <li>เลือกหมวดงาน, สถานที่ (ในพื้นที่ / ต่างจังหวัด / ต่างประเทศ พร้อมปลายทาง), ชื่องาน และรายละเอียด</li>
+      <li>เพิ่ม <b>ผู้เข้าร่วม</b> ได้หลายคน แต่ละคนกำหนดวันของตนเองได้ (ไม่ใส่ = บันทึกของตนเอง)</li>
+      <li>กด <span class="ui">💾 บันทึก</span></li>
+    </ol>
+    <p>แก้ไข/ลบได้เฉพาะผู้สร้าง หรือผู้มีสิทธิ์แก้ไข/ลบบันทึกงาน</p>
+  </section>
+
+  <section class="sec" id="targets">
+    <h2><i class="ti ti-target-arrow"></i>เป้าหมายทีม</h2>
+    <p class="where">เมนู ทีม › เป้าหมายทีม (เฉพาะผู้ได้รับสิทธิ์)</p>
+    <p>เลือกปี พ.ศ. แล้วกรอกเป้าหมายยอดเงินของแต่ละประเภทโครงการ กด <span class="ui">💾 บันทึกเป้าหมาย</span> ค่านี้ใช้ในตาราง “เป้าหมายประจำปี” ของหน้า Overview Admin จัดกลุ่มประเภทโครงการได้ที่ <span class="ui">⚙️ จัดกลุ่มประเภท</span></p>
+  </section>
+
+  <!-- ═════════════ ศูนย์ช่วยเหลือ ═════════════ -->
+  <section class="sec" id="helpdesk">
+    <h2><i class="ti ti-headset"></i>ศูนย์ช่วยเหลือ (Helpdesk)</h2>
+    <p class="where">เมนู ศูนย์ช่วยเหลือ › ศูนย์ช่วยเหลือ — ตัวเลขข้างเมนู = Ticket ใหม่ที่ยังไม่ได้ตอบ</p>
+    <p>รับและติดตามปัญหาที่โรงพยาบาลแจ้งเข้ามาในรูปแบบ Ticket (เลขที่ เช่น <code>HD69100001</code>) ลูกค้าแจ้งเองผ่านฟอร์มเว็บ หรือเจ้าหน้าที่แจ้งแทนจาก LINE/โทรศัพท์</p>
+
+    <h3>สถานะ Ticket</h3>
+    <div class="tbl"><table>
+      <tr><th>สถานะ</th><th>ความหมาย</th></tr>
+      <tr><td>🆕 ใหม่</td><td>เพิ่งเข้ามา</td></tr>
+      <tr><td>🗂 กำลังจัดหมวด</td><td>รอกำหนดหมวด/ผู้รับผิดชอบ</td></tr>
+      <tr><td>📌 มอบหมายแล้ว</td><td>มีผู้รับผิดชอบแล้ว (เปลี่ยนให้อัตโนมัติเมื่อใส่ผู้รับผิดชอบ)</td></tr>
+      <tr><td>🔧 กำลังดำเนินการ</td><td>กำลังแก้ไข</td></tr>
+      <tr><td>⏳ รอข้อมูลจากผู้แจ้ง</td><td>รอลูกค้าตอบ — <b>หยุดนับ SLA</b> ชั่วคราว</td></tr>
+      <tr><td>✅ แก้ไขแล้ว</td><td>แก้เสร็จ ลูกค้าให้คะแนนได้ ยังไม่ปิดงาน</td></tr>
+      <tr><td>🔒 ปิดงาน / 🚫 ยกเลิก</td><td>ล็อก Ticket ไม่ให้ตอบ/แก้ไข จนกว่าจะกด ♻️ เปิดงานใหม่</td></tr>
+      <tr><td>♻️ เปิดใหม่</td><td>ลูกค้าแจ้งว่ายังไม่หาย</td></tr>
+    </table></div>
+
+    <h3>ความสำคัญ (Priority) และ SLA</h3>
+    <p>เวลาทำการ จ.–ศ. 08:30–17:30 (ไม่นับวันหยุดบริษัท) ยกเว้น P1 นับ 24 ชม.</p>
+    <div class="tbl"><table>
+      <tr><th>Priority</th><th>ตอบครั้งแรกภายใน</th><th>แก้ไขเสร็จภายใน</th></tr>
+      <tr><td>P1 วิกฤต</td><td>30 นาที</td><td>4 ชม. (นับ 24/7)</td></tr>
+      <tr><td>P2 สูง</td><td>1 ชม.</td><td>≈1 วันทำการ</td></tr>
+      <tr><td>P3 ปานกลาง</td><td>4 ชม.</td><td>≈3 วันทำการ</td></tr>
+      <tr><td>P4 ต่ำ</td><td>1 วันทำการ</td><td>≈7 วันทำการ</td></tr>
+    </table></div>
+    <p>ความเร่งด่วนที่ลูกค้าเลือกจะกำหนด Priority เริ่มต้น: <b>ทำงานไม่ได้เลย</b> → P2 (แจ้งทีมทันที + เปิดให้วิดีโอคอลได้), <b>กระทบบางส่วน</b> → P3, <b>สอบถาม / ขอปรับแต่ง</b> → P4 ช่อง SLA ในคิวแสดง “เหลือ X”, “ใกล้เกิน”, “เกิน X” หรือ “หยุดนับ”</p>
+
+    <h3>แท็บ</h3>
+    <ul>
+      <li><span class="ui">คิวงาน</span> / <span class="ui">ของฉัน</span> — รายการ Ticket (ของฉัน = เฉพาะที่มอบหมายให้คุณ)</li>
+      <li><span class="ui">แดชบอร์ด</span> — Ticket เข้า/ปิด, FRT/MTTR เฉลี่ย, % ตรง SLA, เปิดซ้ำ, CSAT แยกเดือน/ไตรมาส/ปี</li>
+      <li><span class="ui">🔁 ปัญหาที่พบบ่อย</span> — จับกลุ่มปัญหาที่เกิดซ้ำ และกด <span class="ui">📝 วางแผน</span> เพื่อบันทึกสาเหตุและแผนแก้ถาวร</li>
+      <li><span class="ui">🤖 สรุปรายงาน</span> — สรุปรายสัปดาห์/เดือน/ปี ด้วย AI และ <span class="ui">🖨️ พิมพ์ / PDF</span></li>
+      <li><span class="ui">📚 คลังความรู้</span> — ค้นวิธีแก้ปัญหาที่เคยบันทึกไว้</li>
+    </ul>
+
+    <h3>ทำงานกับคิว</h3>
+    <ul>
+      <li>มุมมองเริ่มต้น <span class="ui">🔴 ต้องทำตอนนี้</span> รวมเรื่องที่ใกล้/เกิน SLA, ยังไม่มีคนรับ, ลูกค้าเพิ่งตอบ หรือเปิดใหม่ — ควรเคลียร์ให้ว่างทุกวัน</li>
+      <li>มุมมองอื่น: 💬 ลูกค้าตอบกลับ, 👤 ยังไม่มอบหมาย, 🛠 กำลังทำ, ⏸ รอผู้แจ้ง, ✅ แก้แล้ว รอปิด, 📦 ปิด/ยกเลิก</li>
+      <li>คอลัมน์ “รอใคร”: ⏳ รอทีม · ⏸ รอผู้แจ้ง · 💬 ลูกค้าตอบ รอเราตอบ</li>
+      <li>กด <span class="ui">รับงาน</span> เพื่อรับเรื่องที่ยังไม่มีเจ้าของ หรือ <span class="ui">🤖 AI จัดคนให้</span> ให้ AI แนะนำผู้รับผิดชอบทั้งหมด</li>
+    </ul>
+
+    <h3>ตอบลูกค้าใน Ticket</h3>
+    <ol class="steps">
+      <li>กด Ticket ในคิวเพื่อเปิด ดูรายละเอียดและไทม์ไลน์บทสนทนา (อัปเดตทันทีเมื่อลูกค้าตอบ)</li>
+      <li>พิมพ์ข้อความ แนบไฟล์ด้วย 📎 ลากวาง หรือวางรูปด้วย <kbd>Ctrl</kbd>+<kbd>V</kbd> กด <span class="ui">🤖 ร่างข้อความตอบ</span> ให้ AI ช่วยร่างได้</li>
+      <li>ติ๊ก <span class="ui">🔒 โน้ตภายใน</span> ถ้าเป็นข้อความถึงทีม (ลูกค้าไม่เห็น)</li>
+      <li>กด <span class="ui">ส่ง ➤</span> (<kbd>Enter</kbd> ส่ง, <kbd>Shift</kbd>+<kbd>Enter</kbd> ขึ้นบรรทัดใหม่) หรือใช้ปุ่มลัด <span class="ui">⏳ ส่ง แล้วรอผู้แจ้งตอบ</span> / <span class="ui">✅ ส่ง แล้วแจ้งว่าแก้ไขเสร็จ</span></li>
+      <li>ปรับสถานะ Priority ผู้รับผิดชอบ และหมวดได้ที่การ์ด “ข้อมูล Ticket” ด้านขวา แล้วกด <span class="ui">🔒 ปิดงาน</span> เมื่อจบ</li>
+      <li>เมื่อแก้ไขเสร็จ ระบบจะชวนบันทึก <b>สาเหตุ</b> และ <b>วิธีแก้ไข</b> เข้าคลังความรู้ (AI เติมร่างให้) ลูกค้าจะเห็นวิธีแก้นี้ในหน้าติดตาม</li>
+    </ol>
+    <p>ปุ่มบนหัว Ticket: <span class="ui">🔗 คัดลอกลิงก์</span> (ลิงก์ติดตามสำหรับส่งลูกค้า), <span class="ui">📋 คัดลอกข้อความ</span>, <span class="ui">📞 เข้าร่วมสาย</span> (เฉพาะเรื่องด่วนที่สุด เมื่อลูกค้ากดวิดีโอคอล)</p>
+
+    <h3>แจ้งแทนลูกค้า</h3>
+    <ul>
+      <li><span class="ui">+ แจ้งแทน</span> — กรอกโรงพยาบาล ระบบที่ใช้ ชื่อผู้แจ้ง รายละเอียด และความเร่งด่วน AI จะจัดหมวด Priority และผู้รับผิดชอบให้</li>
+      <li><span class="ui">🤖 วางแชท LINE</span> — วางข้อความแชทหรือเปิดไฟล์แชท แล้วกด <span class="ui">🤖 ให้ AI แยกปัญหา</span> ระบบสร้างร่าง Ticket หลายใบให้ตรวจก่อนบันทึก (เรื่องที่แก้จบในแชทแล้วจะถูกบันทึกเป็นแก้ไขแล้ว)</li>
+      <li><span class="ui">🔗 ลิงก์ฟอร์มแจ้งเอง</span> — ลิงก์และ QR Code ของฟอร์มแจ้งปัญหา สำหรับพิมพ์ติดที่โรงพยาบาล</li>
+    </ul>
+    <div class="note tip"><i class="ti ti-robot"></i><div>ถ้าผู้ดูแลเปิด <b>AI ตอบกลับอัตโนมัติ</b> ไว้ AI จะตอบลูกค้าเมื่อทีมยังไม่ได้ตอบภายในเวลาที่ตั้ง (เช่น นอกเวลาทำการ) และหยุดทันทีเมื่อเจ้าหน้าที่ตอบ AI ไม่ปิดงานหรือเปลี่ยนสถานะเอง</div></div>
+  </section>
+
+  <section class="sec" id="assist">
+    <h2><i class="ti ti-messages"></i>ผู้ช่วยทีม</h2>
+    <p class="where">เมนู ศูนย์ช่วยเหลือ › ผู้ช่วยทีม</p>
+    <p>แชทถามคำตอบ/โค้ด/ขั้นตอนที่ทีมเก็บไว้ในคลัง เช่น SQL อัปเดต HOSxP คำตอบถูก <b>คัดลอกตรงตัวจากคลัง</b> AI ช่วยแค่หาว่าตรงกับรายการไหน จึงไว้ใจได้ว่าโค้ดไม่ถูกแต่งเพิ่ม</p>
+    <h3>ถามคำถาม</h3>
+    <ul>
+      <li>พิมพ์คำถามเป็นภาษาพูด เช่น “ขอโค้ดอัปเดต HOSxP” แล้วกด <span class="ui">ส่ง ➤</span></li>
+      <li>พิมพ์ <code>/</code> เพื่อดูคำสั่งลัด เช่น <code>/update-hosxp</code> (ตอบทันทีไม่ผ่าน AI)</li>
+      <li>กด <span class="ui">📋 คัดลอก</span> บนกล่องโค้ด อ่านคำเตือน ⚠️ ก่อนใช้งานเสมอ</li>
+      <li>กด <span class="ui">📚 คลังคำตอบ</span> เพื่อเปิดดู/ค้นหารายการทั้งหมด · ประวัติแชทไม่ถูกบันทึก</li>
+    </ul>
+    <h3>เพิ่มคำตอบเข้าคลัง (ผู้มีสิทธิ์เพิ่ม/แก้)</h3>
+    <ol class="steps">
+      <li>กด <span class="ui">+ เพิ่มคำตอบ</span></li>
+      <li>กรอกหัวข้อ, คำสั่งลัด (ไม่บังคับ), หมวด, คำที่ใช้เรียก (คั่นด้วย ,), คำเตือน และเนื้อหา — ครอบโค้ดด้วย <code>```</code> หรือกด <span class="ui">{ } แทรกกล่องโค้ด</span></li>
+      <li>กด <span class="ui">✨ ช่วยคิดคำ</span> ให้ AI แนะนำหัวข้อ/คำเรียก (ไม่แตะโค้ด) แล้วบันทึก</li>
+    </ol>
+  </section>
+
+  <!-- ═════════════ ข้อมูลอ้างอิง ═════════════ -->
+  <section class="sec" id="hospital">
+    <h2><i class="ti ti-building-hospital"></i>รายชื่อ รพ.</h2>
+    <p class="where">เมนู ข้อมูลอ้างอิง › รายชื่อ รพ.</p>
+    <p>ฐานข้อมูลโรงพยาบาล ค้นหาด้วยรหัส/ชื่อ/อำเภอ และกรองตามจังหวัด อำเภอ ระดับ Product ที่ใช้ ส่งออก <span class="ui">Excel</span> ได้</p>
+    <ul>
+      <li><b>แท็บ</b>: รายชื่อ รพ. · สรุปข้อมูลการติดต่อ · วิเคราะห์ Product (อัตราการใช้ Product และโอกาสขายเพิ่ม) · Dashboard</li>
+      <li>กดชื่อ รพ. เพื่อดู <b>ข้อมูลทั่วไป</b>, <b>ผู้ติดต่อ</b>, <b>ระบบ/Anydesk</b> (รหัสผ่านซ่อนไว้ กด 👁 เพื่อดู) และ <b>Product</b> ที่ใช้</li>
+      <li>ผู้ดูแลเพิ่ม รพ. ด้วย <span class="ui">เพิ่ม รพ.</span> — พิมพ์ HOS Code แล้วระบบดึงข้อมูลจาก MOPH ให้ หรือ <span class="ui">เติมข้อมูล API</span> เติมช่องที่ว่าง (ไม่ทับข้อมูลเดิม)</li>
+    </ul>
+    <div class="note warn"><i class="ti ti-lock"></i><div>ข้อมูล Anydesk/Database เป็นข้อมูลลับของลูกค้า ห้ามคัดลอกส่งต่อนอกทีม</div></div>
+  </section>
+
+  <section class="sec" id="contract">
+    <h2><i class="ti ti-file-description"></i>ข้อมูลสัญญา</h2>
+    <p class="where">เมนู ข้อมูลอ้างอิง › ข้อมูลสัญญา</p>
+    <p>ทะเบียนสัญญาจัดกลุ่มตามลูกค้า พร้อมมูลค่าและความคืบหน้าการเรียกเก็บเงิน การ์ดสรุป: สัญญาทั้งหมด, มีผลบังคับ, มูลค่ารวม, ใกล้หมดอายุ (30 วัน), ปิดแล้ว/ยังต้องเรียกเก็บ</p>
+    <h3>เพิ่มสัญญา (Admin/DM/PM)</h3>
+    <ol class="steps">
+      <li>กด <span class="ui">เพิ่มสัญญา</span> — รหัสสัญญาสร้างอัตโนมัติ (<span class="ui">🔄 อัตโนมัติ</span>)</li>
+      <li>กรอกชื่อโครงการ, ลูกค้า/คู่สัญญา, มูลค่า, วันลงนาม, วันเริ่ม-สิ้นสุด (หรือกรอกระยะสัญญาเป็นเดือน/ปี ให้คำนวณวันสิ้นสุด)</li>
+      <li>เพิ่มรายการรับเงินเองได้ที่ <span class="ui">＋ เพิ่ม Transaction</span> แล้วกด <span class="ui">💾 บันทึก</span></li>
+    </ol>
+    <p>การเรียกเก็บ: โครงการที่ผูกกับสัญญาและปิดแล้ว นับเป็น “ปิดแล้ว” · ที่ยังดำเนินการอยู่นับเป็น “ค้างเก็บ” (ผูกโครงการกับสัญญาได้ที่ช่อง 🔗 ผูกสัญญา ในหน้าโครงการ) สถานะสัญญา: ✅ มีผลบังคับ · 🏁 สิ้นสุดแล้ว · 🚫 ยกเลิก</p>
+  </section>
+
+  <!-- ═════════════ ผู้ดูแลระบบ ═════════════ -->
+  <section class="sec" id="admin">
+    <h2><i class="ti ti-settings"></i>Admin Panel <span class="tag adm">ผู้ดูแลระบบ</span></h2>
+    <p class="where">เมนู ระบบ › Admin Panel</p>
+    <div class="tbl"><table>
+      <tr><th>หมวด</th><th>เมนู</th><th>ใช้ทำอะไร</th></tr>
+      <tr><td rowspan="3">บุคลากร</td><td>👥 พนักงาน</td><td>เพิ่ม/แก้ไขพนักงาน แผนก ตำแหน่ง อัตราค่าแรง สถานะ Active/Inactive นำเข้า CSV ได้</td></tr>
+      <tr><td>🏢 แผนก</td><td>รายชื่อแผนก</td></tr>
+      <tr><td>💼 ตำแหน่ง</td><td>ชื่อตำแหน่ง ค่าแรงต่อวัน และลำดับ (1 = สูงสุด ใช้เรียงรายชื่อ)</td></tr>
+      <tr><td rowspan="3">โครงการ</td><td>📂 กลุ่มโครงการ / 🏷️ ประเภทงาน</td><td>ชื่อและสี</td></tr>
+      <tr><td>⚡ PM Stages</td><td>ขั้นตอนบน Delivery Board ลากเรียงลำดับ กำหนดกฎย้ายอัตโนมัติและ % ความคืบหน้า</td></tr>
+      <tr><td>💵 อัตราค่าใช้จ่าย</td><td>เบี้ยเลี้ยงต่อวัน (วันทำงาน/วันหยุด × พื้นที่ปกติ/ชายแดน)</td></tr>
+      <tr><td rowspan="3">Helpdesk</td><td>📦 Product</td><td>รายการระบบ/Product ที่ใช้ในฟอร์มแจ้งปัญหาและข้อมูล รพ.</td></tr>
+      <tr><td>🎧 ตัวเลือกแจ้งปัญหา</td><td>หมวดปัญหา (Priority เริ่มต้น), ชื่อ/สีของ Priority ความเร่งด่วน และสถานะ</td></tr>
+      <tr><td>🤖 AI ตอบกลับอัตโนมัติ</td><td>เปิด/ปิด, ช่วงเวลา, เวลารอก่อน AI ตอบ, ช่องทาง/หมวด/รพ. ที่อนุญาต, รูปแบบการตอบตาม Priority</td></tr>
+      <tr><td rowspan="3">ระบบ</td><td>🔔 การแจ้งเตือน</td><td>Token แจ้งเตือนเข้ากลุ่มแต่ละเรื่อง กด <span class="ui">🧪 ทดสอบส่ง</span> เพื่อตรวจ</td></tr>
+      <tr><td>🔑 ผู้ใช้งานระบบ</td><td>สร้างบัญชี ตั้ง/รีเซ็ตรหัสผ่าน กำหนด Role และผูกกับพนักงาน</td></tr>
+      <tr><td>🔐 สิทธิ์การใช้งาน</td><td>ตารางสิทธิ์ ดู/เพิ่ม/แก้/ลบ ของแต่ละ Role ทุกเมนู และสิทธิ์อนุมัติที่พัก/คำขอทีม Server</td></tr>
+    </table></div>
+    <h3>สร้างบัญชีผู้ใช้ใหม่</h3>
+    <ol class="steps">
+      <li>เพิ่มพนักงานที่ 👥 พนักงาน (ถ้ายังไม่มี)</li>
+      <li>ไปที่ 🔑 ผู้ใช้งานระบบ › <span class="ui">+ เพิ่มบัญชีผู้ใช้</span> กรอก Username, Password, ชื่อ และเลือก Role</li>
+      <li>เลือก <b>ผูกกับพนักงาน</b> — จำเป็นสำหรับ Viewer เพื่อให้ลางานและเห็นข้อมูลของตนเองได้</li>
+      <li>บันทึก แล้วแจ้ง Username/รหัสผ่านให้ผู้ใช้ และแนะนำให้เปลี่ยนรหัสผ่านเมื่อเข้าครั้งแรก</li>
+    </ol>
+    <h3>รีเซ็ตรหัสผ่านตามคำขอ</h3>
+    <p>คำขอจะขึ้นที่กระดิ่ง และมีป้าย <span class="ui">🔑 ขอรีเซ็ตรหัสผ่าน</span> ในรายชื่อผู้ใช้ กด ✏️ ใส่รหัสผ่านใหม่ แล้วบันทึก (คำขอจะหายเอง) จากนั้นแจ้งรหัสใหม่ให้ผู้ใช้</p>
+    <h3>ปรับสิทธิ์</h3>
+    <p>ติ๊ก เพิ่ม/แก้/ลบ ระบบจะติ๊ก “ดู” ให้อัตโนมัติ เอาติ๊ก “ดู” ออกจะล้างสิทธิ์อื่นของเมนูนั้น กด <span class="ui">💾 บันทึกสิทธิ์</span> ทุกครั้ง (<span class="ui">↩️ รีเซ็ตเป็นค่าเริ่มต้น</span> ก็ต้องกดบันทึกเช่นกัน)</p>
+  </section>
+
+  <section class="sec" id="import">
+    <h2><i class="ti ti-file-import"></i>นำเข้าข้อมูล <span class="tag adm">ผู้ดูแลระบบ</span></h2>
+    <p class="where">ปุ่ม “นำเข้า” บนแถบด้านบน</p>
+    <p>นำเข้าข้อมูลจำนวนมากจากไฟล์: โครงการ, พนักงาน, ผู้ใช้งาน, รายการเบิกจ่าย, กลุ่ม/ประเภท/ตำแหน่ง/แผนก, สัญญา, รายชื่อโรงพยาบาล ผู้ติดต่อ และ Product (Excel), ปัญหาเก่า HelpDesk, ปัญหาการใช้งานเก่า (Impl Tracker — 1 ไฟล์ต่อ 1 โครงการ) และคำขอทีม Server</p>
+    <ol class="steps">
+      <li>เลือกชนิดข้อมูล แล้วกด <span class="ui">⬇ ดาวน์โหลดไฟล์ตัวอย่าง</span> เพื่อดูรูปแบบคอลัมน์</li>
+      <li>กรอกข้อมูลตามตัวอย่าง แล้วลากไฟล์มาวาง/คลิกเลือกไฟล์</li>
+      <li>ตรวจตัวอย่างก่อนนำเข้า (ถ้ามี) แล้วกด <span class="ui">🚀 นำเข้าข้อมูล</span> — อย่าปิดหน้าจนกว่าจะเสร็จ</li>
+    </ol>
+    <div class="note warn"><i class="ti ti-alert-triangle"></i><div>ตัวเลือก <span class="ui">⚠ ลบข้อมูลเดิมก่อนนำเข้า</span> จะลบข้อมูลชนิดนั้นทั้งหมดก่อนนำเข้า ใช้เฉพาะเมื่อแน่ใจ</div></div>
+  </section>
+
+  <section class="sec" id="holiday">
+    <h2><i class="ti ti-calendar-star"></i>จัดการวันหยุด</h2>
+    <p class="where">เมนู ระบบ › จัดการวันหยุด (ผู้มีสิทธิ์เพิ่ม/แก้วันหยุด)</p>
+    <ul>
+      <li><span class="ui">เพิ่มวันหยุด</span> — ชื่อ, วันที่, ประเภท: 🇹🇭 วันหยุดราชการ · 🏢 วันหยุดบริษัท · 🎌 ราชการ/บริษัท · ⭐ อื่นๆ</li>
+      <li><span class="ui">นำเข้าวันหยุด</span> — โหลด Template แล้วอัปโหลดไฟล์ .xlsx/.xls/.csv หรือวางข้อความทีละบรรทัดรูปแบบ <code>ชื่อวันหยุด,YYYY-MM-DD,national|company|custom</code> (ปี พ.ศ. ในไฟล์ระบบแปลงให้)</li>
+      <li>แก้ไข ✏️ / ลบ 🗑 ได้จากรายการที่จัดกลุ่มตามเดือน</li>
+    </ul>
+    <div class="note tip"><i class="ti ti-info-circle"></i><div>เฉพาะวันหยุด <b>บริษัท</b> และ <b>ราชการ/บริษัท</b> ที่ถูกหักออกจากวันทำงานใน Timesheet, ทีมว่าง, SLA ของ Helpdesk และวันว่างของทีม Server</div></div>
+  </section>
+
+  <!-- ═════════════ หน้าสาธารณะ ═════════════ -->
+  <section class="sec" id="public">
+    <h2><i class="ti ti-world"></i>หน้าเว็บที่ไม่ต้องล็อกอิน <span class="tag pub">ส่งให้ลูกค้า/บุคคลภายนอก</span></h2>
+    <p>หน้าเหล่านี้ใช้ส่งลิงก์ให้โรงพยาบาลหรือผู้ขอใช้บริการ เปิดได้ทันทีโดยไม่ต้องมีบัญชี</p>
+
+    <h3>ฟอร์มแจ้งปัญหา (help.html)</h3>
+    <p>คัดลอกลิงก์จาก Helpdesk › <span class="ui">🔗 ลิงก์ฟอร์มแจ้งเอง</span></p>
+    <ol class="steps">
+      <li>ลูกค้าเลือกโรงพยาบาล กรอกชื่อ เบอร์/LINE เลือกระบบที่ใช้ ความเร่งด่วน รายละเอียด และแนบรูปหน้าจอ แล้วกด <span class="ui">ส่งเรื่อง</span></li>
+      <li>ได้เลขที่ Ticket และ <b>ลิงก์ติดตาม</b> — ควรบันทึกลิงก์นี้ไว้</li>
+      <li>ในหน้าติดตาม ลูกค้าเห็นความคืบหน้า แชทกับทีมงาน แนบไฟล์ และเห็นว่าทีม “อ่านแล้ว” หรือยัง</li>
+      <li>เมื่อแก้ไขเสร็จ ลูกค้าเห็นสรุปวิธีแก้ ให้คะแนน 1–5 ดาว หรือกด <span class="ui">↺ ยังไม่หาย เปิดเรื่องใหม่</span></li>
+    </ol>
+    <p>เรื่องที่เลือก “ทำงานไม่ได้เลย” ลูกค้ากด <span class="ui">📞 เริ่มคุยสดกับทีมงาน</span> เพื่อวิดีโอคอลได้ ลิงก์ติดตามหมดอายุหลังปิดเรื่อง 30 วัน</p>
+
+    <h3>ฟอร์มขอใช้งานทีม Server (server-request.html)</h3>
+    <p>คัดลอกลิงก์จากเมนูขอใช้งานทีม Server › <span class="ui">คัดลอกลิงก์ฟอร์มขอ</span> ผู้ขอกรอก 4 ขั้น: ผู้ขอ → โรงพยาบาลและ IT ผู้ติดต่อ → รายละเอียดงาน → ช่วงวันที่และจำนวนคน (ปฏิทินแสดงวันว่างของทีมแบบเรียลไทม์) จากนั้นได้ลิงก์ติดตามสถานะการอนุมัติ และยกเลิกคำขอได้ระหว่างรออนุมัติ</p>
+
+    <h3>หน้าอบรม (ลงทะเบียน / แบบประเมิน / แบบทดสอบ)</h3>
+    <ul>
+      <li><b>ลงทะเบียน</b> — เลือกหลักสูตร → รอบอบรม → กรอกข้อมูล รับ QR Code สำหรับเช็คชื่อ ดู/แก้ไข/ยกเลิกการลงทะเบียนได้ภายหลัง</li>
+      <li><b>แบบประเมิน</b> — เปิดได้เฉพาะวันที่มีรอบอบรม ให้คะแนน 1–5 แล้วกด <span class="ui">ส่งแบบประเมิน</span></li>
+      <li><b>แบบทดสอบ</b> — ระบุตัวตนและอีเมล ทำข้อสอบ ดูผลทันที ผู้ที่สอบผ่านได้รับใบประกาศทางอีเมล</li>
+    </ul>
+
+    <h3>Dashboard สรุปปัญหาของโครงการ (impl-dashboard.html)</h3>
+    <p>สร้างจาก ติดตามสถานะโครงการ › แท็บปัญหา › <span class="ui">🖼️ Dashboard</span> โรงพยาบาลดูสรุปจำนวนปัญหา อัตราแก้ไข กราฟ และรายการปัญหาได้ตลอดเวลา</p>
+  </section>
+
+  <!-- ═════════════ FAQ ═════════════ -->
+  <section class="sec" id="faq">
+    <h2><i class="ti ti-help-circle"></i>คำถามที่พบบ่อย &amp; แก้ปัญหาเบื้องต้น</h2>
+    <h4>ไม่เห็นเมนู / ปุ่มที่ต้องใช้</h4>
+    <p>บทบาทของคุณยังไม่มีสิทธิ์ในเมนูนั้น ติดต่อผู้ดูแลระบบให้เพิ่มสิทธิ์ที่ Admin Panel › สิทธิ์การใช้งาน</p>
+    <h4>ข้อมูลไม่อัปเดต หรือหน้าจอแสดงผิดปกติ</h4>
+    <p>กดรีเฟรช (<kbd>F5</kbd>) ถ้ายังไม่หาย ให้ออกจากระบบแล้วเข้าใหม่ หรือกด <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> เพื่อโหลดเวอร์ชันล่าสุด</p>
+    <h4>ขึ้นข้อความ “ไม่สามารถเชื่อมต่อฐานข้อมูลได้”</h4>
+    <p>ตรวจสอบอินเทอร์เน็ต แล้วลองใหม่อีกครั้ง ถ้ายังเป็นอยู่ แจ้งผู้ดูแลระบบ</p>
+    <h4>ไม่มีชื่อพนักงานในรายชื่อทีม/ลางาน</h4>
+    <p>พนักงานอาจยังไม่ถูกเพิ่ม หรือสถานะเป็น Inactive ให้ผู้ดูแลตรวจที่ Admin Panel › พนักงาน</p>
+    <h4>แก้ไขใบลาที่อนุมัติแล้วไม่ได้</h4>
+    <p>ใบลาที่อนุมัติแล้วจะถูกล็อก ต้องให้ Admin แก้ไขหรือลบให้</p>
+    <h4>ลบโครงการไม่ได้</h4>
+    <p>โครงการที่มี Advance หรือข้อมูลที่พักแล้วลบไม่ได้ ต้องลบรายการเหล่านั้นก่อน หรือเปลี่ยนสถานะเป็นยกเลิกแทน</p>
+    <h4>ค่าใช้จ่ายไม่ขึ้นในหน้างบประมาณ</h4>
+    <p>รายการค่าใช้จ่ายจะเข้าหน้างบประมาณเมื่อใบ Advance ถูกบันทึกเป็น <b>เคลียร์แล้ว</b> เท่านั้น</p>
+    <h4>พิมพ์เอกสารแล้วไม่มีอะไรขึ้น</h4>
+    <p>เบราว์เซอร์อาจบล็อกหน้าต่าง Popup ให้กดอนุญาต Popup สำหรับเว็บนี้ แล้วลองใหม่</p>
+    <h4>ไม่ได้รับการแจ้งเตือนบนมือถือ</h4>
+    <p>ตรวจว่าเปิด <span class="ui">📳 เปิดแจ้งเตือนเมื่อปิด WebApp</span> แล้ว อนุญาตการแจ้งเตือนในเบราว์เซอร์/ระบบปฏิบัติการ และบน iPhone ต้องติดตั้งแอปลงหน้าจอโฮมก่อน</p>
+  </section>
+</main>
+</div>
+
+<button class="icon-btn totop" id="totop" type="button" aria-label="กลับด้านบน" onclick="window.scrollTo({top:0})"><i class="ti ti-arrow-up"></i></button>
+
+<script>
+(function () {
+  var toc = document.getElementById('toc');
+  var links = Array.prototype.slice.call(toc.querySelectorAll('a[href^="#"]'));
+  var secs = Array.prototype.slice.call(document.querySelectorAll('section.sec'));
+
+  // ── ค้นหา: ซ่อนหัวข้อที่ไม่มีคำค้น ──
+  var q = document.getElementById('q'), empty = document.getElementById('empty');
+  var norm = function (s) { return (s || '').toLowerCase().replace(/\s+/g, ' '); };
+  var texts = secs.map(function (s) { return norm(s.textContent); });
+  q.addEventListener('input', function () {
+    var words = norm(q.value).trim().split(' ').filter(Boolean), shown = 0;
+    secs.forEach(function (s, i) {
+      var hit = words.every(function (w) { return texts[i].indexOf(w) >= 0; });
+      s.classList.toggle('hide', !hit);
+      var a = toc.querySelector('a[href="#' + s.id + '"]');
+      if (a) a.classList.toggle('hide', !hit);
+      if (hit) shown++;
+    });
+    empty.style.display = shown ? 'none' : 'block';
+  });
+
+  // ── ไฮไลต์หัวข้อที่กำลังอ่านในสารบัญ ──
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (ents) {
+      ents.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        links.forEach(function (a) { a.classList.toggle('on', a.getAttribute('href') === '#' + e.target.id); });
+      });
+    }, { rootMargin: '-70px 0px -70% 0px' });
+    secs.forEach(function (s) { io.observe(s); });
+  }
+
+  // ── สารบัญแบบลิ้นชักบนจอเล็ก ──
+  var body = document.body;
+  document.getElementById('toc-btn').addEventListener('click', function () { body.classList.toggle('toc-open'); });
+  document.getElementById('toc-ov').addEventListener('click', function () { body.classList.remove('toc-open'); });
+  links.forEach(function (a) { a.addEventListener('click', function () { body.classList.remove('toc-open'); }); });
+
+  // ── ปุ่มกลับด้านบน ──
+  var tt = document.getElementById('totop');
+  window.addEventListener('scroll', function () { tt.classList.toggle('show', window.scrollY > 600); }, { passive: true });
+
+  // ── สลับธีม (ใช้ค่าเดียวกับระบบหลัก) ──
+  var root = document.documentElement, tb = document.getElementById('theme-btn');
+  function isDark() {
+    var t = root.getAttribute('data-theme');
+    return t === 'dark' || (t !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  }
+  function syncIcon() { tb.innerHTML = '<i class="ti ' + (isDark() ? 'ti-sun' : 'ti-moon') + '"></i>'; }
+  tb.addEventListener('click', function () {
+    var next = isDark() ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('_bms_dark', next); } catch (e) {}
+    syncIcon();
+  });
+  syncIcon();
+})();
+</script>
+</body>
+</html>

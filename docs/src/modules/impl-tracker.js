@@ -9,18 +9,22 @@
   var esc = window.esc, fd = window.fd, pd = window.pd;
 
   // ── Lookup Helpers ──
-  function imtProject(id) { return window.IMPL_PROJECTS.find(function (p) { return p.id === id; }); }
+  // ระหว่าง render (window.imtIndexPass) ใช้ดัชนีกลุ่มแทนการ .filter/.find ทั้ง array ซ้ำ ๆ ในลูป —
+  // กลุ่มคงลำดับเดิมของ array (ตัวแรกของกลุ่ม = ผลของ find) · slice ก่อน sort เพราะกลุ่มใช้ร่วมกัน ──
+  function imtGrp(jsName, key, val) { var g = window.imtGroupOf(jsName, key, val); return g ? g.slice() : null; }
+  function imtFirst(jsName, id) { var g = window.imtGroupOf(jsName, 'id', id); return g ? g[0] : window[jsName].find(function (x) { return x.id === id; }); }
+  function imtProject(id) { return imtFirst('IMPL_PROJECTS', id); }
   window.imtProject = imtProject; // ── ให้ form-tracker.js (แท็บ "แบบฟอร์ม") เรียกใช้ได้ ไม่ต้อง lookup ซ้ำ ──
-  function imtPhase(id)   { return window.IMPL_PHASES.find(function (p) { return p.id === id; }); }
-  function imtTask(id)    { return window.IMPL_TASKS.find(function (t) { return t.id === id; }); }
-  function imtPhasesOf(pid)    { return window.IMPL_PHASES.filter(function (p) { return p.projectId === pid; }).sort(function (a,b) { return a.order - b.order; }); }
-  function imtTasksOfPhase(id) { return window.IMPL_TASKS.filter(function (t) { return t.phaseId === id; }).sort(function (a,b) { return a.order - b.order; }); }
-  function imtTasksOfProject(pid) { return window.IMPL_TASKS.filter(function (t) { return t.projectId === pid; }).sort(function (a,b) { return a.order - b.order; }); }
-  function imtChecklistOf(tid) { return window.IMPL_CHECKLIST_ITEMS.filter(function (c) { return c.taskId === tid; }).sort(function (a,b) { return a.order - b.order; }); }
+  function imtPhase(id)   { return imtFirst('IMPL_PHASES', id); }
+  function imtTask(id)    { return imtFirst('IMPL_TASKS', id); }
+  function imtPhasesOf(pid)    { return (imtGrp('IMPL_PHASES', 'projectId', pid) || window.IMPL_PHASES.filter(function (p) { return p.projectId === pid; })).sort(function (a,b) { return a.order - b.order; }); }
+  function imtTasksOfPhase(id) { return (imtGrp('IMPL_TASKS', 'phaseId', id) || window.IMPL_TASKS.filter(function (t) { return t.phaseId === id; })).sort(function (a,b) { return a.order - b.order; }); }
+  function imtTasksOfProject(pid) { return (imtGrp('IMPL_TASKS', 'projectId', pid) || window.IMPL_TASKS.filter(function (t) { return t.projectId === pid; })).sort(function (a,b) { return a.order - b.order; }); }
+  function imtChecklistOf(tid) { return (imtGrp('IMPL_CHECKLIST_ITEMS', 'taskId', tid) || window.IMPL_CHECKLIST_ITEMS.filter(function (c) { return c.taskId === tid; })).sort(function (a,b) { return a.order - b.order; }); }
   function imtCommentsOf(tid)  { return window.IMPL_COMMENTS.filter(function (c) { return c.taskId === tid; }).sort(function (a,b) { return (a.createdAt||'').localeCompare(b.createdAt||''); }); }
   function imtAttachmentsOf(tid) { return window.IMPL_ATTACHMENTS.filter(function (a) { return a.taskId === tid; }); }
-  function imtIssue(id)        { return window.IMPL_ISSUES.find(function (i) { return i.id === id; }); }
-  function imtIssuesOfProject(pid) { return window.IMPL_ISSUES.filter(function (i) { return i.projectId === pid; }).sort(function (a,b) { return (b.createdAt||'').localeCompare(a.createdAt||''); }); }
+  function imtIssue(id)        { return imtFirst('IMPL_ISSUES', id); }
+  function imtIssuesOfProject(pid) { return (imtGrp('IMPL_ISSUES', 'projectId', pid) || window.IMPL_ISSUES.filter(function (i) { return i.projectId === pid; })).sort(function (a,b) { return (b.createdAt||'').localeCompare(a.createdAt||''); }); }
 
   // ── สร้าง row เต็มสำหรับ imtApplyLocal('IMPL_TASKS', ...) จาก Task object ปัจจุบัน + overrides
   // (เช่น {status:'done'}) — ต้องรวม sort_order เสมอ ไม่งั้น transform จะ default เป็น 99 ทำให้ลำดับ Task
@@ -46,10 +50,7 @@
   }
 
   function statusTag(st) { return '<span class="tag" style="background:'+st.color+'18;color:'+st.color+'">'+st.icon+' '+esc(st.label)+'</span>'; }
-  function pbarHtml(pct, color) {
-    pct = Math.max(0, Math.min(100, Math.round(pct)));
-    return '<div class="pbar"><div class="pbar-fill" style="width:'+pct+'%;background:'+(color||'var(--violet)')+'"></div></div>';
-  }
+  var pbarHtml = window.pbarHtml;
   // ── หาโครงการต้นทาง (window.PROJECTS) ของโครงการ impl-tracker หนึ่งๆ — ตรรกะอยู่ที่ src/utils/project-team.util.js
   // ที่เดียว (ใช้ร่วมกับหน้าปัญหาทั้งหมด และระบบอบรม) ป้องกันแต่ละจุดเดาโครงการต้นทาง/ทีมงานไม่ตรงกัน ──
   function imtResolveSourceProject(proj) { return window.ProjectTeam.source(proj, window.PROJECTS); }
@@ -164,7 +165,7 @@
     // ── แท็บที่ต้องมีโครงการ (งาน/แบบฟอร์ม/Calendar/Report) แต่ยังไม่มีโครงการ "กำลังดู" อยู่ — auto-select ให้
     // แทนที่จะโผล่หน้าเปล่า ๆ ให้เลือกเอง (เริ่มแอปยังคงอยู่ที่ Dashboard ตามปกติ ไม่ถูกเรียกจุดนี้จนกว่าจะกดเข้าแท็บ) ──
     if (tab === 'training' && !window.canView('training')) tab = window.imtTab = 'workspace';
-    if (TABS_NEED_PROJECT.indexOf(tab) !== -1 && !window.imtCurrentProjectId) _imtAutoSelectProject();
+    if (TABS_NEED_PROJECT.indexOf(tab) !== -1 && !window.imtCurrentProjectId) window.imtIndexPass(_imtAutoSelectProject);
     window.renderImplTracker();
   };
 
@@ -288,7 +289,8 @@
   }
 
   // ── Main Dispatcher ──
-  window.renderImplTracker = function () {
+  window.renderImplTracker = function () { window.imtIndexPass(renderImplTrackerNow); };
+  function renderImplTrackerNow() {
     renderTabs();
     var mount = document.getElementById('imt-content');
     if (!mount) return;
@@ -301,7 +303,7 @@
       calendar: renderImtCalendar, report: renderImtReport, templates: renderImtTemplates,
     };
     (fns[window.imtTab] || renderImtDashboard)(mount);
-  };
+  }
 
   // ── % ที่ "ควรได้" ณ วันนี้ คิดจากกำหนดของแต่ละงาน ถ่วงแบบเดียวกับ calcProjectProgress (งาน → Phase → โครงการ)
   // จึงเทียบกับ % จริงได้ตรง ๆ — งานมีวันเริ่ม = ไล่เชิงเส้นจากวันเริ่มถึงสิ้นวันครบกำหนด, ไม่มีวันเริ่ม = 0% จนพ้นวันครบกำหนด,
@@ -329,9 +331,9 @@
   function imtLastUpdate(p) {
     var last = String(p.updatedAt || p.createdAt || '').slice(0, 10);
     function bump(v) { v = String(v || '').slice(0, 10); if (v > last) last = v; }
-    window.IMPL_ACTIVITY_LOG.forEach(function (a) { if (a.projectId === p.id) bump(a.createdAt); });
-    window.IMPL_TASKS.forEach(function (t) { if (t.projectId === p.id) bump(t.updatedAt); });
-    window.IMPL_ISSUES.forEach(function (i) { if (i.projectId === p.id) bump(i.updatedAt || i.createdAt); });
+    (window.imtGroupOf('IMPL_ACTIVITY_LOG', 'projectId', p.id) || window.IMPL_ACTIVITY_LOG).forEach(function (a) { if (a.projectId === p.id) bump(a.createdAt); });
+    (window.imtGroupOf('IMPL_TASKS', 'projectId', p.id) || window.IMPL_TASKS).forEach(function (t) { if (t.projectId === p.id) bump(t.updatedAt); });
+    (window.imtGroupOf('IMPL_ISSUES', 'projectId', p.id) || window.IMPL_ISSUES).forEach(function (i) { if (i.projectId === p.id) bump(i.updatedAt || i.createdAt); });
     return last;
   }
 
@@ -340,7 +342,15 @@
   function imtScoreColor(score) { return score >= 80 ? 'var(--teal)' : score >= 60 ? 'var(--amber)' : 'var(--coral)'; }
 
   // ── Project Health: ให้ PM เห็นได้ทันทีว่าโครงการไหนล่าช้า/ต้องติดตามพิเศษ/ปกติ — ระดับคิดจาก Health Score ด้านล่าง ──
+  // ── ภายในรอบ render เดียวกันคำนวณครั้งเดียวต่อโครงการ (ถูกเรียกซ้ำจากหัวโครงการ/Dashboard/comparator ของ sort) ──
   function imtProjectHealth(p) {
+    var memo = window.imtPassMemo('health'), hit = memo ? memo.get(p) : undefined;
+    if (hit) return hit;
+    var h = imtProjectHealthCalc(p);
+    if (memo) memo.set(p, h);
+    return h;
+  }
+  function imtProjectHealthCalc(p) {
     var tasks = imtTasksOfProject(p.id);
     var today = new Date(new Date().toDateString());
     var dayDiff = function (d) { return Math.round((today - pd(String(d).slice(0,10))) / 86400000); };
@@ -372,7 +382,7 @@
 
     // ── Health Score 0–100 (สูง = ดี): หักคะแนนตาม 4 ด้าน รวมเต็ม 90 แล้วปรับสเกลเป็น 100
     // (ด้านงบประมาณอีก 10% ยังคิดไม่ได้จนกว่า impl_projects จะเชื่อมกับสัญญา/ค่าใช้จ่าย) ──
-    var openIss = window.IMPL_ISSUES.filter(function (i) { return i.projectId === p.id && i.status !== 'closed'; });
+    var openIss = (window.imtGroupOf('IMPL_ISSUES', 'projectId', p.id) || window.IMPL_ISSUES).filter(function (i) { return i.projectId === p.id && i.status !== 'closed'; });
     var issW = openIss.reduce(function (w, i) { return w + (IMT_SEVERITY_WEIGHT[i.severity] || 2) + (dayDiff(i.createdAt || today.toISOString()) >= 14 ? 1 : 0); }, 0);
     var maxOverdueDays = overdue ? dayDiff(overdueTasks[0].due) : 0;
     var pen = {
@@ -510,7 +520,7 @@
       .sort(function (a,b) { return IMT_HEALTH_ORDER[a.h.level] - IMT_HEALTH_ORDER[b.h.level] || b.h.overdue - a.h.overdue; });
     var n = { delayed:0, risk:0, ontrack:0 };
     rows.forEach(function (x) { n[x.h.level]++; });
-    var lines = ['วันนี้: ' + fd(today.toISOString().slice(0,10)),
+    var lines = ['วันนี้: ' + fd(window.ymd(today)),
       'โครงการที่ยังไม่เสร็จ ' + rows.length + ' โครงการ: ล่าช้า ' + n.delayed + ' · ต้องติดตามพิเศษ ' + n.risk + ' · ปกติ ' + n.ontrack];
     rows.slice(0, 30).forEach(function (x, i) {
       var p = x.p, h = x.h, pid = p.id;
@@ -540,7 +550,7 @@
   }
   window.imtRunAiOverview = async function () {
     if (_imtAiOverview && _imtAiOverview.loading) return;
-    var facts = imtAiOverviewFacts();
+    var facts = window.imtIndexPass(imtAiOverviewFacts);
     if (!facts.count) { window.showAlert && window.showAlert('ไม่มีโครงการที่ยังไม่เสร็จให้สรุป', 'warn'); return; }
     _imtAiOverview = { loading:true };
     window.renderImplTracker();
@@ -883,7 +893,7 @@
 
     // 4) โครงการที่มีปัญหามาก: แถบซ้อน ปิดแล้ว (เขียว) + ยังเปิด (เหลือง) — กดไปแท็บปัญหาของโครงการนั้น
     var projIssueRows = window.IMPL_PROJECTS.map(function (p) {
-      var list = window.IMPL_ISSUES.filter(function (i) { return i.projectId === p.id; });
+      var list = (window.imtGroupOf('IMPL_ISSUES', 'projectId', p.id) || window.IMPL_ISSUES).filter(function (i) { return i.projectId === p.id; });
       var open = list.filter(function (i) { return i.status !== 'closed'; }).length;
       return { p:p, n:list.length, open:open };
     }).filter(function (x) { return x.n > 0; }).sort(function (a, b) { return b.n - a.n; }).slice(0, 5);
@@ -1747,7 +1757,7 @@
     if (!c) return;
     var done = forceDone !== undefined ? forceDone : !c.done;
     var actor = window.meId(); // รหัสผู้ใช้ (users.id)
-    var row = { task_id:c.taskId, checklist_name:c.name, is_done:done, done_date: done ? new Date().toISOString().slice(0,10) : null, done_by: done ? actor : '', remark:c.remark, sort_order:c.order };
+    var row = { task_id:c.taskId, checklist_name:c.name, is_done:done, done_date: done ? window.todayStr() : null, done_by: done ? actor : '', remark:c.remark, sort_order:c.order };
     window.imtApplyLocal('IMPL_CHECKLIST_ITEMS', ckId, row);
     await window.setDoc(window.getDocRef('IMPL_CHECKLIST_ITEMS', ckId), row);
     var t = imtTask(c.taskId);
@@ -1987,26 +1997,24 @@
   // ให้น้ำหนักโครงการประเภทเดียวกันมากกว่า · แสดงผลเป็นคำแนะนำ มีปุ่ม "ใช้ค่านี้" ให้คนตัดสินใจเองเสมอ ──
   var _imtAiLast = null;
   function imtProjectTypeId(pid) { var sp = imtResolveSourceProject(imtProject(pid)); return sp ? sp.typeId : ''; }
-  // ค้นร่วมกับคลังความรู้ของศูนย์ช่วยเหลือ (Ticket ที่บันทึก "วิธีแก้ไข:" แล้ว — hdKbFetch แคช 2 นาที) เรียงรวมตามความคล้าย
-  // ผลลัพธ์รูปแบบเดียวกัน { problem, solution, category, from } · from = ที่มา (ชื่อโครงการ / เลข Ticket)
+  // ค้นจากคลังความรู้กลาง (ai-knowledge.js — ชุดเดียวกับ Helpdesk/AI ตอบอัตโนมัติ) · โครงการประเภทเดียวกันได้คะแนนเพิ่ม
+  // คืน { found (ผลค้นเต็ม ใช้ทำ prompt), similar: [{ problem, solution, category, from }] (แสดงในการ์ด) }
   async function imtAiSimilarIssues(text, pid, excludeId) {
     var myType = imtProjectTypeId(pid), typeCache = {};
-    var impl = (window.IMPL_ISSUES || []).filter(function (x) { return x.id !== excludeId && (x.solution || '').trim(); })
-      .map(function (x) {
-        if (!(x.projectId in typeCache)) typeCache[x.projectId] = imtProjectTypeId(x.projectId);
-        var score = window.aiTextSim(text, x.problem) + (myType && typeCache[x.projectId] === myType ? 0.08 : 0);
-        return { score: score, problem: x.problem, solution: x.solution, category: x.category, from: (imtProject(x.projectId) || {}).name || '' };
-      });
-    var kb = [];
-    try { kb = window.hdKbFetch ? await window.hdKbFetch() : []; } catch (e) {}
-    var hd = kb.map(function (k) {
-      var cat = (window.HELPDESK_CATEGORIES || []).find(function (c) { return c.id === k.categoryId; });
-      return { score: window.aiTextSim(text, k.subject + ' ' + k.description), problem: k.description || k.subject,
-        solution: k.fix, category: cat ? cat.name : '', from: 'ศูนย์ช่วยเหลือ ' + k.ticketNo };
+    var found = await window.aiKnowledgeSearch(text, {
+      excludeIssueId: excludeId, top: 5,
+      boost: function (e) {
+        if (e.type !== 'impl' || !myType) return 0;
+        if (!(e.projectId in typeCache)) typeCache[e.projectId] = imtProjectTypeId(e.projectId);
+        return typeCache[e.projectId] === myType ? 0.08 : 0;
+      },
     });
-    return impl.concat(hd).filter(function (r) { return r.score >= 0.2; })
-      .sort(function (a, b) { return b.score - a.score; })
-      .slice(0, 5);
+    var similar = found.knowledge.map(function (e) {
+      var cat = e.type === 'ticket' ? ((window.HELPDESK_CATEGORIES || []).find(function (c) { return c.id === e.category; }) || {}).name : e.category;
+      var from = e.type === 'impl' ? (imtProject(e.projectId) || {}).name || e.source : e.type === 'ticket' ? 'ศูนย์ช่วยเหลือ ' + e.ref : e.source;
+      return { problem: e.problem, solution: e.fix, category: cat || '', from: from };
+    });
+    return { found: found, similar: similar };
   }
   window.imtAiSuggestIssue = async function (btn) {
     var out = document.getElementById('imt-is-ai-out');
@@ -2019,15 +2027,13 @@
     try {
       var pid = window.imtCurrentProjectId;
       var cats = imtIssueCategories();
-      var sim = await imtAiSimilarIssues(problem, pid, window.imtEditIssueId);
+      var kb = await imtAiSimilarIssues(problem, pid, window.imtEditIssueId), sim = kb.similar;
       var proj = imtProject(pid);
       var user = 'กลุ่มปัญหาที่เลือกได้ (ตอบชื่อให้ตรงตัวอักษร):\n' + cats.map(function (c) { return '- ' + c; }).join('\n')
         + '\n\nโครงการ: ' + ((proj && proj.name) || '-')
         + '\nแผนกที่แจ้ง: ' + (((document.getElementById('imt-is-dept') || {}).value || '').trim() || '-')
         + '\nรายละเอียดปัญหา: ' + problem.slice(0, 1500)
-        + (sim.length ? '\n\nปัญหาเก่าที่คล้ายกันและวิธีแก้ที่เคยใช้:\n' + sim.map(function (x, n) {
-            return (n + 1) + ') [' + (x.category || '-') + ' · ' + x.from + '] ' + String(x.problem).slice(0, 200) + '\n   วิธีแก้: ' + String(x.solution).slice(0, 300);
-          }).join('\n') : '');
+        + '\n\n' + window.aiKnowledge.promptBlock(kb.found, { internal: true });
       var res = await window.aiChatJson(
         'คุณเป็นผู้ช่วยทีมติดตั้งระบบซอฟต์แวร์โรงพยาบาล วิเคราะห์ปัญหาการใช้งานที่ รพ. แจ้ง แล้วตอบ "เฉพาะ JSON" รูปแบบ: '
         + '{"category":"<ชื่อกลุ่มปัญหาจากรายการ หรือ empty ถ้าไม่แน่ใจ>","solution_hint":"<แนวทางแก้ไขภาษาไทย 1–4 ประโยค>",'
@@ -2886,7 +2892,7 @@
     var wb = XLSX.utils.book_new();
     var ws = XLSX.utils.aoa_to_sheet([headers].concat(rows));
     XLSX.utils.book_append_sheet(wb, ws, 'Report');
-    XLSX.writeFile(wb, filename + '_' + new Date().toISOString().slice(0,10) + '.xlsx');
+    XLSX.writeFile(wb, filename + '_' + window.todayStr() + '.xlsx');
   }
 
   window.exportImtReport = function () {
@@ -2991,7 +2997,7 @@
       var n = pages.length;
       pages.forEach(function (p, i) { if (n > 1) p.pno.textContent = 'ภาพที่ '+(i + 1)+'/'+n; else p.pno.remove(); });
       var safeName = projName.replace(/[^a-zA-Z0-9ก-๙]+/g, '_');
-      var base = 'ImplTracker_' + safeName + '_' + new Date().toISOString().slice(0,10);
+      var base = 'ImplTracker_' + safeName + '_' + window.todayStr();
       for (var pi = 0; pi < n; pi++) {
         var el = pages[pi].el;
         var capW = el.scrollWidth, capH = el.scrollHeight;
@@ -3027,7 +3033,7 @@
 
     // ── สรุปสัปดาห์ด้วย AI: อยู่ในแถบเดียวกับ Excel/บันทึกรูปภาพ — กด "สรุปด้วย AI" แล้วเปิด Popup
     // แยกต่างหาก (m-imt-ai-summary) แทนกล่องขยาย/พับเดิม ไม่กินพื้นที่หน้า Report ตอนยังไม่ได้กด ──
-    var aiDate = window.imtAiSelectedDate || new Date().toISOString().slice(0,10);
+    var aiDate = window.imtAiSelectedDate || window.todayStr();
     // ── อยู่ท้ายแถวแท็บของโครงการ (imtSetPtabExtra) เหมือนแท็บปัญหา/แบบฟอร์ม ──
     var toolbar = '<input type="date" class="f-input" id="imt-ai-date" style="max-width:150px;" value="'+esc(aiDate)+'" oninput="window.imtAiSelectedDate=this.value">'
       + '<button class="btn btn-pri btn-sm" onclick="window.imtGenerateAiWeekSummary()">✨ สรุปด้วย AI</button>'
@@ -3323,7 +3329,7 @@
     if (!proj) return;
 
     var dateInput = document.getElementById('imt-ai-date');
-    var selDate = (dateInput && dateInput.value) || new Date().toISOString().slice(0,10);
+    var selDate = (dateInput && dateInput.value) || window.todayStr();
     window.imtAiSelectedDate = selDate;
 
     var wk = imtWeekRange(selDate);

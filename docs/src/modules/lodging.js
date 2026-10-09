@@ -7,12 +7,15 @@ window.layoutLodgingCards=function(){
     var styles=getComputedStyle(grid);
     var row=parseFloat(styles.gridAutoRows)||1;
     var gap=parseFloat(styles.rowGap)||0;
-    grid.querySelectorAll('.ld-project-card').forEach(function(card){
-      card.style.gridRowEnd='auto';
+    // เขียน→อ่าน→เขียน เป็นชุด (กัน layout thrashing ที่ reflow ทุกการ์ด) — ความสูงที่วัดได้เท่าเดิม
+    var cardEls=Array.prototype.slice.call(grid.querySelectorAll('.ld-project-card'));
+    cardEls.forEach(function(card){card.style.gridRowEnd='auto';});
+    var spans=cardEls.map(function(card){
       var cs=getComputedStyle(card);
       var h=card.scrollHeight+(parseFloat(cs.borderTopWidth)||0)+(parseFloat(cs.borderBottomWidth)||0);
-      card.style.gridRowEnd='span '+Math.ceil((h+gap)/(row+gap));
+      return Math.ceil((h+gap)/(row+gap));
     });
+    cardEls.forEach(function(card,i){card.style.gridRowEnd='span '+spans[i];});
   });
 };
 if(!window._lodgingLayoutBound){
@@ -52,7 +55,8 @@ window.renderLodging=function(){
     return (b.start||'').localeCompare(a.start||'');
   });
   // ── Summary bar ──
-  var allLds=window.LODGINGS.filter(l=>fProjs.some(p=>p.id===l.pid));
+  var fPidSet=new Set(fProjs.map(p=>p.id));
+  var allLds=window.LODGINGS.filter(l=>fPidSet.has(l.pid));
   var approvedDCount=fProjs.filter(p=>(grouped[p.id]||[]).some(l=>l.approvedDaily==='yes')).length;
   var approvedMCount=fProjs.filter(p=>(grouped[p.id]||[]).some(l=>l.approvedMonthly==='yes')).length;
   var pendingCount=fProjs.filter(p=>{var lds=grouped[p.id]||[];return!lds.some(l=>l.approvedDaily==='yes'||l.approvedMonthly==='yes');}).length;

@@ -9,7 +9,7 @@ window.advRenderSubnav=function(){
   var cur=document.body.getAttribute('data-view');
   var tabs=[{id:'advance',label:'💳 รายการเบิก'},{id:'expense_form',label:'🧾 เอกสารประกอบ'}]
     .filter(function(t){return !window.canView||window.canView(t.id);});
-  var html=tabs.map(function(t){return`<div class="adv-subtab${t.id===cur?' on':''}" onclick="window.goView('${t.id}')">${t.label}</div>`;}).join('');
+  var html=tabs.map(function(t){return`<div class="adv-subtab${t.id===cur?' on':''}" onclick="window.goView('${t.id}',this)">${t.label}</div>`;}).join('');
   document.querySelectorAll('[data-adv-subnav]').forEach(function(el){el.innerHTML=html;});
 };
 
@@ -33,9 +33,11 @@ window.renderAdvance=function(){
   var ty=window.msValues('adv-type');
   var yr=(document.getElementById('adv-yr')||{}).value||'';
   var now=new Date();
+  // ดัชนีโครงการตาม id (เก็บตัวแรกที่เจอ = ผลเดียวกับ .find) — ใช้ใน filter/sort/การ์ด
+  var pm=new Map();window.PROJECTS.forEach(function(x){if(!pm.has(x.id))pm.set(x.id,x);});
   var rows=window.ADVANCES.filter(function(a){
     if(window.advFilter&&a.status!==window.advFilter)return false;
-    var p=window.PROJECTS.find(function(x){return x.id===a.pid;});
+    var p=pm.get(a.pid);
     if(grp.length&&(!p||!grp.includes(p.groupId)))return false;
     if(ty.length&&(!p||!ty.includes(p.typeId)))return false;
     if(yr&&(!p||getYearBE(p.start)!=yr))return false;
@@ -43,18 +45,18 @@ window.renderAdvance=function(){
   });
   // ── Sort ──
   var sortV=(document.getElementById('adv-sort')||{}).value||'start_desc';
+  var thCmp=new Intl.Collator('th').compare; // = localeCompare(...,'th') แต่ไม่สร้าง collator ใหม่ทุกครั้ง
   rows.sort(function(a,b){
-    var pa=window.PROJECTS.find(function(x){return x.id===a.pid;})||{};
-    var pb=window.PROJECTS.find(function(x){return x.id===b.pid;})||{};
+    var pa=pm.get(a.pid)||{};
+    var pb=pm.get(b.pid)||{};
     if(sortV==='start_asc')return (pa.start||'').localeCompare(pb.start||'');
-    if(sortV==='name_asc')return (pa.name||'').localeCompare(pb.name||'','th');
+    if(sortV==='name_asc')return thCmp(pa.name||'',pb.name||'');
     return (pb.start||'').localeCompare(pa.start||'');
   });
   // ── Summary bar ──
   var totalAmt=rows.reduce((s,a)=>s+(a.amount||0),0);
   var totalClr=rows.reduce((s,a)=>s+(a.cleared||0),0);
   var overdueCount=rows.filter(a=>a.ddate&&pd(a.ddate)<now&&a.status!=='cleared').length;
-  var draftCount=rows.filter(a=>a.status==='draft').length;
   var bar=document.getElementById('adv-summary-bar');
   if(bar)bar.innerHTML=[
     {icon:'💳',label:'รายการทั้งหมด',tip:'จำนวนใบเบิกล่วงหน้า (Advance) ตามแท็บสถานะ/ตัวกรอง/คำค้นที่เลือก',val:rows.length+' รายการ',c:'var(--violet)'},
@@ -76,7 +78,7 @@ window.renderAdvance=function(){
     </div>`;return;
   }
   cards.innerHTML=rows.map(function(a){
-    var p=window.PROJECTS.find(function(x){return x.id===a.pid;});
+    var p=pm.get(a.pid);
     var pt=gT(p?p.typeId:'');var pg=gG(p?p.groupId:'');
     var sf=window.AFLW.find(function(x){return x.id===a.status;})||window.AFLW[0];
     var ov=a.ddate&&pd(a.ddate)<now&&a.status!=='cleared';
@@ -236,7 +238,7 @@ window.saveAdvance=async function(){
 
 window.advSyncCosts = async function(aid, pid, purpose, dbAdv) {
   var batch    = writeBatch();
-  var costDate = dbAdv.due_date || dbAdv.request_date || new Date().toISOString().slice(0,10);
+  var costDate = dbAdv.due_date || dbAdv.request_date || window.todayStr();
   var advno    = dbAdv.advance_no || aid;
 
   // ลบ COSTS เก่าที่มาจาก advance นี้ (batch delete)
@@ -291,7 +293,7 @@ window.advSyncCosts = async function(aid, pid, purpose, dbAdv) {
   await batch.commit();
   // Optimistic local sync: remove old advance-sourced costs, push new ones
   window.COSTS = (window.COSTS||[]).filter(function(c){return c.advanceId!==aid;});
-  var costDate = dbAdv.due_date||dbAdv.request_date||new Date().toISOString().slice(0,10);
+  var costDate = dbAdv.due_date||dbAdv.request_date||window.todayStr();
   var advno = dbAdv.advance_no||aid;
   (dbAdv.expense_items||[]).forEach(function(it,i){
     if(!it.amount||it.amount<=0)return;

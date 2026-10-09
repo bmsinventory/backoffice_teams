@@ -59,17 +59,47 @@
     var obj = fn ? fn(Object.assign({ id:id }, rawData)) : Object.assign({}, rawData, { id:id });
     var idx = arr.findIndex(function (x) { return x.id === id; });
     if (idx >= 0) arr[idx] = obj; else arr.push(obj);
+    if (_imtPass) _imtPass = {}; // แก้ array แบบ in-place → ทิ้งดัชนีของรอบ render ที่ค้างอยู่
   };
 
   window.imtRemoveLocal = function (jsName, id) {
     if (!Array.isArray(window[jsName])) return;
     window[jsName] = window[jsName].filter(function (x) { return x.id !== id; });
+    if (_imtPass) _imtPass = {};
+  };
+
+  // ── ดัชนีชั่วคราวต่อการ render หนึ่งรอบ (กันการ .filter ทั้ง array ซ้ำในลูป โครงการ × Phase × งาน)
+  // ใช้ได้เฉพาะภายใน window.imtIndexPass(fn) ที่รันแบบ synchronous — นอกรอบคืน null ให้ผู้เรียกกลับไปใช้
+  // .filter เดิม · ไม่ cache ข้ามรอบ เพราะ imtApplyLocal แก้ array/แทนที่ object แบบ in-place ──
+  var _imtPass = null;
+  window.imtIndexPass = function (fn) {
+    if (_imtPass) return fn();
+    _imtPass = {};
+    try { return fn(); } finally { _imtPass = null; }
+  };
+  // กลุ่มของ window[jsName] ตาม field key (Map เทียบค่าแบบเดียวกับ === ของ filter · ลำดับในกลุ่ม = ลำดับเดิมใน array)
+  // คืน array ที่ใช้ร่วมกัน — ผู้เรียกห้ามแก้ไข (ต้อง slice ก่อน sort/splice)
+  var _IMT_EMPTY = [];
+  window.imtGroupOf = function (jsName, key, val) {
+    if (!_imtPass) return null;
+    var arr = window[jsName], ck = jsName + '|' + key, c = _imtPass[ck];
+    if (!c || c.arr !== arr) {
+      var m = new Map();
+      arr.forEach(function (x) { var k = x[key], g = m.get(k); if (g) g.push(x); else m.set(k, [x]); });
+      c = _imtPass[ck] = { arr:arr, m:m };
+    }
+    return c.m.get(val) || _IMT_EMPTY;
+  };
+  // ผลคำนวณที่ใช้ซ้ำภายในรอบเดียวกัน (key = object) — คืน null นอกรอบ render
+  window.imtPassMemo = function (name) {
+    if (!_imtPass) return null;
+    return _imtPass['memo|' + name] || (_imtPass['memo|' + name] = new Map());
   };
 
   // ── Progress Calculators (bottom-up: Checklist → Task → Phase → Project) ──
   window.calcTaskProgress = function (task) {
     if (!task) return 0;
-    var items = window.IMPL_CHECKLIST_ITEMS.filter(function (c) { return c.taskId === task.id; });
+    var items = window.imtGroupOf('IMPL_CHECKLIST_ITEMS', 'taskId', task.id) || window.IMPL_CHECKLIST_ITEMS.filter(function (c) { return c.taskId === task.id; });
     // ── Task ที่ไม่มี Checklist เลย ไม่มีฟอร์มไหนให้ผู้ใช้กรอก % progress เอง (field นี้ไม่เคยถูกอัปเดตหลัง
     // สร้าง) เลยอ้างอิงจากสถานะแทน — "เสร็จแล้ว" ต้องได้แถบความคืบหน้าเต็ม 100% เสมอ ไม่งั้นหลอดจะค้างที่ 0%
     // ทั้งที่ป้ายสถานะขึ้นสีเขียวแล้ว (เห็นความไม่ตรงกันชัดเจนในการ์ด Task) ──
@@ -83,15 +113,19 @@
 
   window.calcPhaseProgress = function (phase) {
     if (!phase) return 0;
-    var tasks = window.IMPL_TASKS.filter(function (t) { return t.phaseId === phase.id; });
+    var memo = window.imtPassMemo('phasePct'), hit = memo ? memo.get(phase) : undefined;
+    if (hit !== undefined) return hit;
+    var tasks = window.imtGroupOf('IMPL_TASKS', 'phaseId', phase.id) || window.IMPL_TASKS.filter(function (t) { return t.phaseId === phase.id; });
     if (!tasks.length) return 0;
     var sum = tasks.reduce(function (s, t) { return s + window.calcTaskProgress(t); }, 0);
-    return Math.round(sum / tasks.length);
+    var pct = Math.round(sum / tasks.length);
+    if (memo) memo.set(phase, pct);
+    return pct;
   };
 
   window.calcProjectProgress = function (project) {
     if (!project) return 0;
-    var phases = window.IMPL_PHASES.filter(function (p) { return p.projectId === project.id; });
+    var phases = window.imtGroupOf('IMPL_PHASES', 'projectId', project.id) || window.IMPL_PHASES.filter(function (p) { return p.projectId === project.id; });
     if (!phases.length) return 0;
     var sum = phases.reduce(function (s, p) { return s + window.calcPhaseProgress(p); }, 0);
     return Math.round(sum / phases.length);

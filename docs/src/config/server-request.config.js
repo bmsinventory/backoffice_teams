@@ -23,9 +23,6 @@
     { kind: 'phase',     label: 'ช่วงที่ต้องการใช้งาน',          multi: false, required: false },
   ];
 
-  // ── สถานะที่ "กันคน" ของทีมไว้แล้ว (ใช้คำนวณวันว่างบนฟอร์ม public) ──
-  window.SRV_HOLDING_STATUS = ['approved', 'scheduled'];
-
   window.srvUid = function (prefix) { return (prefix || 'SR') + Date.now() + Math.floor(Math.random() * 1000); };
 
   // ── เลขที่คำขอ: SRV + ปี พ.ศ. 2 หลัก + เดือน + ลำดับ 3 หลัก (เช่น SRV6910001) ──

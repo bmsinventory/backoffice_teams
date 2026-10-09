@@ -310,7 +310,6 @@
 /* ── ไฮไลต์การ์ดที่กำลังลากทับ (drop target) ── */
 .imt-tcard.imt-tcard-dragover { border-color: var(--violet); box-shadow: 0 0 0 2px rgba(124,92,252,.25); }
 .imt-tcard-foot  { display: flex; justify-content: space-between; align-items: center; font-size: 10.5px; color: var(--txt3); margin-top: 8px; }
-.imt-tcard-ck    { font-size: 10px; color: var(--txt3); }
 /* ── การ์ด Task ใน Phase แบบกะทัดรัด: meta ทั้งหมดอยู่บรรทัดเดียว + แถบความคืบหน้าบาง ── */
 .imt-tgrid .imt-tcard { padding: 8px 10px 9px; }
 .imt-tgrid .imt-tcard-head { margin-bottom: 5px; gap: 6px; }

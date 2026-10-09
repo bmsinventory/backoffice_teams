@@ -44,7 +44,7 @@ window.snlBuildHtml = function () {
       '<input type="radio" name="snl-purpose" id="snl-purpose-' + c.key + '" value="' + c.key + '" ' + (c.key === 'inform' ? 'checked' : '') + ' onchange="window.snlOnPurposeChange()" style="margin-top:2px;">' +
       '<span>' + esc(c.label) + '</span></label>';
   }).join('');
-  var todayStr = new Date().toISOString().slice(0, 10);
+  var todayStr = window.todayStr();
 
   return `
   <div class="ecf-layout">
@@ -250,7 +250,7 @@ window.snlInitCombos = function () {
 // call on every New/Load (initProjectCombobox itself is idempotent: first call binds
 // listeners, later calls just update the data via inp._cmbUpdate).
 window.snlRefreshProjectCombobox = function () {
-  var todayStr = new Date().toISOString().slice(0, 10);
+  var todayStr = window.todayStr();
   var projects = (window.PROJECTS || []).filter(function (p) { return p.start && p.start > todayStr; })
     .sort(function (a, b) { return (a.start || '').localeCompare(b.start || ''); });
   window.initProjectCombobox(
@@ -761,7 +761,7 @@ window.snlNewForm = function () {
    'snl-contract-no','snl-contract-amount','snl-contract-date','snl-quote-no','snl-email-to','snl-email-cc'].forEach(function (id) {
     var el = document.getElementById(id); if (el) el.value = '';
   });
-  var docDateEl = document.getElementById('snl-doc-date'); if (docDateEl) docDateEl.value = new Date().toISOString().slice(0, 10);
+  var docDateEl = document.getElementById('snl-doc-date'); if (docDateEl) docDateEl.value = window.todayStr();
   ['snl-task-install','snl-task-revisit','snl-task-reply-lecturer','snl-task-ma','snl-task-present',
    'snl-task-other','snl-task-survey','snl-task-delivery','snl-task-copydata'].forEach(function (id) {
     var el = document.getElementById(id); if (el) el.checked = false;

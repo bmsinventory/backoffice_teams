@@ -58,7 +58,6 @@
   #view-helpdesk.hd-fit .hd-h-no { font-size: 13px; }
   #view-helpdesk.hd-fit .hd-h-st { font-size: 11px; padding: 2px 8px; white-space: nowrap; }
   #view-helpdesk.hd-fit .hd-info-btn { display: inline-flex; }
-  #view-helpdesk.hd-fit #hd-ai-detail { max-height: 35vh; overflow-y: auto; padding: 0 10px !important; }
   #view-helpdesk.hd-fit .hd-detail-grid { display: flex !important; flex-direction: column; flex: 1 1 auto; min-height: 0; padding: 8px 10px 8px !important; gap: 8px !important; }
   #view-helpdesk.hd-fit .hd-left { display: flex; flex-direction: column; flex: 1; min-height: 0; }
   #view-helpdesk.hd-fit .hd-desc-wrap { flex-shrink: 0; max-height: 84px; overflow-y: auto; margin-bottom: 8px !important; padding: 8px 12px; }
@@ -536,14 +535,12 @@ body[data-view="helpdesk"] .nav-btn.on .nl { font-weight: 600; }
 }
 #view-helpdesk .hd-q-toolbar .t-search { flex: 0 1 280px; min-width: 230px; }
 #view-helpdesk .hd-q-toolbar .t-search input,
-#view-helpdesk .hd-q-toolbar .t-sel,
-#view-helpdesk .hd-q-toolbar .sc-btn {
+#view-helpdesk .hd-q-toolbar .t-sel {
   min-height: 40px; border-color: var(--hd-line); border-radius: 11px;
   background-color: var(--hd-soft); box-shadow: none; color: var(--txt2); font-weight: 400;
 }
 #view-helpdesk .hd-q-toolbar .t-search input:focus,
-#view-helpdesk .hd-q-toolbar .t-sel:focus,
-#view-helpdesk .hd-q-toolbar .sc-btn:focus-within {
+#view-helpdesk .hd-q-toolbar .t-sel:focus {
   background-color: var(--surface); border-color: rgba(124, 92, 252, .55);
   box-shadow: 0 0 0 3px rgba(124, 92, 252, .09);
 }
@@ -655,6 +652,10 @@ body[data-view="helpdesk"] .nav-btn.on .nl { font-weight: 600; }
   #view-helpdesk .hd-q-title { white-space: normal; font-size: 13.5px; }
   #view-helpdesk .hd-q-hosp { max-width: none; display: inline; }
   #view-helpdesk .hd-q-hosp + .hd-q-sub { display: inline; margin-left: 6px; }
+  /* ชื่อ รพ./ผู้แจ้งยาว (nowrap) เดิมดันเลยขอบการ์ดแล้วถูกตัดหายเงียบ ๆ → ตัดเป็น … ทั้งบรรทัด */
+  #view-helpdesk .hd-q tr.hd-q-row td:nth-child(4),
+  #view-helpdesk .hd-q tr.hd-q-row td:nth-child(7) { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  #view-helpdesk .hd-q-sub { overflow: hidden; text-overflow: ellipsis; }
   #view-helpdesk .hd-q-bar { margin-left: auto; width: 90px; }
   #view-helpdesk .hd-q tr.hd-q-g { display: block; margin: 4px 0 8px; }
   #view-helpdesk .hd-q tr.hd-q-g td { display: block; border-radius: 8px; }
@@ -672,7 +673,6 @@ body[data-view="helpdesk"] .nav-btn.on .nl { font-weight: 600; }
 }
 [data-theme="dark"] #view-helpdesk .hd-q-toolbar .t-search input,
 [data-theme="dark"] #view-helpdesk .hd-q-toolbar .t-sel,
-[data-theme="dark"] #view-helpdesk .hd-q-toolbar .sc-btn { background-color: var(--surface2); }
 [data-theme="dark"] #view-helpdesk .hd-view.on { background: rgba(124, 92, 252, .14); }
 
 /* ── แท็บ "🔁 ปัญหาซ้ำ" — กลุ่มปัญหาที่พบบ่อย + แผนจัดการ ── */

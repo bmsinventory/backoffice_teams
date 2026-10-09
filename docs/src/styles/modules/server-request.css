@@ -439,6 +439,10 @@
 .srv-tl-c.proj { background: rgba(124,92,252,.55); }
 .srv-tl-c.leave { background: rgba(201,130,12,.55); }
 .srv-tl-c.off { background: repeating-linear-gradient(45deg, var(--surface2), var(--surface2) 3px, var(--surface3) 3px, var(--surface3) 6px); }
+.srv-tl-pr .srv-tl-c { min-height: 0; }
+.srv-tl-bar { position: relative; z-index: 1; align-self: center; height: 24px; margin: 0 2px; padding: 0 7px; border-radius: 6px; line-height: 24px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 11px; font-weight: 600; color: #fff; background: rgba(124,92,252,.85); box-shadow: 0 2px 6px rgba(0,0,0,.15); cursor: pointer; transition: transform .15s, box-shadow .15s; }
+.srv-tl-bar:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(0,0,0,.25); }
+.srv-tl-bar.leave { background: rgba(201,130,12,.15); border: 2px dashed #c9820c; color: #9a6206; line-height: 20px; }
 .srv-tl-c.today, .srv-tl-s.today, .srv-tl-q.today { box-shadow: inset 2px 0 0 var(--violet), inset -2px 0 0 var(--violet); }
 
 /* ── ตั้งค่า ── */

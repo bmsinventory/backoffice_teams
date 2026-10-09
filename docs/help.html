@@ -34,7 +34,7 @@
   header.top b{font-size:16px}
   .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin-bottom:16px}
   .card h2{font-size:15px;margin:0 0 12px}
-  .card h2>.ti,.sec-title>.ti{width:28px;height:28px;border-radius:8px;color:var(--glyph-color,var(--accent));background:var(--glyph-bg,var(--accent-soft));font-size:16px}
+  .card h2>.ti{width:28px;height:28px;border-radius:8px;color:var(--glyph-color,var(--accent));background:var(--glyph-bg,var(--accent-soft));font-size:16px}
   button>.ti,a>.ti{color:var(--glyph-color,currentColor)}
   .success-icon>.ti{color:var(--ok);font-size:32px}
   .att-drop-ic>.ti,.c-av>.ti{color:var(--glyph-color,var(--accent))}
@@ -205,21 +205,6 @@
   .c-bub img{width:64px!important;height:64px!important}
   @media (prefers-color-scheme:dark){ .c-row.me .c-bub{background:#2e7d32;color:#eaffea} }
   /* ── AI แนะนำวิธีแก้เบื้องต้น (ฟอร์มแจ้งปัญหา) ── */
-  .ai-btn{display:inline-flex;align-items:center;gap:4px;margin-top:6px;padding:4px 12px;min-height:0;border:1px solid var(--accent);border-radius:999px;background:var(--accent-soft);color:var(--accent);font-size:12.5px;font-weight:600;line-height:1.5}
-  .ai-btn:disabled{opacity:.6;cursor:wait}
-  .ai-flag{font-size:11.5px;font-weight:600;color:var(--bad);margin-top:4px}
-  .ai-box{margin-top:8px;border-radius:10px;background:var(--accent-soft);border-left:4px solid var(--accent);font-size:13px;line-height:1.7;color:var(--ink)}
-  .ai-box>summary{display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;list-style:none;user-select:none}
-  .ai-box>summary::-webkit-details-marker{display:none}
-  .ai-box-s{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .ai-box-more{flex-shrink:0;font-size:12px;color:var(--accent)}
-  .ai-box-more::after{content:"ดูเพิ่มเติม ▾"}
-  .ai-box[open] .ai-box-more::after{content:"ซ่อน ▴"}
-  .ai-box-body{padding:0 14px 12px}
-  .ai-box-h{font-weight:800;flex-shrink:0}
-  .ai-box ol{margin:0 0 6px;padding-left:22px}
-  .ai-box-note{margin-top:4px}
-  .ai-box-foot{margin-top:8px;font-size:11.5px;color:var(--bad)}
   /* ── ช่องแนบไฟล์: คลิก/ลากวาง/Ctrl+V + รายการพรีวิว ── */
   .att-drop{display:flex;flex-direction:column;align-items:center;gap:4px;padding:18px 14px;border:2px dashed var(--line);border-radius:12px;background:var(--bg);cursor:pointer;text-align:center;transition:border-color .15s,background .15s}
   .att-drop:hover,.att-drop:focus,.att-drop.over{border-color:var(--accent);background:var(--accent-soft);outline:none}

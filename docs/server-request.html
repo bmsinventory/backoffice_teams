@@ -31,7 +31,7 @@
   *{box-sizing:border-box}
   html{scroll-behavior:smooth}
   body{margin:0;background:var(--bg);color:var(--ink);font-family:'Noto Sans Thai',system-ui,sans-serif;font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
-  h1,h2,h3,.disp{font-family:'Prompt','Noto Sans Thai',sans-serif}
+  h1,h2,h3{font-family:'Prompt','Noto Sans Thai',sans-serif}
   a{color:var(--accent)}
   .hidden{display:none!important}
 
@@ -219,7 +219,10 @@
   .lookup-results{display:none;margin-top:10px;border-top:1px solid var(--line);padding-top:10px}
   .lookup-results.show{display:block}
   .lookup-state{display:flex;align-items:center;justify-content:center;gap:7px;min-height:46px;color:var(--ink3);font-size:12.5px;text-align:center}
-  .lookup-groups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;align-items:start}
+  .lookup-groups{display:flex;flex-direction:column;gap:8px}
+  .lookup-groups+.lookup-sec{margin-top:14px}
+  .lookup-sec{margin-bottom:6px;font-size:11.5px;font-weight:600;color:var(--ink2)}
+  .lookup-sec:empty{display:none}
   .lookup-group{min-width:0;overflow:hidden;border:1px solid var(--line);border-radius:13px;background:var(--surface2)}
   .lookup-group-head{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:9px;padding:9px 10px;background:var(--surface);border-bottom:1px solid var(--line)}
   .lookup-group-head>i{width:31px;height:31px;border-radius:9px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);font-size:16px}
@@ -273,7 +276,6 @@
     .track-lookup{padding:12px}
     .lookup-main{align-items:stretch;flex-direction:column;gap:9px}
     .lookup-title{min-width:0}
-    .lookup-groups{grid-template-columns:1fr}
   }
 
   /* ── Success / tracking ── */
@@ -642,7 +644,7 @@
 
   function lookupHtml() {
     return '<section class="card track-lookup" aria-label="ติดตามงาน">'
-      + '<div class="lookup-main"><div class="lookup-title"><i class="ti ti-radar-2"></i><span><b>ติดตามงาน</b><small>ค้นหาคำขอที่เคยส่ง</small></span></div>'
+      + '<div class="lookup-main"><div class="lookup-title"><i class="ti ti-radar-2"></i><span><b>ติดตามงาน</b><small>คำขอที่กำลังดำเนินการ</small></span></div>'
       + '<div class="lookup-field"><i class="ti ti-search"></i><input id="lookup-q" type="search" autocomplete="off" placeholder="ค้นหาจากชื่อโรงพยาบาล หรือชื่อผู้แจ้ง" aria-label="ค้นหาจากชื่อโรงพยาบาล หรือชื่อผู้แจ้ง">'
       + '<button class="lookup-clear" id="lookup-clear" type="button" aria-label="ล้างคำค้น"><i class="ti ti-x"></i></button></div></div>'
       + '<div class="lookup-results" id="lookup-results" aria-live="polite"></div></section>';
@@ -675,47 +677,72 @@
       if (cleaned.length < 2) { showLookupState('พิมพ์อย่างน้อย 2 ตัวอักษรเพื่อค้นหา', false); return; }
       var pattern = '%' + cleaned + '%';
       var fields = 'req_no,access_token,requester_name,hospital_name,start_date,end_date,status,created_at';
-      var found = await Promise.all([
-        db.from('server_requests').select(fields).neq('access_token', '').ilike('hospital_name', pattern).order('created_at', { ascending: false }).limit(12),
-        db.from('server_requests').select(fields).neq('access_token', '').ilike('requester_name', pattern).order('created_at', { ascending: false }).limit(12),
-      ]);
+      // แสดงเฉพาะคำขอที่ยังไม่จบ (ตัด เสร็จสิ้น/ไม่อนุมัติ/ยกเลิก)
+      var openOnly = function (col) {
+        return db.from('server_requests').select(fields).neq('access_token', '').not('status', 'in', '(done,rejected,cancelled)')
+          .ilike(col, pattern).order('created_at', { ascending: false }).limit(30);
+      };
+      var found = await Promise.all([openOnly('requester_name'), openOnly('hospital_name')]);
       if (seq !== _lookupSeq) return;
-      var byId = {};
-      rows(found[0]).concat(rows(found[1])).forEach(function (r) { byId[r.req_no || r.access_token] = r; });
-      var list = Object.keys(byId).map(function (k) { return byId[k]; }).sort(function (a, b) { return String(b.created_at).localeCompare(String(a.created_at)); }).slice(0, 12);
-      renderLookupResults(list);
+      // ตรงชื่อผู้ขอ → กลุ่มตามผู้ขอ · ตรงแค่ชื่อ รพ. → กลุ่มตาม รพ. (คำขอเดียวไม่ซ้ำสองหมวด)
+      var byPerson = rows(found[0]), seen = {};
+      byPerson.forEach(function (r) { seen[r.req_no || r.access_token] = 1; });
+      var byHosp = rows(found[1]).filter(function (r) { return !seen[r.req_no || r.access_token]; });
+      if (!byPerson.length && !byHosp.length) {
+        // ไม่มีงานค้าง → เช็กว่าเคยมีคำขอที่จบไปแล้วไหม เพื่อแจ้งให้ชัด
+        var pastCount = function (col) {
+          return db.from('server_requests').select('req_no', { count: 'exact', head: true }).neq('access_token', '').ilike(col, pattern);
+        };
+        var past = await Promise.all([pastCount('requester_name'), pastCount('hospital_name')]);
+        if (seq !== _lookupSeq) return;
+        showLookupState((past[0].count || past[1].count)
+          ? 'ไม่มีงานค้างของ "' + cleaned + '" — คำขอทั้งหมดดำเนินการจบแล้ว'
+          : 'ไม่พบคำขอจากชื่อโรงพยาบาลหรือชื่อผู้แจ้ง "' + cleaned + '"', false);
+        return;
+      }
+      renderLookupResults(byPerson, byHosp);
     } catch (e) {
       console.error(e);
       if (seq === _lookupSeq) showLookupState('ค้นหาไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', false);
     }
   }
-  function renderLookupResults(list) {
+  // จัดกลุ่มคำขอตามฟิลด์ที่ค้นเจอ (เรียงตามคำขอล่าสุด)
+  function lookupGroups(list, field, fallback) {
+    var groups = [], byKey = {};
+    list.forEach(function (r) {
+      var name = String(r[field] || '').trim() || fallback;
+      var key = name.toLocaleLowerCase('th-TH');
+      if (!byKey[key]) { byKey[key] = { name: name, requests: [] }; groups.push(byKey[key]); }
+      byKey[key].requests.push(r);
+    });
+    return groups;
+  }
+  function lookupItem(r, sub) {
+    var st = window.SRV_STATUS[r.status] || { label: r.status || '-', color: '#8a90a0' };
+    var dates = r.start_date && r.end_date ? range(r.start_date, r.end_date) : '-';
+    return '<a class="lookup-item" href="server-request.html?t=' + encodeURIComponent(r.access_token || '') + '"><i class="ti ti-file-description"></i><span>'
+      + '<b>' + esc(r.req_no || '-') + ' · ' + esc(r[sub] || '-') + '</b><small>' + esc(dates) + '</small></span>'
+      + '<em style="color:' + st.color + ';background:' + st.color + '1f">' + esc(st.label) + '</em></a>';
+  }
+  function lookupSection(title, icon, groups, sub) {
+    if (!groups.length) return '';
+    return '<div class="lookup-sec">' + title + '</div><div class="lookup-groups">' + groups.map(function (g) {
+      return '<section class="lookup-group"><div class="lookup-group-head"><i class="ti ti-' + icon + '"></i><b title="' + esc(g.name) + '">' + esc(g.name) + '</b>'
+        + '<em>' + g.requests.length + ' คำขอ</em></div><div class="lookup-group-list">'
+        + g.requests.map(function (r) { return lookupItem(r, sub); }).join('') + '</div></section>';
+    }).join('') + '</div>';
+  }
+  function renderLookupResults(byPerson, byHosp) {
     var box = $('lookup-results');
     if (!box) return;
     box.classList.add('show');
-    if (!list.length) { box.innerHTML = '<div class="lookup-state"><i class="ti ti-search-off"></i>ไม่พบคำขอจากชื่อโรงพยาบาลหรือชื่อผู้แจ้งนี้</div>'; return; }
-    var groups = [], byHospital = {};
-    list.forEach(function (r) {
-      var hospital = String(r.hospital_name || '').trim() || 'ไม่ระบุโรงพยาบาล';
-      var key = hospital.toLocaleLowerCase('th-TH');
-      if (!byHospital[key]) {
-        byHospital[key] = { hospital: hospital, requests: [] };
-        groups.push(byHospital[key]);
-      }
-      byHospital[key].requests.push(r);
-    });
-    box.innerHTML = '<div class="lookup-count">พบ ' + list.length + ' คำขอ · ' + groups.length + ' โรงพยาบาล · เลือกรายการเพื่อเปิดหน้าติดตาม</div><div class="lookup-groups">'
-      + groups.map(function (group) {
-        return '<section class="lookup-group"><div class="lookup-group-head"><i class="ti ti-building-hospital"></i><b title="' + esc(group.hospital) + '">' + esc(group.hospital) + '</b>'
-          + '<em>' + group.requests.length + ' คำขอ</em></div><div class="lookup-group-list">'
-          + group.requests.map(function (r) {
-            var st = window.SRV_STATUS[r.status] || { label: r.status || '-', color: '#8a90a0' };
-            var dates = r.start_date && r.end_date ? range(r.start_date, r.end_date) : '-';
-            return '<a class="lookup-item" href="server-request.html?t=' + encodeURIComponent(r.access_token || '') + '"><i class="ti ti-file-description"></i><span>'
-              + '<b>' + esc(r.req_no || '-') + ' · ' + esc(r.requester_name || '-') + '</b><small>' + esc(dates) + '</small></span>'
-              + '<em style="color:' + st.color + ';background:' + st.color + '1f">' + esc(st.label) + '</em></a>';
-          }).join('') + '</div></section>';
-      }).join('') + '</div>';
+    var total = byPerson.length + byHosp.length;
+    var people = lookupGroups(byPerson, 'requester_name', 'ไม่ระบุผู้ขอ');
+    var hosps = lookupGroups(byHosp, 'hospital_name', 'ไม่ระบุโรงพยาบาล');
+    var both = people.length && hosps.length;
+    box.innerHTML = '<div class="lookup-count">พบ ' + total + ' คำขอ · เลือกรายการเพื่อเปิดหน้าติดตาม</div>'
+      + lookupSection(both ? 'ตรงกับชื่อผู้ขอ' : '', 'user', people, 'hospital_name')
+      + lookupSection(both ? 'ตรงกับชื่อโรงพยาบาล' : '', 'building-hospital', hosps, 'requester_name');
   }
 
   function renderForm() {

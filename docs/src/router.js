@@ -75,7 +75,21 @@
     }
     window.goTo(id);
 
-    // Trigger per-view render
+    // กดจากเมนู (มี el) — ให้เบราว์เซอร์วาดไฮไลต์เมนู/หัวข้อ/หน้าใหม่ก่อน แล้วค่อย render ในเฟรมถัดไป
+    // (เดิม render ทันทีในคลิกเดียวกัน หน้าที่ข้อมูลเยอะทำให้จอค้างที่หน้าเดิมจน render เสร็จ = รู้สึกหน่วง)
+    // กดหลายเมนูติดกันเร็ว ๆ → render เฉพาะเมนูสุดท้าย · เรียกจากโค้ด (ไม่มี el) ยัง render ทันทีเหมือนเดิม
+    var seq = ++_renderSeq;
+    if (el) {
+      requestAnimationFrame(function () {
+        setTimeout(function () { if (seq === _renderSeq) _renderView(id); }, 0);
+      });
+    } else {
+      _renderView(id);
+    }
+  };
+
+  var _renderSeq = 0;
+  function _renderView(id) {
     if (id === 'hospital') {
       window._hspPopulateFilters && window._hspPopulateFilters();
       if (window._hspViewMode === 'dashboard') { window.renderHspDashboard && window.renderHspDashboard(); }
@@ -86,8 +100,8 @@
       window.avlPopulateDept && window.avlPopulateDept();
       var avlS = document.getElementById('avl-start');
       var avlE = document.getElementById('avl-end');
-      if (avlS && !avlS.value) { var t = new Date(); avlS.value = t.toISOString().slice(0, 10); }
-      if (avlE && !avlE.value) { var t2 = new Date(); t2.setDate(t2.getDate() + 29); avlE.value = t2.toISOString().slice(0, 10); }
+      if (avlS && !avlS.value) { var t = new Date(); avlS.value = window.ymd(t); }
+      if (avlE && !avlE.value) { var t2 = new Date(); t2.setDate(t2.getDate() + 29); avlE.value = window.ymd(t2); }
       window.renderAvailability && window.renderAvailability();
     } else {
       var _renderMap = {
@@ -121,7 +135,7 @@
       var fn = _renderMap[id];
       if (fn && typeof window[fn] === 'function') window[fn]();
     }
-  };
+  }
 
   // ── Sidebar: desktop collapse + mobile open/close ──
   window.toggleSB = function () {
@@ -207,11 +221,6 @@
       return !window.canView || window.canView(m);
     });
     if (first) window.goView(first);
-  };
-
-  // ── Backward-compat: showView(id) ──
-  window.showView = function (id, navEl) {
-    window.goView(id);
   };
 
 })();

@@ -555,20 +555,6 @@ const HSP_TYPES = [
 ];
 const HSP_TYPE_MAP = Object.fromEntries(HSP_TYPES.map(t => [t.id, t]));
 
-const TH_PROVINCES = [
-  'กรุงเทพมหานคร','กระบี่','กาญจนบุรี','กาฬสินธุ์','กำแพงเพชร','ขอนแก่น',
-  'จันทบุรี','ฉะเชิงเทรา','ชลบุรี','ชัยนาท','ชัยภูมิ','ชุมพร','เชียงราย',
-  'เชียงใหม่','ตรัง','ตราด','ตาก','นครนายก','นครปฐม','นครพนม','นครราชสีมา',
-  'นครศรีธรรมราช','นครสวรรค์','นนทบุรี','นราธิวาส','น่าน','บึงกาฬ','บุรีรัมย์',
-  'ปทุมธานี','ประจวบคีรีขันธ์','ปราจีนบุรี','ปัตตานี','พระนครศรีอยุธยา','พะเยา',
-  'พังงา','พัทลุง','พิจิตร','พิษณุโลก','เพชรบุรี','เพชรบูรณ์','แพร่','ภูเก็ต',
-  'มหาสารคาม','มุกดาหาร','แม่ฮ่องสอน','ยโสธร','ยะลา','ร้อยเอ็ด','ระนอง',
-  'ระยอง','ราชบุรี','ลพบุรี','ลำปาง','ลำพูน','เลย','ศรีสะเกษ','สกลนคร',
-  'สงขลา','สตูล','สมุทรปราการ','สมุทรสงคราม','สมุทรสาคร','สระแก้ว','สระบุรี',
-  'สิงห์บุรี','สุโขทัย','สุพรรณบุรี','สุราษฎร์ธานี','สุรินทร์','หนองคาย',
-  'หนองบัวลำภู','อ่างทอง','อำนาจเจริญ','อุดรธานี','อุตรดิตถ์','อุทัยธานี','อุบลราชธานี',
-];
-
 // ── STATE ──────────────────────────────────────────────────────────────────
 window._hspPage = 1;
 var _hspPerPage = 50;
@@ -731,8 +717,12 @@ function _hspFiltered() {
       if (!hay.includes(q)) return false;
     }
     return true;
-  }).sort((a, b) => (a.code || '').localeCompare(b.code || '', 'th'));
+  }).sort((a, b) => _hspThCmp(a.code || '', b.code || ''));
 }
+// ── ตัวเปรียบเทียบภาษาไทยตัวเดียวใช้ซ้ำ — ผลเหมือน localeCompare(x,'th') ทุกประการ แต่ไม่ต้องสร้าง collator ใหม่
+// ทุกครั้งที่เทียบ (sort รพ. หลายพันแห่งด้วย localeCompare+locale ช้ามาก) ──
+var _hspThCollator = null;
+function _hspThCmp(a, b) { return (_hspThCollator || (_hspThCollator = new Intl.Collator('th'))).compare(a, b); }
 
 // ── RENDER ─────────────────────────────────────────────────────────────────
 window.renderHospital = function() {
@@ -783,7 +773,7 @@ window.renderHospital = function() {
       typeBadge +
       '<span style="font-family:var(--mono);color:var(--primary);font-size:12px;font-weight:700;">' + esc(h.code||'—') + '</span>' +
       '<span style="font-weight:700;color:var(--txt);font-size:13px;flex:1;min-width:140px;">' + esc(h.name) + '</span>' +
-      (locStr ? '<span style="font-size:11px;color:var(--txt-muted);white-space:nowrap;">' + locStr + '</span>' : '') +
+      (locStr ? '<span class="hsp-card-loc" style="font-size:11px;color:var(--txt-muted);white-space:nowrap;">' + locStr + '</span>' : '') +
       editBtns +
       '</div>';
 
@@ -2630,7 +2620,7 @@ window._hspPopulateFilters = function() {
   var provSel = document.getElementById('hsp-prov');
   if (!provSel) return;
   var curProv = provSel.value;
-  var usedProvs = [...new Set((window.HOSPITALS||[]).map(h=>h.province).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'th'));
+  var usedProvs = [...new Set((window.HOSPITALS||[]).map(h=>h.province).filter(Boolean))].sort(_hspThCmp);
   provSel.innerHTML = '<option value="">ทุกจังหวัด</option>' +
     usedProvs.map(p => `<option value="${esc(p)}"${p===curProv?' selected':''}>${esc(p)}</option>`).join('');
   _hspUpdateDistrictFilter();
@@ -2655,7 +2645,7 @@ function _hspUpdateDistrictFilter() {
   var dists = [...new Set(
     (window.HOSPITALS || []).filter(h => !prov || h.province === prov)
       .map(h => h.district).filter(Boolean)
-  )].sort((a, b) => a.localeCompare(b, 'th'));
+  )].sort(_hspThCmp);
   distSel.innerHTML = '<option value="">ทุกอำเภอ</option>' +
     dists.map(d => `<option value="${esc(d)}"${d===curDist?' selected':''}>${esc(d)}</option>`).join('');
 }
@@ -3269,6 +3259,26 @@ function _hspCalcTier(h, prods) {
   var hasGroup = function(gid) {
     return prods.some(function(p) { return p.group === gid && hProdIds.includes(p.id); });
   };
+  return _hspTierOf(hProdIds, hasGroup);
+}
+// ── ตัวคำนวณ Tier สำหรับ render ทั้งหน้า: สร้างดัชนี id Product → กลุ่ม ครั้งเดียว + จำผลต่อ รพ.
+// (เดิม prods.some × includes ทุก รพ. ซ้ำ 2–3 รอบต่อการ render) — ผลเหมือน _hspCalcTier(h, prods) ──
+function _hspTierFn(prods) {
+  var grpById = new Map();
+  prods.forEach(function(p) { var s = grpById.get(p.id); if (!s) grpById.set(p.id, s = new Set()); s.add(p.group); });
+  var memo = new Map();
+  return function(h) {
+    var hit = memo.get(h);
+    if (hit) return hit;
+    var hProdIds = h.products || [];
+    var grps = new Set();
+    hProdIds.forEach(function(id) { var s = grpById.get(id); if (s) s.forEach(function(g) { grps.add(g); }); });
+    var ti = _hspTierOf(hProdIds, function(gid) { return grps.has(gid); });
+    memo.set(h, ti);
+    return ti;
+  };
+}
+function _hspTierOf(hProdIds, hasGroup) {
   var hasFront = hasGroup('his_front');
   var hasBack  = hasGroup('his_back');
   var hasIC    = hasGroup('interconnect');
@@ -3304,8 +3314,16 @@ window.renderHspAnalysis = function() {
   var tier4Count   = hosps.filter(function(h) { return (h.products||[]).length === 0; }).length;
   var filled       = hosps.reduce(function(s,h) { return s + (h.products||[]).length; }, 0);
   var whitespace   = totalHosps * prods.length - filled;
+  // จำนวน รพ. ที่ใช้ Product แต่ละตัว (นับ รพ. ละครั้ง) — วนครั้งเดียวแทน Product × รพ. × includes
+  var haveByProd = new Map();
+  hosps.forEach(function(h) {
+    var seen = new Set();
+    (h.products||[]).forEach(function(id) { if (seen.has(id)) return; seen.add(id); haveByProd.set(id, (haveByProd.get(id) || 0) + 1); });
+  });
+  var haveOf = function(id) { return haveByProd.get(id) || 0; };
+  var tierOf = _hspTierFn(prods);
   var topWS        = prods.reduce(function(mx, p) {
-    var miss = hosps.filter(function(h) { return !(h.products||[]).includes(p.id); }).length;
+    var miss = totalHosps - haveOf(p.id);
     return miss > mx.miss ? { p: p, miss: miss } : mx;
   }, { p: prods[0], miss: -1 });
 
@@ -3336,7 +3354,7 @@ window.renderHspAnalysis = function() {
     penetHtml += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">' +
       '<div style="font-size:11px;font-weight:700;color:' + grp.color + ';text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">' + esc(grp.label) + '</div>';
     grpProds.forEach(function(p) {
-      var haveN = hosps.filter(function(h) { return (h.products||[]).includes(p.id); }).length;
+      var haveN = haveOf(p.id);
       var barPct = totalHosps ? Math.round(haveN / totalHosps * 100) : 0;
       penetHtml += '<div style="margin-bottom:7px;">' +
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">' +
@@ -3358,7 +3376,7 @@ window.renderHspAnalysis = function() {
     { tier: 0, label: 'Full',      sublabel: 'Full Coverage',  color: '#059669', desc: 'ครบทุกกลุ่ม',                      icon: '🟢' },
   ];
   var tierCounts = {};
-  hosps.forEach(function(h) { var t = _hspCalcTier(h, prods).tier; tierCounts[t] = (tierCounts[t]||0)+1; });
+  hosps.forEach(function(h) { var t = tierOf(h).tier; tierCounts[t] = (tierCounts[t]||0)+1; });
 
   var tierHtml = '<div style="margin-bottom:24px;">' +
     '<div style="font-size:13px;font-weight:700;color:var(--txt);margin-bottom:12px;">🎯 Customer Segmentation by Tier <span style="font-size:11px;font-weight:400;color:var(--txt-muted);">(คลิกเพื่อกรอง)</span></div>' +
@@ -3383,7 +3401,7 @@ window.renderHspAnalysis = function() {
   if (filterDist) showHosps = showHosps.filter(function(h) { return h.district === filterDist; });
   if (filterType) showHosps = showHosps.filter(function(h) { return (h.level||h.type||'') === filterType; });
   if (filterQ)    showHosps = showHosps.filter(function(h) { return (h.name||'').toLowerCase().includes(filterQ) || (h.code||'').toLowerCase().includes(filterQ) || (h.district||'').toLowerCase().includes(filterQ); });
-  if (filterTier) showHosps = showHosps.filter(function(h) { return String(_hspCalcTier(h, prods).tier) === filterTier; });
+  if (filterTier) showHosps = showHosps.filter(function(h) { return String(tierOf(h).tier) === filterTier; });
   if (filterProds.length) showHosps = showHosps.filter(function(h) { return filterProds.every(function(id){ return (h.products||[]).includes(id); }); });
   if (prodUsage === 'has')  showHosps = showHosps.filter(function(h) { return (h.products||[]).length > 0; });
   if (prodUsage === 'none') showHosps = showHosps.filter(function(h) { return !(h.products||[]).length; });
@@ -3430,7 +3448,7 @@ window.renderHspAnalysis = function() {
 
   // ── HOSPITAL CARDS ─────────────────────────────────────────────────────────
   var cardsHtml = pageHosps.map(function(h, idx) {
-    var ti     = _hspCalcTier(h, prods);
+    var ti     = tierOf(h);
     var hProds = h.products || [];
     var rowNum = rangeStart + idx;
     var htype  = _hspType(h.type);
@@ -3818,7 +3836,7 @@ window._hspDashPopup = function(title, filter) {
       if (a !== filter.affil.toLowerCase()) return false;
     }
     return true;
-  }).sort(function(a,b){ return (a.code||'').localeCompare(b.code||'','th'); });
+  }).sort(function(a,b){ return _hspThCmp(a.code||'', b.code||''); });
 
   var rows = list.map(function(h) {
     var t = HSP_TYPE_MAP[h.type] || HSP_TYPE_MAP['other'];
@@ -3956,11 +3974,18 @@ window.renderHspDashboard = function() {
   Object.keys(_HSP_REGIONS).forEach(function(rn) {
     byRegion[rn] = { count:0, color:_HSP_REGIONS[rn].color };
   });
-  hosps.forEach(function(h) {
-    var p = (h.province || '').trim();
-    Object.keys(_HSP_REGIONS).forEach(function(rn) {
-      if (_HSP_REGIONS[rn].provinces.indexOf(p) >= 0) byRegion[rn].count++;
+  // จังหวัด → ภาค (สร้างครั้งเดียว แทนการไล่ indexOf ทุกภาคต่อ รพ.) · จังหวัดที่อยู่หลายภาคนับทุกภาคเหมือนเดิม
+  var regionsByProv = new Map();
+  Object.keys(_HSP_REGIONS).forEach(function(rn) {
+    _HSP_REGIONS[rn].provinces.forEach(function(pv) {
+      var l = regionsByProv.get(pv);
+      if (!l) regionsByProv.set(pv, l = []);
+      if (l.indexOf(rn) < 0) l.push(rn);
     });
+  });
+  hosps.forEach(function(h) {
+    var l = regionsByProv.get((h.province || '').trim());
+    if (l) l.forEach(function(rn) { byRegion[rn].count++; });
   });
 
   var typeSorted  = HSP_TYPES.filter(function(t){ return byType[t.id]; })
@@ -3975,7 +4000,6 @@ window.renderHspDashboard = function() {
   var maxType   = typeSorted.length  ? typeSorted[0].count  : 1;
   var maxProv   = provSorted.length  ? provSorted[0].count  : 1;
   var maxAffil  = affilSorted.length ? affilSorted[0].count : 1;
-  var maxRegion = Math.max.apply(null, Object.keys(byRegion).map(function(rn){ return byRegion[rn].count; }).concat([1]));
 
   function miniBar(val, max, color) {
     var w = max ? Math.round(val / max * 100) : 0;

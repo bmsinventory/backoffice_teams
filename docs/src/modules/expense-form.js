@@ -412,7 +412,7 @@ window.ecfSetOthers = function (items) {
 // project picker) — refreshes the project list + resets/restores selection. Call with a pid to
 // preselect it (loading a saved form), or no args to reset to unselected (new form / initial build).
 window.ecfRefreshProjectCombobox = function (curPid) {
-  var todayStr = new Date().toISOString().slice(0, 10);
+  var todayStr = window.todayStr();
   var projects = (window.PROJECTS || []).filter(function (p) { return p.start && p.start > todayStr; })
     .sort(function (a, b) { return (a.start || '').localeCompare(b.start || ''); });
   // ถ้าโหลดฟอร์มเดิมที่อ้างอิงโครงการซึ่งเลยวันเริ่มไปแล้ว ให้แทรกกลับเข้ามาด้วย ไม่งั้นค่าที่เคยเลือกไว้จะหายไปจาก dropdown
@@ -706,7 +706,7 @@ window.ecfWord = (function () {
       + '<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom><w:DoNotOptimizeForBrowser/></w:WordDocument></xml><![endif]-->'
       + '<style>@page Section1{size:595.3pt 841.9pt;mso-page-orientation:portrait;margin:36pt 51pt 36pt 51pt;} div.Section1{page:Section1;}</style>'
       + baseStyle(s) + '</head><body>' + section(body, s) + '</body></html>';
-    var fname = (name + (docNo ? '_' + docNo : '') + '_' + new Date().toISOString().slice(0, 10)).replace(/[\\/:*?"<>|]+/g, '-') + '.doc';
+    var fname = (name + (docNo ? '_' + docNo : '') + '_' + window.todayStr()).replace(/[\\/:*?"<>|]+/g, '-') + '.doc';
     var blob = new Blob(['﻿', html], { type: 'application/msword' });
     var a = document.createElement('a');
     a.href = URL.createObjectURL(blob);

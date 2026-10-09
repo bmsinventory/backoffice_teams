@@ -32,9 +32,8 @@ let _lvEdits={};
 let keyEntryData=[];
 let keSearchTxt='';
 let _keReasonTimers={};
-let nextId=1,nextSessId=1,nextCatId=1;
 let selectedCatId=null,selectedSessId=null,sessFilt='all';
-let scanStream=null,scanReq=null,scanLog=[],scanInterval=null,currentFacingMode='environment',_scanLogIds=new Set();
+let scanStream=null,scanLog=[],scanInterval=null,currentFacingMode='environment',_scanLogIds=new Set();
 let _charts={};
 let isAdminLoggedIn=false;
 let currentAdminUser=null;
@@ -385,18 +384,16 @@ async function loadAllData(light=false){
   } // ยังไม่อยู่ในทีมโครงการไหนที่เปิดอบรม → ไม่เห็นข้อมูลของใคร
   allSessionsFull=(asR.data||[]);
   if(OVERVIEW)return; // ภาพรวมใช้แค่รายการโครงการ — ตัวเลขโหลดใน renderOverview รอบเดียว
-  // ผู้ลงทะเบียน: เฉพาะโครงการที่ใช้งาน (เดิมดึงทุกโครงการทุกปีทุกครั้ง ยิ่งใช้ยิ่งช้า)
-  // หน้าผู้ดูแลแบบหลายโครงการ = ทุกโครงการที่เห็น · แท็บอบรมของโครงการ/ผู้เข้าอบรม = โครงการเดียว
-  const regSites=isAdminLoggedIn&&!PROJECT_ID?locations.map(l=>l.code):[currentSite].filter(Boolean);
+  // ผู้ลงทะเบียน: เฉพาะโครงการที่เปิดอยู่เท่านั้น (ทุกหน้าใช้แค่ของโครงการนี้ · ตัวเลขข้ามโครงการให้ฐานข้อมูลนับ — trn_overview_stats)
   const site=currentSite,none=!site,needRef=!_refReady; // ยังไม่มีโครงการ → ไม่ต้องถามข้อมูลของโครงการ
-  const mSites=[...new Set([site,...regSites].filter(Boolean))]; // ข้อมูลพื้นฐานของทุกโครงการที่โหลดผู้ลงทะเบียน (แปลงรหัส → ชื่อ)
+  const regSites=none?[]:[site];
   // รอบ 2 (พร้อมกัน): ข้อมูลของโครงการ (+ ข้อมูลอ้างอิงถ้ายังไม่มี)
   const [cR,scR,sR,rR,mR,lvR,qzR,snR,stR,gnR,psR]=await Promise.all([
     none?_NONE:_sb.from('trn_categories').select('*').order('id'),
     none?_NONE:_sb.from('trn_site_categories').select('cat_id,quiz_open').eq('site',site),
     none?_NONE:_sb.from('trn_sessions').select('*').eq('site',site).order('id'),
     _regsOfSites(regSites),
-    mSites.length?_sb.from('trn_master_items').select('*').in('site',mSites).order('type,sort_order,id'):_NONE,
+    none?_NONE:_sb.from('trn_master_items').select('*').eq('site',site).order('type,sort_order,id'),
     none?_NONE:_sb.from('trn_login_verify').select('*').eq('site',site),
     none?_NONE:_sb.from('trn_quizzes').select('id,title').eq('is_active',true),
     needRef?_sb.from('trn_settings').select('value').eq('key','site_notify_tokens').maybeSingle():_NONE,
@@ -514,31 +511,41 @@ function _scheduleRtRefresh(){
   },400);
 }
 
+// ผู้ลงทะเบียนเปลี่ยน (ลงทะเบียน/เช็คชื่อ — วันอบรมเกิดถี่มาก) → แก้รายการในเครื่องแล้ววาดหน้าใหม่ ไม่โหลดข้อมูลทั้งหมดซ้ำ
+// เก็บเฉพาะของโครงการที่เปิดอยู่ (รอบอบรมอยู่ใน sessions) · หน้าภาพรวมถามตัวเลขจากฐานข้อมูลใหม่เอง (_ovRefresh)
+let _rtRenderTimer=null;
+function _scheduleRtRender(){
+  clearTimeout(_rtRenderTimer);
+  _rtRenderTimer=setTimeout(refreshCurrentView,400);
+}
+function _rtUpsertReg(row){
+  const reg=getReg(row.id),mine=!!getSess(row.session_id);
+  if(reg&&mine)Object.assign(reg,_mReg(row));
+  else if(reg)registrations=registrations.filter(r=>r.id!==row.id); // ย้ายไปรอบของโครงการอื่น
+  else if(mine)registrations.push(_mReg(row));
+}
 function initRealtime(){
   if(_rtChannel)return;
   if(_rtReconnectTimer){clearTimeout(_rtReconnectTimer);_rtReconnectTimer=null;}
   _rtChannel=_sb.channel('bms-rt-v3')
-    // registrations: อัพเดทข้อมูลใน local array ทันที ไม่รอ debounce
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'trn_registrations'},(p)=>{
-      if(p.new&&!getReg(p.new.id))registrations.push(_mReg(p.new));
-      _scheduleRtRefresh();
+      if(p.new)_rtUpsertReg(p.new);
+      _scheduleRtRender();
     })
     .on('postgres_changes',{event:'UPDATE',schema:'public',table:'trn_registrations'},(p)=>{
       if(!p.new)return;
-      const reg=getReg(p.new.id);
-      if(reg)Object.assign(reg,_mReg(p.new));
-      else registrations.push(_mReg(p.new));
+      _rtUpsertReg(p.new);
       updateCheckinHeroStats();
       _mergeRealtimeScanLog();
       const sub=document.querySelector('.checkin-sub.active');
       if(sub&&sub.id==='csub-list')loadAttendance();
-      _scheduleRtRefresh();
+      _scheduleRtRender();
     })
     .on('postgres_changes',{event:'DELETE',schema:'public',table:'trn_registrations'},(p)=>{
       if(!p.old)return;
       const idx=registrations.findIndex(r=>r.id===p.old.id);
       if(idx!==-1)registrations.splice(idx,1);
-      _scheduleRtRefresh();
+      _scheduleRtRender();
     })
     // ตาราง sessions / categories / master_items / locations: debounce full reload
     .on('postgres_changes',{event:'*',schema:'public',table:'trn_sessions'},()=>_scheduleRtRefresh())
@@ -1277,8 +1284,6 @@ async function renderSurveyCharts(){
   const ynYes=ynRows.filter(r=>r.q6_6===true).length;
   const ynPct=ynRows.length?Math.round(ynYes/ynRows.length*100):0;
   const allQAvgs=secAvgs.flatMap(s=>s.qAvgs).filter(q=>q.avg>0);
-  const topQ=allQAvgs.reduce((a,b)=>a.avg>b.avg?a:b,{avg:0});
-  const botQ=allQAvgs.reduce((a,b)=>a.avg<b.avg?a:b,{avg:999});
 
   document.getElementById('svd-kpi').innerHTML=`
     <div class="stat-card blue" style="min-width:0;">
@@ -1785,171 +1790,6 @@ async function saveSurveyImage(){
   }finally{
     document.body.removeChild(wrap);
   }
-}
-
-function printSurveyReport(){
-  const data=_svFiltered();
-  if(!data.length){showToast('ไม่มีข้อมูลสำหรับพิมพ์','danger');return;}
-
-  const site=document.getElementById('svd-site')?.value||currentSite;
-  const sessId=parseInt(document.getElementById('svd-sess')?.value)||0;
-  const period=document.getElementById('svd-period')?.value||'all';
-  const selSess=_svSessions.find(s=>+s.id===sessId);
-  const selCat=selSess?_svCats.find(c=>c.id===selSess.cat_id):null;
-  const loc=locations.find(l=>l.code===site);
-
-  // label/color ตามช่วงคะแนนในตารางแปรผล
-  const _pLabel=v=>v>=4.5?'มากที่สุด':v>=3.5?'มาก':v>=2.5?'ปานกลาง':v>=1.5?'น้อย':'น้อยที่สุด';
-  const _pColor=v=>v>=4.5?'#16a34a':v>=3.5?'#65a30d':v>=2.5?'#ca8a04':v>=1.5?'#ea580c':'#dc2626';
-  // sample standard deviation (n-1)
-  const _pStd=arr=>{
-    const v=arr.filter(x=>x!=null&&x>=1&&x<=5);
-    if(v.length<2)return 0;
-    const m=v.reduce((a,b)=>a+b,0)/v.length;
-    return Math.sqrt(v.reduce((s,x)=>s+(x-m)**2,0)/(v.length-1));
-  };
-
-  // header info
-  let hdr='';
-  if(selSess){
-    hdr=`หลักสูตร/ระบบงาน: ${selCat?.name||''} : ${selSess.name}&nbsp;&nbsp;|&nbsp;&nbsp;วันที่อบรม: ${fmtDateShort(selSess.date)}&nbsp;&nbsp;|&nbsp;&nbsp;วิทยากร: ${selSess.trainer||'—'}`;
-  }else{
-    const pTxt=period==='all'?'ทั้งหมด':`${period} วันล่าสุด`;
-    hdr=`โครงการ: ${loc?.name||site}&nbsp;&nbsp;|&nbsp;&nbsp;ทุกรอบ (${data.length} ราย)&nbsp;&nbsp;|&nbsp;&nbsp;ช่วงเวลา: ${pTxt}`;
-  }
-
-  // compute per-question stats
-  const secData=SVD_SECTIONS.map(sec=>({
-    ...sec,
-    qData:sec.keys.map((k,i)=>{
-      const vals=data.map(r=>r[k]).filter(x=>x!=null&&x>=1&&x<=5);
-      const avg=vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:0;
-      return{label:sec.qs[i],avg,std:_pStd(vals),counts:[5,4,3,2,1].map(v=>vals.filter(x=>x===v).length)};
-    })
-  }));
-
-  const overallAvg=_avg(secData.flatMap(s=>s.qData).map(q=>q.avg).filter(v=>v>0));
-  const ynRows=data.filter(r=>r.q6_6!=null);
-  const ynYes=ynRows.filter(r=>r.q6_6===true).length;
-  const ynPct=ynRows.length?Math.round(ynYes/ynRows.length*100):0;
-  const comments=data.filter(r=>r.comments?.trim());
-
-  // build table rows (rowspan for section header)
-  let rows='';
-  secData.forEach(sec=>{
-    sec.qData.forEach((q,qi)=>{
-      const lbl=q.avg>0?_pLabel(q.avg):'—';
-      const clr=q.avg>0?_pColor(q.avg):'#94a3b8';
-      rows+=`<tr>
-        ${qi===0?`<td rowspan="${sec.qData.length}" class="sc">${sec.num}.<br>${sec.title}</td>`:''}
-        <td class="qc">${q.label}</td>
-        ${q.counts.map(c=>`<td class="nc">${c}</td>`).join('')}
-        <td class="ac">${q.avg>0?q.avg.toFixed(2):'—'}</td>
-        <td class="dc">${q.std>0?q.std.toFixed(2):'0.00'}</td>
-        <td class="lc"><span style="background:${clr};color:#fff;padding:2px 9px;border-radius:12px;font-size:11px;font-weight:700;white-space:nowrap;">${lbl}</span></td>
-      </tr>`;
-    });
-  });
-
-  const html=`<!DOCTYPE html>
-<html lang="th"><head><meta charset="UTF-8">
-<title>สรุปผลการประเมิน — BMS Training</title>
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap');
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Sarabun',sans-serif;font-size:13px;color:#111;background:#fff;padding:16px}
-.wrap{max-width:1060px;margin:0 auto}
-.title-box{background:#ffff00;border:2px solid #111;text-align:center;padding:10px 16px;margin-bottom:10px;border-radius:2px}
-.title-box h1{font-size:17px;font-weight:700}
-.title-box .sub{font-size:12px;margin-top:5px;color:#1a3a6e;font-weight:600}
-.layout{display:flex;gap:12px;margin-bottom:12px;align-items:flex-start}
-.tbl-wrap{flex:1;min-width:0}
-.side{min-width:205px;flex-shrink:0;display:flex;flex-direction:column;gap:10px}
-table{width:100%;border-collapse:collapse;font-size:12px}
-th,td{border:1px solid #555;padding:5px 6px;vertical-align:middle}
-thead th{background:#00b050;color:#fff;text-align:center;font-weight:700}
-thead th.th-l{text-align:left}
-.sc{background:#eff6ff;font-weight:700;font-size:11px;text-align:center;color:#1e40af;line-height:1.5;white-space:nowrap}
-.qc{font-size:11.5px;color:#1a3a6e}
-.nc{text-align:center}
-.ac{text-align:center;font-weight:700;color:#1a56a0;font-size:13px}
-.dc{text-align:center;color:#475569}
-.lc{text-align:center}
-.leg th{background:#ffff00;color:#111;text-align:center;font-size:12px;font-weight:700}
-.l1{background:#dc2626;color:#fff;font-weight:700;text-align:center}
-.l2{background:#ea580c;color:#fff;font-weight:700;text-align:center}
-.l3{background:#f59e0b;color:#111;font-weight:700;text-align:center}
-.l4{background:#84cc16;color:#111;font-weight:700;text-align:center}
-.l5{background:#16a34a;color:#fff;font-weight:700;text-align:center}
-.ynbox{border:1px solid #e2e8f0;border-radius:4px;padding:10px}
-.ynbox .yt{font-size:12px;font-weight:700;margin-bottom:7px;color:#374151}
-.hl{border:2px solid #fbbf24;background:#fffde7;padding:8px 16px;margin-bottom:10px;font-size:13px;text-align:center;border-radius:4px;line-height:1.7}
-.cmtbox{border:2px solid #fbbf24;border-radius:4px;overflow:hidden}
-.cmtt{background:#fbbf24;padding:7px 12px;font-weight:700;font-size:13px}
-.cmtb{padding:10px 16px}
-.cmtb ul{padding-left:16px}
-.cmtb li{font-size:12px;padding:3px 0;color:#374151;line-height:1.5}
-@media print{body{padding:6px}@page{margin:.7cm;size:A4 landscape}}
-</style></head><body>
-<div class="wrap">
-  <div class="title-box">
-    <h1>สรุปผลการประเมินของผู้เข้าร่วมรับการอบรม</h1>
-    <div class="sub">${hdr}</div>
-  </div>
-  <div class="layout">
-    <div class="tbl-wrap">
-      <table>
-        <thead><tr>
-          <th style="width:88px;">หัวข้อการประเมิน</th>
-          <th class="th-l">หัวข้อคำถาม</th>
-          <th style="width:30px;background:#16a34a;">5</th>
-          <th style="width:30px;background:#65a30d;">4</th>
-          <th style="width:30px;background:#ca8a04;">3</th>
-          <th style="width:30px;background:#ea580c;">2</th>
-          <th style="width:30px;background:#dc2626;">1</th>
-          <th style="width:46px;">AVG</th>
-          <th style="width:42px;">STD</th>
-          <th style="width:78px;">แปลผล</th>
-        </tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>
-    <div class="side">
-      <table class="leg">
-        <thead>
-          <tr><th colspan="3">ตารางแปรผลคะแนน</th></tr>
-          <tr><th>ระดับ<br>ความคิดเห็น</th><th>ต่ำสุด</th><th>สูงสุด</th></tr>
-        </thead>
-        <tbody>
-          <tr><td class="l1">น้อยที่สุด</td><td style="text-align:center">1</td><td style="text-align:center">1.49</td></tr>
-          <tr><td class="l2">น้อย</td><td style="text-align:center">1.5</td><td style="text-align:center">2.49</td></tr>
-          <tr><td class="l3">ปานกลาง</td><td style="text-align:center">2.5</td><td style="text-align:center">3.49</td></tr>
-          <tr><td class="l4">มาก</td><td style="text-align:center">3.5</td><td style="text-align:center">4.49</td></tr>
-          <tr><td class="l5">มากที่สุด</td><td style="text-align:center">4.5</td><td style="text-align:center">5</td></tr>
-        </tbody>
-      </table>
-      ${ynRows.length?`<div class="ynbox">
-        <div class="yt">ต้องการอบรมเพิ่มเติม</div>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <span style="background:${ynPct>=50?'#16a34a':'#dc2626'};color:#fff;padding:4px 14px;border-radius:20px;font-weight:700;font-size:16px;">${ynPct}%</span>
-          <span style="font-size:12px;color:var(--text-muted);">${ynYes} / ${ynRows.length} ราย</span>
-        </div>
-      </div>`:''}
-    </div>
-  </div>
-  ${overallAvg>0?`<div class="hl">คะแนนเฉลี่ยรวมทุกด้าน <strong>${overallAvg.toFixed(2)} / 5.00</strong> — ระดับ <strong>"${_pLabel(overallAvg)}"</strong> &nbsp;|&nbsp; ผู้ทำแบบประเมิน <strong>${data.length} ราย</strong></div>`:''}
-  <div class="cmtbox">
-    <div class="cmtt">💬 ข้อเสนอแนะเพิ่มเติม (Comments)</div>
-    <div class="cmtb">${comments.length?`<ul>${comments.map(r=>`<li>${_esc(r.comments)}</li>`).join('')}</ul>`:'<p style="color:var(--text-muted);font-size:12px;">ไม่มี</p>'}</div>
-  </div>
-</div>
-<script>window.onload=()=>setTimeout(()=>{window.print();},400);</script>
-</body></html>`;
-
-  const w=window.open('','_blank','width=1150,height=860');
-  if(!w){showToast('กรุณาอนุญาต Pop-up ในเบราว์เซอร์ก่อนพิมพ์','danger');return;}
-  w.document.write(html);
-  w.document.close();
 }
 
 /* ══════════════════ STEP ══════════════════ */
@@ -4303,7 +4143,6 @@ function _ncPreview(){
 async function submitAddCat(){
   const name=document.getElementById('nc-name').value.trim();
   if(!name){showToast('กรุณาระบุชื่อหลักสูตรอบรม','danger');return;}
-  const fileInput=document.getElementById('nc-banner-file');
   const bannerUrlField=document.getElementById('nc-banner-url').value||'';
   let bannerUrl=null;
   if(croppedBlob){
@@ -4493,22 +4332,18 @@ const _mapPtypes=rows=>(rows||[]).map(t=>({id:t.type_id||t.id,label:t.label_th||
 async function _ovCats(){
   const seq=++_ovCatSeq,el=document.getElementById('ov-content');
   if(!el.querySelector('#ov-cat-table'))el.innerHTML='<div class="tqa-empty">กำลังโหลด...</div>';
-  const [cR,scR,sR,qR,tR]=await Promise.all([
+  const [cR,uR,qR,tR]=await Promise.all([
     _sb.from('trn_categories').select('*').order('id'),
-    _allRows(()=>_sb.from('trn_site_categories').select('site,cat_id').order('cat_id')),
-    _allRows(()=>_sb.from('trn_sessions').select('id,cat_id').order('id')),
+    _sb.rpc('trn_category_usage'), // ฐานข้อมูลนับให้: เปิดกี่โครงการ / กี่รอบอบรม ต่อหลักสูตร
     _sb.from('trn_quizzes').select('id,title,is_active').order('title'),
     _sb.from('ptypes').select('id,type_id,label_th,label,color_hex'), // ประเภทโครงการ (จัดกลุ่มหลักสูตร)
   ]);
   if(seq!==_ovCatSeq)return;
-  if(cR.error||scR.error||sR.error||qR.error){el.innerHTML='<div class="tqa-empty">โหลดข้อมูลไม่สำเร็จ</div>';return;}
+  if(cR.error||uR.error||qR.error){el.innerHTML='<div class="tqa-empty">โหลดข้อมูลไม่สำเร็จ</div>';return;}
   allCategories=categories=(cR.data||[]).map(r=>_mCat(r,null));
   _ovQuizzes=qR.data||[];
   _ovPtypes=_mapPtypes(tR.data);
-  _ovCatUse={};
-  const use=id=>_ovCatUse[id]||(_ovCatUse[id]={sites:0,sess:0});
-  (scR.data||[]).forEach(x=>use(x.cat_id).sites++);
-  (sR.data||[]).forEach(x=>{if(x.cat_id)use(x.cat_id).sess++;});
+  _ovCatUse=Object.fromEntries((uR.data||[]).map(x=>[x.cat_id,{sites:+x.sites,sess:+x.sess}]));
   _ovCatsRender();
 }
 // แถบสรุป (ทั้งหมด/มีแบบทดสอบ/ยังไม่มี — กดชิปเพื่อกรอง) + ค้นหา · ตารางเดิมคำอธิบายยาวดันคอลัมน์อื่นจนอ่านยาก → แสดงเป็นการ์ด
@@ -4614,36 +4449,34 @@ async function _ovSummary(){
   }
   if(!el.querySelector('.stats-grid'))el.innerHTML='<div style="padding:30px;text-align:center;color:var(--text-muted);">กำลังโหลด...</div>'; // Realtime วาดใหม่ทับของเดิม ไม่กะพริบ
   const codes=locations.map(l=>l.code);
-  const keys=SVD_SECTIONS.flatMap(s=>s.keys);
-  // ทุกอย่างในรอบเดียว · เลือกเฉพาะคอลัมน์ที่ใช้นับ (ผู้ลงทะเบียน = รอบ+เข้าอบรม · ผลประเมิน = คะแนน)
-  const [sR,cR,svR,qR,ipR,rR]=await Promise.all([
+  // ทุกอย่างในรอบเดียว · ผู้ลงทะเบียน/แบบประเมิน/ผลสอบ ให้ฐานข้อมูลนับ (trn_overview_stats — db-training.sql)
+  // ได้แค่ตัวเลขต่อรอบ/ต่อโครงการ ไม่ดึงทุกแถวมานับเอง → ข้อมูลสะสมมากแค่ไหนก็โหลดเร็วเท่าเดิม
+  const [sR,cR,stR,ipR]=await Promise.all([
     _sb.from('trn_sessions').select('id,site,cat_id,name,date,time_start,time_end,capacity').in('site',codes),
     _sb.from('trn_categories').select('id,name'),
-    _allRows(()=>_sb.from('trn_survey_responses').select('id,site,'+keys.join(',')).in('site',codes).order('id')),
-    _allRows(()=>_sb.from('trn_quiz_attempts').select('id,site,status').in('site',codes).neq('status','started').order('id')),
+    _sb.rpc('trn_overview_stats',{p_sites:codes}),
     isSup?_sb.from('impl_projects').select('id,project_name,status'):Promise.resolve({data:[]}),
-    _regsOfSites(codes,'id,session_id,attended'),
   ]);
   if(seq!==_ovSeq)return;
-  const sess=sR.data||[],cats=cR.data||[],svs=svR.data||[],qas=qR.data||[];
-  const regsAll=(rR.data||[]).map(r=>({sessionId:r.session_id,attended:!!r.attended}));
+  if(sR.error||stR.error){el.innerHTML='<div class="tqa-empty">โหลดข้อมูลไม่สำเร็จ</div>';return;}
+  const sess=sR.data||[],cats=cR.data||[],st=stR.data||{};
+  const regOf=Object.fromEntries((st.regs||[]).map(r=>[r.id,r])); // รอบอบรม → {n, att}
+  const nRegs=id=>regOf[id]?.n||0;
+  const svOf=Object.fromEntries((st.survey||[]).map(r=>[r.site,r]));
+  const qzOf=Object.fromEntries((st.quiz||[]).map(r=>[r.site,r]));
   const today=_ymd(new Date()),in14=_ymd(new Date(Date.now()+14*864e5));
-  const scoresOf=r=>keys.map(k=>+r[k]).filter(v=>v>=1&&v<=5);
-  const mean=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
-  const regsOf=sids=>regsAll.filter(r=>sids.has(r.sessionId));
 
   const rows=locations.map(l=>{
     const ss=sess.filter(s=>s.site===l.code);
-    const regs=regsOf(new Set(ss.map(s=>s.id)));
-    const sv=svs.filter(r=>r.site===l.code);
-    const qa=qas.filter(a=>a.site===l.code);
+    const sv=svOf[l.code]||{},qz=qzOf[l.code]||{};
     const next=ss.filter(s=>s.date>=today).sort((a,b)=>a.date.localeCompare(b.date))[0];
-    return{l,n:ss.length,done:ss.filter(s=>s.date<today).length,next,regs:regs.length,att:regs.filter(r=>r.attended).length,
-      svN:sv.length,sv:mean(sv.flatMap(scoresOf)),qN:qa.length,qPass:qa.filter(a=>a.status==='PASS').length};
+    return{l,n:ss.length,done:ss.filter(s=>s.date<today).length,next,
+      regs:ss.reduce((t,s)=>t+nRegs(s.id),0),att:ss.reduce((t,s)=>t+(regOf[s.id]?.att||0),0),
+      svN:sv.n||0,sv:sv.cnt?sv.sum/sv.cnt:null,svSum:sv.sum||0,svCnt:sv.cnt||0,qN:qz.n||0,qPass:qz.pass||0};
   });
   const sum=k=>rows.reduce((t,r)=>t+r[k],0);
   const pct=(a,b)=>b?Math.round(a/b*100)+'%':'—';
-  const allSv=mean(svs.flatMap(scoresOf));
+  const allSv=sum('svCnt')?sum('svSum')/sum('svCnt'):null;
   const upcoming=sess.filter(s=>s.date>=today&&s.date<=in14).sort((a,b)=>(a.date+a.time_start).localeCompare(b.date+b.time_start));
 
   const kpi=`<div class="stats-grid">
@@ -4651,7 +4484,7 @@ async function _ovSummary(){
     ${_ovStat('รอบอบรม',sum('n'),`จัดแล้ว ${sum('done')} · รอจัด ${sum('n')-sum('done')}`,'amber','รอบอบรมทุกโครงการ · จัดแล้ว = วันที่ก่อนวันนี้ · รอจัด = วันนี้เป็นต้นไป')}
     ${_ovStat('ผู้ลงทะเบียน',sum('regs'),'','green','ผู้ลงทะเบียนทุกรอบของทุกโครงการ (รวม Walk-in)')}
     ${_ovStat('เข้าอบรมจริง',pct(sum('att'),sum('regs')),`${sum('att')} คน`,'green','ผู้ที่เช็คชื่อเข้าอบรม ÷ ผู้ลงทะเบียนทั้งหมด × 100')}
-    ${_ovStat('คะแนนประเมินเฉลี่ย',allSv!=null?allSv.toFixed(2):'—',`จาก 5 · ${svs.length} แบบประเมิน`,'blue','ค่าเฉลี่ยของคะแนนทุกข้อ (1–5) จากแบบประเมินทุกฉบับรวมกัน')}
+    ${_ovStat('คะแนนประเมินเฉลี่ย',allSv!=null?allSv.toFixed(2):'—',`จาก 5 · ${sum('svN')} แบบประเมิน`,'blue','ค่าเฉลี่ยของคะแนนทุกข้อ (1–5) จากแบบประเมินทุกฉบับรวมกัน')}
     ${_ovStat('สอบผ่าน',pct(sum('qPass'),sum('qN')),`${sum('qPass')}/${sum('qN')} ครั้ง`,'amber','ครั้งที่สอบผ่าน ÷ ครั้งที่ส่งคำตอบแล้วทั้งหมด × 100 (นับทุกครั้งที่สอบ ไม่ใช่รายคน)')}
   </div>`;
 
@@ -4679,7 +4512,7 @@ async function _ovSummary(){
   const locByCode=Object.fromEntries(locations.map(l=>[l.code,l]));
   const up=`<div class="card"><div class="card-header"><div class="card-title"><i class="ti ti-calendar-event"></i>รอบอบรม 14 วันข้างหน้า</div></div>
     ${upcoming.length?`<div class="table-wrap table-cards"><table><thead><tr><th>วันที่</th><th>เวลา</th><th>โครงการ</th><th>หัวข้อ</th><th>ลงทะเบียน</th></tr></thead><tbody>
-      ${upcoming.map(s=>{const l=locByCode[s.site]||{};const n=regsAll.filter(r=>r.sessionId===s.id).length;
+      ${upcoming.map(s=>{const l=locByCode[s.site]||{};const n=nRegs(s.id);
         return`<tr style="cursor:pointer;" onclick="_ovOpen('${_esc(l.project_id||'')}')">
           <td data-label="วันที่" style="white-space:nowrap;">${fmtDateShort(s.date)}</td>
           <td data-label="เวลา" style="white-space:nowrap;">${s.time_start||''}–${s.time_end||''}</td>
@@ -4692,26 +4525,26 @@ async function _ovSummary(){
   const linked=new Set(locations.map(l=>l.project_id).filter(Boolean));
   const notOpened=isSup?(ipR.data||[]).filter(p=>!linked.has(p.id)&&!['done','cancelled'].includes(p.status)):[];
 
-  el.innerHTML=_ovTodo({sess,cats,rows,locByCode,notOpened,today,regsAll})+kpi+table+up;
+  el.innerHTML=_ovTodo({sess,cats,rows,locByCode,notOpened,today,regOf})+kpi+table+up;
 }
 /* ── ต้องจัดการ: เรื่องที่ต้องลงมือ (บนสุดของภาพรวม) — กดรายการ → แท็บอบรมของโครงการ ── */
 const OV_TODO={lowRegDays:3,lowRegPct:.5,lowSurvey:3.5,minSurveyN:3,lowPass:.7,minQuizN:5};
-function _ovTodo({sess,cats,rows,locByCode,notOpened,today,regsAll}){
+function _ovTodo({sess,cats,rows,locByCode,notOpened,today,regOf}){
   const items=[]; // {sev:'danger'|'warn', icon, title, sub, pid}
   const dayDiff=d=>Math.round((new Date(d+'T00:00:00')-new Date(today+'T00:00:00'))/864e5);
   const sessLabel=s=>[(cats.find(c=>c.id===s.cat_id)||{}).name,s.name].filter(Boolean).join(' · ');
   for(const s of sess){
     const l=locByCode[s.site]||{};
-    const regs=regsAll.filter(r=>r.sessionId===s.id);
+    const rg=regOf[s.id]||{n:0,att:0};
     const dd=dayDiff(s.date);
-    if(dd>=0&&dd<=OV_TODO.lowRegDays&&s.capacity>0&&regs.length<s.capacity*OV_TODO.lowRegPct)
+    if(dd>=0&&dd<=OV_TODO.lowRegDays&&s.capacity>0&&rg.n<s.capacity*OV_TODO.lowRegPct)
       items.push({sev:dd<=1?'danger':'warn',icon:'users-minus',pid:l.project_id,
         title:`คนลงทะเบียนน้อย — ${dd===0?'วันนี้':dd===1?'พรุ่งนี้':`อีก ${dd} วัน`} (${fmtDateShort(s.date)})`,
-        sub:`${_esc(l.name||s.site)} · ${_esc(sessLabel(s))} · ลงทะเบียน ${regs.length}/${s.capacity} คน`});
-    else if(dd<0&&regs.length&&!regs.some(r=>r.attended))
+        sub:`${_esc(l.name||s.site)} · ${_esc(sessLabel(s))} · ลงทะเบียน ${rg.n}/${s.capacity} คน`});
+    else if(dd<0&&rg.n&&!rg.att)
       items.push({sev:'warn',icon:'checklist',pid:l.project_id,
         title:`ยังไม่เช็คชื่อเข้าอบรม — รอบ ${fmtDateShort(s.date)}`,
-        sub:`${_esc(l.name||s.site)} · ${_esc(sessLabel(s))} · มีผู้ลงทะเบียน ${regs.length} คน แต่ยังไม่มีใครถูกเช็คชื่อ`});
+        sub:`${_esc(l.name||s.site)} · ${_esc(sessLabel(s))} · มีผู้ลงทะเบียน ${rg.n} คน แต่ยังไม่มีใครถูกเช็คชื่อ`});
   }
   for(const r of rows){
     if(r.svN>=OV_TODO.minSurveyN&&r.sv<OV_TODO.lowSurvey)
@@ -5291,16 +5124,27 @@ function openClearRegsBySite(){
   document.getElementById('clear-site-ok-btn').disabled=true;
   document.getElementById('modal-clear-regs-site').classList.add('open');
 }
-function updateClearSiteCount(){
+// จำนวนผู้ลงทะเบียนของโครงการที่เลือก — ถามฐานข้อมูล (ในเครื่องมีเฉพาะผู้ลงทะเบียนของโครงการที่เปิดอยู่)
+let _clearSiteCnt=0;
+const _regCount=(code,attended)=>{
+  let q=_sb.from('trn_registrations').select('id,trn_sessions!inner(site)',{count:'exact',head:true}).eq('trn_sessions.site',code);
+  if(attended)q=q.eq('attended',true);
+  return q;
+};
+async function updateClearSiteCount(){
   const code=document.getElementById('clear-site-sel').value;
   const preview=document.getElementById('clear-site-preview');
   const btn=document.getElementById('clear-site-ok-btn');
-  if(!code){preview.style.display='none';btn.disabled=true;return;}
-  const siteSessIds=new Set(allSessionsFull.filter(s=>s.site===code).map(s=>s.id));
-  const cnt=registrations.filter(r=>siteSessIds.has(r.sessionId)).length;
-  const loc=locations.find(l=>l.code===code);
-  const attended=registrations.filter(r=>siteSessIds.has(r.sessionId)&&r.attended).length;
+  btn.disabled=true;_clearSiteCnt=0;
+  if(!code){preview.style.display='none';return;}
   preview.style.display='block';
+  preview.innerHTML='<span style="color:var(--text-muted);">กำลังนับ...</span>';
+  const [aR,tR]=await Promise.all([_regCount(code),_regCount(code,true)]);
+  if(document.getElementById('clear-site-sel').value!==code)return; // เปลี่ยนโครงการระหว่างรอ
+  if(aR.error||tR.error){preview.innerHTML='<span style="color:var(--danger);">นับจำนวนไม่สำเร็จ</span>';return;}
+  const cnt=aR.count||0,attended=tR.count||0;
+  _clearSiteCnt=cnt;
+  const loc=locations.find(l=>l.code===code);
   preview.innerHTML=`
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:${cnt?'8px':'0'};">
       <i class="ti ti-building" style="color:var(--primary);font-size:15px;"></i>
@@ -5318,7 +5162,8 @@ async function confirmClearRegsBySite(){
   if(!code)return;
   const loc=locations.find(l=>l.code===code);
   const siteSessIds=new Set(allSessionsFull.filter(s=>s.site===code).map(s=>s.id));
-  const cnt=registrations.filter(r=>siteSessIds.has(r.sessionId)).length;
+  const cnt=_clearSiteCnt;
+  if(!cnt)return;
   if(!await showConfirm(`ลบข้อมูลลงทะเบียน ${cnt} รายการ?`,`โครงการ: ${loc?loc.name:code}`,{okLabel:`ลบ ${cnt} รายการ`,danger:true}))return;
   const btn=document.getElementById('clear-site-ok-btn');
   btn.disabled=true;btn.innerHTML='<i class="ti ti-loader-2" style="animation:spin .8s linear infinite"></i>กำลังลบ...';
@@ -5809,7 +5654,6 @@ function _esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
 
 /* ══════════════════ PRINT DOCUMENTS ══════════════════ */
 const _thaiMonths=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
-const _thaiD=['๐','๑','๒','๓','๔','๕','๖','๗','๘','๙'];
 let _printDocTitles=[];
 let _printDocTitlesLoaded=false;
 let _docTitleEditing=null;
@@ -5819,9 +5663,6 @@ function _isoToThaiDate(iso){
   if(!iso) return '';
   const [y,m,d]=iso.split('-').map(Number);
   return `${d} ${_thaiMonths[m-1]} ${y+543}`;
-}
-function _numToThai(n){
-  return String(n).split('').map(d=>_thaiD[+d]||d).join('');
 }
 
 /* ── สถานพยาบาลบนเอกสาร = รพ. ของโครงการ (trn_locations.hospital_id → hospitals) แสดงแค่ "ชื่อ จ.จังหวัด" ไม่มีรหัส ── */
@@ -6180,7 +6021,6 @@ function _scalePrintPreview(){
   const availW=wrap.clientWidth-pad*2;
   const availH=wrap.clientHeight-pad*2;
   const scaleW=availW/paperW;
-  const scaleH=availH/paperH;
   const n=pages.length;
   const gap=12;
   // scale so ALL pages fit both width and height of panel
@@ -6328,7 +6168,8 @@ window.addEventListener('afterprint',function(){
   // (browser จะ ignore start_url/scope/icons.src ทั้งหมดว่า URL is invalid) จึงต้องแปลงทุก URL ให้เป็น absolute ก่อน
   const _baseHref=location.origin+location.pathname.replace(/[^/]*$/,'');
   const _manUrl=new URL('../manifest-training.json',location.href).href;
-  fetch(_manUrl).then(r=>r.json()).then(m=>{
+  // โหมดฝังใน Backoffice (iframe) ติดตั้งแอปจาก iframe ไม่ได้ — ไม่ต้องดึง manifest ซ้ำ
+  if(!EMBED)fetch(_manUrl).then(r=>r.json()).then(m=>{
     m.start_url=`${_baseHref}index.html?site=${encodeURIComponent(currentSite)}`;
     m.scope=_baseHref;
     m.id=m.start_url;

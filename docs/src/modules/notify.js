@@ -213,7 +213,7 @@ window.testNotify = async function() {
   );
 };
 window.testNotifyAdvance = async function() {
-  var fake = { name:'[ทดสอบ] โครงการตัวอย่าง', siteOwner:'ทดสอบไซต์', installer:'ทดสอบผู้ติดตั้ง', start:new Date().toISOString().slice(0,10), end:'' };
+  var fake = { name:'[ทดสอบ] โครงการตัวอย่าง', siteOwner:'ทดสอบไซต์', installer:'ทดสอบผู้ติดตั้ง', start:window.todayStr(), end:'' };
   await _testWithFeedback(
     window.NOTIFY_ADVANCE_TOKEN || '',
     '📋 **ทดสอบ: ถึงกำหนดจัดทำ Advance**\n' + _projNotifyBlock(fake),
@@ -221,7 +221,7 @@ window.testNotifyAdvance = async function() {
   );
 };
 window.testNotifyProject = async function() {
-  var fake = { name:'[ทดสอบ] โครงการตัวอย่าง', siteOwner:'ทดสอบไซต์', installer:'ทดสอบผู้ติดตั้ง', start:new Date().toISOString().slice(0,10), end:new Date().toISOString().slice(0,10) };
+  var fake = { name:'[ทดสอบ] โครงการตัวอย่าง', siteOwner:'ทดสอบไซต์', installer:'ทดสอบผู้ติดตั้ง', start:window.todayStr(), end:window.todayStr() };
   await _testWithFeedback(
     window.NOTIFY_PROJECT_TOKEN || '',
     '🚀 **ทดสอบ: เริ่มดำเนินการโครงการแล้ว**\n' + _projNotifyBlock(fake),
@@ -283,8 +283,10 @@ window.sendAdvanceSavedNotify=async function(adv,isNew){
 };
 
 // ── SEND ADVANCE NOTIFY (stage plan / 14-day reminder) ────────────────────────
+var _NO_ADV_NOTIFY_GRPS=['GRP17733355541905','GRP17733355541906'];
 window.sendAdvanceNotify=async function(p,isReminder){
   var token=window.NOTIFY_ADVANCE_TOKEN||'';if(!token)return;
+  if(p&&_NO_ADV_NOTIFY_GRPS.includes(p.groupId))return;
   var header=isReminder
     ?'⚠️ **เตือนซ้ำ: ยังไม่มีการจัดทำ Advance**\nเหลืออีก 14 วัน ก่อนเริ่มโครงการ'
     :'📋 **ถึงกำหนดที่ต้องจัดทำ Advance แล้ว**';
@@ -310,7 +312,7 @@ window.sendProjectNotify=async function(p,eventType){
 };
 
 // ── DAILY CHECK (dedup via localStorage) ─────────────────────────────────────
-function _todayStr(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+var _todayStr = window.todayStr;
 function _notiKey(type,pid){return'noti_sent_'+type+'_'+pid+'_'+_todayStr();}
 function _notiSent(type,pid){return!!localStorage.getItem(_notiKey(type,pid));}
 function _notiMark(type,pid){try{localStorage.setItem(_notiKey(type,pid),'1');}catch(e){}}

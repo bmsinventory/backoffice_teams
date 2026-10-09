@@ -641,4 +641,67 @@ grant execute on function trn_quiz_start(text, int, text, int, text, text, text)
 grant execute on function trn_quiz_submit(uuid, smallint[]) to anon, authenticated;
 grant execute on function trn_quiz_admin(text, text, text, jsonb) to anon, authenticated;
 
+
+-- ── ตัวเลขสรุปที่ฐานข้อมูลนับให้ (หน้าภาพรวม/หลักสูตรกลาง) ──
+-- ── ดัชนีของคอลัมน์ที่ใช้กรอง/รวม ──
+create index if not exists idx_trn_survey_site        on trn_survey_responses(site);
+create index if not exists idx_trn_quiz_att_site_stat on trn_quiz_attempts(site, status);
+create index if not exists idx_trn_sessions_cat       on trn_sessions(cat_id);
+create index if not exists idx_trn_site_cat_cat       on trn_site_categories(cat_id);
+create index if not exists idx_trn_master_site        on trn_master_items(site);
+
+-- ── ภาพรวมการอบรม (หน้า ภาพรวม) — ตัวเลขของโครงการที่ระบุ ──
+-- regs   : [{id, n, att}]                 ผู้ลงทะเบียน/เข้าอบรม ต่อรอบอบรม (เฉพาะรอบที่มีคนลงทะเบียน)
+-- survey : [{site, n, sum, cnt}]          จำนวนแบบประเมิน · ผลรวม/จำนวนคะแนนทุกข้อ (1–5) → ค่าเฉลี่ย = sum/cnt
+-- quiz   : [{site, n, pass}]              ครั้งที่ส่งคำตอบแล้ว (ไม่นับที่กำลังทำ) · ครั้งที่ผ่าน
+create or replace function trn_overview_stats(p_sites text[])
+returns jsonb language sql stable set search_path = public as $$
+  select jsonb_build_object(
+    'regs', coalesce((
+      select jsonb_agg(jsonb_build_object('id', r.session_id, 'n', r.n, 'att', r.att))
+      from (select g.session_id, count(*) n, count(*) filter (where g.attended) att
+            from trn_registrations g join trn_sessions s on s.id = g.session_id
+            where s.site = any(p_sites) group by g.session_id) r), '[]'::jsonb),
+    'survey', coalesce((
+      select jsonb_agg(jsonb_build_object('site', v.site, 'n', v.n, 'sum', v.sum, 'cnt', v.cnt))
+      from (select r.site, count(distinct r.id) n, coalesce(sum(x), 0) sum, count(x) cnt
+            from trn_survey_responses r
+            left join lateral unnest(array[
+              r.q1_1, r.q1_2, r.q1_3, r.q1_4, r.q1_5, r.q1_6,
+              r.q2_1, r.q2_2, r.q2_3, r.q2_4, r.q2_5, r.q2_6, r.q2_7,
+              r.q3_1, r.q3_2, r.q3_3, r.q3_4, r.q3_5, r.q3_6, r.q3_7, r.q3_8, r.q3_9, r.q3_10,
+              r.q4_1, r.q4_2, r.q4_3, r.q4_4, r.q4_5,
+              r.q5_1, r.q5_2, r.q5_3, r.q5_4, r.q5_5, r.q5_6, r.q5_7,
+              r.q6_1, r.q6_2, r.q6_3, r.q6_4, r.q6_5]) x on true
+            where r.site = any(p_sites) group by r.site) v), '[]'::jsonb),
+    'quiz', coalesce((
+      select jsonb_agg(jsonb_build_object('site', q.site, 'n', q.n, 'pass', q.pass))
+      from (select site, count(*) n, count(*) filter (where status = 'PASS') pass
+            from trn_quiz_attempts
+            where site = any(p_sites) and status <> 'started' group by site) q), '[]'::jsonb)
+  );
+$$;
+
+-- ── หลักสูตรอบรม (กลาง) — แต่ละหลักสูตรเปิดในกี่โครงการ / มีกี่รอบอบรม ──
+create or replace function trn_category_usage()
+returns table (cat_id integer, sites bigint, sess bigint) language sql stable set search_path = public as $$
+  select c.id,
+    (select count(*) from trn_site_categories sc where sc.cat_id = c.id),
+    (select count(*) from trn_sessions s where s.cat_id = c.id)
+  from trn_categories c;
+$$;
+
+-- ── คลังแบบทดสอบกลาง — แต่ละชุดใช้ในกี่โครงการ (ผ่านหลักสูตรที่ผูก) / มีข้อสอบที่เปิดใช้กี่ข้อ ──
+create or replace function trn_quiz_usage()
+returns table (quiz_id integer, sites bigint, questions bigint) language sql stable set search_path = public as $$
+  select q.id,
+    (select count(distinct sc.site) from trn_site_categories sc join trn_categories c on c.id = sc.cat_id where c.quiz_id = q.id),
+    (select count(*) from trn_quiz_questions x where x.quiz_id = q.id and x.is_active)
+  from trn_quizzes q;
+$$;
+
+grant execute on function trn_overview_stats(text[]) to anon, authenticated;
+grant execute on function trn_category_usage()       to anon, authenticated;
+grant execute on function trn_quiz_usage()           to anon, authenticated;
+
 notify pgrst, 'reload schema';

@@ -456,7 +456,7 @@
 
       <!-- Preview column -->
       <div style="display:flex;flex-direction:column;height:100%;overflow:hidden;background:#e8ecf0;">
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--card);flex-shrink:0;">
+        <div class="prt-prev-head" style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--card);flex-shrink:0;">
           <span style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">ตัวอย่างเอกสาร</span>
           <button class="btn btn-primary btn-sm" onclick="doPrint()" style="gap:6px;">
             <i class="ti ti-printer"></i>พิมพ์เอกสาร
@@ -591,7 +591,7 @@
     <div class="card" style="margin-bottom:14px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
         <div class="card-title" style="margin-bottom:0;"><i class="ti ti-chart-radar" style="color:#7c3aed;"></i>Dashboard ผลการประเมินความพึงพอใจ</div>
-        <div style="display:flex;gap:6px;">
+        <div class="svd-actions" style="display:flex;gap:6px;">
           <button class="btn btn-sm" onclick="trnAiSurvey()" style="background:linear-gradient(135deg,#7c3aed,#db2777);color:#fff;gap:5px;border:none;" title="ให้ AI สรุปคะแนนและข้อเสนอแนะ (src/modules/training-ai.js)"><i class="ti ti-sparkles"></i>สรุปด้วย AI</button>
           <button class="btn btn-ghost btn-sm" onclick="loadSurveyDashboard()" style="gap:5px;"><i class="ti ti-refresh"></i>รีเฟรช</button>
           <button class="btn btn-ghost btn-sm" onclick="exportSurveyExcel()" style="gap:5px;"><i class="ti ti-file-spreadsheet"></i>Export Excel</button>

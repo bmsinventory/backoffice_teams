@@ -2,10 +2,7 @@
 const { esc, fd, pd, avC } = window;
 
 // ── helpers ──
-function _ds(d) {
-  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-}
-function _todayStr() { return _ds(new Date()); }
+const _ds = window.ymd, _todayStr = window.todayStr;
 function _addDays(str, n) { var d = pd(str); d.setDate(d.getDate()+n); return _ds(d); }
 function _weeks(days) {
   if (days <= 0) return '0 สัปดาห์';
@@ -56,13 +53,11 @@ function _fmtRange(r) {
   return _dmon(r.start)+' – '+_dmon(r.end);
 }
 
-// คำนวณ workdays + company holidays ในช่วง
-function _calcAvailability(sid, startStr, endStr) {
-  var zero = { totalDays:0, freeDays:0, busyDays:0, leaveDays:0, wlDays:0, holDays:0, busyProjects:[], leaveInfo:[], wlInfo:[] };
-  if (!startStr || !endStr) return zero;
-  var s = pd(startStr), e = pd(endStr); e.setHours(23,59,59);
-  if (s > e) return zero;
-
+// ข้อมูลที่เหมือนกันทุกคนในช่วงเดียวกัน — คำนวณครั้งเดียวต่อการ render (เดิมคำนวณซ้ำทุกคน)
+// workSet/holSet ของช่วง, โครงการต่อคน (sid → [{proj, myMems}]) และ WORK_LOGS ต่อคน (sid → [{wl, ws, we}]) เรียงตามลำดับเดิม
+function _availPre(s, e) {
+  var holIdx = new Map();
+  (window.HOLIDAYS || []).forEach(function(h) { if (!holIdx.has(h.date)) holIdx.set(h.date, h); });
   // สร้าง set วันทำงาน (จ-ศ) แยก company holiday ออก
   var workSet = new Set(), holSet = new Set();
   var cur = new Date(s);
@@ -70,22 +65,52 @@ function _calcAvailability(sid, startStr, endStr) {
     var dow = cur.getDay();
     if (dow !== 0 && dow !== 6) {
       var ds = _ds(cur);
-      var hol = (window.HOLIDAYS || []).find(function(h) { return h.date === ds; });
+      var hol = holIdx.get(ds);
       if (hol && (hol.type === 'company' || hol.type === 'both')) holSet.add(ds);
       else workSet.add(ds);
     }
     cur.setDate(cur.getDate()+1);
   }
-
-  // วันติดงานจาก PROJECTS
-  var projBusySet = new Set(), busyProjects = [];
+  var projBySid = new Map();
   (window.PROJECTS || []).forEach(function(proj) {
     if (!proj.start || !proj.end || proj.status === 'cancelled') return;
     var mems = (proj.members && proj.members.length > 0)
       ? proj.members
       : (proj.team || []).map(function(id) { return { sid:id, s:proj.start, e:proj.end }; });
-    var myMems = mems.filter(function(m) { return m.sid === sid; });
-    if (!myMems.length) return;
+    var bySid = new Map();
+    mems.forEach(function(m) { var l = bySid.get(m.sid); if (!l) { l = []; bySid.set(m.sid, l); } l.push(m); });
+    bySid.forEach(function(myMems, k) { var l = projBySid.get(k); if (!l) { l = []; projBySid.set(k, l); } l.push({ proj:proj, myMems:myMems }); });
+  });
+  var wlBySid = new Map();
+  var addWl = function(k, wl, ws, we) { var l = wlBySid.get(k); if (!l) { l = []; wlBySid.set(k, l); } l.push({ wl:wl, ws:ws, we:we }); };
+  (window.WORK_LOGS||[]).forEach(function(wl){
+    if(wl.scope==='personal'){
+      addWl(wl.staffId, wl, wl.type==='daily' ? wl.date : wl.startDate, wl.type==='daily' ? wl.date : wl.endDate);
+    } else if(wl.scope==='group'){
+      var seen = new Set();
+      (wl.participants||[]).forEach(function(pt){
+        if (seen.has(pt.sid)) return; // .find เอาคนแรกที่เจอ
+        seen.add(pt.sid);
+        addWl(pt.sid, wl, pt.s||(wl.type==='daily'?wl.date:wl.startDate), pt.e||(wl.type==='daily'?wl.date:wl.endDate));
+      });
+    }
+  });
+  return { workSet:workSet, holSet:holSet, projBySid:projBySid, wlBySid:wlBySid };
+}
+
+// คำนวณ workdays + company holidays ในช่วง
+function _calcAvailability(sid, startStr, endStr, pre) {
+  var zero = { totalDays:0, freeDays:0, busyDays:0, leaveDays:0, wlDays:0, holDays:0, busyProjects:[], leaveInfo:[], wlInfo:[] };
+  if (!startStr || !endStr) return zero;
+  var s = pd(startStr), e = pd(endStr); e.setHours(23,59,59);
+  if (s > e) return zero;
+  pre = pre || _availPre(s, e);
+  var workSet = pre.workSet, holSet = pre.holSet;
+
+  // วันติดงานจาก PROJECTS
+  var projBusySet = new Set(), busyProjects = [];
+  (pre.projBySid.get(sid) || []).forEach(function(x) {
+    var proj = x.proj, myMems = x.myMems;
     var projDayCount = 0;
     myMems.forEach(function(m) {
       var ms = m.s || proj.start, me2 = m.e || proj.end;
@@ -132,15 +157,8 @@ function _calcAvailability(sid, startStr, endStr) {
 
   // วันติดงานจาก WORK_LOGS
   var wlBusySet = new Set(), wlInfo = [];
-  (window.WORK_LOGS||[]).forEach(function(wl){
-    var wlStart, wlEnd;
-    if(wl.scope==='personal' && wl.staffId===sid){
-      wlStart = wl.type==='daily' ? wl.date : wl.startDate;
-      wlEnd   = wl.type==='daily' ? wl.date : wl.endDate;
-    } else if(wl.scope==='group'){
-      var pt = (wl.participants||[]).find(function(p){ return p.sid===sid; });
-      if(pt){ wlStart = pt.s||(wl.type==='daily'?wl.date:wl.startDate); wlEnd = pt.e||(wl.type==='daily'?wl.date:wl.endDate); }
-    }
+  (pre.wlBySid.get(sid) || []).forEach(function(x){
+    var wl = x.wl, wlStart = x.ws, wlEnd = x.we;
     if(!wlStart||!wlEnd) return;
     var ws2 = pd(wlStart), we2 = pd(wlEnd); we2.setHours(23,59,59);
     var c2  = new Date(Math.max(ws2.getTime(), s.getTime()));
@@ -185,9 +203,11 @@ window.renderAvailability = function() {
     return true;
   });
 
-  // คำนวณ availability ทุกคน
+  // คำนวณ availability ทุกคน (ข้อมูลร่วมคำนวณครั้งเดียว)
+  var _avE = pd(endStr); _avE.setHours(23,59,59);
+  var _avPre = _availPre(pd(startStr), _avE);
   var results = staffList.map(function(s, i) {
-    return { s:s, i:i, info:_calcAvailability(s.id, startStr, endStr) };
+    return { s:s, i:i, info:_calcAvailability(s.id, startStr, endStr, _avPre) };
   }).sort(function(a, b) { return b.info.freeDays - a.info.freeDays; });
 
   var fullyFree = results.filter(function(r) { return r.info.freeDays > 0 && r.info.freeDays === r.info.totalDays; });

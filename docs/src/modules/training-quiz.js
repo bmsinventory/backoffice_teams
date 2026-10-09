@@ -9,7 +9,7 @@
    ข้อที่มีคนสอบแล้วแก้คำถาม/ตัวเลือก/เฉลยไม่ได้ (ผลสอบเก่าจะไม่ตรง) — แก้ = ปิดข้อเดิม + เพิ่มเป็นข้อใหม่ · ลบ = ปิดข้อ
    ผู้สอบใช้ /training/?page=quiz (src/modules/training-quiz-take.js) · ใบประกาศ/อีเมล = src/utils/trn-cert.util.js
 ══════════════════════════════════════════════════════════════════════════ */
-let _tqaTab='quizzes',_tqaQuizzes=[],_tqaUse=[],_tqaQ=null,_tqaQs=[],_tqaRes=[],_tqaPending=[],_tqaCerts=[],_tqaSt=null,_tqaSite=null,_tqaDraft=[];
+let _tqaTab='quizzes',_tqaQuizzes=[],_tqaUse={},_tqaQ=null,_tqaQs=[],_tqaRes=[],_tqaPending=[],_tqaCerts=[],_tqaSt=null,_tqaSite=null,_tqaDraft=[];
 const _TQA_CH=['ก','ข','ค','ง','จ','ฉ'];
 const _tqaLink=catId=>`${location.origin}${location.pathname.replace(/[^/]*$/,'')}?page=quiz&site=${encodeURIComponent(currentSite)}&cat=${catId}`;
 const _tqaName=q=>q?.title||'';
@@ -17,7 +17,7 @@ const _tqaEl=()=>document.getElementById(OVERVIEW?'ov-content':'tqa-body');
 // แก้คลังกลาง (กระทบทุกโครงการ) = Admin หรือสิทธิ์ "แก้ไข" ของอบรม — ฐานข้อมูลตรวจซ้ำใน trn_quiz_admin
 const _tqaCanEdit=()=>!currentAdminUser||currentAdminUser.role==='superadmin'||!!currentAdminUser.perm?.edit;
 // โครงการที่ใช้ชุดนี้ (โครงการที่เปิดหลักสูตรอบรมที่ผูกชุดนี้ไว้)
-const _tqaSites=id=>new Set(_tqaUse.filter(c=>c.quiz_id===id).map(c=>c.site));
+const _tqaUsedIn=id=>_tqaUse[id]?.sites||0; // จำนวนโครงการที่ใช้ชุดนี้ (trn_quiz_usage)
 
 // งานที่ต้องใช้เฉลย / แก้คลังกลาง — ส่ง session ของ Backoffice ไปให้ฐานข้อมูลตรวจ
 async function _tqaAdmin(action,data){
@@ -52,14 +52,15 @@ function _tqaRender(){
 async function _tqaLoadQuizzes(){
   const [qR,uR,cR,tR]=await Promise.all([
     _sb.from('trn_quizzes').select('*').order('title'),
-    _allRows(()=>_sb.from('trn_site_categories').select('site,cat_id,trn_categories!inner(quiz_id)').order('cat_id')),
+    _sb.rpc('trn_quiz_usage'), // ฐานข้อมูลนับให้: ใช้ในกี่โครงการ / ข้อสอบที่เปิดใช้กี่ข้อ ต่อชุด
     OVERVIEW?_sb.from('trn_categories').select('*').order('id'):_NONE, // เมนูระบบอบรม: หลักสูตรกลางทั้งหมด (แสดงว่าชุดไหนผูกกับหลักสูตรใด)
     OVERVIEW?_sb.from('ptypes').select('id,type_id,label_th,label,color_hex'):_NONE, // ประเภทโครงการ (จัดกลุ่มตามประเภทของหลักสูตรที่ผูก)
   ]);
   _tqaQuizzes=qR.data||[];
   if(cR.data)allCategories=categories=cR.data.map(r=>_mCat(r,null));
   if(tR.data)_ovPtypes=_mapPtypes(tR.data);
-  _tqaUse=(uR.data||[]).map(x=>({site:x.site,quiz_id:x.trn_categories?.quiz_id})).filter(x=>x.quiz_id);
+  _tqaUse=Object.fromEntries((uR.data||[]).map(x=>[x.quiz_id,{sites:+x.sites}]));
+  _tqaQCount=Object.fromEntries((uR.data||[]).map(x=>[x.quiz_id,+x.questions]));
   _tqaSyncCats();
 }
 // หลักสูตรที่เปิดสอบอยู่ (_quizCatIds ของ training-app.js) — ใช้ใน Analytics / หลักสูตรอบรม (หน้าลงทะเบียนไม่แสดงปุ่มสอบ)
@@ -71,9 +72,6 @@ let _tqaQCount={},_tqaListQ='',_tqaListF='all';
 const _tqaShort=q=>(_tqaQCount[q.id]||0)<q.questions_count;
 async function _tqaList(){
   await _tqaLoadQuizzes();
-  const qR=_tqaQuizzes.length?await _allRows(()=>_sb.from('trn_quiz_questions').select('id,quiz_id').eq('is_active',true).order('id')):{data:[]};
-  _tqaQCount={};
-  (qR.data||[]).forEach(x=>{_tqaQCount[x.quiz_id]=(_tqaQCount[x.quiz_id]||0)+1;});
   _tqaListRender();
 }
 function _tqaListRender(){
@@ -105,7 +103,7 @@ function _tqaListGrid(){
   const ids=new Set(list.map(q=>q.id));
   const byActive=(a,b)=>(b.is_active-a.is_active)||a.title.localeCompare(b.title,'th');
   const row=q=>{
-    const cnt=_tqaQCount[q.id]||0,short=_tqaShort(q),used=_tqaSites(q.id).size;
+    const cnt=_tqaQCount[q.id]||0,short=_tqaShort(q),used=_tqaUsedIn(q.id);
     const meta=[`สุ่ม ${q.questions_count} จาก ${cnt} ข้อ`,`ผ่าน ${q.pass_percent}%`,q.time_limit_min?q.time_limit_min+' นาที':'ไม่จับเวลา',q.max_attempts?'สอบได้ '+q.max_attempts+' ครั้ง':'ไม่จำกัดครั้ง'];
     return`<div class="ov-cr tqa-qr${q.is_active?'':' off'}">
       <span class="tqa-cat-ic" style="background:var(--primary-light);color:var(--primary);"><i class="ti ti-clipboard-list"></i></span>
@@ -144,7 +142,7 @@ function _tqaListGrid(){
 }
 function _tqaEdit(id){
   const q=id?_tqaQuizzes.find(x=>x.id===id):{title:'',questions_count:10,pass_percent:80,time_limit_min:0,max_attempts:0,is_active:true};
-  const used=id?_tqaSites(id).size:0;
+  const used=id?_tqaUsedIn(id):0;
   _tqaModal('modal-tqa-quiz',`<div class="modal-title"><i class="ti ti-${id?'settings':'plus'}"></i>${id?'ตั้งค่าแบบทดสอบ':'สร้างแบบทดสอบ'}</div>
     ${used>1?`<div class="tqa-warn"><i class="ti ti-alert-triangle"></i>ชุดนี้ใช้อยู่ ${used} โครงการ — การตั้งค่าจะมีผลกับทุกโครงการ</div>`:''}
     <div class="form-group"><label class="form-label">ชื่อแบบทดสอบ <span style="font-weight:400;color:var(--text-muted)">(แสดงบนใบประกาศ)</span></label><input class="form-control" id="tqa-f-title" value="${_esc(q.title)}" placeholder="เช่น การใช้งานระบบคลังสินค้า"></div>
@@ -185,7 +183,7 @@ async function _tqaCopy(id){
   catch(e){showToast(e.message,'danger');}
 }
 async function _tqaDelete(id){
-  const q=_tqaQuizzes.find(x=>x.id===id),used=_tqaSites(id).size;
+  const q=_tqaQuizzes.find(x=>x.id===id),used=_tqaUsedIn(id);
   if(!await showConfirm(`ลบแบบทดสอบ "${_tqaName(q)}"?`,(used?`ชุดนี้ใช้อยู่ ${used} โครงการ — หลักสูตรอบรมที่เลือกชุดนี้จะไม่มีแบบทดสอบ · `:'')+'ลบได้เฉพาะชุดที่ยังไม่มีผู้สอบ (มีแล้วให้ปิดใช้งานที่ "ตั้งค่า" แทน)',{okLabel:'ลบ'}))return;
   try{await _tqaAdmin('delete_quiz',{id});}catch(e){return showToast(e.message,'danger');}
   categories.forEach(c=>{if(c.quizId===id)c.quizId=null;});
@@ -202,7 +200,7 @@ async function _tqaQuestions(){
   const el=_tqaEl();
   try{[_tqaQs]=await Promise.all([_tqaAdmin('questions',{quiz_id:_tqaQ.id}),_tqaSt?null:TrnCert.settings(_sb).then(s=>{_tqaSt=s;})]);}
   catch(e){el.innerHTML=`<div class="tqa-empty">${_esc(e.message)}</div>`;return;}
-  const q=_tqaQ,act=_tqaQs.filter(x=>x.is_active).length,n=q.questions_count,used=_tqaSites(q.id).size,edit=_tqaCanEdit();
+  const q=_tqaQ,act=_tqaQs.filter(x=>x.is_active).length,n=q.questions_count,used=_tqaUsedIn(q.id),edit=_tqaCanEdit();
   // ความพร้อมก่อนส่งลิงก์ให้ผู้เข้าอบรม
   const ready=[
     [act>=n,`ข้อสอบในคลัง ${act}/${n} ข้อ`,act>=n?'ครบตามจำนวนที่สุ่ม':`ต้องเพิ่มอีก ${n-act} ข้อ`],

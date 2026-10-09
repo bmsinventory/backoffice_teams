@@ -123,9 +123,6 @@
     return TI_EMOJI[cleanName(raw)] || '';
   }
 
-  window.APP_MODULE_ICONS = MODULE_ICONS;
-  window.APP_MODULE_TONES = MODULE_TONES;
-  window.APP_ICON_EMOJI = TI_EMOJI;
   window.moduleIcon = function (moduleId) {
     return MODULE_ICONS[moduleId] || 'layout-grid';
   };
@@ -168,7 +165,6 @@
     if (root.matches('.ti')) return upgradeEl(root);
     root.querySelectorAll('.ti').forEach(upgradeEl);
   }
-  window.upgradeIcons = upgradeTree;
 
   // ระบบอบรมใส่ script หลัง DOMContentLoaded แล้ว → เริ่มทันที
   function init() {

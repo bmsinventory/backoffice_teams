@@ -26,7 +26,7 @@ if (!TS_SORTS[_tsSort]) _tsSort = 'util';
 
 const _n1  = v => { const r = Math.round(v * 10) / 10; return r.toLocaleString('en-US', { maximumFractionDigits: 1 }); };
 const _pad = n => String(n).padStart(2, '0');
-const _ds  = d => d.getFullYear() + '-' + _pad(d.getMonth() + 1) + '-' + _pad(d.getDate());
+const _ds  = window.ymd;
 function _eachDay(s, e, fn) {
   const cur = pd(s), end = pd(e);
   while (cur <= end) { fn(cur, _ds(cur)); cur.setDate(cur.getDate() + 1); }
@@ -42,12 +42,31 @@ function _tsRange(r) {
   const g = _tsRangeRaw(r);
   return { s: _iso(g.s), e: _iso(g.e) };
 }
+// ── แคชภายในรอบ render (ดัชนี id → โครงการ/พนักงาน, วันหยุดบริษัท, วันลารายคน) ──
+// ตั้งค่าเฉพาะระหว่าง renderTimesheet() — นอกรอบ render (เช่น export) ใช้ .find แบบเดิม
+let _tsRC = null;
+function _tsBuildRC() {
+  const pm = new Map(), sm = new Map(), lvBy = new Map();
+  (window.PROJECTS || []).forEach(p => { if (!pm.has(p.id)) pm.set(p.id, p); });
+  (window.STAFF || []).forEach(s => { if (!sm.has(s.id)) sm.set(s.id, s); });
+  const hol = (window.HOLIDAYS || []).filter(h => h.date && (h.type === 'company' || h.type === 'both')).map(h => ({ h, d: pd(h.date) }));
+  (window.LEAVES || []).forEach(lv => {
+    if (lv.status === 'rejected' || !lv.startDate || !lv.endDate) return;
+    const le = pd(lv.endDate); le.setHours(23, 59, 59);
+    const a = lvBy.get(lv.staffId) || (lvBy.set(lv.staffId, []), lvBy.get(lv.staffId));
+    a.push({ ls: pd(lv.startDate), le });
+  });
+  return { pm, sm, hol, lvBy };
+}
+const _projById = pid => _tsRC ? _tsRC.pm.get(pid) : (window.PROJECTS || []).find(p => p.id === pid);
+const _stById   = sid => (_tsRC && _tsRC.sm.get(sid)) || gSt(sid);
+
 function _tsRangeRaw(r) {
   let s = r.workDate, e = r.workDate;
   if (r.source === 'project') {
     if (r.visitStart && r.visitEnd) return { s: r.visitStart, e: r.visitEnd };
     // fallback: member-based records (ID: TS-{pid}-M{i})
-    const proj = (window.PROJECTS || []).find(p => p.id === r.pid);
+    const proj = _projById(r.pid);
     if (proj) {
       if (Array.isArray(proj.members)) {
         let mem = null;
@@ -153,7 +172,7 @@ function _periodLabel(f) {
 function _tsCompute() {
   const c = _getCache(), f = _tsFilters(), P = _period(f, c);
   const inP = ds => ds >= P.s && ds <= P.e && (!P.mon || Number(ds.slice(5, 7)) === P.mon);
-  const projOf = pid => window.PROJECTS.find(p => p.id === pid);
+  const projOf = _projById;
 
   // วันทำงานในช่วงที่เลือก (ฐานคำนวณกำลังคน)
   const pDays = [];
@@ -165,7 +184,7 @@ function _tsCompute() {
   if (f.pid) recs = recs.filter(r => r.pid === f.pid);
   if (f.sid) recs = recs.filter(r => r.staffId === f.sid);
   if (f.q)   recs = recs.filter(r => {
-    const p = projOf(r.pid), s = gSt(r.staffId);
+    const p = projOf(r.pid), s = _stById(r.staffId);
     return (p?.name || '').toLowerCase().includes(f.q) || (p?.code || '').toLowerCase().includes(f.q) ||
            (s?.name || '').toLowerCase().includes(f.q) || (s?.nickname || '').toLowerCase().includes(f.q) ||
            (r.description || '').toLowerCase().includes(f.q);
@@ -189,6 +208,9 @@ function _tsCompute() {
     window.STAFF.forEach(s => { if (s.active && everSids.has(s.id) && (!f.sid || s.id === f.sid)) sidSet.add(s.id); });
   }
 
+  // จัดกลุ่มแถวตามพนักงานครั้งเดียว (แทน rows.filter ต่อคน) — ลำดับในกลุ่มคงเดิม
+  const rowsBy = new Map();
+  rows.forEach(x => { const k = x.r.staffId; (rowsBy.get(k) || (rowsBy.set(k, []), rowsBy.get(k))).push(x); });
   const staff = [...sidSet].map(sid => {
     const lv = c.leaveBy[sid], ld = c.load[sid] || {};
     let leaveDays = 0, overDays = 0, freeDays = 0;
@@ -205,7 +227,7 @@ function _tsCompute() {
         run.h = Math.max(run.h, x.h);
       } else run = null;
     });
-    const mine  = rows.filter(x => x.r.staffId === sid);
+    const mine  = rowsBy.get(sid) || [];
     const hours = mine.reduce((s, x) => s + x.hp, 0);
     const cap   = Math.max(0, pDays.length - leaveDays) * TS_DAY_H;
     const projs = {};
@@ -216,7 +238,7 @@ function _tsCompute() {
       if (x.a.e && x.a.e > p.e) p.e = x.a.e;
     });
     return {
-      sid, s: gSt(sid), hours, cap, util: cap ? hours / cap * 100 : null,
+      sid, s: _stById(sid), hours, cap, util: cap ? hours / cap * 100 : null,
       leaveDays, overDays, freeDays, overRanges,
       projs: Object.values(projs).sort((a, b) => b.h - a.h),
     };
@@ -248,13 +270,13 @@ function _tsHeat(d) {
 
   // รายการที่ผ่านตัวกรอง (ไม่รวมตัวกรองเดือน)
   const recs = new Set();
-  const projOf = pid => window.PROJECTS.find(p => p.id === pid);
+  const projOf = _projById;
   window.TIMESHEETS.forEach(r => {
     if (f.types.length) { const p = projOf(r.pid); if (!p || !f.types.includes(p.typeId)) return; }
     if (f.pid && r.pid !== f.pid) return;
     if (f.sid && r.staffId !== f.sid) return;
     if (f.q) {
-      const p = projOf(r.pid), s = gSt(r.staffId);
+      const p = projOf(r.pid), s = _stById(r.staffId);
       if (!((p?.name || '').toLowerCase().includes(f.q) || (s?.name || '').toLowerCase().includes(f.q) ||
             (s?.nickname || '').toLowerCase().includes(f.q) || (r.description || '').toLowerCase().includes(f.q))) return;
     }
@@ -285,7 +307,7 @@ function _tsHeat(d) {
       return { h: hrs[m], cap, leave, util: cap ? hrs[m] / cap * 100 : null };
     });
     const h = cells.reduce((s, x) => s + x.h, 0), cap = cells.reduce((s, x) => s + x.cap, 0);
-    return { sid, s: gSt(sid), cells, h, cap, util: cap ? h / cap * 100 : null };
+    return { sid, s: _stById(sid), cells, h, cap, util: cap ? h / cap * 100 : null };
   }).sort((a, b) => (b.util || 0) - (a.util || 0));
 
   const team = mDays.map((_, m) => {
@@ -302,7 +324,9 @@ function _getTsHolLeave(r) {
   const sD = pd(startDate), eD = pd(endDate);
   eD.setHours(23, 59, 59);
 
-  const hols = (window.HOLIDAYS || []).filter(h => {
+  const hols = _tsRC
+    ? _tsRC.hol.filter(x => x.d >= sD && x.d <= eD).map(x => x.h)
+    : (window.HOLIDAYS || []).filter(h => {
     if (!h.date) return false;
     if (h.type !== 'company' && h.type !== 'both') return false;
     const hd = pd(h.date);
@@ -310,7 +334,9 @@ function _getTsHolLeave(r) {
   });
 
   const lvSet = c.leaveBy[r.staffId];
-  const leaves = window.getStaffLeaveConflicts
+  // ตรวจล่วงหน้าจากวันลาที่แยกรายคนไว้ — ไม่ทับช่วงเลยก็ข้ามการสแกน LEAVES ทั้งก้อน (ผลเป็น [] เหมือนเดิม)
+  const lvHit = !_tsRC || (startDate && endDate && (_tsRC.lvBy.get(r.staffId) || []).some(x => x.ls <= eD && x.le >= sD));
+  const leaves = lvHit && window.getStaffLeaveConflicts
     ? window.getStaffLeaveConflicts(r.staffId, startDate, endDate)
         .filter(x => x.leave.status !== 'rejected')
         .map(x => {
@@ -352,7 +378,7 @@ const _sName    = s => esc(s.nickname || s.name || '–');
 const _sFull    = s => esc((s.name || s.nickname || '–') + (s.nickname && s.name && s.nickname !== s.name ? ' (' + s.nickname + ')' : ''));
 const _pctTxt   = u => u === null ? '–' : Math.round(u) + '%';
 function _pColor(pid, i) {
-  const p = window.PROJECTS.find(x => x.id === pid);
+  const p = _projById(pid);
   const t = p && (window.PTYPES || []).find(x => x.id === p.typeId);
   return (t && t.color) || TS_PAL[i % TS_PAL.length];
 }
@@ -366,6 +392,8 @@ function _utilBar(u) {
 // ── RENDER ───────────────────────────────────────────────────────────────────
 window.renderTimesheet = function() {
   if (!window.cu) return;
+  _tsRC = _tsBuildRC();
+  try {
   _populateTsFilters();
   const d = _tsCompute();
   _renderKpis(d);
@@ -376,6 +404,7 @@ window.renderTimesheet = function() {
   if (_tsView === 'month')        box.innerHTML = _renderHeat(d);
   else if (_tsView === 'project') box.innerHTML = _renderProjects(d);
   else                            box.innerHTML = _renderStaff(d);
+  } finally { _tsRC = null; }
 };
 
 function _renderKpis(d) {
@@ -465,12 +494,12 @@ function _renderStaff(d) {
     if (x.leaveDays) flags.push(`<span class="ts-chip ts-chip-leave">🌴 ลา ${x.leaveDays} วัน</span>`);
 
     const stack = x.hours ? `<div class="ts-stack">${x.projs.map((p, i) =>
-      `<span style="width:${p.h / x.hours * 100}%;background:${_pColor(p.pid, i)}" title="${esc(window.PROJECTS.find(q => q.id === p.pid)?.name || p.pid)} · ${_n1(p.h)} ชม."></span>`).join('')}</div>` : '';
+      `<span style="width:${p.h / x.hours * 100}%;background:${_pColor(p.pid, i)}" title="${esc(_projById(p.pid)?.name || p.pid)} · ${_n1(p.h)} ชม."></span>`).join('')}</div>` : '';
 
     const body = `
       <div class="ts-srow-body"${isOpen ? '' : ' style="display:none"'}>
         ${x.projs.length ? x.projs.map((p, i) => {
-          const proj = window.PROJECTS.find(q => q.id === p.pid);
+          const proj = _projById(p.pid);
           const share = x.cap ? p.h / x.cap * 100 : 0;
           return `<div class="ts-prow" onclick="window.tsOpenProject('${esc(p.pid)}')" title="ดูรายละเอียดโครงการ">
             <i class="ts-dot" style="background:${_pColor(p.pid, i)}"></i>
@@ -483,7 +512,7 @@ function _renderStaff(d) {
           <div class="ts-over-ttl">⚠ ช่วงที่ถูกจัดงานซ้อน (เกิน ${TS_DAY_H} ชม./วัน)</div>
           ${x.overRanges.slice(0, 8).map(o => `<div class="ts-over-item">
             <b>${_rangeTxt(o.s, o.e)}</b> · สูงสุด ${_n1(o.h)} ชม./วัน ·
-            ${[...o.p].map(pid => esc(window.PROJECTS.find(q => q.id === pid)?.name || pid)).join(' ＋ ')}
+            ${[...o.p].map(pid => esc(_projById(pid)?.name || pid)).join(' ＋ ')}
           </div>`).join('')}
           ${x.overRanges.length > 8 ? `<div class="ts-over-item">…และอีก ${x.overRanges.length - 8} ช่วง</div>` : ''}
         </div>` : ''}
@@ -702,23 +731,23 @@ function _populateTsFilters() {
 
   // Project types that appear in timesheets
   if ((window.PTYPES || []).length) {
-    const pids    = [...new Set(window.TIMESHEETS.map(r => r.pid).filter(Boolean))];
-    const typeIds = new Set(window.PROJECTS.filter(p => pids.includes(p.id)).map(p => p.typeId).filter(Boolean));
+    const pids    = new Set(window.TIMESHEETS.map(r => r.pid).filter(Boolean));
+    const typeIds = new Set(window.PROJECTS.filter(p => pids.has(p.id)).map(p => p.typeId).filter(Boolean));
     window.msFilter('ts-type', window.PTYPES.filter(t => typeIds.has(t.id)).map(t => ({ value: t.id, label: t.label, color: t.color })), { placeholder: 'ทุกประเภท', onChange: window.renderTimesheet });
   }
 
   // Projects that have timesheets
-  const pids = [...new Set(window.TIMESHEETS.map(r => r.pid).filter(Boolean))];
-  const tsProjList = window.PROJECTS.filter(p => pids.includes(p.id));
+  const pids = new Set(window.TIMESHEETS.map(r => r.pid).filter(Boolean));
+  const tsProjList = window.PROJECTS.filter(p => pids.has(p.id));
   const curProj = tsProjList.some(p => p.id === projSel.value) ? projSel.value : '';
   window.initProjectCombobox(window.projectComboIds('ts-proj-cmb', 'ts-proj'), tsProjList, curProj,
     () => window.renderTimesheet(), { allLabel: 'ทุกโครงการ', minWidth: 360 });
 
   // Staff that have timesheets
-  const sids = [...new Set(window.TIMESHEETS.map(r => r.staffId).filter(Boolean))];
+  const sids = new Set(window.TIMESHEETS.map(r => r.staffId).filter(Boolean));
   const curStf = stfSel.value;
   stfSel.innerHTML = '<option value="">ทุกคน</option>' +
-    window.staffOptionsGrouped(window.STAFF.filter(s => s.active && sids.includes(s.id)), curStf);
+    window.staffOptionsGrouped(window.STAFF.filter(s => s.active && sids.has(s.id)), curStf);
 }
 
 // ── AUTO-SYNC FROM PROJECT MEMBERS / VISITS ──────────────────────────────────

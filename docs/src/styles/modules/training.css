@@ -143,7 +143,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14
 .form-control{width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font);font-size:14px;color:var(--text);background:var(--card);transition:border-color .15s}
 .form-control:focus{outline:none;border-color:var(--primary-mid);box-shadow:0 0 0 3px rgba(59,130,246,.1)}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.form-row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
 /* Register form name row */
 .reg-name-row{display:grid;grid-template-columns:110px 1fr 1fr;gap:8px;}
 .reg-field-label{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;}
@@ -478,9 +477,6 @@ tr:hover td{background:var(--bg-subtle)}
 }
 @media(hover:none){.sess-card:not(.full):hover{transform:none}.sess-card:not(.full):active{transform:scale(.98)}}
 @media(prefers-reduced-motion:reduce){.sess-hero-deco,.sess-hero-icon,.sess-day-rel.hot,.sess-cap-fill::after,.sess-anim .sess-card{animation:none}}
-.confirm-box{background:var(--primary-light);border:1px solid #bfdbfe;border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:14px}
-.confirm-box .clabel{font-size:11px;color:var(--text-muted);margin-bottom:2px}
-.confirm-box .cvalue{font-size:14px;font-weight:600;color:var(--primary)}
 /* MASTER LIST (dept/trainer/venue/prefix) */
 .master-list{display:flex;flex-direction:column;gap:5px;max-height:180px;overflow-y:auto;margin-bottom:10px;padding-right:2px}
 .master-item{display:flex;align-items:center;justify-content:space-between;padding:6px 11px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border);font-size:13px}
@@ -702,8 +698,27 @@ tr:hover td{background:var(--bg-subtle)}
   #ov-cat-grid .ov-cg-list{grid-template-columns:minmax(0,1fr)}
   #ov-cat-grid .ov-course-card{grid-template-columns:40px minmax(0,1fr) auto;grid-template-areas:"icon main actions" "meta meta meta";padding:12px;gap:10px}
   #ov-cat-grid .ov-course-card>.tqa-cat-ic{width:40px;height:40px}
-  .ov-course-meta{grid-column:auto}
+  /* เต็มแถวล่าง — เดิม grid-column:auto ทับ grid-area:meta ทำให้แถบนี้ไปตกในคอลัมน์ไอคอน 40px
+     ป้าย "ยังไม่ผูกแบบทดสอบ" ถูกบีบเป็นตัวอักษรเรียงแนวตั้ง */
+  .ov-course-meta{grid-column:1/-1}
   #ov-cat-grid .ov-cr-quiz{grid-column:auto;max-width:100%}
+}
+/* พิมพ์เอกสาร: กริด 270px | ตัวอย่าง (inline) ไม่มี override มือถือ — ตัวอย่างเอกสารเหลือกว้าง 50-120px
+   → สแตก ฟอร์มตั้งค่าอยู่บน ตัวอย่างอยู่ล่าง (สูงคงที่ ให้ _scalePrintPreview ย่อกระดาษพอดีกล่อง) ทั้งหน้าเลื่อนลงได้ */
+@media screen and (max-width:760px){
+  #page-print.active{height:auto!important;overflow:visible!important}
+  #page-print>div{grid-template-columns:minmax(0,1fr)!important;overflow:visible!important}
+  #page-print>div>div:first-child{height:auto!important;overflow:visible!important;border-right:0!important;border-bottom:1px solid var(--border)}
+  #page-print>div>div:last-child{height:75vh!important}
+}
+/* Dashboard ผลประเมิน: ปุ่ม 5 ปุ่ม (ไม่ห่อ) + กริด inline 2 คอลัมน์ (minmax 200-220px) ล้นจอมือถือ */
+@media(max-width:760px){
+  /* หัวหน้า (Analytics ฯลฯ) ปุ่มหลายปุ่มเรียงแถวเดียวไม่ห่อ ล้นจอ 320-360px */
+  .section-header,.section-header>div[style*="display:flex"]{flex-wrap:wrap;gap:8px}
+  .prt-prev-head{flex-wrap:wrap;gap:6px}
+  .svd-actions{flex-wrap:wrap}
+  #svd-content>div[style*="grid-template-columns"]{grid-template-columns:minmax(0,1fr)!important}
+  #svd-content .card{min-width:0}
 }
 @media(max-width:600px){
   .ov-cat-search{flex:1 1 100%}
@@ -714,8 +729,6 @@ tr:hover td{background:var(--bg-subtle)}
 .tqa-chips span{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 8px;border-radius:99px;background:var(--bg-subtle);color:var(--text-secondary)}
 .tqa-warn{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--warn);background:var(--warn-light);border-radius:var(--radius-sm);padding:7px 10px;margin-bottom:10px}
 .tqa-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
-.tqa-bar-title{font-weight:700;font-size:15px;flex:1;min-width:180px}
-.tqa-bar-title span{display:block;font-size:12px;font-weight:400;color:var(--text-muted)}
 .tqa-bar-actions{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
 .tqa-ai{background:linear-gradient(135deg,#7c3aed,#db2777);color:#fff;border:none}
 .nc-modal-head{display:flex;align-items:center;gap:12px;margin-bottom:12px}.nc-modal-head .modal-title{flex:1;min-width:0;margin-bottom:0}.nc-ai-main-btn{flex:none;white-space:nowrap;box-shadow:0 4px 12px rgba(124,58,237,.2)}
@@ -903,7 +916,6 @@ tr:hover td{background:var(--bg-subtle)}
 .scan-result-header.confirm .scan-result-title{color:var(--primary)}
 .scan-result-body{background:var(--card);padding:14px 18px}
 /* ATTENDANCE */
-.att-session-select{display:flex;gap:10px;align-items:flex-end;margin-bottom:16px;flex-wrap:wrap}
 .att-progress-mini{display:flex;align-items:center;gap:8px;flex-shrink:0;font-size:11px;color:var(--text-muted);white-space:nowrap;margin-top:4px}
 .att-progress-bar{width:120px;height:6px;background:var(--border);border-radius:3px;overflow:hidden}
 .att-progress-fill{height:100%;border-radius:5px;background:var(--success);transition:width .5s}
@@ -971,7 +983,6 @@ tr:hover td{background:var(--bg-subtle)}
 @media(max-width:900px){
   .cat-grid{grid-template-columns:repeat(2,1fr);gap:14px}
   .page{padding:16px}
-  .form-row3{grid-template-columns:1fr 1fr}
 }
 /* ── Mobile (≤ 640px) ─────────────────────────── */
 @media(max-width:640px){
@@ -1011,6 +1022,8 @@ tr:hover td{background:var(--bg-subtle)}
   .page{padding:10px}
   .cat-grid{grid-template-columns:1fr;gap:10px}
   .reg-hero{padding:18px 16px}
+  /* minmax(118-140px) ×2 + gap กว้างเกินกล่องบนจอ 320-360px → การ์ดคอลัมน์ขวาถูกตัดขอบ */
+  .reg-hero-stats,.tk-hero .reg-hero-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
   .reg-hero-title{font-size:22px}
   .reg-hero-sub{font-size:12.5px}
   .reg-stat{padding:10px;gap:9px}
@@ -1113,7 +1126,6 @@ tr:hover td{background:var(--bg-subtle)}
 .pv-phtbl{flex-shrink:0;}
 .pv-dtbl{flex-shrink:0;}
 .pv-pf{flex-shrink:0;}
-.pv-sig{display:flex;justify-content:space-between;padding:0 8mm;margin-top:5mm;}
 .sig-blk{text-align:center;width:44%;}
 .sig-line{border-bottom:1px solid #333;width:51mm;margin:0 auto 3px;}
 .sig-lbl{font-size:16px;line-height:1.3;font-family:'TH SarabunPSK';}

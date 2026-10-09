@@ -126,8 +126,6 @@ window.renderHolView=function(){
 
 // ── LEAVE ──
 var LEAVE_TYPE_LABEL={sick:'🤒 ลาป่วย',vacation:'🏖 ลาพักร้อน',personal:'📋 ลากิจ',maternity:'🤱 ลาคลอด',ordain:'🙏 ลาบวช',other:'📝 อื่นๆ'};
-var LEAVE_STATUS_LABEL={pending:'⏳ รออนุมัติ',approved:'✅ อนุมัติ',rejected:'❌ ไม่อนุมัติ'};
-var LEAVE_STATUS_COLOR={pending:'var(--amber)',approved:'var(--teal)',rejected:'var(--coral)'};
 
 window.renderLeave=function(){
   // Init year dropdown once
@@ -170,11 +168,13 @@ window.renderLeave=function(){
   if(_deptPar)_deptPar.style.display=_isViewer?'none':'';
   if(_staffPar)_staffPar.style.display=_isViewer?'none':'';
   if(_isViewer&&window.cu.staffId)fStaff=window.cu.staffId;
+  // ดัชนีพนักงานตาม id (ตัวแรกที่เจอ = ผลเดียวกับ .find) — ใช้ซ้ำทั้งกรองแผนก/จัดกลุ่ม/ผู้ทำงานแทน
+  var sm=new Map();window.STAFF.forEach(function(s){if(!sm.has(s.id))sm.set(s.id,s);});
   var list=(window.LEAVES||[]).filter(function(lv){
     if(fStaff&&lv.staffId!==fStaff)return false;
     if(fType&&lv.leaveType!==fType)return false;
     if(fStatus&&lv.status!==fStatus)return false;
-    if(fDept){var st=window.STAFF.find(s=>s.id===lv.staffId);if(!st||(st.dept||'')!==fDept)return false;}
+    if(fDept){var st=sm.get(lv.staffId);if(!st||(st.dept||'')!==fDept)return false;}
     if(fYear){
       var s=new Date(lv.startDate),e=new Date(lv.endDate);
       if(isNaN(s)||isNaN(e))return false;
@@ -238,7 +238,7 @@ window.renderLeave=function(){
   // Group by dept (sort by dept name, then by startDate desc within each group)
   var deptMap={};
   list.forEach(function(lv){
-    var stf=window.STAFF.find(s=>s.id===lv.staffId)||{name:'?',dept:'',role:''};
+    var stf=sm.get(lv.staffId)||{name:'?',dept:'',role:''};
     var d=stf.dept||'ไม่ระบุแผนก';
     if(!deptMap[d])deptMap[d]=[];
     deptMap[d].push({lv:lv,stf:stf});
@@ -246,7 +246,7 @@ window.renderLeave=function(){
   var deptKeys=Object.keys(deptMap).sort(function(a,b){return a.localeCompare(b,'th');});
 
   function makeCard(lv,stf,globalIdx){
-    var sub=lv.substituteId?(window.STAFF.find(s=>s.id===lv.substituteId)||{name:''}).name:'';
+    var sub=lv.substituteId?(sm.get(lv.substituteId)||{name:''}).name:'';
     var days=lvDays(lv);
     var sColor=S_COLOR[lv.status]||'var(--txt3)';
     var sBg=S_BG[lv.status]||'transparent';

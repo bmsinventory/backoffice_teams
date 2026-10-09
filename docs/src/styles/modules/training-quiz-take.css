@@ -35,7 +35,6 @@ button{font-family:inherit}
 @keyframes tqfloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
 
 .tq-h1{font-size:20px;font-weight:800;margin-bottom:6px;text-align:center}
-.tq-sub{font-size:13px;color:var(--text-muted);text-align:center}
 .tq-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:14px;box-shadow:var(--sh-sm)}
 .tq-card-title{font-size:15px;font-weight:700;color:var(--primary);display:flex;align-items:center;gap:8px;margin-bottom:12px}
 /* ══ ยืนยันตัวตน — ฮีโร่ + ฟอร์ม (จอกว้างวางคู่ · จอแคบเรียงลง) ══ */

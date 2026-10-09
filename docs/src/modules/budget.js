@@ -18,9 +18,9 @@ window.budRenderSubnav=function(){
 };
 
 window._budSwitchTab=function(tab){
-  if(tab==='cost'){window.goView('cost');return;}
+  if(tab==='cost'){window.goView('cost',true);return;}
   _budCurTab=tab;
-  if(document.body.getAttribute('data-view')!=='budget')window.goView('budget');
+  if(document.body.getAttribute('data-view')!=='budget')window.goView('budget',true);
   else window.renderBudget();
 };
 
@@ -120,13 +120,14 @@ window.budCalcRows=function(f){
   if(f.status==='burn')rows=rows.filter(function(r){return r.burnAhead;});
   else if(f.status)rows=rows.filter(function(r){return r.health===f.status;});
   var s=f.sort;
+  var thCmp=s==='name_asc'?new Intl.Collator('th').compare:null; // = localeCompare(...,'th') แต่สร้างครั้งเดียว
   if(s)rows.sort(function(a,b){
     if(s==='pct_desc')return b.pct-a.pct;
     if(s==='pct_asc')return a.pct-b.pct;
     if(s==='budget_desc')return b.budget-a.budget;
     if(s==='remain_asc')return a.remain-b.remain;
     if(s==='gap_desc')return (b.pct-b.progress)-(a.pct-a.progress);
-    if(s==='name_asc')return a.p.name.localeCompare(b.p.name,'th');
+    if(s==='name_asc')return thCmp(a.p.name,b.p.name);
     return 0;
   });
   return rows;
@@ -192,7 +193,8 @@ function _renderBudgetTab(){
   var pctUsed=T.budget>0?Math.round(T.used/T.budget*100):0;
   var cnt={over:0,warn:0,ok:0,nobudget:0,burn:0};
   all.forEach(function(r){cnt[r.health]++;if(r.burnAhead)cnt.burn++;});
-  var pendN=(window.ADVANCES||[]).filter(function(a){return a.status==='pending'&&all.some(function(r){return r.p.id===a.pid;});}).length;
+  var allPids=new Set(all.map(function(r){return r.p.id;}));
+  var pendN=(window.ADVANCES||[]).filter(function(a){return a.status==='pending'&&allPids.has(a.pid);}).length;
 
   // ── 1. KPI ──
   var kpi=document.getElementById('bud-kpi');

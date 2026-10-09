@@ -38,6 +38,7 @@
     }
     if (uName) uName.textContent = cu.name || cu.username || '';
     if (uRole) uRole.textContent = window.roleLabel ? window.roleLabel(cu.role) : (cu.role || '');
+    window.showWhatsNew();
 
     // Show/hide role-based CSS class elements
     var isAdm  = window.isAdmin && window.isAdmin();
@@ -240,7 +241,7 @@
     window.updateBadge && window.updateBadge();
   };
 
-  // ── เมนูบัญชีผู้ใช้: กดชื่อผู้ใช้ท้าย sidebar → เปลี่ยนรหัสผ่าน / ออกจากระบบ
+  // ── เมนูบัญชีผู้ใช้: กดชื่อผู้ใช้ท้าย sidebar → เปลี่ยนรหัสผ่าน / แนะนำการใช้งาน / ออกจากระบบ
   // วางเหนือแถวผู้ใช้ · sidebar แบบย่อ (เหลือแค่อวาตาร์) → วางด้านขวาแทน · ปิดเมื่อกดที่อื่น/Esc ──
   function _closeUserMenu() { var m = document.getElementById('user-menu'); if (m) m.remove(); }
   window.toggleUserMenu = function (e) {
@@ -251,7 +252,9 @@
     m.id = 'user-menu';
     m.innerHTML = '<div class="um-head"><b>' + window.esc(cu.name || cu.username || '') + '</b><span>'
       + window.esc(window.roleLabel ? window.roleLabel(cu.role) : (cu.role || '')) + '</span></div>'
+      + '<button type="button" data-act="manual">📖 คู่มือการใช้งาน</button>'
       + '<button type="button" data-act="pw">🔒 เปลี่ยนรหัสผ่าน</button>'
+      + '<button type="button" data-act="tour">🧭 แนะนำการใช้งาน</button>'
       + '<button type="button" data-act="out" class="danger">🚪 ออกจากระบบ</button>';
     document.body.appendChild(m);
     var r = row ? row.getBoundingClientRect() : { left: 12, right: 12, top: window.innerHeight, bottom: window.innerHeight, width: 200 };
@@ -262,7 +265,9 @@
       if (!act) return;
       _closeUserMenu();
       window.closeMobSidebar && window.closeMobSidebar();
-      if (act === 'pw') window.openChangePassword && window.openChangePassword();
+      if (act === 'manual') window.open('manual.html', '_blank');
+      else if (act === 'pw') window.openChangePassword && window.openChangePassword();
+      else if (act === 'tour') window.startTour && window.startTour();
       else window.doLogout && window.doLogout();
     });
   };
@@ -271,6 +276,53 @@
     if (m && !m.contains(e.target)) _closeUserMenu();
   });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') _closeUserMenu(); });
+
+  // ── มีอะไรใหม่: popup รายการปรับแก้ของเวอร์ชันที่ผู้ใช้ยังไม่กดรับทราบ (src/config/changelog.config.js) ──
+  // จำการรับทราบแยกตามผู้ใช้ (users.id) ในเบราว์เซอร์ — เวอร์ชันถัดไปจะเตือนใหม่อีกครั้ง
+  var _whatsNewShown = false;
+  function _verAckKey() { return '_bms_ver_ack_' + (window.cu && window.cu.id); }
+  function _getVerAck() { try { return localStorage.getItem(_verAckKey()); } catch (e) { return null; } }
+
+  // force = เปิดดูเองจากการคลิกเลขเวอร์ชัน (แสดงเวอร์ชันล่าสุดแม้รับทราบแล้ว)
+  window.showWhatsNew = function (force) {
+    var log = window.CHANGELOG || [];
+    if (!window.cu || !log.length) return;
+    if (!force && (_whatsNewShown || _getVerAck() === window.APP_VERSION)) return;
+    var ack = force ? null : _getVerAck();
+    var seen = log.findIndex(function (v) { return v.version === ack; });
+    // ยังไม่เคยรับทราบ/ไม่พบเวอร์ชันเดิมในรายการ → แสดงเฉพาะเวอร์ชันล่าสุด
+    var list = log.slice(0, seen > 0 ? seen : 1);
+    var esc = window.esc;
+    var TYPES = { new: 'ใหม่', improve: 'ปรับปรุง', fix: 'แก้ไข' };
+    var count = list.reduce(function (n, v) { return n + v.items.length; }, 0);
+    document.getElementById('wn-ver').textContent = window.APP_VERSION;
+    document.getElementById('wn-sub').textContent = (list[0].date ? 'อัปเดตเมื่อ ' + window.fd(list[0].date) + ' · ' : '')
+      + count + ' รายการที่เปลี่ยน' + (list.length > 1 ? ' (รวม ' + list.length + ' เวอร์ชันที่คุณยังไม่ได้ดู)' : '');
+    document.getElementById('wn-body').innerHTML = list.map(function (v) {
+      return (list.length > 1 ? '<div class="wn-group">' + esc(v.version) + '</div>' : '')
+        + v.items.map(function (it) {
+          var t = TYPES[it.type] ? it.type : 'new';
+          return '<div class="wn-item wn-' + t + '">'
+            + '<div class="wn-ic">' + esc(it.icon || '✨') + '</div>'
+            + '<div class="wn-main">'
+            +   '<div class="wn-top"><span class="wn-tag">' + TYPES[t] + '</span><span class="wn-title">' + esc(it.title) + '</span></div>'
+            +   (it.where ? '<div class="wn-where"><span>📍 อยู่ที่</span>' + esc(it.where) + '</div>' : '')
+            +   (it.desc ? '<div class="wn-desc">' + esc(it.desc) + '</div>' : '')
+            + '</div></div>';
+        }).join('');
+    }).join('');
+    _whatsNewShown = true;
+    // รอให้หน้าโหลดข้อมูลเสร็จก่อน ไม่ให้ซ้อนอยู่ใต้ตัวโหลด
+    (function waitLoader() {
+      if (document.querySelector('#sys-loader.on')) return setTimeout(waitLoader, 300);
+      window.openM('m-whats-new');
+    })();
+  };
+
+  window.ackWhatsNew = function () {
+    try { localStorage.setItem(_verAckKey(), window.APP_VERSION); } catch (e) {}
+    window.closeM('m-whats-new');
+  };
 
   // ── New Version Available Banner ──
   // Shown instead of a silent forced reload, so an in-progress form isn't wiped out.
@@ -318,8 +370,12 @@
 
   // ── DOM Ready: restore remembered login + bind login form ──
   document.addEventListener('DOMContentLoaded', function () {
+    var verEl = document.getElementById('app-ver');
+    if (verEl) verEl.textContent = window.APP_VERSION || '';
     // ฟอนต์กราฟทุกหน้าให้ตรงกับฟอนต์ของแอป (Chart.js โหลดแบบ defer → พร้อมก่อน DOMContentLoaded)
     if (window.Chart) window.Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+    // กราฟถูกสร้างใหม่ทุกครั้งที่เข้าหน้า/ข้อมูลเปลี่ยน — แอนิเมชันเริ่มต้น 1 วินาทีแย่งเฟรมกับการวาดหน้า (เลื่อนจอกระตุก) จึงย่อให้สั้น
+    if (window.Chart) window.Chart.defaults.animation.duration = 250;
 
     var remUser = window.StorageService && window.StorageService.getRememberedUser();
     var remPass = window.StorageService && window.StorageService.getRememberedPassword();

@@ -10,6 +10,7 @@
 <link rel="icon" type="image/png" href="img/icon_app.png">
 <link rel="manifest" href="manifest.json">
 <!-- PWA: iOS -->
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="BMS">
@@ -17,6 +18,10 @@
 <link rel="apple-touch-icon" sizes="180x180" href="img/icon_app.png">
 <link rel="apple-touch-startup-image" href="img/BMS_T.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- มี session ค้าง (Refresh) → ตั้ง class ก่อนวาดหน้าแรก: ซ่อนหน้าล็อกอิน แสดงตัวโหลดทันที (ไม่วาบหน้าล็อกอิน)
+     auth.service.js _restoreSession เอา class ออกเมื่อเข้าแอปได้/ไม่ได้ · key เดียวกับ src/utils/session.util.js -->
+<script>try{if(sessionStorage.getItem('_bms_sess')||localStorage.getItem('_bms_sess'))document.documentElement.classList.add('boot-sess');}catch(e){}</script>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+Thai:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css">
 <!-- defer: ดาวน์โหลดคู่ขนาน ไม่บล็อกการวาดหน้า · ใช้ภายในฟังก์ชันหลังเปิดหน้าเท่านั้น (รันก่อน DOMContentLoaded)
@@ -175,8 +180,8 @@
       <div class="sb-logo" style="background:#fff;padding:2px;"><img src="img/BMS_T.png" style="width:100%;height:100%;object-fit:contain;display:block;"></div>
       <div>
         <div class="sb-title">Backoffice Teams</div>
-        <!-- เลขเวอร์ชัน: +0.001 ทุกครั้งที่ปล่อยเวอร์ชัน (deploy) -->
-        <div class="sb-sub">V1.006</div>
+        <!-- เลขเวอร์ชัน: แก้ที่ src/config/changelog.config.js (APP_VERSION) — src/app.js ใส่ค่าให้ -->
+        <div class="sb-sub" id="app-ver" title="ดูว่ามีอะไรใหม่" style="cursor:pointer" onclick="window.showWhatsNew(true)"></div>
       </div>
     </div>
     <div class="sb-nav">
@@ -250,6 +255,10 @@
       </div>
       <div class="nav-btn" onclick="window.goView('contract',this)">
         <i class="ti ti-file-description ni" aria-hidden="true"></i><span class="nl">ข้อมูลสัญญา</span>
+      </div>
+      <!-- คู่มือการใช้งาน (docs/manual.html) — เปิดแท็บใหม่ · ทุกคนเห็น ไม่ผูกสิทธิ์ -->
+      <div class="nav-btn" onclick="window.open('manual.html','_blank')">
+        <i class="ti ti-book-2 ni" aria-hidden="true"></i><span class="nl">คู่มือการใช้งาน</span>
       </div>
 
       <div class="sb-sec" id="sb-sec-system" style="display:none">ระบบ</div>
@@ -420,7 +429,6 @@
           <div style="flex:1"></div>
           <button class="btn btn-pri btn-sm" onclick="window.kbAiAdvSummary()" title="สรุปไซต์ในคอลัมน์ วางแผนงาน/จัดทำ Adv. ที่ต้องขออนุมัติ Adv. เป็นข้อความส่ง LINE"><i class="ti ti-sparkles" aria-hidden="true"></i>AI สรุปขออนุมัติ Adv.</button>
           <button class="btn btn-sm ce-only" style="background:var(--violet)15;color:var(--violet);border:1px solid var(--violet)30;font-weight:700;" onclick="window.runAutoStage(false)"><i class="ti ti-bolt" aria-hidden="true"></i>อัปเดต Stage อัตโนมัติ</button>
-          <div id="kb-last-auto" style="font-size:10px;color:var(--txt3);padding:0 8px;"></div>
         </div>
         <div id="kb-board"></div>
       </div>
@@ -814,7 +822,7 @@
           <button class="btn btn-pri btn-sm admin-only" style="display:none" onclick="window.openHospitalModal(null)"><i class="ti ti-plus" aria-hidden="true"></i>เพิ่ม รพ.</button>
         </div>
         <!-- View toggle tabs -->
-        <div style="display:flex;gap:0;border-bottom:2px solid var(--border);padding:0 24px;background:var(--surface);">
+        <div class="hsp-vtabs" style="display:flex;gap:0;border-bottom:2px solid var(--border);padding:0 24px;background:var(--surface);">
           <button id="hsp-vtab-list" onclick="window.goHspView('list')"
             style="padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;cursor:pointer;color:var(--violet);border-bottom:2px solid var(--violet);margin-bottom:-2px;transition:all .15s;">
             <i class="ti ti-list-details" aria-hidden="true"></i> รายชื่อ รพ.
@@ -1031,6 +1039,24 @@
     </div>
     <div class="m-body" id="m-hd-assign-body"></div>
     <div class="m-foot" id="m-hd-assign-foot" style="display:flex;align-items:center;"></div>
+  </div>
+</div>
+<!-- มีอะไรใหม่ — แสดงหลังเข้าสู่ระบบเมื่อยังไม่กดรับทราบเวอร์ชันล่าสุด · src/app.js showWhatsNew / src/config/changelog.config.js -->
+<div class="overlay" id="m-whats-new">
+  <div class="modal wn-modal" role="dialog" aria-labelledby="wn-ver">
+    <div class="wn-hero">
+      <div class="wn-hero-ic">🚀</div>
+      <div>
+        <div class="wn-kicker">ระบบอัปเดตแล้ว · มีอะไรใหม่</div>
+        <div class="wn-ver" id="wn-ver"></div>
+        <div class="wn-sub" id="wn-sub"></div>
+      </div>
+    </div>
+    <div class="wn-body" id="wn-body"></div>
+    <div class="wn-foot">
+      <button class="wn-btn" onclick="window.ackWhatsNew()">รับทราบแล้ว</button>
+      <div class="wn-note">กดรับทราบแล้วจะไม่แสดงอีก จนกว่าจะมีเวอร์ชันถัดไป</div>
+    </div>
   </div>
 </div>
 <!-- รายการวันหยุด (ดูอย่างเดียว) — ปุ่ม 🎌 วันหยุด ในปฏิทินทีม · src/modules/leave.js openHolView -->
@@ -2068,22 +2094,6 @@
   </div>
 </div>
 
-<!-- ── Annual Target Modal ── -->
-<div class="modal" id="m-target">
-  <div class="modal-box" style="max-width:520px;">
-    <button class="modal-close" onclick="window.closeM('m-target')">✕</button>
-    <div id="m-target-body"></div>
-  </div>
-</div>
-
-<!-- ── Type Group Modal ── -->
-<div class="modal" id="m-typegroups">
-  <div class="modal-box" style="max-width:560px;">
-    <button class="modal-close" onclick="window.closeM('m-typegroups')">✕</button>
-    <div id="m-typegroups-body"></div>
-  </div>
-</div>
-
 <!-- HOSPITAL IMPORT PREVIEW MODAL -->
 <div class="overlay" id="m-hsp-import">
   <div class="modal xl" style="max-width:880px;display:flex;flex-direction:column;max-height:90vh;">
@@ -2150,7 +2160,7 @@
       <button class="m-x" onclick="window.closeM('m-hsp-detail')">✕</button>
     </div>
     <!-- Tab bar -->
-    <div style="display:flex;gap:0;border-bottom:2px solid var(--border);flex-shrink:0;padding:0 24px;">
+    <div class="hsp-vtabs" style="display:flex;gap:0;border-bottom:2px solid var(--border);flex-shrink:0;padding:0 24px;">
       <button id="m-hsp-dtab-info" onclick="window._hspDetailTab('info')"
         style="background:none;border:none;padding:10px 16px;cursor:pointer;font-size:13px;font-weight:600;color:var(--violet);border-bottom:2px solid var(--violet);margin-bottom:-2px;transition:color .15s;">
         🏥 ข้อมูลทั่วไป
@@ -2219,6 +2229,8 @@
       <div style="font-size:12px;color:var(--txt-muted);margin-bottom:12px;">
         ล็อกอินด้วยบัญชี <b>hcode.moph.go.th</b> · token เก็บใน browser นี้เท่านั้น
       </div>
+      <!-- form ให้ตัวจัดการรหัสผ่านของเบราว์เซอร์จำ/เติมให้ได้ · กด Enter เรียก hspApiLogin เอง (onsubmit กันหน้าโหลดใหม่) -->
+      <form onsubmit="return false">
       <div class="f-group" style="margin-bottom:10px;">
         <label class="f-label">Username</label>
         <input class="f-input" id="hsp-api-user" placeholder="ชื่อผู้ใช้งาน hcode.moph.go.th" autocomplete="username"
@@ -2229,6 +2241,7 @@
         <input class="f-input" id="hsp-api-pass" type="password" placeholder="รหัสผ่าน" autocomplete="current-password"
           onkeydown="if(event.key==='Enter')window.hspApiLogin()">
       </div>
+      </form>
       <div style="display:flex;gap:10px;justify-content:flex-end;">
         <button class="btn btn-ghost" onclick="window.closeM('m-hsp-api')">ปิด</button>
         <button class="btn btn-pri" id="hsp-api-login-btn" onclick="window.hspApiLogin()">🔗 เชื่อมต่อ</button>
@@ -2248,7 +2261,7 @@
     </div>
 
     <!-- Tab bar -->
-    <div style="display:flex;gap:0;border-bottom:2px solid var(--border);flex-shrink:0;padding:0 24px;">
+    <div class="hsp-vtabs" style="display:flex;gap:0;border-bottom:2px solid var(--border);flex-shrink:0;padding:0 24px;">
       <button id="m-hsp-tab-info" onclick="window._hspTab('info')"
         style="padding:10px 20px;font-size:13px;font-weight:600;background:none;border:none;cursor:pointer;
                color:var(--violet);border-bottom:2px solid var(--violet);margin-bottom:-2px;transition:all .15s;">
@@ -2486,6 +2499,7 @@
 <!-- 1. Config Layer -->
 <script src="src/config/api.config.js"></script>
 <script src="src/config/app.config.js"></script>
+<script src="src/config/changelog.config.js"></script>
 <script src="src/config/routes.config.js"></script>
 <script src="src/config/impl-tracker.config.js"></script>
 <script src="src/config/form-tracker.config.js"></script>
@@ -2514,9 +2528,6 @@
 <!-- 3. Services Layer (ต้องโหลดหลัง utils) -->
 <script src="src/utils/session.util.js"></script>
 <script src="src/services/storage.service.js"></script>
-<!-- LOCAL TEST MODE: ถ้าเปิดผ่าน localhost (หรือ window.LOCAL_TEST_MODE=true) จะใช้ localStorage แทน backend
-     ต้องโหลดก่อน db.service.js — ตัวนั้นมี guard เช็ค window.__LOCAL_DB_ACTIVE__ แล้วข้ามตัวเอง -->
-<script src="src/services/local-db.service.js"></script>
 <script src="src/services/db.service.js"></script>
 <script src="src/services/realtime.service.js"></script>
 <script src="src/services/auth.service.js"></script>
@@ -2526,6 +2537,7 @@
 <script src="src/services/site-deploy-form.service.js"></script>
 <script src="src/services/site-notice-form.service.js"></script>
 <script src="src/services/ai.service.js"></script>
+<script src="src/services/ai-knowledge.js"></script>
 <script src="src/services/helpdesk.service.js"></script>
 <script src="src/services/push.service.js"></script>
 
@@ -2565,6 +2577,7 @@
 <script src="src/modules/training.js"></script>
 <script src="src/modules/budget.js"></script>
 <script src="src/modules/export.js"></script>
+<script src="src/modules/tour.js"></script>
 
 <!-- 5. App Entry Point (โหลดสุดท้าย หลัง feature modules ทั้งหมด) -->
 <script src="src/app.js"></script>

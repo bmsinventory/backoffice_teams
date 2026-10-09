@@ -29,10 +29,25 @@
   }
   // ── หาโครงการต้นทาง (window.PROJECTS) — ตรรกะเดียวกับติดตามสถานะโครงการ (src/utils/project-team.util.js) ──
   function aioResolveSourceProject(proj) { return window.ProjectTeam.source(proj, window.PROJECTS); }
+  // ── แคชค่าต่อโครงการภายใน render หนึ่งรอบ (_rc) — เดิม .find โครงการ/โครงการต้นทาง/เดาชื่อ รพ. (วนทุก รพ.)
+  // ซ้ำทุกแถวปัญหา · นอกรอบ render (คลิก drill-down) คำนวณตรงเหมือนเดิม ──
+  var _rc = null;
+  function aioCached(bucket, pid, fn) {
+    if (!_rc) return fn(pid);
+    var m = _rc[bucket] || (_rc[bucket] = new Map());
+    if (m.has(pid)) return m.get(pid);
+    var v = fn(pid);
+    m.set(pid, v);
+    return v;
+  }
+  function aioProjectById(pid) {
+    return aioCached('proj', pid, function (id) { return (window.IMPL_PROJECTS || []).find(function (x) { return x.id === id; }); });
+  }
   function aioProjectTypeId(pid) {
-    var p = (window.IMPL_PROJECTS || []).find(function (x) { return x.id === pid; });
-    var src = aioResolveSourceProject(p);
-    return (src && src.typeId) || '';
+    return aioCached('type', pid, function (id) {
+      var src = aioResolveSourceProject(aioProjectById(id));
+      return (src && src.typeId) || '';
+    });
   }
   function aioTypeLabel(typeId) {
     var t = (window.PTYPES || []).find(function (x) { return x.id === typeId; });
@@ -42,13 +57,14 @@
   // ── ชื่อโครงการ — ใช้ IMPL_PROJECTS.name ตรง ๆ (window.PROJECTS.siteOwner/hospitalName ที่เคยลองอ่าน
   // ไม่ได้เก็บชื่อ รพ. จริงตามที่คาดไว้ แสดงผลผิด จึงตัดออกใช้ชื่อโครงการแทนตรง ๆ) ──
   function aioProjectLabel(pid) {
-    var p = (window.IMPL_PROJECTS || []).find(function (x) { return x.id === pid; });
+    var p = aioProjectById(pid);
     return p ? p.name : 'ไม่ทราบโครงการ';
   }
   // ── โรงพยาบาลของโครงการ — จาก รพ. ของโครงการต้นทาง (projects.hospital_id) · ยังไม่ได้ผูกก็เดาจากชื่อ
   // โครงการ (เหมือน expense-form) · หาไม่เจอ → null (การ์ดใช้ชื่อโครงการแทน) ──
-  function aioProjectHospital(pid) {
-    var p = (window.IMPL_PROJECTS || []).find(function (x) { return x.id === pid; });
+  function aioProjectHospital(pid) { return aioCached('hosp', pid, aioProjectHospitalCalc); }
+  function aioProjectHospitalCalc(pid) {
+    var p = aioProjectById(pid);
     if (!p) return null;
     var hosps = window.HOSPITALS || [];
     var src = aioResolveSourceProject(p);
@@ -146,12 +162,11 @@
     return buckets;
   }
   function aioComputeTrend() {
-    var allIssues = window.IMPL_ISSUES || [];
+    // แปลงวันที่ครั้งเดียวต่อปัญหา (เดิม new Date ซ้ำทุกงวด × ทุกปัญหา)
+    var dated = (window.IMPL_ISSUES || []).map(function (i) { return { i: i, d: i.createdAt ? new Date(i.createdAt) : null }; });
     return aioTrendBuckets(_trendMode, TREND_PERIODS).map(function (b) {
-      var inBucket = allIssues.filter(function (i) {
-        var d = i.createdAt ? new Date(i.createdAt) : null;
-        return d && d >= b.start && d < b.end;
-      });
+      var inBucket = [];
+      dated.forEach(function (x) { if (x.d && x.d >= b.start && x.d < b.end) inBucket.push(x.i); });
       return {
         start: b.start, end: b.end, label: b.label,
         open: inBucket.filter(function (i) { return i.status === 'open'; }).length,
@@ -267,12 +282,6 @@
   function aioFilterKey() { return _selectedYear + '|' + _selectedHosp; }
 
   // ── Drill-down: เปิด modal รายการปัญหาตามเงื่อนไขที่คลิก ── //
-  // ── คลิกชื่อโครงการในตาราง "สถานะรายโครงการ" — เปิด popup รายการปัญหาของโครงการนั้นในหน้านี้เลย
-  // (ไม่พาไปหน้า Impl Tracker เพราะกลับมาหน้านี้ยาก) มีปุ่มเปิดใน Impl Tracker ให้ถ้าต้องแก้ไขจริง ──
-  window.aioShowProjectIssues = function (pid) {
-    var list = aioYearFilteredIssues().filter(function (i) { return i.projectId === pid; });
-    window.aioShowIssueDetail(list, aioProjectLabel(pid), pid);
-  };
   // ── คลิกในตาราง รพ. × ระบบ — ปัญหาของกลุ่มโครงการนั้น (ช่อง = รพ.+ระบบ, ชื่อ/รวม = ทั้ง รพ.) ·
   // pendingOnly = เฉพาะข้อที่ยังไม่เสร็จ (คลิกช่องที่ค้าง / ยอดรวมที่ค้าง) ──
   window.aioShowGroupIssues = function (key, pendingOnly) {
@@ -436,6 +445,11 @@
 
   // ── Render หลัก ── //
   window.renderAllIssuesOverview = function () {
+    if (_rc) return renderAllIssuesNow();
+    _rc = {};
+    try { return renderAllIssuesNow(); } finally { _rc = null; }
+  };
+  function renderAllIssuesNow() {
     var mount = document.getElementById('view-all-issues');
     if (!mount) return;
 
@@ -729,6 +743,6 @@
       + anaHtml
       + trendHtml
       + '<div class="aio-sec">' + hospToolbar + matrixHtml + '</div>';
-  };
+  }
 
 })();

@@ -7,6 +7,8 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # ตัวส่ง Web Push รันคู่ nginx ใน container นี้ (ไม่ต้องเพิ่ม service บน server) · worker.secret มาจากเครื่องที่ build (ไม่อยู่ใน git)
 COPY push-worker/ /opt/push-worker/
+# ตัวค้นคลังความรู้ AI ใช้ไฟล์เดียวกับหน้าเว็บ
+COPY docs/src/services/ai-knowledge.js /opt/push-worker/ai-knowledge.js
 RUN apk add --no-cache nodejs npm && cd /opt/push-worker && npm ci --omit=dev && npm cache clean --force && apk del npm
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 
@@ -15,9 +17,8 @@ RUN sed -i 's/\r$//' /docker-entrypoint.sh && chmod +x /docker-entrypoint.sh
 
 ENV SUPABASE_URL=""
 ENV SUPABASE_ANON_KEY=""
-# คำขอข้อมูลผ่าน nginx นี้ (บีบอัด gzip) → API_UPSTREAM · ว่าง = ใช้ SUPABASE_URL · API_PROXY=0 = ปิด (ดู docker-entrypoint.sh)
+# คำขอข้อมูลผ่าน nginx นี้ (บีบอัด gzip) → API_UPSTREAM · ว่าง = ใช้ SUPABASE_URL (ดู docker-entrypoint.sh)
 ENV API_UPSTREAM=""
-ENV API_PROXY="1"
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["nginx", "-g", "daemon off;"]

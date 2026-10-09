@@ -11,7 +11,7 @@
   // ── Global Data Store ──
   // ชื่อ global ตรงกับชื่อ table แบบ UPPERCASE (getColRef fallback lower-case ชื่อ collection
   // เป็นชื่อ table โดยอัตโนมัติเมื่อไม่มีอยู่ใน COL_MAP ของ db.service.js — ห้ามเปลี่ยนชื่อนี้
-  // โดยไม่ตรงกับชื่อ table ใน db-migration-site-notice-form.sql)
+  // โดยไม่ตรงกับชื่อ table ใน db-schema.sql)
   window.SITE_NOTICE_FORMS = [];
 
   // ── ระบบที่แจ้ง (ช่อง checkbox บนฟอร์มกระดาษ — เลือกได้ 1 ระบบ) ──

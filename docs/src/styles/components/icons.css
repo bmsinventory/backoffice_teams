@@ -3,7 +3,6 @@
    Keeps navigation, headings, actions and status surfaces visually aligned.
 ================================================================ */
 
-.app-icon,
 .ti {
   display: inline-flex;
   align-items: center;
@@ -62,34 +61,27 @@
   -webkit-text-fill-color: transparent;
 }
 
-/* เมนูซ้าย / แถบล่างมือถือ: อีโมจิสีบนกรอบมนสีอ่อนตามโทนของโมดูล · เลือกอยู่ = กรอบขาวยกลอย + ขอบสีโมดูล */
+/* เมนูซ้าย: อีโมจิล้วน ไม่มีกรอบพื้นหลัง · แถบล่างมือถือ: อีโมจิบนกรอบมนสีอ่อนตามโทนของโมดูล */
 .nav-btn .ni {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
-  min-width: 30px;
-  margin: -5px 0 -5px -5px;
-  border-radius: 9px;
-  background: var(--icon-bg, rgba(124,92,252,.12));
-  font-size: 16px;
-  box-shadow: inset 0 0 0 1px rgba(127,127,127,.08);
-  transition: background .18s, transform .18s, box-shadow .18s;
+  width: 22px;
+  min-width: 22px;
+  background: none;
+  font-size: 18px;
+  transition: transform .18s;
 }
-.nav-btn:hover .ni { transform: translateY(-1px) scale(1.06); }
+.nav-btn:hover .ni { transform: translateY(-1px) scale(1.08); }
 .nav-btn.on {
   background: linear-gradient(90deg, var(--icon-bg, rgba(124,92,252,.12)), transparent);
 }
 .nav-btn.on .nl { color: var(--icon-color, var(--violet)); }
 .nav-btn.on::before { background: var(--icon-color, var(--violet)); }
 .nav-btn.on .ni {
-  background: var(--surface, #fff);
-  -webkit-background-clip: border-box;
-  background-clip: border-box;
+  background: none;
   -webkit-text-fill-color: initial;
-  box-shadow: 0 0 0 1.5px var(--icon-color, var(--violet)), 0 5px 12px var(--icon-shadow, rgba(124,92,252,.25));
-  transform: scale(1.04);
+  transform: scale(1.1);
 }
 
 .bottom-nav-icon {
@@ -149,7 +141,6 @@
 
 .m-icon > .ti { color: var(--glyph-color, currentColor); font-size: 20px; }
 .adm-perm-mod > .ti,
-.adm-tab > .ti,
 .af-tab > .ti {
   width: 25px;
   height: 25px;

@@ -63,8 +63,18 @@ window._selectCostCat = function(pid, cat) {
 };
 
 // ── HOLIDAY / LEAVE CHECK (per date) ─────────────────────────────────────────
-function _costHolLeave(staffId, dateStr) {
+// cache (ถ้ามี) = แคชภายในรอบ render เดียว — ผลขึ้นกับ วันที่ / พนักงาน+วันที่ เท่านั้น จึงใช้ซ้ำได้
+function _costHolLeave(staffId, dateStr, cache) {
   if (!dateStr) return { hols: [], leaves: [] };
+  if (cache) {
+    var hols0 = cache.hol.get(dateStr);
+    if (!hols0) { hols0 = _costHolLeave(null, dateStr).hols; cache.hol.set(dateStr, hols0); }
+    var bySid = cache.lv.get(staffId);
+    if (!bySid) { bySid = new Map(); cache.lv.set(staffId, bySid); }
+    var lv0 = bySid.get(dateStr);
+    if (!lv0) { lv0 = _costHolLeave(staffId, dateStr).leaves; bySid.set(dateStr, lv0); }
+    return { hols: hols0, leaves: lv0 };
+  }
   var sD = pd(dateStr), eD = pd(dateStr);
   eD.setHours(23, 59, 59);
 
@@ -95,10 +105,14 @@ window.renderCost = function() {
   const proj = document.getElementById('cost-proj')?.value || '';
   const cat  = document.getElementById('cost-cat')?.value || '';
 
+  // ดัชนีโครงการตาม id (ตัวแรกที่เจอ = ผลเดียวกับ .find)
+  const pm = new Map();
+  window.PROJECTS.forEach(p => { if (!pm.has(p.id)) pm.set(p.id, p); });
+
   let rows = window.COSTS.slice();
 
   if (type.length) rows = rows.filter(r => {
-    const p = window.PROJECTS.find(p => p.id === r.pid);
+    const p = pm.get(r.pid);
     return p && type.includes(p.typeId);
   });
   if (proj) rows = rows.filter(r => r.pid === proj);
@@ -106,7 +120,7 @@ window.renderCost = function() {
   if (yr)   rows = rows.filter(r => getYearBE(r.costDate) == yr);
   if (mon)  rows = rows.filter(r => r.costDate && new Date(r.costDate).getMonth() + 1 == mon);
   if (q)    rows = rows.filter(r => {
-    const p = window.PROJECTS.find(p => p.id === r.pid);
+    const p = pm.get(r.pid);
     return (p?.name || '').toLowerCase().includes(q) ||
            (r.description || '').toLowerCase().includes(q) ||
            (r.receiptNo || '').toLowerCase().includes(q);
@@ -119,9 +133,9 @@ window.renderCost = function() {
   const byCatAll     = {};
   rows.forEach(r => { byCatAll[r.category] = (byCatAll[r.category] || 0) + r.amount; });
   const topCats      = Object.entries(byCatAll).sort((a, b) => b[1] - a[1]).slice(0, 3);
-  const filteredPids = [...new Set(rows.map(r => r.pid))];
+  const filteredPids = new Set(rows.map(r => r.pid));
   const totalBudget  = window.PROJECTS
-    .filter(p => filteredPids.includes(p.id))
+    .filter(p => filteredPids.has(p.id))
     .reduce((s, p) => s + (p.cost || 0), 0);
   const burnPct   = totalBudget > 0 ? Math.min(Math.round(totalCost / totalBudget * 100), 999) : 0;
   const burnColor = burnPct >= 90 ? 'var(--coral)' : burnPct >= 70 ? 'var(--amber)' : 'var(--teal)';
@@ -176,8 +190,8 @@ window.renderCost = function() {
 
   // Sort: project end date descending (latest end first)
   pidOrder.sort((a, b) => {
-    const projA = window.PROJECTS.find(p => p.id === a);
-    const projB = window.PROJECTS.find(p => p.id === b);
+    const projA = pm.get(a);
+    const projB = pm.get(b);
     const endA  = projA?.end || '';
     const endB  = projB?.end || '';
     return endB.localeCompare(endA);
@@ -186,9 +200,10 @@ window.renderCost = function() {
   // auto-expand single project filter
   if (proj && !_costExpanded.has(proj)) _costExpanded.add(proj);
 
+  const hlCache = { hol: new Map(), lv: new Map() };
   container.innerHTML = pidOrder.map(pid => {
     const items  = byProject[pid];
-    const p      = window.PROJECTS.find(p => p.id === pid);
+    const p      = pm.get(pid);
     const total  = items.reduce((s, r) => s + r.amount, 0);
     const budget = p?.cost || 0;
     const bp     = budget > 0 ? Math.min(Math.round(total / budget * 100), 999) : 0;
@@ -256,7 +271,7 @@ window.renderCost = function() {
         const s = gSt(r.staffId);
         const staffLabel = s.nickname || s.name || '';
         const isAdv = r.source === 'advance';
-        const hlInfo = _costHolLeave(r.staffId, r.costDate);
+        const hlInfo = _costHolLeave(r.staffId, r.costDate, hlCache);
         const hlParts = [];
         if (hlInfo.hols.length) hlParts.push(`<span style="font-size:10px;color:var(--coral);background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.25);border-radius:5px;padding:1px 5px;white-space:nowrap;" title="${esc(hlInfo.hols.map(h=>h.name).join(', '))}">🎌 วันหยุด</span>`);
         hlInfo.leaves.forEach(x => hlParts.push(`<span style="font-size:10px;color:var(--amber);background:rgba(255,166,43,.1);border:1px solid rgba(255,166,43,.25);border-radius:5px;padding:1px 5px;white-space:nowrap;" title="${esc(x.label+': '+fd(x.leave.startDate)+' – '+fd(x.leave.endDate))}">${x.emoji} ${x.label}</span>`));
@@ -387,13 +402,13 @@ function _populateCostFilters() {
 
   // Project types that appear in costs
   if ((window.PTYPES || []).length) {
-    const pids    = [...new Set(window.COSTS.map(r => r.pid).filter(Boolean))];
-    const typeIds = new Set(window.PROJECTS.filter(p => pids.includes(p.id)).map(p => p.typeId).filter(Boolean));
+    const pids    = new Set(window.COSTS.map(r => r.pid).filter(Boolean));
+    const typeIds = new Set(window.PROJECTS.filter(p => pids.has(p.id)).map(p => p.typeId).filter(Boolean));
     window.msFilter('cost-type', window.PTYPES.filter(t => typeIds.has(t.id)).map(t => ({value:t.id,label:t.label,color:t.color})), {placeholder:'ทุกประเภท',onChange:window.renderCost});
   }
 
-  const pids = [...new Set(window.COSTS.map(r => r.pid).filter(Boolean))];
-  const costProjList = window.PROJECTS.filter(p => pids.includes(p.id));
+  const pids = new Set(window.COSTS.map(r => r.pid).filter(Boolean));
+  const costProjList = window.PROJECTS.filter(p => pids.has(p.id));
   const curProj = costProjList.some(p => p.id === projSel.value) ? projSel.value : '';
   window.initProjectCombobox(window.projectComboIds('cost-proj-cmb', 'cost-proj'), costProjList, curProj,
     () => window.renderCost(), { allLabel: 'ทุกโครงการ', minWidth: 360 });

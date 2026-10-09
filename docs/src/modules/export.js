@@ -4,7 +4,7 @@
   var _vm=function(id){return window.msValues?window.msValues(id):[];}
   var _pname=function(pid){var p=(window.PROJECTS||[]).find(function(x){return x.id===pid;});return p?p.name:pid||'';}
   var _sname=function(sid){var s=(window.STAFF||[]).find(function(x){return x.id===sid;});return s?s.name:sid||'';}
-  var _today=function(){return new Date().toISOString().slice(0,10);}
+  var _today=function(){return window.todayStr();}
 
   async function doExport(headers,rows,filename){
     if(!(await window.LibLoader.need('xlsx')))return;

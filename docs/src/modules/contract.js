@@ -40,8 +40,9 @@ window._ctCalcEndDate = function(){
 };
 
 // ── linked-project financial breakdown per contract ───────────────────────────
-function _ctFinance(c){
-  var linked = (window.PROJECTS||[]).filter(function(p){ return p.contractId === c.id; });
+// byCt (ถ้ามี) = Map contractId → โครงการ (ลำดับเดียวกับ PROJECTS) ที่จัดกลุ่มไว้ครั้งเดียวต่อรอบ render
+function _ctFinance(c, byCt){
+  var linked = byCt ? (byCt.get(c.id)||[]) : (window.PROJECTS||[]).filter(function(p){ return p.contractId === c.id; });
   var closed = 0, open = 0;
   if(linked.length > 0){
     linked.forEach(function(p){
@@ -73,7 +74,7 @@ function _ctRenderTxns(c){
   var manualTotal = _ctPendingTxns.reduce(function(s,t){ return s+(t.amount||0); }, 0);
   if(totalEl) totalEl.textContent = fca(autoTotal + manualTotal);
 
-  var today  = new Date().toISOString().slice(0,10);
+  var today  = window.todayStr();
   var safeId = c.id.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
 
   var autoHtml = autoRows.map(function(p){
@@ -139,14 +140,14 @@ window._ctConfirmTxn = function(contractId){
   if(!amount){ window.showAlert('กรุณาระบุมูลค่า','warn'); return; }
   _ctPendingTxns.push({
     name:   ((nameEl||{}).value||'').trim() || 'รายการชำระ',
-    date:   (dateEl||{}).value || new Date().toISOString().slice(0,10),
+    date:   (dateEl||{}).value || window.todayStr(),
     amount: amount
   });
   var c = (window.CONTRACTS||[]).find(function(x){ return x.id === contractId; });
   if(c) _ctRenderTxns(c);
   if(nameEl)   nameEl.value   = '';
   if(amountEl) amountEl.value = '';
-  if(dateEl)   dateEl.value   = new Date().toISOString().slice(0,10);
+  if(dateEl)   dateEl.value   = window.todayStr();
   var row = document.getElementById('ct-txn-new-row');
   if(row) row.style.display = 'none';
 };
@@ -234,11 +235,17 @@ window.renderContract = function(){
     return true;
   });
 
+  // ── การเงินต่อสัญญา: จัดกลุ่มโครงการตาม contractId ครั้งเดียว + คำนวณครั้งเดียวต่อสัญญา (ใช้ซ้ำ 3 จุดด้านล่าง) ──
+  var byCt = new Map();
+  (window.PROJECTS||[]).forEach(function(p){ var k=p.contractId; if(!byCt.has(k)) byCt.set(k,[]); byCt.get(k).push(p); });
+  var finCache = new Map();
+  var finOf = function(c){ var f=finCache.get(c); if(!f){ f=_ctFinance(c, byCt); finCache.set(c,f); } return f; };
+
   // ── summary bar (before grouping) ──
   var totalVal     = rows.reduce(function(s,c){return s+c.value;},0);
   var completedVal = 0, activeVal = 0, expiringN = 0;
   rows.forEach(function(c){
-    var f = _ctFinance(c);
+    var f = finOf(c);
     completedVal += f.closed;
     activeVal    += f.open;
     if(c.status==='active' && c.endDate){
@@ -294,7 +301,7 @@ window.renderContract = function(){
     // group totals
     var gTotal = group.reduce(function(s,c){ return s+c.value; }, 0);
     var gClosed = 0, gOpen = 0;
-    group.forEach(function(c){ var f=_ctFinance(c); gClosed+=f.closed; gOpen+=f.open; });
+    group.forEach(function(c){ var f=finOf(c); gClosed+=f.closed; gOpen+=f.open; });
 
     // group header
     var groupHtml = '<div class="ct-group">'
@@ -314,7 +321,7 @@ window.renderContract = function(){
     var canDel2 = window.canDel  ? window.canDel('contract')  : false;
     var cardsHtml = group.map(function(c){
       var st      = ctSt(c.status);
-      var fin     = _ctFinance(c);
+      var fin     = finOf(c);
       var endD    = c.endDate ? pd(c.endDate) : null;
       var diff    = endD ? Math.ceil((endD - now)/864e5) : null;
       var expWarn = c.status==='active' && diff!==null && diff>=0 && diff<=30;
@@ -401,7 +408,7 @@ window.openContractModal = function(id){
   document.getElementById('ctf-status').value   = isNew ? 'active' : (c.status||'active');
   document.getElementById('ctf-note').value     = isNew ? '' : (c.note||'');
 
-  var today = new Date().toISOString().slice(0,10);
+  var today = window.todayStr();
   document.getElementById('ctf-sign').value  = isNew ? today : (c.signDate||'');
   document.getElementById('ctf-start').value = isNew ? today : (c.startDate||'');
   document.getElementById('ctf-end').value   = isNew ? '' : (c.endDate||'');

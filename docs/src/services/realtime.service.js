@@ -74,7 +74,7 @@
   };
 
   // ── Check if active view needs re-render ──
-  function _von(id) { var el = document.getElementById(id); return el && el.classList.contains('on'); }
+  var _von = window._von;
 
   // ── Optimistic Local Update Helpers ──
   // Call these right after setDoc/deleteDoc so the UI updates instantly

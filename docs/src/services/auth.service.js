@@ -1,6 +1,6 @@
 /**
  * auth.service.js — Authentication Service
- * จัดการ login, logout, user session, และ seed data
+ * จัดการ login, logout, user session
  * ต้องโหลดหลัง db.service.js และ utils/
  */
 (function () {
@@ -11,48 +11,6 @@
     get: function () { return window.cu || null; },
     configurable: true,
   });
-
-  // ── Default Users (fallback ถ้า DB ว่าง) ──
-  var DEFAULT_USERS = [
-    { id:'U1', username:'admin',  password:'admin123', role:'admin',  name:'Admin User',        active:true },
-    { id:'U2', username:'pm1',    password:'pm1234',   role:'pm',     name:'Project Manager 1', active:true },
-    { id:'U3', username:'viewer', password:'view1234', role:'viewer', name:'Viewer User',       active:true },
-  ];
-
-  // ── Seed Database (ถ้าฐานข้อมูลว่างเปล่า) ──
-  async function seedDatabaseIfEmpty() {
-    try {
-      var deptsSnap = await window.getDocs(window.getColRef('DEPARTMENTS'));
-      if (deptsSnap.empty) {
-        var dBatch = window.writeBatch();
-        ['ติดตั้งระบบคลังสินค้า','ติดตั้งระบบและดูแลหลังการขาย','ติดตั้งระบบบัญชี','แผนกวิเคราะห์ข้อมูล','แผนกฝึกอบรม'].forEach(function (name, i) {
-          var did = 'DEPT_' + (i + 1);
-          dBatch.set(window.getDocRef('DEPARTMENTS', did), { dept_id:did, label_th:name });
-        });
-        await dBatch.commit();
-      }
-
-      var usersSnap = await window.getDocs(window.getColRef('USERS'));
-      if (usersSnap.empty) {
-        var batch = window.writeBatch();
-        DEFAULT_USERS.forEach(function (u) { batch.set(window.getDocRef('USERS', u.id), u); });
-        [
-          { id:'pending', label:'รอดำเนินการ', color:'#9ba3b8', order:1 },
-          { id:'plan',    label:'วางแผน',      color:'#ffa62b', order:2 },
-          { id:'exec',    label:'ดำเนินการ',   color:'#4361ee', order:3 },
-          { id:'deliver', label:'ส่งมอบ',      color:'#7c5cfc', order:4 },
-          { id:'close',   label:'ปิดโครงการ',  color:'#06d6a0', order:5 },
-        ].forEach(function (s) { batch.set(window.getDocRef('STAGES', s.id), s); });
-        [
-          { id:'gen', label:'General', color:'#4361ee' },
-          { id:'urg', label:'Urgent',  color:'#ff6b6b' },
-        ].forEach(function (t) { batch.set(window.getDocRef('PTYPES', t.id), t); });
-        await batch.commit();
-      }
-    } catch (err) {
-      console.warn('[auth.service] seed error:', err.message);
-    }
-  }
 
   // ── Login UI Reset ──
   function _loginBtnReset() {
@@ -69,7 +27,7 @@
     var errEl    = document.getElementById('lerr');
     var errMsg   = document.getElementById('lerr-msg');
     var infoEl   = document.getElementById('linfo');
-    var searchList = (window.USERS && window.USERS.length > 0) ? window.USERS : DEFAULT_USERS;
+    var searchList = window.USERS || [];
     var usr = searchList.find(function (x) {
       return x.username === username && x.password === password && x.active !== false;
     });
@@ -106,6 +64,8 @@
     // Set current user & switch to app view
     window.cu = usr;
     window.syncWebPush && window.syncWebPush();
+    window.preloadTraining && window.preloadTraining();
+    window.saveDataCache && window.saveDataCache();
     document.getElementById('login').style.display = 'none';
     document.getElementById('wrap').style.display = 'flex';
 
@@ -136,6 +96,7 @@
       window.setupUser && window.setupUser();
       window.renderAll && window.renderAll();
       _goAfterLoad && _goAfterLoad();
+      window.maybeStartTour && window.maybeStartTour();  // ครั้งแรกที่เข้าใช้ → ทัวร์แนะนำเมนู (src/modules/tour.js)
     } else {
       window.showLoader && window.showLoader('กำลังโหลดข้อมูล...');
       window.setupUser && window.setupUser();
@@ -144,6 +105,7 @@
           clearInterval(waitRender);
           window.renderAll && window.renderAll();
           _goAfterLoad && _goAfterLoad();
+          window.maybeStartTour && window.maybeStartTour();
         }
       }, 300);
       setTimeout(function () {
@@ -244,6 +206,8 @@
     window.disableWebPush && window.disableWebPush(true);
     window.cu = null;
     window.StorageService.clearSession();
+    window.clearDataCache && window.clearDataCache(); // ข้อมูลที่เก็บไว้ในเครื่อง (db.service.js) — ไม่ทิ้งไว้ให้คนถัดไป
+    window.resetTraining && window.resetTraining();
     if (window._loginRetryInterval) { clearInterval(window._loginRetryInterval); window._loginRetryInterval = null; }
     window.closeMobSidebar && window.closeMobSidebar();
     try { history.replaceState(null, '', location.pathname); } catch (e) {}
@@ -286,33 +250,38 @@
   // ── กู้ session หลัง Refresh: ซ่อนหน้าล็อกอินทันที (ไม่ให้วาบ) รอข้อมูลผู้ใช้โหลด แล้วตรวจว่ายังใช้ได้
   // (บัญชียังเปิดอยู่ + รหัสผ่านไม่เปลี่ยน) → เข้าแอปต่อหน้าเดิม · ไม่ผ่าน/โหลดไม่ทัน → ลบ session กลับหน้าล็อกอิน ──
   function _restoreSession() {
+    var root = document.documentElement;
     var sess = window.StorageService.getSession();
-    if (!sess || !sess.uid) return;
+    if (!sess || !sess.uid) { root.classList.remove('boot-sess'); return; }
     var loginEl = document.getElementById('login');
     if (loginEl) loginEl.style.display = 'none';
     window.showLoader && window.showLoader('กำลังโหลดข้อมูล...');
     var tries = 0;
     var t = setInterval(function () {
       tries++;
-      if (!window.isDbLoaded && tries < 60) return; // รอสูงสุด ~30 วินาที
+      if (!window.isDbLoaded && tries < 300) return; // รอสูงสุด ~30 วินาที
       clearInterval(t);
-      var list = (window.USERS && window.USERS.length) ? window.USERS : DEFAULT_USERS;
+      var list = window.USERS || [];
       var usr = window.isDbLoaded && list.find(function (x) { return x.id === sess.uid && x.active !== false; });
-      if (usr && _sessSig(usr) === sess.sig) { window.hideLoader && window.hideLoader(); _enterApp(usr, true); return; }
+      if (usr && _sessSig(usr) === sess.sig) {
+        window.hideLoader && window.hideLoader();
+        _enterApp(usr, true);
+        root.classList.remove('boot-sess');
+        return;
+      }
       window.StorageService.clearSession();
       window.hideLoader && window.hideLoader();
+      root.classList.remove('boot-sess');
       if (loginEl) loginEl.style.display = 'flex';
-    }, 500);
+    }, 100);
   }
   document.addEventListener('DOMContentLoaded', _restoreSession);
 
-  // ── Initialize: seed + start realtime ──
-  seedDatabaseIfEmpty().then(function () {
+  // ── Initialize: start realtime (รอให้ service ที่โหลดทีหลังพร้อมก่อน) ──
+  document.addEventListener('DOMContentLoaded', function () {
     window.RealtimeService && window.RealtimeService.setup();
     window.ImplTrackerService && window.ImplTrackerService.setup();
     window.FormTrackerService && window.FormTrackerService.setup();
-  }).catch(function (e) {
-    console.warn('[auth.service] init error:', e.message);
   });
 
 })();

@@ -6,12 +6,32 @@
 const { esc, fd, fca, pd, gSt } = window;
 
 // ── helpers ─────────────────────────────────────────────────────────────
-function hdStatus(id) { return (window.HD_STATUS || []).find(function (s) { return s.id === id; }) || { id: id, label: id, color: '#9ba3b8', icon: '•', open: true }; }
-function hdPri(id)    { return (window.HD_PRIORITY || []).find(function (p) { return p.id === id; }) || { id: id, short: id, label: id, color: '#9ba3b8' }; }
-function hdCat(id)    { return (window.HELPDESK_CATEGORIES || []).find(function (c) { return c.id === id; }) || null; }
+// ดัชนี id → ตำแหน่ง ของ array กลาง (STAFF/HOSPITALS/หมวด/สถานะ) — สร้างครั้งเดียวต่อรอบ render แทน .find ทุกแถว
+// (เดิม O(แถว × ขนาด array)) · ล้างทิ้งเองเมื่อจบงาน sync รอบนี้ (microtask) + เช็กความยาว/ตรวจ id ซ้ำ กันข้อมูลเปลี่ยนกลางรอบ
+// ผลเหมือน .find(x => x.id === id) ทุกกรณี (ตัวแรกที่ id ตรงกัน, ไม่เจอ = undefined)
+var _hdIdx = null;
+function hdById(arr, id) {
+  if (!_hdIdx) { _hdIdx = new Map(); Promise.resolve().then(function () { _hdIdx = null; }); }
+  var c = _hdIdx.get(arr);
+  if (!c || c.len !== arr.length) {
+    var pos = new Map();
+    for (var i = 0; i < arr.length; i++) if (!pos.has(arr[i].id)) pos.set(arr[i].id, i);
+    c = { len: arr.length, pos: pos };
+    _hdIdx.set(arr, c);
+  }
+  var p = c.pos.get(id);
+  if (p === undefined) return undefined;
+  var x = arr[p];
+  if (x && x.id === id) return x;
+  _hdIdx.delete(arr); // ข้อมูลถูกแทนที่กลางรอบ → หาแบบเดิม
+  return arr.find(function (y) { return y.id === id; });
+}
+function hdStatus(id) { return hdById(window.HD_STATUS || [], id) || { id: id, label: id, color: '#9ba3b8', icon: '•', open: true }; }
+function hdPri(id)    { return hdById(window.HD_PRIORITY || [], id) || { id: id, short: id, label: id, color: '#9ba3b8' }; }
+function hdCat(id)    { return hdById(window.HELPDESK_CATEGORIES || [], id) || null; }
 // ชื่อพนักงาน — ไม่ได้ระบุ/หาไม่เจอ → ค่าว่าง (gSt() กลางคืน "?" ซึ่งไม่สื่อความหมายในหน้านี้)
-function hdStaffName(id) { var s = id && (window.STAFF || []).find(function (x) { return x.id === id; }); return (s && s.name) || ''; }
-function hdHosp(id)   { return (window.HOSPITALS || []).find(function (h) { return h.id === id; }) || null; }
+function hdStaffName(id) { var s = id && hdById(window.STAFF || [], id); return (s && s.name) || ''; }
+function hdHosp(id)   { return hdById(window.HOSPITALS || [], id) || null; }
 
 // ปุ่ม "โทรด่วน" (Jitsi) + แจ้งเตือนทีมงาน — trigger ที่ priority ของความเร่งด่วน "ทำงานไม่ได้เลย" (blocked)
 // อ่านจาก window.HD_URGENCY สด ๆ (merge override ของ Admin แล้ว) แทนที่จะ hardcode 'p2' ตรง ๆ
@@ -178,6 +198,7 @@ var HD_VIEWS = [
   { id: 'closed', label: '📦 ปิด / ยกเลิก', fn: function (t) { return t.status === 'closed' || t.status === 'cancelled'; } },
   { id: 'all', label: 'ทั้งหมด', fn: function () { return true; } },
 ];
+var HD_TKNO_COLL = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
 var HD_CH_ICON = { line: '💬', web: '🌐', phone: '📞', import: '📥' };
 var HD_WAIT = { team: '⏳ รอทีม', user: '⏸ รอผู้แจ้ง', reply: '💬 ลูกค้าตอบ รอเราตอบ' };
 
@@ -268,13 +289,13 @@ function hdEvWho(e) {
 function hdFiltered(mineOnly) {
   var f = window.hdFilter || {};
   var meId = (window.cu && (window.cu.staffId || window.cu.staff_id)) || '';
+  var q = f.q ? f.q.toLowerCase() : '';
   return (window.HELPDESK_TICKETS || []).filter(function (t) {
     if (mineOnly) { if (!meId || t.assigneeId !== meId) return false; }
     if (f.priority && t.priority !== f.priority) return false;
     if (f.assignee === '-' ? t.assigneeId : (f.assignee && t.assigneeId !== f.assignee)) return false;
     if (f.category && t.categoryId !== f.category) return false;
     if (f.q) {
-      var q = f.q.toLowerCase();
       var hay = (t.ticketNo + ' ' + t.subject + ' ' + t.description + ' ' + t.reporterName + ' ' +
         ((hdHosp(t.hospitalId) || {}).name || '')).toLowerCase();
       if (hay.indexOf(q) < 0) return false;
@@ -338,9 +359,12 @@ function hdQueueHtml(mineOnly) {
   }).join('');
 
   // เรียงตามเลขที่ Ticket จากมากไปน้อย (natural sort เพื่อให้ส่วนตัวเลขเรียงแบบตัวเลขจริง)
-  var rows = base.filter(function (r) { return view.fn(r.t, r.x); }).sort(function (a, b) {
-    var d = String(b.t.ticketNo || '').localeCompare(String(a.t.ticketNo || ''), 'en', { numeric: true, sensitivity: 'base' });
-    return d || String(b.t.createdAt || '').localeCompare(String(a.t.createdAt || ''));
+  // ใช้ Intl.Collator ตัวเดียว (= localeCompare(…, 'en', {numeric, sensitivity}) แต่ไม่สร้าง collator ใหม่ทุกครั้งที่เทียบ)
+  var rows = base.filter(function (r) { return view.fn(r.t, r.x); });
+  rows.forEach(function (r) { r.kNo = String(r.t.ticketNo || ''); r.kAt = String(r.t.createdAt || ''); });
+  rows.sort(function (a, b) {
+    var d = HD_TKNO_COLL.compare(b.kNo, a.kNo);
+    return d || b.kAt.localeCompare(a.kAt);
   });
 
   var catOpts = '<option value="">หมวด: ทั้งหมด</option>' + (window.HELPDESK_CATEGORIES || [])
@@ -497,7 +521,6 @@ function hdRenderDetail(root, t) {
     + '<button class="btn btn-ghost btn-sm hd-h-desk" onclick="window.hdCopyLink(\'' + t.id + '\')">🔗 คัดลอกลิงก์</button>'
     + '<button class="btn btn-ghost btn-sm hd-h-desk" onclick="window.hdCopyMsg(\'' + t.id + '\')">📋 คัดลอกข้อความ</button>'
     + '</div>'
-    + '<div id="hd-ai-detail" style="padding:0 20px;"></div>'
     + '<div style="display:grid;grid-template-columns:1fr 320px;gap:16px;padding:16px 20px 32px;align-items:start;" class="hd-detail-grid">'
     //  LEFT
     + '<div class="hd-left">'
@@ -1289,7 +1312,7 @@ window.hdOpenModal = function (id) {
     + '<div class="f-group"><label class="f-label">เบอร์ / LINE (ถ้ามี)</label><input id="hdf-phone" class="f-input" value="' + esc(t ? t.reporterPhone : '') + '"></div>'
     + '<div class="f-group"' + full + '><label class="f-label">รายละเอียดปัญหา <span class="hd-req">*</span> <span style="color:var(--txt3);font-weight:400">(วางข้อความจากแชตได้เลย)</span></label><textarea id="hdf-desc" rows="3" class="f-input">' + esc(t ? t.description : '') + '</textarea>'
       + (t ? '' : '<div class="ai-flag" style="margin-top:7px;color:var(--violet);">🤖 เมื่อบันทึก AI จะจัดหมวด Priority และผู้รับผิดชอบให้อัตโนมัติ · ทีมแก้ไขภายหลังได้</div>')
-      + '<div id="hdf-ai-out"></div></div>'
+      + '</div>'
     // หมวด/ความเร่งด่วนอยู่ใต้รายละเอียด — Ticket ใหม่ปล่อยหมวดว่างได้เพื่อให้ AI จัดให้ตอนบันทึก
     + catUrg
     + '<div class="f-group"><label class="f-label">Priority</label><select id="hdf-pri" class="f-input">' + prOpts + '</select></div>'
@@ -1304,14 +1327,6 @@ window.hdOpenModal = function (id) {
   window._initHdStaffCombobox('hdf-assignee', defaultAssignee);
   if (!t) window.attPickerInit('hdf-files', { accept: window.HD_ATTACH_ACCEPT, max: window.HD_ATTACH_MAX, hint: window.HD_ATTACH_HINT });
 };
-// ── เติมหมวด → ความเร่งด่วน → Priority จากผล AI (ลำดับสำคัญ: เลือกหมวด/เร่งด่วน จะตั้ง Priority ตามค่าตั้งต้นของมันเอง
-// จึงตั้ง Priority ของ AI เป็นลำดับสุดท้ายให้ชนะ) ──
-function hdAiAutoFillModal(s) {
-  var cat = document.getElementById('hdf-cat'), urg = document.getElementById('hdf-urg'), pri = document.getElementById('hdf-pri');
-  if (cat && s.categoryId) { cat.value = s.categoryId; window.hdModalCatChange(); window.aiFlagField(cat, cat.value === s.categoryId); }
-  if (urg && s.priority && Array.prototype.some.call(urg.options, function (o) { return o.value === s.priority; })) { urg.value = s.priority; window.aiFlagField(urg, true); }
-  if (pri && s.priority) { pri.value = s.priority; window.aiFlagField(pri, pri.value === s.priority); }
-}
 window.hdModalCatChange = function () {
   var sel = document.getElementById('hdf-cat');
   var pri = sel && sel.options[sel.selectedIndex] && sel.options[sel.selectedIndex].getAttribute('data-pri');
@@ -1340,6 +1355,7 @@ async function hdAutoTriageCommon(common) {
         description: next.description,
         sourceSystem: next.source_system,
         hospitalName: ((hdHosp(next.hospital_id) || {}).name || ''),
+        hospitalId: next.hospital_id,
       });
       if (analysis.categoryId) { next.category_id = analysis.categoryId; usedAiCategory = true; }
       if (analysis.priority) next.priority = analysis.priority;
@@ -1526,9 +1542,7 @@ window.hdAiDraftReplyRun = async function (id, btn) {
   if (btn) { btn.disabled = true; btn.textContent = '⏳ กำลังร่าง...'; }
   try {
     var evs = await window.hdFetchEvents(t.id, true);
-    var last = window._hdAiLast;
-    var hint = last && last.ticketId === id ? last.resolutionHint : '';
-    ta.value = await window.hdAiDraftReply(t, evs, hint);
+    ta.value = await window.hdAiDraftReply(t, evs);
     var cb = document.getElementById('hd-reply-internal'); if (cb) cb.checked = false;
     ta.focus();
     window.showAlert && window.showAlert('ร่างข้อความแล้ว — ตรวจทาน/แก้ไขก่อนกดส่ง', 'success');
@@ -1536,88 +1550,6 @@ window.hdAiDraftReplyRun = async function (id, btn) {
     window.showAlert && window.showAlert(String(e.message || e), 'error');
   } finally {
     if (btn) { btn.disabled = false; btn.innerHTML = oldTxt; }
-  }
-};
-
-// ── AI ช่วยวิเคราะห์ (ตัวเรียก AI กลาง: src/services/ai.service.js) ────────────────
-window._hdAiLast = null;
-
-function hdAiCardHtml(sug, mode) {
-  var conf = { low: 'ต่ำ', medium: 'ปานกลาง', high: 'สูง' }[sug.confidence] || sug.confidence || '-';
-  var cat = (window.HELPDESK_CATEGORIES || []).find(function (c) { return c.id === sug.categoryId; });
-  var pr = sug.priority ? hdPri(sug.priority) : null;
-  var rows = '';
-  // ฟอร์มแจ้งแทนลูกค้า (modal) เติมหมวด/Priority ให้อัตโนมัติแล้ว — แสดงป้าย "เติมให้แล้ว" แทนปุ่ม "ใช้ค่านี้"
-  var useBtn = function (field) {
-    return mode === 'modal' ? '<span class="ai-use" style="color:var(--teal);font-size:11.5px;font-weight:700;">✓ เติมให้แล้ว</span>'
-      : '<button class="btn btn-ghost btn-sm ai-use" onclick="window.hdAiApply(\'' + mode + '\',\'' + field + '\')">ใช้ค่านี้</button>';
-  };
-  rows += '<div class="ai-row"><span>หมวด: <b>' + esc(cat ? cat.name : '— AI ไม่แน่ใจ —') + '</b></span>' + (cat ? useBtn('cat') : '') + '</div>';
-  rows += '<div class="ai-row"><span>Priority: <b>' + esc(pr ? pr.label : '— AI ไม่แน่ใจ —') + '</b></span>' + (pr ? useBtn('pri') : '') + '</div>';
-  if (sug.resolutionHint) {
-    rows += '<div class="ai-row" style="align-items:flex-start;"><span>แนวทางแก้ไข: ' + esc(sug.resolutionHint) + '</span>'
-      + '<button class="btn btn-ghost btn-sm ai-use" onclick="window.hdAiApply(\'' + mode + '\',\'fix\')">' + (mode === 'modal' ? 'คัดลอก' : 'ใส่โน้ตภายใน') + '</button></div>';
-  }
-  // แบบย่อ 1 บรรทัด (หมวด · Priority) กด "ดูเพิ่มเติม" เพื่อดูแนวทางแก้/เหตุผล/ปุ่มใช้ค่า
-  return window.aiSuggestHtml({
-    title: 'AI',
-    summary: [cat ? esc(cat.name) : '', pr ? esc(pr.short || pr.label) : ''].filter(Boolean).join(' · ')
-      + (mode === 'modal' && (cat || pr) ? ' <span style="color:var(--teal);">✓ เติมให้แล้ว</span>' : '')
-      || '<span style="color:var(--txt3);">ไม่แน่ใจหมวด/Priority</span>',
-    body: '<div style="color:var(--txt3);font-size:11px;margin:4px 0;">ความมั่นใจ ' + esc(conf) + (sug.similarCount ? ' · อ้างอิงงานเก่า ' + sug.similarCount + ' รายการ' : '') + '</div>'
-      + rows
-      + (sug.reason ? '<div style="font-size:11px;color:var(--txt3);margin-top:4px;">เหตุผล: ' + esc(sug.reason) + '</div>' : '')
-      + '<div style="font-size:10.5px;color:var(--txt3);margin-top:4px;">* AI ช่วยแนะนำเท่านั้น เจ้าหน้าที่ตรวจสอบก่อนใช้เสมอ</div>',
-  });
-}
-
-async function hdAiCommon(desc, hospId, sourceSystem, outEl, mode, btn) {
-  if (!outEl) return;
-  var oldTxt = btn ? btn.innerHTML : ''; // innerHTML — ปุ่มมี <span> ป้ายที่ซ่อนบนมือถือ
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ กำลังวิเคราะห์...'; }
-  outEl.innerHTML = '<div style="font-size:12px;color:var(--txt3);padding:6px 0;">⏳ กำลังวิเคราะห์...</div>';
-  try {
-    var h = hospId ? hdHosp(hospId) : null;
-    var sug = await window.hdAiAnalyze({ description: desc, hospitalName: h && h.name, sourceSystem: sourceSystem });
-    sug.ticketId = mode === 'modal' ? '' : mode; // ให้ปุ่ม "ร่างข้อความตอบ" ใช้แนวทางแก้เฉพาะของ Ticket เดียวกัน
-    window._hdAiLast = sug;
-    if (mode === 'modal') hdAiAutoFillModal(sug);
-    outEl.innerHTML = hdAiCardHtml(sug, mode);
-  } catch (e) {
-    outEl.innerHTML = '<div class="ai-out" style="color:var(--coral);font-size:12px;">' + esc(String(e.message || e)) + '</div>';
-  } finally {
-    if (btn) { btn.disabled = false; btn.innerHTML = oldTxt; }
-  }
-}
-
-window.hdAiRunModal = function (btn) {
-  var desc = ((document.getElementById('hdf-desc') || {}).value || '').trim();
-  if (!desc) { window.showAlert && window.showAlert('กรอกรายละเอียดปัญหาก่อน', 'warn'); return; }
-  hdAiCommon(desc, (document.getElementById('hdf-hosp') || {}).value || '',
-    (document.getElementById('hdf-sys') || {}).value || '',
-    document.getElementById('hdf-ai-out'), 'modal', btn);
-};
-
-window.hdAiRunDetail = function (id, btn) {
-  var t = hdTicket(id); if (!t) return;
-  hdAiCommon(t.description || t.subject || '', t.hospitalId, t.sourceSystem,
-    document.getElementById('hd-ai-detail'), id, btn);
-};
-
-window.hdAiApply = function (mode, field) {
-  var s = window._hdAiLast; if (!s) return;
-  if (mode === 'modal') { // หมวด/Priority เติมอัตโนมัติแล้ว (hdAiAutoFillModal) — เหลือแค่คัดลอกแนวทางแก้
-    if (field === 'fix' && s.resolutionHint) hdCopy(s.resolutionHint, 'คัดลอกแนวทางแก้ไขแล้ว');
-    return;
-  }
-  // mode = ticket id (หน้ารายละเอียด)
-  var id = mode;
-  if (field === 'cat' && s.categoryId) window.hdSetField(id, 'categoryId', s.categoryId);
-  else if (field === 'pri' && s.priority) window.hdSetField(id, 'priority', s.priority);
-  else if (field === 'fix' && s.resolutionHint) {
-    var ta = document.getElementById('hd-reply'), cb = document.getElementById('hd-reply-internal');
-    if (ta) { ta.value = (ta.value ? ta.value + '\n' : '') + 'แนวทางแก้ไข (AI): ' + s.resolutionHint; ta.focus(); }
-    if (cb) cb.checked = true;
   }
 };
 
@@ -2376,8 +2308,14 @@ function hdRenderCharts() {
     bs = be;
   }
   var days = bins.map(function (b) { return b.lbl; });
-  var inD = bins.map(function (b) { return all.filter(function (t) { return hdInRange(t.createdAt, b.s, b.e); }).length; });
-  var outD = bins.map(function (b) { return all.filter(function (t) { return hdInRange(t.resolvedAt, b.s, b.e); }).length; });
+  // นับลงช่องในรอบเดียว (แปลงวันที่ครั้งเดียวต่อ Ticket) แทน filter ทั้งชุดทุกช่อง — ช่องไม่ทับกัน ผลเท่าเดิม
+  var inD = bins.map(function () { return 0; }), outD = bins.map(function () { return 0; });
+  var binAdd = function (cnt, v) {
+    if (!v) return;
+    var x = new Date(v).getTime();
+    for (var bi = 0; bi < bins.length; bi++) { if (x >= bins[bi].s && x < bins[bi].e) { cnt[bi]++; return; } }
+  };
+  all.forEach(function (t) { binAdd(inD, t.createdAt); binAdd(outD, t.resolvedAt); });
   var cTrend = document.getElementById('hd-c-trend');
   if (cTrend) window._hdCharts.trend = new Chart(cTrend, {
     type: 'line',
@@ -2589,6 +2527,8 @@ function hdWkData() {
   return {
     s: s, e: e, isCurrent: isCurrent, cutoff: cutoff, all: all,
     inW: inW, prevW: prevW, resW: resW, openEnd: openEnd, overdue: overdue,
+    // Set ของชุดเดียวกัน — ใช้เช็ก "อยู่ในชุดไหม" แทน indexOf ในลูป (เดิม O(n×m))
+    inSet: new Set(inW), openSet: new Set(openEnd), overSet: new Set(overdue),
     cancelled: all.filter(function (t) { return t.status === 'cancelled' && inRange(t.createdAt, s, e); }).length,
     urgent: inW.filter(function (t) { return t.priority === 'p1' || t.priority === 'p2'; }),
     reopened: live.filter(function (t) { return (t.reopenedCount || 0) > 0 && (inRange(t.createdAt, s, e) || inRange(t.resolvedAt, s, e)); }),
@@ -2675,7 +2615,8 @@ function hdWkTracked(D) {
   return out;
 }
 function hdWkIsCarry(t, D) { return new Date(t.createdAt || 0) < D.s; }
-function hdWkIsDone(t, D) { return D.openEnd.indexOf(t) < 0; }
+function hdWkIsDone(t, D) { return !D.openSet.has(t); }
+function hdWkIsOver(t, D) { return D.overSet.has(t); }
 
 var HD_WK_TRACK = [
   { id: 'all', label: 'ทั้งหมด' },
@@ -2688,7 +2629,7 @@ var HD_WK_TRACK = [
 function hdWkTrackFilter(id, D) {
   return function (t) {
     if (id === 'open') return !hdWkIsDone(t, D);
-    if (id === 'overdue') return D.overdue.indexOf(t) >= 0;
+    if (id === 'overdue') return hdWkIsOver(t, D);
     if (id === 'urgent') return t.priority === 'p1' || t.priority === 'p2';
     if (id === 'carry') return hdWkIsCarry(t, D);
     if (id === 'done') return hdWkIsDone(t, D);
@@ -2703,10 +2644,11 @@ function hdWkTrackHtml(D) {
     return '<button class="hd-wk-fchip' + (cur === f.id ? ' on' : '') + '" onclick="window.hdWkTrack(\'' + f.id + '\')">' + f.label + (f.id === 'carry' ? hdWkP().unit + 'ก่อน' : '') + ' <b>' + c + '</b></button>';
   }).join('') + '</div>';
   // ค้างขึ้นก่อน (เกิน SLA → ด่วน → เก่าสุด) แล้วค่อยเรื่องที่แก้เสร็จ
-  var rank = function (t) { return hdWkIsDone(t, D) ? 3 : D.overdue.indexOf(t) >= 0 ? 0 : (t.priority === 'p1' || t.priority === 'p2') ? 1 : 2; };
-  var list = all.filter(hdWkTrackFilter(cur, D)).sort(function (a, b) {
-    return rank(a) - rank(b) || new Date(a.createdAt) - new Date(b.createdAt);
-  });
+  var rank = function (t) { return hdWkIsDone(t, D) ? 3 : hdWkIsOver(t, D) ? 0 : (t.priority === 'p1' || t.priority === 'p2') ? 1 : 2; };
+  // คำนวณ rank/เวลาเปิดไว้ก่อนเรียง (ไม่แปลงวันที่ซ้ำทุกครั้งที่เทียบ) — ลำดับเหมือนเดิม
+  var list = all.filter(hdWkTrackFilter(cur, D)).map(function (t) { return { t: t, r: rank(t), c: new Date(t.createdAt) - 0 }; })
+    .sort(function (a, b) { return a.r - b.r || a.c - b.c; })
+    .map(function (x) { return x.t; });
   if (!list.length) return chips + '<div class="hd-wk-empty">ไม่มีรายการ</div>';
   var pages = Math.ceil(list.length / HD_WK_PAGE), pg = Math.min(Math.max(st.trackPage || 0, 0), pages - 1), from = pg * HD_WK_PAGE;
   var pager = pages < 2 ? '' : '<div class="hd-wk-pager hd-wk-noprint">'
@@ -2715,7 +2657,7 @@ function hdWkTrackHtml(D) {
     + '<button class="hd-wk-fchip"' + (pg < pages - 1 ? ' onclick="window.hdWkTrackPage(' + (pg + 1) + ')"' : ' disabled') + '>ถัดไป ›</button></div>';
   var rows = list.slice(from, from + HD_WK_PAGE).map(function (t) {
     var s = hdStatus(t.status), p = hdPri(t.priority), f = hdWkFix(t.id), done = hdWkIsDone(t, D), c = new Date(t.createdAt);
-    var tags = (D.overdue.indexOf(t) >= 0 ? '<span class="hd-pill hd-bad">เกิน SLA</span>' : '')
+    var tags = (hdWkIsOver(t, D) ? '<span class="hd-pill hd-bad">เกิน SLA</span>' : '')
       + ((t.reopenedCount || 0) > 0 ? '<span class="hd-pill hd-warn">เปิดซ้ำ ' + t.reopenedCount + '</span>' : '')
       + (hdWkIsCarry(t, D) ? '<span class="hd-pill hd-neu">ยกมา</span>' : '');
     var dur = done && t.resolvedAt ? '<span class="hd-wk-ok">แก้ใน ' + hdWkFmtDur(hdWkMins(t.createdAt, t.resolvedAt)) + '</span>'
@@ -2876,9 +2818,9 @@ function hdWkHtml() {
   // ── 1) กลุ่ม LINE: การ์ดต่อกลุ่ม (กด = กรองทั้งหน้า) ──
   var prevSrc = {}; D.prevW.forEach(function (t) { var k = hdWkSrc(t); prevSrc[k] = (prevSrc[k] || 0) + 1; });
   var groups = hdWkCount(tracked, hdWkSrc).map(function (g) {
-    var inG = g.list.filter(function (t) { return D.inW.indexOf(t) >= 0; });
+    var inG = g.list.filter(function (t) { return D.inSet.has(t); });
     var openG = g.list.filter(function (t) { return !hdWkIsDone(t, D); });
-    var overG = g.list.filter(function (t) { return D.overdue.indexOf(t) >= 0; }).length;
+    var overG = g.list.filter(function (t) { return hdWkIsOver(t, D); }).length;
     var doneG = g.list.length - openG.length;
     var hs = hdWkCount(g.list, function (t) { return t.hospitalId; }).map(function (h) { return hdWkHospName(h.key); });
     var cats = hdWkCount(g.list, function (t) { return t.categoryId; }).slice(0, 2).map(function (c) { return hdWkCatName(c.key) + ' ' + c.list.length; });
@@ -2910,7 +2852,7 @@ function hdWkHtml() {
   var sf = function (id) { return staffMap[id] = staffMap[id] || { id: id, got: 0, done: [], open: 0, over: 0 }; };
   D.inW.forEach(function (t) { sf(t.assigneeId).got++; });
   D.resW.forEach(function (t) { sf(t.assigneeId).done.push(t); });
-  D.openEnd.forEach(function (t) { var x = sf(t.assigneeId); x.open++; if (D.overdue.indexOf(t) >= 0) x.over++; });
+  D.openEnd.forEach(function (t) { var x = sf(t.assigneeId); x.open++; if (hdWkIsOver(t, D)) x.over++; });
   var staffRows = Object.keys(staffMap).map(function (k) { return staffMap[k]; })
     .sort(function (a, b) { return b.done.length - a.done.length || b.got - a.got; }).map(function (x) {
       var r = x.done.filter(function (t) { return t.csatScore != null; });
@@ -2941,7 +2883,8 @@ function hdWkKbHtml(D) {
   var kb = done.filter(function (t) { var f = hdWkFix(t.id); return f && f.src === 'kb'; });
   var reply = done.filter(function (t) { var f = hdWkFix(t.id); return f && f.src === 'reply'; }).length;
   var none = n - kb.length - reply, pct = Math.round(kb.length / n * 100);
-  var miss = done.filter(function (t) { return kb.indexOf(t) < 0; });
+  var kbSet = new Set(kb);
+  var miss = done.filter(function (t) { return !kbSet.has(t); });
   return title + '<div class="hd-wk-stats">'
     + '<div class="hd-wk-stat"><div class="k">เข้าคลังความรู้' + window.calcTip('เรื่องที่แก้เสร็จในช่วงนี้ที่มีบันทึก "วิธีแก้ไข" เข้าคลังความรู้ ÷ เรื่องที่แก้เสร็จทั้งหมด') + '</div><div class="v hd-wk-' + (pct >= 80 ? 'good' : pct >= 50 ? 'warn' : 'bad') + '">' + kb.length + '/' + n + '</div><div class="s">' + pct + '%</div></div>'
     + '<div class="hd-wk-stat"><div class="k">มีแค่ข้อความตอบ</div><div class="v">' + reply + '</div></div>'
@@ -2961,12 +2904,16 @@ function hdWkRenderChart() {
   if (!cv || !window.Chart) return;
   var st = hdWkState(), D = hdWkData();
   var labels = [], inN = [], outN = [];
+  // แปลงวันที่ของ Ticket ครั้งเดียว (ms · ไม่มีค่า = null) แล้วนับทุกช่วงจากชุดนี้ แทนการ new Date ซ้ำทุกช่วง
+  var tms = D.all.filter(function (t) { return t.status !== 'cancelled'; }).map(function (t) {
+    return { c: t.createdAt ? new Date(t.createdAt).getTime() : null, r: t.resolvedAt ? new Date(t.resolvedAt).getTime() : null };
+  });
   for (var i = HD_WK_TREND_N[st.period] - 1; i >= 0; i--) {
-    var a = hdWkAdd(D.s, -i, st.period), b = hdWkAdd(a, 1, st.period);
-    var inR = function (iso) { if (!iso) return false; var d = new Date(iso); return d >= a && d < b; };
+    var a = hdWkAdd(D.s, -i, st.period), b = hdWkAdd(a, 1, st.period), am = a.getTime(), bm = b.getTime();
+    var inR = function (x) { return x !== null && x >= am && x < bm; };
     labels.push(st.period === 'year' ? String(a.getFullYear() + 543) : st.period === 'month' ? HD_WK_MON[a.getMonth()] + ' ' + String(a.getFullYear() + 543).slice(2) : hdWkD(a));
-    inN.push(D.all.filter(function (t) { return t.status !== 'cancelled' && inR(t.createdAt); }).length);
-    outN.push(D.all.filter(function (t) { return t.status !== 'cancelled' && inR(t.resolvedAt); }).length);
+    inN.push(tms.filter(function (x) { return inR(x.c); }).length);
+    outN.push(tms.filter(function (x) { return inR(x.r); }).length);
   }
   var css = getComputedStyle(document.body), dark = hdIsDark();
   var grid = (css.getPropertyValue('--border') || '#e2e5ec').trim(), ink2 = (css.getPropertyValue('--txt2') || '#5a6075').trim(), ink3 = (css.getPropertyValue('--txt3') || '#9ba3b8').trim();
@@ -3048,7 +2995,7 @@ function hdWkStatsText(D) {
 }
 function hdWkTicketLine(t, D) {
   var f = hdWkFix(t.id), flags = [];
-  if (D.overdue.indexOf(t) >= 0) flags.push('เกิน SLA');
+  if (hdWkIsOver(t, D)) flags.push('เกิน SLA');
   if ((t.reopenedCount || 0) > 0) flags.push('เปิดซ้ำ ' + t.reopenedCount);
   var c = new Date(t.createdAt);
   return '#' + t.ticketNo + ' | ' + c.getDate() + '/' + (c.getMonth() + 1) + ' | ' + hdWkHospName(t.hospitalId) + ' | ' + hdWkSrc(t) + ' | ' + hdWkCatName(t.categoryId)
@@ -3561,7 +3508,7 @@ window.saveHdAiAutoSettings = async function () {
     enabled: !!(document.getElementById('hd-ai-enabled') || {}).checked,
     mode: (document.getElementById('hd-ai-mode') || {}).value || 'all_hours', timezone:'Asia/Bangkok',
     business_delay_minutes:n('hd-ai-delay-business',10,0,1440), off_hours_delay_minutes:n('hd-ai-delay-off',3,0,1440), holiday_delay_minutes:n('hd-ai-delay-holiday',3,0,1440),
-    followup_delay_minutes:n('hd-ai-followup',1,0,1440), max_auto_replies:n('hd-ai-max',2,1,10), return_after_hours:n('hd-ai-return',24,0,168), kb_similarity_threshold:0.22, min_confidence:'high',
+    followup_delay_minutes:n('hd-ai-followup',1,0,1440), max_auto_replies:n('hd-ai-max',2,1,10), return_after_hours:n('hd-ai-return',24,0,168),
     use_holidays:!!(document.getElementById('hd-ai-use-holidays') || {}).checked,
     channels:channels,
     allowed_category_ids:chosen('hd-ai-categories'), allowed_hospital_ids:chosen('hd-ai-hospitals'), priority_modes:pm, schedule:schedule,
@@ -3783,10 +3730,17 @@ function hdRcRedraw() {
   if (b && window.hdTab === 'recur' && !window.hdOpenId) b.innerHTML = hdRcHtml();
 }
 
+// จำผล bigram ต่อข้อความ — hdRcAfterPlan เรียกกับ Ticket ทั้งหมดทุกการ์ด/ทุกแผนทุกรอบวาด (ผลเป็นแบบอ่านอย่างเดียว ใช้ร่วมกันได้)
+var _hdRcBigMemo = new Map();
 function hdRcBig(s) {
-  var t = String(s || '').toLowerCase().replace(/[\s\p{P}\p{S}\d]+/gu, ''), o = {}, n = 0;
+  var src = String(s || ''), hit = _hdRcBigMemo.get(src);
+  if (hit) return hit;
+  var t = src.toLowerCase().replace(/[\s\p{P}\p{S}\d]+/gu, ''), o = {}, n = 0;
   for (var i = 0; i < t.length - 1; i++) { var k = t.substr(i, 2); if (!o[k]) { o[k] = 1; n++; } }
-  return { o: o, n: n };
+  if (_hdRcBigMemo.size > 20000) _hdRcBigMemo.clear();
+  hit = { o: o, n: n };
+  _hdRcBigMemo.set(src, hit);
+  return hit;
 }
 function hdRcDice(A, B) {
   if (!A.n || !B.n) return 0;

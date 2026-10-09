@@ -37,10 +37,6 @@
   function writeStore(data) {
     try { localStorage.setItem(STORE_KEY, JSON.stringify(data)); } catch (e) {}
   }
-  function todayLocal() {
-    var d = new Date(), pad = function (n) { return String(n).padStart(2, '0'); };
-    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
-  }
   function thaiDate(iso) {
     if (!iso) return '';
     var a = iso.split('-').map(Number);
@@ -51,7 +47,7 @@
     state.pid = pid;
     state.titles = Array.isArray(all.titles) && all.titles.length ? all.titles.slice() : DEFAULT_TITLES.slice();
     state.config = {
-      title: saved.title || state.titles[0], date: todayLocal(), rows: saved.rows || 25,
+      title: saved.title || state.titles[0], date: window.todayStr(), rows: saved.rows || 25,
       showOfficer: !!saved.showOfficer, officer: saved.officer || '',
       leftName: saved.leftName || '', leftPos: saved.leftPos || '',
       rightName: saved.rightName || '', rightPos: saved.rightPos || '', rightInst: saved.rightInst || ''

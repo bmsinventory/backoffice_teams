@@ -48,6 +48,10 @@
 }
 .pulse.ok   { background: var(--teal); }
 
+/* ── เปิดหน้าใหม่/Refresh ขณะมี session (class ตั้งใน <head> index.html) — ซ่อนหน้าล็อกอิน แสดงตัวโหลดบนพื้นหลังทึบตั้งแต่เฟรมแรก ── */
+html.boot-sess #login { display: none !important; }
+html.boot-sess #sys-loader { display: flex; background: var(--bg) !important; backdrop-filter: none; }
+
 /* ── Loader Box ── */
 .loader-box {
   background: var(--surface); padding: 24px 32px; border-radius: 16px;

@@ -2,7 +2,8 @@
 .claude
 .gitignore
 README.md
-migration/
+.edge-*/
+tests/
 db-schema.sql
 db-training.sql
 deploy/

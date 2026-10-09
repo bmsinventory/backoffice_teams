@@ -13,6 +13,7 @@
 @import './components/sidebar.css';
 @import './components/topbar.css';
 @import './components/modal.css';
+@import './components/whats-new.css';
 @import './components/table.css';
 @import './components/form.css';
 @import './components/buttons.css';
@@ -21,6 +22,7 @@
 @import './components/ai.css';
 @import './components/staff-combo.css';
 @import './components/calc-tip.css';
+@import './components/tour.css';
 
 /* ── Feature Modules ── */
 @import './modules/login.css';

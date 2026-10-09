@@ -1,5 +1,5 @@
-const CACHE      = 'bms-app-v1791536286';
-const IMG_CACHE  = 'bms-img-v1791536286';
+const CACHE      = 'bms-app-v1791571710';
+const IMG_CACHE  = 'bms-img-v1791571710';
 
 const IMG_EXTS = ['.png', '.jpg', '.jpeg', '.gif', '.ico', '.webp', '.woff', '.woff2'];
 
@@ -17,7 +17,7 @@ self.addEventListener('install', (e) => {
   );
 });
 
-// Activate: delete old caches, claim clients, then notify them to reload
+// Activate: delete old caches, claim clients
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys()
@@ -25,13 +25,6 @@ self.addEventListener('activate', (e) => {
         Promise.all(keys.filter((k) => k !== CACHE && k !== IMG_CACHE).map((k) => caches.delete(k)))
       )
       .then(() => self.clients.claim())
-      // หน้าเวอร์ชันเก่า (index.html เดิม) ฟังข้อความนี้แล้ว reload เอง — คงไว้ให้เครื่องที่ยังค้างโค้ดเก่าอัปเดตได้
-      // หน้าเวอร์ชันใหม่ใช้ controllerchange ใน app.js แทน (ไม่ต้องฟังข้อความนี้)
-      .then(() =>
-        self.clients.matchAll({ type: 'window' }).then((clients) => {
-          clients.forEach((c) => c.postMessage({ type: 'SW_UPDATED' }));
-        })
-      )
   );
 });
 
@@ -50,7 +43,11 @@ self.addEventListener('fetch', (e) => {
       caches.match(e.request).then((cached) => {
         if (cached) return cached;
         return fetch(e.request).then((res) => {
-          if (res.ok) caches.open(IMG_CACHE).then((c) => c.put(e.request, res.clone()));
+          // clone ทันทีก่อนคืน res — ถ้า clone ใน .then() ทีหลัง body อาจถูกอ่านไปแล้ว ("body is already used")
+          if (res.ok) {
+            const copy = res.clone();
+            e.waitUntil(caches.open(IMG_CACHE).then((c) => c.put(e.request, copy)).catch(() => {}));
+          }
           return res;
         }).catch(() => new Response('', { status: 408 }));
       })
@@ -67,7 +64,10 @@ self.addEventListener('fetch', (e) => {
   e.respondWith(
     fetch(fresh)
       .then((res) => {
-        if (res.ok) caches.open(CACHE).then((c) => c.put(e.request, res.clone()));
+        if (res.ok) {
+          const copy = res.clone();
+          e.waitUntil(caches.open(CACHE).then((c) => c.put(e.request, copy)).catch(() => {}));
+        }
         return res;
       })
       .catch(() => caches.match(e.request).then((c) => c || caches.match('./index.html')))

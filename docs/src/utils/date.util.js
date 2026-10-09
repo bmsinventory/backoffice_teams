@@ -14,6 +14,12 @@
            (d.getFullYear() + 543);
   };
 
+  // ── Date → 'YYYY-MM-DD' ตามเวลาเครื่อง · ห้ามใช้ toISOString().slice(0,10) (เป็นวันที่ UTC → ก่อน 07:00 ได้เมื่อวาน) ──
+  window.ymd = function (d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  };
+  window.todayStr = function () { return window.ymd(new Date()); };
+
   // ── ช่องเลือกวันที่ที่ "แสดงผลเป็น พ.ศ." — ใช้แทน <input type="date"> ตรง ๆ ──
   // ค่าใน .value ยังเป็น ค.ศ. (YYYY-MM-DD) เหมือนเดิม, id เดิมใช้ได้ปกติ
   // ตัวอย่าง: html += window.beDateField('pf-start', p ? p.start : '', { onchange:'window.foo()', disabled:!ce });

@@ -424,6 +424,7 @@ DECLARE
   ];
 BEGIN
   FOREACH tbl IN ARRAY tbls LOOP
+    EXECUTE format('DROP POLICY IF EXISTS "anon_all_%s" ON %I', tbl, tbl);
     EXECUTE format(
       'CREATE POLICY "anon_all_%s" ON %I FOR ALL TO anon USING (true) WITH CHECK (true)',
       tbl, tbl
@@ -434,30 +435,28 @@ END $$;
 -- =============================================================
 -- REALTIME
 -- =============================================================
-ALTER PUBLICATION supabase_realtime ADD TABLE stages;
-ALTER PUBLICATION supabase_realtime ADD TABLE ptypes;
-ALTER PUBLICATION supabase_realtime ADD TABLE pgroups;
-ALTER PUBLICATION supabase_realtime ADD TABLE positions;
-ALTER PUBLICATION supabase_realtime ADD TABLE departments;
-ALTER PUBLICATION supabase_realtime ADD TABLE staff;
-ALTER PUBLICATION supabase_realtime ADD TABLE users;
-ALTER PUBLICATION supabase_realtime ADD TABLE projects;
-ALTER PUBLICATION supabase_realtime ADD TABLE advances;
-ALTER PUBLICATION supabase_realtime ADD TABLE lodgings;
-ALTER PUBLICATION supabase_realtime ADD TABLE holidays;
-ALTER PUBLICATION supabase_realtime ADD TABLE leaves;
-ALTER PUBLICATION supabase_realtime ADD TABLE timesheets;
-ALTER PUBLICATION supabase_realtime ADD TABLE costs;
-ALTER PUBLICATION supabase_realtime ADD TABLE contracts;
-ALTER PUBLICATION supabase_realtime ADD TABLE hsp_products;
-ALTER PUBLICATION supabase_realtime ADD TABLE hospitals;
-ALTER PUBLICATION supabase_realtime ADD TABLE work_logs;
-ALTER PUBLICATION supabase_realtime ADD TABLE settings;
+DO $$
+DECLARE
+  tbl TEXT;
+  tbls TEXT[] := ARRAY[
+    'stages','ptypes','pgroups','positions','departments','staff','users',
+    'projects','advances','lodgings','holidays','leaves','timesheets','costs',
+    'contracts','hsp_products','hospitals','work_logs','settings'
+  ];
+BEGIN
+  FOREACH tbl IN ARRAY tbls LOOP
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_publication_tables
+      WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = tbl
+    ) THEN
+      EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE %I', tbl);
+    END IF;
+  END LOOP;
+END $$;
 
 -- =============================================================
 -- IMPLEMENTATION TRACKER (impl_tracker) — Module ติดตามงานโครงการติดตั้งระบบ
 -- Project → Phase → Task → Checklist, แยกอิสระจากตาราง projects เดิม (คนละความหมาย)
--- รายละเอียดเต็ม + seed template: ดู db-migration-impl-tracker.sql
 -- =============================================================
 CREATE TABLE IF NOT EXISTS impl_templates (
   id            TEXT PRIMARY KEY,
@@ -637,11 +636,19 @@ BEGIN
   END LOOP;
 END $$;
 
-INSERT INTO storage.buckets (id, name, public)
-VALUES ('impl-attachments', 'impl-attachments', true)
-ON CONFLICT (id) DO NOTHING;
+-- ── Storage bucket สำหรับไฟล์แนบของ Task (impl-tracker.service.js) ──
+DO $$
+BEGIN
+  INSERT INTO storage.buckets (id, name, public)
+  VALUES ('impl-attachments', 'impl-attachments', true)
+  ON CONFLICT (id) DO NOTHING;
 
--- Seed template ("TPL_INV_STD") + storage policies: ดู db-migration-impl-tracker.sql
+  EXECUTE 'DROP POLICY IF EXISTS "impl_bucket_all" ON storage.objects';
+  EXECUTE 'CREATE POLICY "impl_bucket_all" ON storage.objects FOR ALL TO anon '
+        || 'USING (bucket_id = ''impl-attachments'') WITH CHECK (bucket_id = ''impl-attachments'')';
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'ข้าม storage bucket/policy (%) — ให้สร้าง bucket impl-attachments (public) + policy anon เองใน Studio', SQLERRM;
+END $$;
 
 -- ================================================================
 -- FORM TRACKER (form_tracker) — ส่วนย่อย "แบบฟอร์ม" ในหน้า "ติดตามโครงการติดตั้ง" (impl_tracker)
@@ -1531,6 +1538,91 @@ BEGIN
   ) RETURNING j.*;
 END $$;
 
+-- ── คลังความรู้กลางของ AI ทุกจุด (ตอบอัตโนมัติ · AI ช่วยวิเคราะห์ · ร่างข้อความตอบ · แนะนำปัญหาโครงการ) ──
+-- รวมทุกแหล่งในที่เดียว · การค้น/จัดอันดับอยู่ใน docs/src/services/ai-knowledge.js (ใช้ทั้งหน้าเว็บและ worker)
+-- tickets: ทุกใบ (ยกเว้นยกเลิก) + วิธีแก้ที่บันทึก "วิธีแก้ไข:" + คำตอบทีมงาน (ไม่รวมโน้ตภายใน)
+-- impl: ปัญหาทุกโครงการติดตั้ง ทั้งที่มี/ยังไม่มีวิธีแก้ · assist: ข้อความตอบกลับของผู้ช่วยทีม · problems: ปัญหาที่พบซ้ำ
+-- ข้อมูลทุกตารางนี้ anon อ่านได้อยู่แล้ว (RLS anon_all) จึงเปิดให้หน้าเว็บเรียกได้โดยไม่เพิ่มสิทธิ์
+CREATE OR REPLACE FUNCTION ai_knowledge_corpus()
+RETURNS JSONB LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT jsonb_build_object(
+    'tickets', COALESCE((
+      SELECT jsonb_agg(to_jsonb(r0)) FROM (
+        SELECT rt.id, rt.ticket_no, rt.subject, LEFT(rt.description, 600) AS description,
+               rt.source_system, rt.category_id, rt.status,
+               COALESCE((SELECT LEFT(regexp_replace(ke.body, '^วิธีแก้ไข\s*[:：]\s*', '', 'i'), 900)
+                 FROM helpdesk_ticket_events ke
+                 WHERE ke.ticket_id = rt.id AND ke.type = 'comment' AND ke.body ~* '^วิธีแก้ไข\s*[:：]'
+                 ORDER BY ke.created_at DESC LIMIT 1), '') AS fix,
+               COALESCE((SELECT LEFT(string_agg(re.body, ' / ' ORDER BY re.created_at), 900)
+                 FROM helpdesk_ticket_events re
+                 WHERE re.ticket_id = rt.id AND re.type = 'comment' AND re.actor_type = 'agent'
+                   AND NOT COALESCE(re.is_internal, false) AND length(re.body) >= 15
+                   AND re.body !~* '^วิธีแก้ไข\s*[:：]'), '') AS replies
+        FROM helpdesk_tickets rt
+        WHERE rt.status <> 'cancelled'
+        ORDER BY rt.created_at DESC LIMIT 5000
+      ) r0
+    ), '[]'::jsonb),
+    'impl', COALESCE((
+      SELECT jsonb_agg(to_jsonb(i0)) FROM (
+        SELECT ii.id, ii.project_id, LEFT(ii.problem, 600) AS problem, LEFT(COALESCE(ii.solution, ''), 900) AS solution,
+               ii.category, ii.department, ii.status
+        FROM impl_issues ii
+        WHERE COALESCE(ii.problem, '') <> ''
+        ORDER BY ii.updated_at DESC NULLS LAST LIMIT 5000
+      ) i0
+    ), '[]'::jsonb),
+    'assist', COALESCE((
+      SELECT jsonb_agg(jsonb_build_object('id', ar.id, 'title', ar.title, 'keywords', ar.keywords, 'category', ar.category,
+        'content', LEFT(ar.content, 1200), 'note', ar.note))
+      FROM assist_replies ar WHERE ar.active AND COALESCE(ar.content, '') <> ''
+    ), '[]'::jsonb),
+    'problems', COALESCE((
+      SELECT jsonb_agg(jsonb_build_object('id', hp.id, 'title', hp.title, 'source_system', hp.source_system, 'status', hp.status,
+        'root_cause', LEFT(hp.root_cause, 600), 'action_plan', LEFT(hp.action_plan, 600), 'result', LEFT(hp.result, 400)))
+      FROM helpdesk_problems hp WHERE COALESCE(hp.title, '') <> ''
+    ), '[]'::jsonb)
+  );
+$$;
+REVOKE ALL ON FUNCTION ai_knowledge_corpus() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION ai_knowledge_corpus() TO anon, authenticated;
+
+-- ── ข้อมูลของโรงพยาบาลผู้แจ้ง ให้ AI ใช้ประกอบนอกเหนือจากคลังความรู้ ──
+-- ระบบที่ใช้ · โครงการติดตั้ง/สถานะ · Ticket ก่อนหน้าของ รพ. เดียวกัน (+คำตอบทีม) · ปัญหาในโครงการของ รพ. นี้
+-- ไม่ส่ง hospitals.systems (รหัสผ่าน/AnyDesk/ฐานข้อมูล) และไม่ส่งรายชื่อผู้ติดต่อ
+CREATE OR REPLACE FUNCTION ai_hospital_context(p_hospital_id TEXT, p_exclude_ticket TEXT DEFAULT '')
+RETURNS JSONB LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT CASE WHEN COALESCE(p_hospital_id, '') = '' THEN '{}'::jsonb ELSE jsonb_build_object(
+    'type', h.type, 'beds', h.beds, 'province', h.province,
+    'products', COALESCE((SELECT jsonb_agg(hp.name ORDER BY hp.name) FROM hsp_products hp
+      WHERE h.products ? hp.id), '[]'::jsonb),
+    'projects', COALESCE((SELECT jsonb_agg(to_jsonb(p0)) FROM (
+      SELECT p.project_name, COALESCE((SELECT NULLIF(s.label_th, '') FROM stages s WHERE s.id = p.stage_id OR s.stage_id = p.stage_id LIMIT 1), p.stage_id) AS stage,
+             p.status, p.progress_pct, p.start_date, p.end_date
+      FROM projects p WHERE p.hospital_id = h.id
+      ORDER BY p.created_at DESC LIMIT 5) p0), '[]'::jsonb),
+    'tickets', COALESCE((SELECT jsonb_agg(to_jsonb(t0)) FROM (
+      SELECT t.ticket_no, LEFT(t.subject, 200) AS subject, t.status, t.source_system, t.created_at,
+             COALESCE((SELECT LEFT(e.body, 400) FROM helpdesk_ticket_events e
+               WHERE e.ticket_id = t.id AND e.type = 'comment' AND e.actor_type = 'agent' AND NOT COALESCE(e.is_internal, false)
+               ORDER BY e.created_at DESC LIMIT 1), '') AS last_reply
+      FROM helpdesk_tickets t
+      WHERE t.hospital_id = h.id AND t.id <> COALESCE(p_exclude_ticket, '') AND t.status <> 'cancelled'
+      ORDER BY t.created_at DESC LIMIT 8) t0), '[]'::jsonb),
+    'issues', COALESCE((SELECT jsonb_agg(to_jsonb(i0)) FROM (
+      SELECT LEFT(ii.problem, 300) AS problem, ii.status, LEFT(COALESCE(ii.solution, ''), 300) AS solution, ii.updated_at
+      FROM impl_issues ii
+      JOIN impl_projects ip ON ip.id = ii.project_id
+      JOIN projects p ON p.id = ip.source_project_id AND p.hospital_id = h.id
+      WHERE COALESCE(ii.problem, '') <> ''
+      ORDER BY (ii.status = 'closed'), ii.updated_at DESC NULLS LAST LIMIT 10) i0), '[]'::jsonb)
+  ) END
+  FROM (SELECT 1) one LEFT JOIN hospitals h ON h.id = p_hospital_id;
+$$;
+REVOKE ALL ON FUNCTION ai_hospital_context(TEXT, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION ai_hospital_context(TEXT, TEXT) TO anon, authenticated;
+
 -- Context ที่ worker ต้องใช้เท่านั้น: ไม่ส่งชื่อ/เบอร์/อีเมลผู้แจ้งไป AI
 CREATE OR REPLACE FUNCTION helpdesk_ai_worker_context(p_secret TEXT, p_id TEXT)
 RETURNS JSONB LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
@@ -1559,28 +1651,8 @@ BEGIN
       FROM helpdesk_attachments a WHERE a.ticket_id = t.id
     ), '[]'::jsonb),
     'holidays', COALESCE((SELECT jsonb_agg(jsonb_build_object('date', h.date, 'name', h.name)) FROM holidays h), '[]'::jsonb),
-    -- คลังความรู้ทั้งหมด (วิธีแก้ล่าสุดต่อ Ticket) — worker เลือกเรื่องที่คล้ายเอง จึงห้ามตัดเหลือแค่ช่วงล่าสุด
-    'knowledge', COALESCE((
-      SELECT jsonb_agg(to_jsonb(k0)) FROM (
-        SELECT * FROM (
-          SELECT DISTINCT ON (ke.ticket_id) kt.id AS ticket_id, kt.subject, kt.description, kt.source_system, kt.category_id,
-                 regexp_replace(ke.body, '^วิธีแก้ไข\s*[:：]\s*', '', 'i') AS fix, ke.created_at
-          FROM helpdesk_ticket_events ke
-          JOIN helpdesk_tickets kt ON kt.id = ke.ticket_id
-          WHERE ke.type = 'comment' AND ke.body ~* '^วิธีแก้ไข\s*[:：]'
-          ORDER BY ke.ticket_id, ke.created_at DESC
-        ) d ORDER BY d.created_at DESC LIMIT 3000
-      ) k0
-    ), '[]'::jsonb),
-    -- ปัญหาในโครงการติดตั้งที่มีวิธีแก้แล้ว (ชุดเดียวกับที่ปุ่ม AI ช่วยวิเคราะห์ใช้)
-    'impl_knowledge', COALESCE((
-      SELECT jsonb_agg(to_jsonb(i0)) FROM (
-        SELECT ii.problem, ii.solution AS fix, ii.category
-        FROM impl_issues ii
-        WHERE COALESCE(ii.solution,'') <> '' AND COALESCE(ii.problem,'') <> ''
-        ORDER BY ii.updated_at DESC NULLS LAST LIMIT 3000
-      ) i0
-    ), '[]'::jsonb)
+    'corpus', ai_knowledge_corpus(),
+    'hospital', ai_hospital_context(t.hospital_id, t.id)
   ) INTO out_json
   FROM helpdesk_ai_reply_jobs j
   JOIN helpdesk_tickets t ON t.id = j.ticket_id
@@ -1839,3 +1911,63 @@ BEGIN
     END IF;
   END LOOP;
 END $$;
+
+-- ── ล้างของที่เลิกใช้: ตารางสำรองค่าเดิมของการแปลงชื่อ → รหัส (แปลงเสร็จแล้ว) ──
+DROP TABLE IF EXISTS _mig_name_to_id_backup;
+
+NOTIFY pgrst, 'reload schema';
+
+-- ══ ดึงเฉพาะข้อมูลที่เปลี่ยน (แคชในเครื่อง docs/src/services/db.service.js) ══
+-- แถวที่ถูกลบ (เก็บแค่ชื่อตาราง + id + เวลา) · ลบประวัติเก่ากว่า 90 วันเอง (หน้าเว็บที่แคชเก่ากว่า 7 วันดึงทั้งตารางใหม่อยู่แล้ว)
+CREATE TABLE IF NOT EXISTS sync_deleted (
+  tbl        TEXT        NOT NULL,
+  id         TEXT        NOT NULL,
+  deleted_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (tbl, id)
+);
+CREATE INDEX IF NOT EXISTS idx_sync_deleted_tbl_at ON sync_deleted (tbl, deleted_at);
+ALTER TABLE sync_deleted ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "sync_deleted_read" ON sync_deleted;
+CREATE POLICY "sync_deleted_read" ON sync_deleted FOR SELECT USING (true); -- อ่านได้อย่างเดียว · เขียนผ่าน trigger เท่านั้น
+GRANT SELECT ON sync_deleted TO anon, authenticated;
+
+-- เพิ่ม/แก้แถว → ประทับเวลา (ทับค่าที่ส่งมาเสมอ)
+CREATE OR REPLACE FUNCTION sync_touch() RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  NEW.sync_at := clock_timestamp();
+  RETURN NEW;
+END $$;
+
+-- ลบแถว → จดไว้ใน sync_deleted
+CREATE OR REPLACE FUNCTION sync_log_delete() RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  INSERT INTO sync_deleted (tbl, id, deleted_at) VALUES (TG_TABLE_NAME, OLD.id::text, clock_timestamp())
+    ON CONFLICT (tbl, id) DO UPDATE SET deleted_at = EXCLUDED.deleted_at;
+  IF random() < 0.01 THEN DELETE FROM sync_deleted WHERE deleted_at < now() - interval '90 days'; END IF;
+  RETURN OLD;
+END $$;
+
+-- ตารางที่ข้อมูลสะสมตามเวลา (ตรงกับ DELTA_TABLES ใน docs/src/services/db.service.js)
+DO $$
+DECLARE t TEXT;
+BEGIN
+  FOREACH t IN ARRAY ARRAY[
+    'projects','advances','lodgings','leaves','timesheets','costs','work_logs','contracts','hospitals','hsp_products',
+    'impl_projects','impl_phases','impl_tasks','impl_checklist_items','impl_issues','impl_comments','impl_attachments',
+    'impl_activity_log','form_items','expense_clearing_forms','site_deploy_forms','site_notice_forms',
+    'helpdesk_tickets','helpdesk_problems','assist_replies','server_requests']
+  LOOP
+    IF to_regclass('public.' || t) IS NULL THEN
+      RAISE NOTICE 'ข้าม % (ยังไม่มีตาราง)', t;
+      CONTINUE;
+    END IF;
+    EXECUTE format('ALTER TABLE %I ADD COLUMN IF NOT EXISTS sync_at TIMESTAMPTZ NOT NULL DEFAULT now()', t);
+    EXECUTE format('CREATE INDEX IF NOT EXISTS %I ON %I (sync_at)', 'idx_' || t || '_sync_at', t);
+    EXECUTE format('DROP TRIGGER IF EXISTS trg_sync_touch ON %I', t);
+    EXECUTE format('CREATE TRIGGER trg_sync_touch BEFORE INSERT OR UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION sync_touch()', t);
+    EXECUTE format('DROP TRIGGER IF EXISTS trg_sync_log_delete ON %I', t);
+    EXECUTE format('CREATE TRIGGER trg_sync_log_delete AFTER DELETE ON %I FOR EACH ROW EXECUTE FUNCTION sync_log_delete()', t);
+  END LOOP;
+END $$;
+
+NOTIFY pgrst, 'reload schema';

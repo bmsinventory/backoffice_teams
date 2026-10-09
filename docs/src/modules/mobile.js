@@ -188,8 +188,10 @@ function startTableObserver() {
       if (m.addedNodes.length > 0) {
         clearTimeout(window._cardInitTimer);
         window._cardInitTimer = setTimeout(function () {
-          window.initMobileTable();
-          window.compactToolbarButtons();
+          // ทำเฉพาะหน้าที่เปิดอยู่ — เดิมไล่ทุกตาราง/ปุ่มของทุกหน้า (รวมหน้าที่ซ่อนอยู่) ทุกครั้งที่ DOM เปลี่ยน
+          var scope = _activeView();
+          window.initMobileTable(scope);
+          window.compactToolbarButtons(scope);
         }, 200);
         break;
       }
@@ -199,23 +201,7 @@ function startTableObserver() {
   if (content) _cardObs.observe(content, { childList: true, subtree: true });
 }
 
-// ── Bottom Navigation ──────────────────────────────────────
-function updateBottomNav(viewId) {
-  document.querySelectorAll('.bottom-nav-item').forEach(function (el) {
-    el.classList.toggle('active', el.dataset.view === viewId);
-  });
-}
-
-// Patch goView to also sync bottom-nav indicator (router.js defines goView first)
-function patchGoView() {
-  if (!window.goView || window.goView._patched) return;
-  var orig = window.goView;
-  window.goView = function (viewId, btn) {
-    orig(viewId, btn);
-    updateBottomNav(viewId);
-  };
-  window.goView._patched = true;
-}
+function _activeView() { return document.querySelector('#content .view.on') || undefined; }
 
 // ── Bottom nav badge sync ───────────────────────────────────
 function syncBottomBadges() {
@@ -228,21 +214,22 @@ function syncBottomBadges() {
 }
 
 // ── Resize handler ─────────────────────────────────────────
+// (หน่วงไว้จนหยุดย่อ/ขยายจอ — เดิมไล่ทุกตารางซ้ำทุก event ระหว่างลากขอบจอ ทำให้กระตุก)
+var _resizeTimer = null;
 window.addEventListener('resize', function () {
-  if (window.innerWidth <= 768) {
-    window.initMobileTable();
-  }
+  clearTimeout(_resizeTimer);
+  _resizeTimer = setTimeout(function () {
+    if (window.innerWidth <= 768) window.initMobileTable(_activeView());
+  }, 200);
 });
 
 // ── Init on DOMContentLoaded ───────────────────────────────
 document.addEventListener('DOMContentLoaded', function () {
   startTableObserver();
-  patchGoView();
 });
 
 // ── Init after data loads (called from auth-sb.js) ─────────
 window._mobileInit = function () {
-  patchGoView();
   window.initMobileTable();
   window.compactToolbarButtons();
   syncBottomBadges();

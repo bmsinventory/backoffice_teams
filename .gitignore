@@ -16,8 +16,8 @@ Thumbs.db
 .vscode/
 *.swp
 
-# Migration script output
-migration/failed-uploads.json
+# Headless browser profiles (ตรวจหน้าจอ)
+.edge-*/
 
 # Web Push: รหัสลับของตัวส่ง (ฝังใน frontend image ตอน build) — ห้าม commit
 push-worker/worker.secret

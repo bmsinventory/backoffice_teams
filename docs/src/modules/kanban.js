@@ -17,12 +17,18 @@ window.renderKanban = function(){
   var fProjs=kbFilteredProjects();
   var now=new Date();now.setHours(0,0,0,0);
   var board=document.getElementById('kb-board');
+  // index ครั้งเดียวต่อการ render (เดิม filter/find ทั้งตารางทุกการ์ด) — เก็บลำดับเดิมของแต่ละกลุ่ม
+  var byStage=new Map(),startKey=new Map(),advByPid=new Map(),ldByPid=new Map(),staffIdx=new Map();
+  fProjs.forEach(function(p){var l=byStage.get(p.stage);if(!l){l=[];byStage.set(p.stage,l);}l.push(p);startKey.set(p,p.start?+pd(p.start):0);});
+  window.ADVANCES.forEach(function(a){var l=advByPid.get(a.pid);if(!l){l=[];advByPid.set(a.pid,l);}l.push(a);});
+  window.LODGINGS.forEach(function(x){var l=ldByPid.get(x.pid);if(!l){l=[];ldByPid.set(x.pid,l);}l.push(x);});
+  window.STAFF.forEach(function(s){if(!staffIdx.has(s.id))staffIdx.set(s.id,s);});
   board.innerHTML=window.STAGES.map(function(sg){
-    var items=fProjs.filter(function(p){return p.stage===sg.id;}).sort(function(a,b){var as=a.start?pd(a.start):new Date(0);var bs=b.start?pd(b.start):new Date(0);return as-bs;});
+    var items=(byStage.get(sg.id)||[]).slice().sort(function(a,b){return startKey.get(a)-startKey.get(b);});
     var totalBudget=items.reduce(function(s,p){return s+p.cost;},0);
     var cards=items.map(function(p){
       var pt=gT(p.typeId);var pg=gG(p.groupId);
-      var pAdvs=window.ADVANCES.filter(function(a){return a.pid===p.id;});
+      var pAdvs=advByPid.get(p.id)||[];
       var adv=pAdvs.find(function(a){return a.status!=='cleared';})||pAdvs[pAdvs.length-1];
       var advStat=adv?window.AFLW.find(function(x){return x.id===adv.status;}):null;
       var advBadge=advStat?`<span class="kb-card-type" style="background:${advStat.color}18;color:${advStat.color};margin:0" title="มี Advance — สถานะ: ${esc(advStat.label)}">💰 ${advStat.icon} ${esc(advStat.label)}</span>`:'';
@@ -30,7 +36,7 @@ window.renderKanban = function(){
       var _exLd=['GRP17733355541905','GRP17733355541906'];
       var ldBadge='';
       if(!_exLd.includes(p.groupId)){
-        var _pLds=window.LODGINGS.filter(function(l){return l.pid===p.id;});
+        var _pLds=ldByPid.get(p.id)||[];
         if(_pLds.length&&!_pLds.some(function(l){return l.approvedDaily==='yes'||l.approvedMonthly==='yes';})){
           ldBadge=`<span class="kb-card-type" style="background:#ffa62b18;color:var(--amber);margin:0" title="มีคำขอจัดหาที่พัก ยังไม่อนุมัติ">🏨 ที่พักรออนุมัติ</span>`;
         }
@@ -38,7 +44,7 @@ window.renderKanban = function(){
       var displayProg=p.progress;
       if((sg.id==='exec'||sg.label==='ดำเนินการ')&&p.start&&p.end){var sDate=pd(p.start);var eDate=pd(p.end);var totalMs=eDate-sDate;if(totalMs>0)displayProg=Math.min(100,Math.max(0,Math.round((now-sDate)/totalMs*100)));}
       var mems=(p.members&&p.members.length>0?p.members:p.team.map(function(id){return{sid:id};}));
-      var nicknames=mems.slice(0,3).map(function(m){var s=window.STAFF.find(function(x){return x.id===m.sid;});return s?s.nickname||s.name.split(' ')[0]:'';}).filter(Boolean);
+      var nicknames=mems.slice(0,3).map(function(m){var s=staffIdx.get(m.sid);return s?s.nickname||s.name.split(' ')[0]:'';}).filter(Boolean);
       var extraMems=mems.length>3?`<span style="font-size:9px;color:var(--txt3);font-weight:600;">+${mems.length-3}</span>`:'';
       var avatarHtml=nicknames.map(function(n,i){return`<div style="width:20px;height:20px;border-radius:50%;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:${avC(i)};color:#fff;border:1.5px solid var(--surface);">${n.charAt(0)}</div>`;}).join('');
       var endDate=p.end?pd(p.end):null;
@@ -102,6 +108,8 @@ window.runAutoStage=async function(silent){
     // This lets manually-advanced stages (e.g. 'close') stay put
     var curStageObj=window.STAGES.find(function(s){return s.id===p.stage;});
     var curHasRule=curStageObj&&curStageObj.autoRule;
+    var startD=p.start?pd(p.start):null;
+    var endD=p.end?pd(p.end):null;
     // Pre-check: find what the best auto stage would be (without committing)
     // If current stage has no rule and is at same or higher order than any matching rule — skip
     if(curStageObj&&!curHasRule){
@@ -109,7 +117,7 @@ window.runAutoStage=async function(silent){
       var wouldMatch=null;
       ruledStages.forEach(function(s){
         var m=false,offsetMs=(s.autoOffset||0)*86400000;
-        var startD2=p.start?pd(p.start):null,endD2=p.end?pd(p.end):null;
+        var startD2=startD,endD2=endD;
         if(s.autoRule==='before_start'&&startD2){var t=new Date(startD2.getTime()-offsetMs);if(now>=t&&now<startD2)m=true;}
         else if(s.autoRule==='on_start'&&startD2){if(now>=startD2&&(!endD2||now<endD2))m=true;}
         else if(s.autoRule==='on_end'&&endD2){if(now>=endD2)m=true;}
@@ -119,8 +127,6 @@ window.runAutoStage=async function(silent){
       if(wouldMatch&&(curStageObj.order||0)>=(wouldMatch.order||0))return;
       if(!wouldMatch)return; // no rule matches at all, nothing to do
     }
-    var startD=p.start?pd(p.start):null;
-    var endD=p.end?pd(p.end):null;
     var bestStage=null,bestProg=-1;
     ruledStages.forEach(function(s){
       var match=false;
@@ -169,7 +175,9 @@ window.runAutoStage=async function(silent){
     }
   }
   if(!silent)window.showToast(`⚡ อัปเดต Stage อัตโนมัติ ${updates.length} โครงการ`,'info');
-  window.renderKanban();window.renderOverview();window.renderProjects();
+  // render เฉพาะหน้าที่เปิดอยู่ (เดิม render ทั้ง 3 หน้าแม้ซ่อนอยู่)
+  var _v=document.body.getAttribute('data-view');
+  if(_v==='kanban')window.renderKanban();else if(_v==='overview')window.renderOverview();else if(_v==='projects')window.renderProjects();
   return updates.length;
 }
 

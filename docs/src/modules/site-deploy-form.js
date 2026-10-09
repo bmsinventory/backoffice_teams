@@ -488,7 +488,7 @@ window.sdfNewForm = function () {
    'sdf-adv-used','sdf-adv-uncleared','sdf-preparer-name'].forEach(function (id) {
     var el = document.getElementById(id); if (el) el.value = '';
   });
-  var prepDate = document.getElementById('sdf-preparer-date'); if (prepDate) prepDate.value = new Date().toISOString().slice(0, 10);
+  var prepDate = document.getElementById('sdf-preparer-date'); if (prepDate) prepDate.value = window.todayStr();
   ['sdf-work-open','sdf-work-percontract','sdf-work-other','sdf-work-revisit','sdf-work-fixissue','sdf-work-closecontract'].forEach(function (id) {
     var el = document.getElementById(id); if (el) el.checked = false;
   });

@@ -14,7 +14,7 @@ services:
       SUPABASE_URL: "https://backoffice-teams.bmscloud.in.th"
       SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzg2MDY5OTg0LCJleHAiOjE5NDM3NDk5ODR9.87h6yNOOf2UIVLygJp-hap-Y0n37xQ7OzPfv7HTlrbY"
       # คำขอข้อมูลของหน้าเว็บวิ่งผ่าน container นี้ (บีบอัด gzip) แล้วต่อ Supabase (Kong) ในเครื่องตรง ๆ
-      # ต่อไม่ได้ หน้าเว็บสลับไปต่อ SUPABASE_URL ตรงเอง · ไม่ใส่บรรทัดนี้ = ผ่าน SUPABASE_URL · API_PROXY: "0" = ปิด
+      # ไม่ใส่บรรทัดนี้ = ผ่าน SUPABASE_URL
       API_UPSTREAM: "http://10.95.10.108:8000"
     ports:
       - "8089:80"

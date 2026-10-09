@@ -11,7 +11,7 @@
   // ── Global Data Stores ──
   // ชื่อ global ตรงกับชื่อ table แบบ UPPERCASE ทุกตัว (getColRef fallback lower-case ชื่อ collection
   // เป็นชื่อ table โดยอัตโนมัติเมื่อไม่มีอยู่ใน COL_MAP ของ db.service.js — ห้ามเปลี่ยนชื่อเหล่านี้
-  // โดยไม่ตรงกับชื่อ table ใน db-migration-impl-tracker.sql)
+  // โดยไม่ตรงกับชื่อ table ใน db-schema.sql)
   window.IMPL_TEMPLATES       = [];
   window.IMPL_PROJECTS        = [];
   window.IMPL_PHASES          = [];

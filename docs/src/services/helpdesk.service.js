@@ -133,9 +133,7 @@
   };
 
   // ── Working-hours date math (ฝั่ง client — P0 ไม่มี pg_cron) ──
-  function _ymd(dt) {
-    return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
-  }
+  var _ymd = window.ymd;
   function _isHoliday(dt) {
     var key = _ymd(dt);
     return (window.HOLIDAYS || []).some(function (h) { return h.date === key; });
@@ -258,9 +256,9 @@
   // ── AI ช่วยวิเคราะห์ — ตัวเรียก AI กลางอยู่ที่ src/services/ai.service.js (aiChat / aiChatJson) ──
 
   // ── คลังความรู้ (Knowledge Base) = comment ในไทม์ไลน์ที่ขึ้นต้น "วิธีแก้ไข:" (บันทึกตอนปิดงาน / นำเข้าข้อมูลเก่า)
-  // ใช้ทั้งแท็บ "คลังความรู้" และเป็นตัวอย่างให้ AI (hdAiSimilar) — cache สั้น ๆ กันยิงซ้ำถี่ ──
+  // ใช้แสดงในแท็บ "คลังความรู้" (AI ค้นจากคลังกลาง ai-knowledge.js) — cache สั้น ๆ กันยิงซ้ำถี่ ──
   var _kbCache = null, _kbAt = 0;
-  window.hdKbInvalidate = function () { _kbCache = null; };
+  window.hdKbInvalidate = function () { _kbCache = null; window.aiKnowledgeInvalidate && window.aiKnowledgeInvalidate(); };
   window.hdKbFetch = async function () {
     if (_kbCache && Date.now() - _kbAt < 120000) return _kbCache;
     var db = window.getDb && window.getDb();
@@ -291,40 +289,23 @@
     return _kbCache;
   };
 
-  // เลือกรายการในคลังความรู้ที่คล้ายข้อความ เพื่อเป็น context ให้ AI (ความคล้ายแบบ bigram — รองรับภาษาไทย)
-  // ── กรณีเก่าที่คล้ายกัน: คลังความรู้ Helpdesk + ปัญหาใน Impl Tracker ที่มีวิธีแก้แล้ว (ค้นร่วมกัน เรียงตามความคล้าย)
-  // IMPL_ISSUES โหลดเบื้องหลังหลังล็อกอิน (ImplTrackerService) — ยังไม่มาก็ใช้แค่ฝั่ง Helpdesk ──
-  window.hdAiSimilar = async function (text, limit) {
-    var kb = (await window.hdKbFetch()).map(function (k) {
-      return { score: window.aiTextSim(text, k.subject + ' ' + k.description), subject: k.subject, description: k.description, fix: 'วิธีแก้ไข: ' + k.fix, from: 'Ticket ' + k.ticketNo };
-    });
-    var impl = (window.IMPL_ISSUES || []).filter(function (x) { return (x.solution || '').trim() && (x.problem || '').trim(); }).map(function (x) {
-      var p = (window.IMPL_PROJECTS || []).find(function (pp) { return pp.id === x.projectId; });
-      return { score: window.aiTextSim(text, x.problem), subject: '', description: x.problem, fix: 'วิธีแก้ไข: ' + x.solution, from: 'ปัญหาโครงการ ' + ((p && p.name) || '') };
-    });
-    return kb.concat(impl).filter(function (x) { return x.score >= 0.2; })
-      .sort(function (a, b) { return b.score - a.score; })
-      .slice(0, limit || 3);
-  };
-
   window.hdAiAnalyze = async function (opt) {
     opt = opt || {};
     var desc = String(opt.description || '').trim();
     if (!desc) throw new Error('ยังไม่มีรายละเอียดปัญหาให้วิเคราะห์');
     var cats = (window.HELPDESK_CATEGORIES || []).map(function (c) { return c.id + ' — ' + c.name; }).join('\n');
-    var sim = [];
-    try { sim = await window.hdAiSimilar(desc, 3); } catch (e) {}
-    var simTxt = sim.length
-      ? '\n\nกรณีเก่าที่คล้ายกัน (จาก Ticket และปัญหาในโครงการติดตั้ง — ใช้ประกอบการแนะนำวิธีแก้ไข):\n'
-        + sim.map(function (x, i) { return (i + 1) + ') [' + x.from + '] ปัญหา: ' + (x.description || x.subject || '').slice(0, 200) + '\n   ' + x.fix.slice(0, 300); }).join('\n')
-      : '';
+    // คลังความรู้กลาง (ชุดเดียวกับ AI ตอบอัตโนมัติ) — ใช้ประกอบการแนะนำวิธีแก้ไข
+    var found = { knowledge: [], related: [] };
+    try { found = await window.aiKnowledgeSearch(desc, { system: opt.sourceSystem, excludeTicketId: opt.ticketId, top: 4 }); } catch (e) {}
+    var hosp = await window.aiHospitalContextText(opt.hospitalId, opt.ticketId);
+    var simTxt = (hosp ? '\n\nข้อมูลของโรงพยาบาลผู้แจ้ง:\n' + hosp : '') + '\n\n' + window.aiKnowledge.promptBlock(found, { internal: true });
     var user = 'รายการหมวดปัญหา (เลือก id ให้ตรงที่สุด):\n' + cats
       + '\n\n--- ปัญหาที่ต้องวิเคราะห์ ---\n'
       + (opt.hospitalName ? 'โรงพยาบาล: ' + opt.hospitalName + '\n' : '')
       + (opt.sourceSystem ? 'ระบบที่ใช้งาน: ' + opt.sourceSystem + '\n' : '')
       + 'รายละเอียด: ' + desc + simTxt;
 
-    var out = await window.aiChatJson(window.HD_AI_SYSTEM_PROMPT, user, { maxTokens: 500 });
+    var out = await window.aiChatJson(window.HD_AI_SYSTEM_PROMPT, user, { maxTokens: 700 });
     var catOk = (window.HELPDESK_CATEGORIES || []).some(function (c) { return c.id === out.category_id; });
     return {
       categoryId: catOk ? out.category_id : '',
@@ -332,13 +313,13 @@
       resolutionHint: String(out.resolution_hint || '').trim(),
       confidence: out.confidence || '',
       reason: String(out.reason || '').trim(),
-      similarCount: sim.length,
+      similarCount: found.knowledge.length + found.related.length,
     };
   };
 
   // ── ร่างข้อความตอบผู้แจ้ง (รพ.) จากรายละเอียด Ticket + บทสนทนาทั้งหมด (รวมโน้ตภายในเป็นข้อมูลประกอบ
   // แต่สั่งห้ามเปิดเผยตรง ๆ) — คืนข้อความล้วน ให้เจ้าหน้าที่ตรวจ/แก้ก่อนกดส่งเองเสมอ ──
-  window.hdAiDraftReply = async function (t, events, hint) {
+  window.hdAiDraftReply = async function (t, events) {
     var who = function (e) { return e.actor_type === 'reporter' ? 'ผู้แจ้ง' : e.actor_type === 'system' ? 'ระบบ' : e.actor_type === 'ai' ? 'AI ผู้ช่วย' : 'ทีมงาน'; };
     var convo = (events || []).filter(function (e) { return e.type === 'comment' && e.body; }).slice(-12).map(function (e) {
       return '[' + who(e) + (e.is_internal ? ' · โน้ตภายใน' : '') + '] ' + String(e.body).slice(0, 500);
@@ -348,10 +329,20 @@
       + 'ผู้แจ้ง: ' + (t.reporterName || '-') + '\n'
       + 'สถานะปัจจุบัน: ' + st + '\n'
       + 'รายละเอียดปัญหา: ' + String(t.description || '').slice(0, 1500) + '\n'
-      + (convo ? '\nบทสนทนาที่ผ่านมา (เก่า → ใหม่):\n' + convo + '\n' : '')
-      + (hint ? '\nแนวทางแก้ไขที่ทีมพิจารณาอยู่: ' + hint + '\n' : '')
-      + '\nร่างข้อความตอบกลับผู้แจ้งฉบับถัดไป';
-    return window.aiChat(window.HD_AI_REPLY_PROMPT, user, { maxTokens: 500, temperature: 0.4 });
+      + (convo ? '\nบทสนทนาที่ผ่านมา (เก่า → ใหม่):\n' + convo + '\n' : '');
+    // คลังความรู้กลาง ค้นด้วยหัวข้อ + รายละเอียด + ข้อความล่าสุดของผู้แจ้ง (ชุดเดียวกับ AI ตอบอัตโนมัติ)
+    var asked = (events || []).filter(function (e) { return e.type === 'comment' && e.actor_type === 'reporter'; }).slice(-3)
+      .map(function (e) { return e.body || ''; });
+    var topic = (t.subject || '') + ' ' + (t.description || '');
+    var found = { knowledge: [], related: [] };
+    try {
+      found = await window.aiKnowledgeSearch([topic, asked[asked.length - 1] || '', topic + ' ' + asked.join(' ')],
+        { system: t.sourceSystem, excludeTicketId: t.id });
+    } catch (e) {}
+    var hosp = await window.aiHospitalContextText(t.hospitalId, t.id);
+    user += (hosp ? '\nข้อมูลของโรงพยาบาลผู้แจ้ง (ใช้ประกอบ เช่น เคยแจ้งเรื่องเดียวกัน/อยู่ระหว่างติดตั้ง):\n' + hosp + '\n' : '')
+      + '\n' + window.aiKnowledge.promptBlock(found, { internal: true }) + '\n\nร่างข้อความตอบกลับผู้แจ้งฉบับถัดไป';
+    return window.aiChat(window.HD_AI_REPLY_PROMPT, user, { maxTokens: 900, temperature: 0.4 });
   };
 
   // ── Realtime Subscriptions (background, ไม่ block loader หลัก) ──
@@ -383,19 +374,11 @@
     _legacyStatusBackfillRunning = true;
     var now = new Date().toISOString();
     try {
-      if (db.__localMock) {
-        var batch = window.writeBatch();
-        legacy.forEach(function (t) {
-          batch.update(window.getDocRef('HELPDESK_TICKETS', t.id), { status: 'assigned', updated_at: now });
-        });
-        await batch.commit();
-      } else {
-        var res = await db.from('helpdesk_tickets').update({ status: 'assigned', updated_at: now })
-          .eq('status', 'triage')
-          .not('category_id', 'is', null).neq('category_id', '')
-          .not('assignee_id', 'is', null).neq('assignee_id', '');
-        if (res.error) throw res.error;
-      }
+      var res = await db.from('helpdesk_tickets').update({ status: 'assigned', updated_at: now })
+        .eq('status', 'triage')
+        .not('category_id', 'is', null).neq('category_id', '')
+        .not('assignee_id', 'is', null).neq('assignee_id', '');
+      if (res.error) throw res.error;
 
       // Reflect the migration immediately; realtime will confirm the same rows.
       legacy.forEach(function (t) { t.status = 'assigned'; t.updatedAt = now; });

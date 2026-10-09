@@ -64,7 +64,11 @@ docker compose ps   # ทุก service ต้อง Up/healthy
 ```bash
 docker compose exec -T db psql -U postgres -d postgres \
   < /path/to/backoffice_teams-supabase/db-schema.sql
+docker compose exec -T db psql -U postgres -d postgres \
+  < /path/to/backoffice_teams-supabase/db-training.sql
 ```
+
+รันตามลำดับนี้เสมอ (db-training.sql อ้างตาราง hospitals / impl_projects ของ db-schema.sql) · ทั้งสองไฟล์รันซ้ำได้ ใช้อัปเดต DB เดิมได้ด้วย
 
 ตรวจว่าตาราง/RLS/bucket ถูกสร้างครบ (เปิด Supabase Studio ที่ `http://<SERVER_IP>:8000` ล็อกอินด้วย DASHBOARD_USERNAME/PASSWORD ที่ตั้งไว้ ดูใน Table Editor + Storage)
 
@@ -93,37 +97,7 @@ docker compose exec -T db psql -U postgres -d postgres < /tmp/backup_data.sql
 
 ---
 
-## Phase 5 — Migrate ไฟล์แนบ (Storage)
-
-```bash
-cd /path/to/backoffice_teams-supabase/migration
-npm install
-
-OLD_SUPABASE_URL="https://zsxllqiygochmldmtpgc.supabase.co" \
-OLD_SERVICE_ROLE_KEY="<service_role key ของ Cloud project เดิม จาก Dashboard>" \
-NEW_SUPABASE_URL="https://api.<DOMAIN>" \
-NEW_SERVICE_ROLE_KEY="<SERVICE_ROLE_KEY จาก Phase 2>" \
-node migrate-storage.mjs
-```
-
-ถ้ามี `failed-uploads.json` เกิดขึ้น ให้เปิดดูรายการที่พลาดแล้วรันซ้ำเฉพาะไฟล์นั้น
-
----
-
-## Phase 6 — แก้ URL ไฟล์แนบเก่าให้ชี้ domain ใหม่
-
-แก้ `migration/fix-file-urls.sql` ให้ `new_domain` เป็น `https://api.<DOMAIN>` แล้วรัน:
-
-```bash
-docker compose exec -T db psql -U postgres -d postgres \
-  < /path/to/backoffice_teams-supabase/migration/fix-file-urls.sql
-```
-
-เช็คว่า query สุดท้ายในสคริปต์คืนค่า 0 แถวก่อน commit (ถ้ารันผ่าน psql ตรงๆ แบบนี้ transaction จะ commit อัตโนมัติเมื่อจบไฟล์ — ถ้าอยากเช็คก่อน ให้รันทีละคำสั่งผ่าน `psql -U postgres -d postgres` แบบ interactive แทน)
-
----
-
-## Phase 7 — ชี้ Frontend ไปที่ Supabase instance ใหม่
+## Phase 5 — ชี้ Frontend ไปที่ Supabase instance ใหม่
 
 แก้ `deploy/docker-compose.yml`:
 
@@ -133,8 +107,9 @@ environment:
   SUPABASE_ANON_KEY: "<ANON_KEY จาก Phase 2>"
 ```
 
-- ปุ่ม AI ช่วยวิเคราะห์เรียก `https://vllm-gemma.bmscloud.in.th` จากเบราว์เซอร์ และ worker ตอบกลับอัตโนมัติใช้ปลายทางเดียวกัน (ไม่ใช้คีย์) ค่าเริ่มต้นจึงไม่ต้องตั้งเพิ่ม หากต้องเปลี่ยนปลายทางให้กำหนด `AI_BASE` ใน environment ของ frontend container
+- ฟีเจอร์ AI บนหน้าเว็บเรียก `https://vllm-gemma.bmscloud.in.th` จากเบราว์เซอร์ และ worker ตอบกลับอัตโนมัติใช้ปลายทางเดียวกัน (ไม่ใช้คีย์) ค่าเริ่มต้นจึงไม่ต้องตั้งเพิ่ม หากต้องเปลี่ยนปลายทางให้กำหนด `AI_BASE` ใน environment ของ frontend container
 - หลังอัปเดตเวอร์ชันที่มี AI ตอบกลับอัตโนมัติ ต้องรัน `db-schema.sql` ก่อน restart/rebuild frontend เพื่อสร้างคิว, Audit Log, trigger และ RPC ของ worker
+- คลังความรู้ของ AI ทุกจุดมาจาก RPC `ai_knowledge_corpus()` และค้นด้วย `docs/src/services/ai-knowledge.js` ไฟล์เดียว (Dockerfile คัดลอกไปให้ worker ด้วย) — แก้วิธีค้นที่ไฟล์นี้ที่เดียว
 
 ```bash
 docker compose up -d   # ไม่ต้อง rebuild image — env var อ่านใหม่ตอน container start
@@ -142,7 +117,7 @@ docker compose up -d   # ไม่ต้อง rebuild image — env var อ่�
 
 ---
 
-## Phase 8 — nginx + SSL
+## Phase 6 — nginx + SSL
 
 Copy 2 ไฟล์จาก `deploy/nginx/` ไปที่ `/etc/nginx/sites-available/` บนเซิร์ฟเวอร์ใหม่ แก้ `YOURDOMAIN.com` เป็น domain จริง แล้ว:
 
@@ -157,7 +132,7 @@ certbot --nginx -d api.<DOMAIN>
 
 ---
 
-## Phase 9 — ทดสอบให้ครบก่อน cutover จริง
+## Phase 7 — ทดสอบให้ครบก่อน cutover จริง
 
 - [ ] เปิด `https://app.<DOMAIN>` login ได้, เห็นข้อมูลครบ
 - [ ] CRUD ทุกโมดูลหลัก (staff, projects, advance, timesheet)
@@ -170,17 +145,17 @@ certbot --nginx -d api.<DOMAIN>
 
 ---
 
-## Phase 10 — Cutover
+## Phase 8 — Cutover
 
 1. แจ้งผู้ใช้ล่วงหน้าเรื่อง maintenance window + URL ใหม่
 2. Freeze การเขียนข้อมูลฝั่ง Cloud เดิม (ปิดหน้าแอปเก่าชั่วคราว)
-3. รัน Phase 4-6 ซ้ำเฉพาะข้อมูล/ไฟล์ที่เปลี่ยนหลัง dump รอบแรก (delta sync)
-4. ตรวจสอบผ่าน Phase 9 อีกรอบ
+3. รัน Phase 4 ซ้ำเฉพาะข้อมูลที่เปลี่ยนหลัง dump รอบแรก (delta sync)
+4. ตรวจสอบผ่าน Phase 7 อีกรอบ
 5. ประกาศ URL ใหม่ให้ผู้ใช้ (คนที่ install PWA ต้องลบของเก่า/ติดตั้งใหม่)
 
 ---
 
-## Phase 11 — หลัง Live
+## Phase 9 — หลัง Live
 
 ```bash
 # ตั้ง cron backup รายวัน (ตัวอย่าง crontab -e)

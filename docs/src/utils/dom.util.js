@@ -96,6 +96,12 @@
     return el && el.classList.contains('on');
   };
 
+  // ── แถบความคืบหน้า (pct 0-100) ──
+  window.pbarHtml = function (pct, color) {
+    pct = Math.max(0, Math.min(100, Math.round(pct)));
+    return '<div class="pbar"><div class="pbar-fill" style="width:' + pct + '%;background:' + (color || 'var(--violet)') + '"></div></div>';
+  };
+
   // ── Highlight helper shared by the combobox widgets below ──
   function _cmbHi(txt, q) {
     if (!q) return window.esc(txt);

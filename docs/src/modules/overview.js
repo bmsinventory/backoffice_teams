@@ -7,12 +7,10 @@ window.renderOverview = function(){
   window.msFilter('ov-type',window.PTYPES,{placeholder:'ทุกประเภทโครงการ',onChange:window.renderOverview});
   var yr=(yf||{}).value||'';var grp=window.msValues('ov-grp');var ovTyp=window.msValues('ov-type');
   var fProjs=window.PROJECTS.filter(function(p){return(!yr||getYearBE(p.start)==yr)&&(!grp.length||grp.includes(p.groupId))&&(!ovTyp.length||ovTyp.includes(p.typeId));});
-  var fPids=fProjs.map(p=>p.id);
-  var fAdvs=window.ADVANCES.filter(function(a){return fPids.includes(a.pid);});
+  var fPids=new Set(fProjs.map(p=>p.id));
+  var fAdvs=window.ADVANCES.filter(function(a){return fPids.has(a.pid);});
   var totalBudget=fProjs.reduce(function(s,p){return s+p.cost;},0);
   var aPnd=fAdvs.filter(function(a){return a.status!=='cleared';});
-  var aOv=fAdvs.filter(function(a){return a.ddate&&pd(a.ddate)<new Date()&&a.status!=='cleared';});
-  var totalAdvancePending=aPnd.reduce(function(s,a){return s+a.amount;},0);
   var now=new Date();now.setHours(0,0,0,0);
   // ── health ──
   var health={onTrack:0,atRisk:0,delayed:0,completed:0};
@@ -54,16 +52,20 @@ window.renderOverview = function(){
   var ctxWL=document.getElementById('chart-workload-trend');
   if(ctxWL){
     var months=[];for(var mi=0;mi<12;mi++)months.push(new Date(yr?Number(yr)-543:now.getFullYear(),mi,1));
-    var typeColors=window.PTYPES.map(t=>t.color);
+    // แปลงวันที่โครงการครั้งเดียว + จัดกลุ่มตามประเภท (เดิม parse ซ้ำทุกประเภท×ทุกเดือน)
+    var mEnds=months.map(function(mDate){return new Date(mDate.getFullYear(),mDate.getMonth()+1,0,23,59,59);});
+    var wlByType=new Map();
+    fProjs.forEach(function(p){
+      if(!p.start||!p.end)return;
+      var l=wlByType.get(p.typeId);if(!l){l=[];wlByType.set(p.typeId,l);}
+      l.push({ps:pd(p.start),pe:pd(p.end)});
+    });
     var typeDatasets=window.PTYPES.map(function(t,ti){
-      return{label:t.label,data:months.map(function(mDate){
-        return fProjs.filter(function(p){
-          if(p.typeId!==t.id)return false;
-          var ps=p.start?pd(p.start):null,pe=p.end?pd(p.end):null;
-          if(!ps||!pe)return false;
-          var mEnd=new Date(mDate.getFullYear(),mDate.getMonth()+1,0,23,59,59);
-          return ps<=mEnd&&pe>=mDate;
-        }).length;
+      var tl=wlByType.get(t.id)||[];
+      return{label:t.label,data:months.map(function(mDate,mi2){
+        var mEnd=mEnds[mi2],c=0;
+        for(var k=0;k<tl.length;k++){if(tl[k].ps<=mEnd&&tl[k].pe>=mDate)c++;}
+        return c;
       }),backgroundColor:t.color+'cc',stack:'s'};
     });
     window.cWLTrend=new Chart(ctxWL,{type:'bar',data:{labels:window.THMON.map(m=>m.slice(0,3)),datasets:typeDatasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:10,usePointStyle:true}}},scales:{x:{grid:{display:false},stacked:true,ticks:{font:{size:10}}},y:{stacked:true,grid:{color:'rgba(0,0,0,.06)'},ticks:{font:{size:10},stepSize:1}}}}});
@@ -71,14 +73,16 @@ window.renderOverview = function(){
   // ── Resource Status ring ──
   if(window.cResource)window.cResource.destroy();
   var ctxRes=document.getElementById('chart-resource');
-  var wlNow=new Date();
   var ovLoad=[],actStaff=[],availStaff=[];
+  // นับจำนวนโครงการต่อคนครั้งเดียว (เดิม: ทุกคน × ทุกโครงการ × สมาชิก)
+  var projCnt=new Map();
+  fProjs.forEach(p=>{
+    if(p.status==='cancelled'||p.status==='completed')return;
+    var mems=p.members&&p.members.length>0?p.members:p.team.map(id=>({sid:id}));
+    new Set(mems.map(m=>m.sid)).forEach(sid=>{projCnt.set(sid,(projCnt.get(sid)||0)+1);});
+  });
   window.STAFF.filter(s=>s.active).forEach(s=>{
-    var cnt=fProjs.filter(p=>{
-      if(p.status==='cancelled'||p.status==='completed')return false;
-      var mems=p.members&&p.members.length>0?p.members:p.team.map(id=>({sid:id,s:p.start,e:p.end}));
-      return mems.some(m=>m.sid===s.id);
-    }).length;
+    var cnt=projCnt.get(s.id)||0;
     if(cnt===0)availStaff.push(s);else if(cnt>3)ovLoad.push(s);else actStaff.push(s);
   });
   if(ctxRes){window.cResource=new Chart(ctxRes,{type:'doughnut',data:{labels:['Overload (>3)','Active (1-3)',`Available (${availStaff.length})`],datasets:[{data:[ovLoad.length,actStaff.length,availStaff.length],backgroundColor:['#ff6b6b','#4361ee','#06d6a0'],borderWidth:3,borderColor:'var(--surface)'}]},options:{responsive:true,maintainAspectRatio:false,cutout:'70%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>' '+c.label+': '+c.parsed+' คน'}}}}});}
@@ -100,6 +104,7 @@ window.renderOverview = function(){
   if(ctxSt){window.cStage=new Chart(ctxSt,{type:'bar',data:{labels:window.STAGES.map(s=>s.label),datasets:[{data:window.STAGES.map(s=>fProjs.filter(p=>p.stage===s.id).length),backgroundColor:window.STAGES.map(s=>s.color+'44'),borderColor:window.STAGES.map(s=>s.color),borderWidth:2,borderRadius:6,barThickness:18}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:10},maxRotation:40,minRotation:30}},y:{grid:{color:'rgba(0,0,0,.06)'},ticks:{font:{size:10},stepSize:1}}}}});}
   // ── Critical timeline ──
   var critProjs=fProjs.filter(function(p){if(p.progress===100||p.stage==='close'||p.status==='completed'||!p.end)return false;return Math.ceil((pd(p.end)-now)/(1000*60*60*24))<=30;}).sort((a,b)=>pd(a.end)-pd(b.end));
+  var staffIdx=_ovIdIdx(window.STAFF);
   var cntEl=document.getElementById('ov-crit-count');if(cntEl)cntEl.textContent=critProjs.length+' โครงการ';
   var ovCrit=document.getElementById('ov-critical');
   if(ovCrit){ovCrit.innerHTML=critProjs.map(function(p){
@@ -107,7 +112,7 @@ window.renderOverview = function(){
     var color=diffDays<0?'var(--coral)':'var(--amber)';
     var dayText=diffDays<0?`ล่าช้า ${Math.abs(diffDays)} วัน`:diffDays===0?'วันนี้':`${diffDays} วัน`;
     var pt=gT(p.typeId);
-    var mems=(p.members&&p.members.length>0?p.members:p.team.map(id=>({sid:id}))).map(m=>{var s=window.STAFF.find(x=>x.id===m.sid);return s?s.nickname||s.name.split(' ')[0]:'';}).filter(Boolean);
+    var mems=(p.members&&p.members.length>0?p.members:p.team.map(id=>({sid:id}))).map(m=>{var s=staffIdx.get(m.sid);return s?s.nickname||s.name.split(' ')[0]:'';}).filter(Boolean);
     return`<div onclick="window.openProjModal('${p.id}')" style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:.15s" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
       <div style="flex:1;min-width:0;">
         <div style="font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(p.name)}</div>
@@ -123,12 +128,15 @@ window.renderOverview = function(){
     </div>`;
   }).join('')||'<div style="font-size:12px;color:var(--txt3);text-align:center;padding:30px;">🎉 ไม่มีโครงการใกล้สิ้นสุด</div>';}
   // ── Advance alerts ──
-  var advAlerts=[...aPnd].sort((a,b)=>pd(a.ddate)-pd(b.ddate)).slice(0,8);
+  var advKey=new Map();aPnd.forEach(a=>{advKey.set(a,+pd(a.ddate));});
+  var advAlerts=[...aPnd].sort((a,b)=>advKey.get(a)-advKey.get(b)).slice(0,8);
   var ovAdv=document.getElementById('ov-adv-alerts');
   if(ovAdv){ovAdv.innerHTML=advAlerts.map(function(a){var p=window.PROJECTS.find(x=>x.id===a.pid);var isOv=a.ddate&&pd(a.ddate)<now;var color=isOv?'var(--coral)':'var(--amber)';return`<div onclick="window.goView('advance')" style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px dashed var(--border);cursor:pointer;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''"><div style="width:28px;height:28px;border-radius:8px;background:${color}15;color:${color};display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">${isOv?'⚠':'💳'}</div><div style="flex:1;min-width:0;"><div style="font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p?esc(p.name):'—'}</div><div style="font-size:10px;color:var(--txt3);">${fd(a.ddate)} · <span style="color:${color};font-weight:600;">${isOv?'เกินกำหนด':'รอเคลียร์'}</span></div></div><div style="font-size:12px;font-weight:800;">${fc(a.amount)}</div></div>`;}).join('')||'<div style="font-size:12px;color:var(--txt3);text-align:center;padding:20px;">ไม่มีรายการค้าง</div>';}
   // ── render project table ──
   window.renderOvTable();
 }
+// index id → แถวแรก (เทียบเท่า .find ตัวแรกที่เจอ)
+function _ovIdIdx(arr){var m=new Map();(arr||[]).forEach(function(x){if(!m.has(x.id))m.set(x.id,x);});return m;}
 window.renderOvTable = function() {
   // Populate stage filter
   var sf=document.getElementById('ov-tbl-stg');
@@ -147,9 +155,13 @@ window.renderOvTable = function() {
   var rows=window.PROJECTS.filter(function(p){
     return (!yr||getYearBE(p.start)==yr)&&(!grp.length||grp.includes(p.groupId))&&(!typeF.length||typeF.includes(p.typeId))&&(!stg||p.stage===stg)&&(!q||p.name.toLowerCase().includes(q));
   });
+  // แปลงวันที่ครั้งเดียวต่อแถวก่อน sort (เดิม pd() ซ้ำทุกครั้งที่เปรียบเทียบ)
+  var sKey=new Map();
+  if(sort==='end_asc')rows.forEach(function(p){sKey.set(p,p.end?+pd(p.end):9e12);});
+  else if(sort==='start_desc')rows.forEach(function(p){sKey.set(p,p.start?+pd(p.start):0);});
   rows.sort(function(a,b){
-    if(sort==='end_asc'){var ad=a.end?pd(a.end):new Date(9e12);var bd=b.end?pd(b.end):new Date(9e12);return ad-bd;}
-    if(sort==='start_desc'){return (b.start?pd(b.start):new Date(0))-(a.start?pd(a.start):new Date(0));}
+    if(sort==='end_asc'){return sKey.get(a)-sKey.get(b);}
+    if(sort==='start_desc'){return sKey.get(b)-sKey.get(a);}
     if(sort==='progress_asc')return a.progress-b.progress;
     if(sort==='name_asc')return a.name.localeCompare(b.name,'th');
     return 0;
@@ -165,13 +177,14 @@ window.renderOvTable = function() {
   var page=Math.min(Math.max(1,window._ovTblPage||1),pages);window._ovTblPage=page;
   var off=(page-1)*PER;
   renderOvPager(rows.length,page,pages,off,PER);
+  var staffIdx=_ovIdIdx(window.STAFF);
   tb.innerHTML=rows.slice(off,off+PER).map(function(p,_ri){
     var sg=gS(p.stage);var pt=gT(p.typeId);var pg=gG(p.groupId);
     var endDate=p.end?pd(p.end):null;
     var diffDays=endDate?Math.ceil((endDate-now)/(1000*60*60*24)):null;
     var urgColor=diffDays===null?'':diffDays<0?'var(--coral)':diffDays<=15?'var(--amber)':'';
     var mems=(p.members&&p.members.length>0?p.members:p.team.map(function(id){return{sid:id};}));
-    var nicknames=mems.map(function(m){var s=window.STAFF.find(function(x){return x.id===m.sid;});return s?s.nickname||s.name.split(' ')[0]:'';}).filter(Boolean);
+    var nicknames=mems.map(function(m){var s=staffIdx.get(m.sid);return s?s.nickname||s.name.split(' ')[0]:'';}).filter(Boolean);
     var teamStr=nicknames.length>0?nicknames.join(', '):'<span style="color:var(--txt3)">—</span>';
     var pbarW=Math.max(4,p.progress);
     return `<tr class="fade" onclick="window.openProjModal('${p.id}')" style="cursor:pointer;">
@@ -346,7 +359,6 @@ window.renderAnnualTarget = function(fProjs, yr) {
   var targets = window.YEAR_TARGETS || [];
   var entry = targets.find(function(t) { return String(t.year) === String(displayYr); });
   var byType = (entry && entry.byType) ? entry.byType : {};
-  var canEditTgt = window.isAdmin() || window.canEdit('targets');
   var hasGroups = (window.TARGET_TYPE_GROUPS||[]).length > 0;
   var grouped = hasGroups && (localStorage.getItem('tgt_grouped') !== '0');
 
@@ -566,82 +578,6 @@ function _tgtFmtVal(v) {
     ? new Intl.NumberFormat('th-TH', {minimumFractionDigits: 2, maximumFractionDigits: 2}).format(n)
     : '';
 }
-
-// ── TARGET MODAL ──
-window.openTargetModal = function(yr) {
-  var targets = window.YEAR_TARGETS || [];
-  var entry = targets.find(function(t) { return String(t.year) === String(yr); });
-  var byType = (entry && entry.byType) ? entry.byType : {};
-
-  // ปีที่มีอยู่ในโครงการ (สำหรับ dropdown)
-  var allYears = [...new Set((window.PROJECTS || []).map(function(p) {
-    return p.start ? (new Date(p.start).getFullYear() + 543) : null;
-  }).filter(Boolean))].sort(function(a, b) { return b - a; });
-  var currentBE = new Date().getFullYear() + 543;
-  if (!allYears.includes(currentBE)) allYears.unshift(currentBE);
-  if (!allYears.includes(Number(yr))) allYears.unshift(Number(yr));
-
-  var yrOpts = allYears.map(function(y) {
-    return '<option value="' + y + '"' + (String(y) === String(yr) ? ' selected' : '') + '>พ.ศ. ' + y + '</option>';
-  }).join('');
-
-  var typeRows = (window.PTYPES || []).map(function(t) {
-    var cur = byType[t.id] ? Number(byType[t.id]) : '';
-    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">' +
-      '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + (t.color || '#4361ee') + ';flex-shrink:0;"></span>' +
-      '<span style="flex:1;font-size:13px;font-weight:600;color:var(--txt);">' + esc(t.label) + '</span>' +
-      '<input type="text" inputmode="numeric" id="tgt-inp-' + t.id + '" value="' + _tgtFmtVal(cur) + '" placeholder="0.00" ' +
-        'onfocus="window._tgtNumFocus(this)" onblur="window._tgtNumBlur(this)" ' +
-        'style="width:160px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--txt);font-size:13px;text-align:right;">' +
-      '<span style="font-size:12px;color:var(--txt3);">บาท</span>' +
-    '</div>';
-  }).join('');
-
-  var html = '<div style="padding:20px;">' +
-    '<div style="font-size:16px;font-weight:800;color:var(--txt);margin-bottom:16px;">🎯 ตั้งเป้าหมายประจำปี</div>' +
-    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">' +
-      '<label style="font-size:13px;font-weight:600;color:var(--txt2);">ปี พ.ศ.:</label>' +
-      '<select id="tgt-yr-sel" onchange="window._reloadTargetModal(this.value)" style="padding:6px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--txt);font-size:13px;">' +
-        yrOpts + '</select>' +
-    '</div>' +
-    '<div style="display:flex;flex-direction:column;gap:0;">' + typeRows + '</div>' +
-    '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px;">' +
-      '<button onclick="window.closeM(\'m-target\')" style="padding:8px 18px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--txt2);font-size:13px;cursor:pointer;">ยกเลิก</button>' +
-      '<button onclick="window.saveAnnualTargets()" style="padding:8px 20px;border:none;border-radius:8px;background:var(--violet);color:#fff;font-size:13px;font-weight:700;cursor:pointer;">💾 บันทึก</button>' +
-    '</div>' +
-  '</div>';
-
-  document.getElementById('m-target-body').innerHTML = html;
-  window._targetModalYr = String(yr);
-  document.getElementById('m-target').classList.add('on');
-};
-
-window._reloadTargetModal = function(newYr) {
-  window.openTargetModal(newYr);
-};
-
-window.saveAnnualTargets = function() {
-  var yr = window._targetModalYr;
-  var byType = {};
-  (window.PTYPES || []).forEach(function(t) {
-    var inp = document.getElementById('tgt-inp-' + t.id);
-    if (inp) {
-      var val = parseFloat(inp.value.replace(/,/g, ''));
-      if (!isNaN(val) && val > 0) byType[t.id] = val;
-    }
-  });
-  var targets = (window.YEAR_TARGETS || []).filter(function(t) { return String(t.year) !== String(yr); });
-  if (Object.keys(byType).length > 0) targets.push({ year: Number(yr), byType: byType });
-  window.YEAR_TARGETS = targets;
-  window.setDoc(getDocRef('SETTINGS', 'app'), { year_targets: _yearTargetsPayload(targets) }, { merge: true })
-    .then(function() {
-      window.closeM('m-target');
-      window.showAlert('บันทึกเป้าหมายปี ' + yr + ' เรียบร้อย ✓', 'success');
-      window.renderOverview();
-      window.renderTargets && window.renderTargets();
-    })
-    .catch(function(e) { window.showDbError(e); });
-};
 
 // ── TARGETS PAGE ──────────────────────────────────────────────────────────────
 window.renderTargets = function() {

@@ -13,10 +13,7 @@
   function ftkItemsOfProject(pid) { return window.FORM_ITEMS.filter(function (i) { return i.projectId === pid; }); }
   function ftkStatus(id) { return window.FORM_STATUS.find(function (s) { return s.id === id; }) || window.FORM_STATUS[0]; }
 
-  function pbarHtml(pct, color) {
-    pct = Math.max(0, Math.min(100, Math.round(pct)));
-    return '<div class="pbar"><div class="pbar-fill" style="width:'+pct+'%;background:'+(color||'var(--violet)')+'"></div></div>';
-  }
+  var pbarHtml = window.pbarHtml;
 
   // ================================================================
   // MAIN — เรียกจาก dispatcher ของ impl-tracker.js (window.imtCurrentProjectId เดียวกันทุกแท็บ)
@@ -332,7 +329,7 @@
       });
       var safeName = (proj ? proj.name : 'FormTracker').replace(/[^a-zA-Z0-9ก-๙]+/g, '_');
       var link = document.createElement('a');
-      link.download = 'FormTracker_' + safeName + '_' + new Date().toISOString().slice(0,10) + '.png';
+      link.download = 'FormTracker_' + safeName + '_' + window.todayStr() + '.png';
       link.href = canvas.toDataURL('image/png');
       link.click();
     } catch (e) {
@@ -364,7 +361,7 @@
     var wb = XLSX.utils.book_new();
     var ws = XLSX.utils.aoa_to_sheet([headers].concat(rows));
     XLSX.utils.book_append_sheet(wb, ws, 'Forms');
-    XLSX.writeFile(wb, 'FormTracker_'+proj.name+'_'+new Date().toISOString().slice(0,10)+'.xlsx');
+    XLSX.writeFile(wb, 'FormTracker_'+proj.name+'_'+window.todayStr()+'.xlsx');
   };
 
   window.renderImtForms = function (mount) {

@@ -49,15 +49,7 @@
   var name = new URLSearchParams(location.search).get('page');
   if (!PAGES[name]) name = 'app';
   var page = { title: PAGES[name].title, css: COMMON.css.concat(PAGES[name].css), js: COMMON.js.concat(PAGES[name].js) };
-  window.TRN_PAGE = name;
   document.title = page.title;
-  // เริ่มดาวน์โหลด script ทุกตัวพร้อมกันตั้งแต่ตอนนี้ (ตัว <script> จริงใส่หลัง DOMContentLoaded — ไม่ต้องรอ HTML ทั้งหน้าก่อนค่อยโหลด)
-  page.js.forEach(function (src) {
-    var l = document.createElement('link');
-    l.rel = 'preload'; l.as = 'script'; l.href = src;
-    document.head.appendChild(l);
-  });
-
   // ซ่อนหน้าไว้ก่อน จนกว่า style ของส่วนนี้โหลดเสร็จ
   var root = document.documentElement;
   root.classList.add('trn-boot');
