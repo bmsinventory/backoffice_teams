@@ -528,11 +528,8 @@
   async function loadUrgencyOptions() {
     var overrides = {};
     try {
-      var r = await db.from('settings').select('helpdesk_urgency_overrides,notify_helpdesk_token').eq('id', 'app').limit(1);
-      if (r.data && r.data[0]) {
-        overrides = r.data[0].helpdesk_urgency_overrides || {};
-        _hdNotifyToken = r.data[0].notify_helpdesk_token || '';
-      }
+      var r = await db.from('settings').select('helpdesk_urgency_overrides').eq('id', 'app').limit(1);
+      if (r.data && r.data[0]) overrides = r.data[0].helpdesk_urgency_overrides || {};
     } catch (e) {}
     var defaults = window.HD_URGENCY_DEFAULTS || [];
     var merged = defaults.map(function (base) {
@@ -550,17 +547,14 @@
     _criticalPriority = (u && u.priority) || 'p2';
   }
   function jitsiUrl(ticketNo) { return 'https://jitsi1.hosxp.net/' + encodeURIComponent(ticketNo); }
-  // Token ตั้งค่าที่ Admin Panel → 🔔 ตั้งค่าการแจ้งเตือน (settings.notify_helpdesk_token) — โหลดมาพร้อม
-  // loadUrgencyOptions() ด้านบน · หน้านี้ไม่มี login เหมือนแอปหลัก แต่ RLS ของตาราง settings เปิดกว้าง
-  // (anon อ่านได้อยู่แล้วเหมือน token แจ้งเตือนอื่น ๆ ของระบบ) จึงเรียกยิง BMS Notify ตรง ๆ ได้เลย
-  var _hdNotifyToken = '';
+  // แจ้งเตือน BMS Notify ช่อง helpdesk — Token ตั้งที่ Admin Panel → 🔔 ตั้งค่าการแจ้งเตือน
+  // หน้าส่งแค่ข้อความ เซิร์ฟเวอร์ (/api/notify) อ่าน Token จากฐานข้อมูลเอง — หน้านี้ไม่เห็น Token
   async function sendHdUrgentNotify(content) {
-    if (!_hdNotifyToken) return;
     try {
-      await fetch('https://api-notify.bmscloud.in.th/api/v1/push-notify', {
+      await fetch('/api/notify', {
         method: 'POST',
-        headers: { 'Token': _hdNotifyToken, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: content, receiver: null })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channel: 'helpdesk', content: content })
       });
     } catch (e) {}
   }

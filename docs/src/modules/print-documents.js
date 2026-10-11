@@ -26,10 +26,12 @@
     if (h) return (h.name || '') + (h.province && !(h.name || '').includes(h.province) ? ' จ.' + String(h.province).replace(/^(จังหวัด|จ\.)\s*/, '') : '');
     return (src && src.name) || (p && p.name) || '';
   }
+  window.pdocHospitalLabel = hospitalLabel; // ใบส่งมอบแบบฟอร์ม (form-handover.js) ใช้ชื่อ รพ. รูปแบบเดียวกัน
+  window.pdocHospital = hospitalOf; // ใบส่งมอบแบบฟอร์มใช้รายชื่อผู้ติดต่อของ รพ. เป็นผู้ลงนามขวา
   function teamOf(p) {
     if (!p || !window.ProjectTeam) return [];
     var ids = window.ProjectTeam.staffIds(p, window.PROJECTS || []);
-    return ids.map(function (id) { return (window.STAFF || []).find(function (s) { return s.id === id; }); }).filter(Boolean);
+    return ids.map(function (id) { return (window.STAFF || []).find(function (s) { return s.id === id; }); }).filter(Boolean).sort(window.sortStaffByRank);
   }
   function readStore() {
     try { return JSON.parse(localStorage.getItem(STORE_KEY) || '{}') || {}; } catch (e) { return {}; }

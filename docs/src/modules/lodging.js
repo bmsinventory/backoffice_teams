@@ -99,8 +99,8 @@ window.renderLodging=function(){
       var hasDRate=l.dsQty>0||l.ddQty>0||l.dTotal>0;
       var hasMRate=l.msQty>0||l.mdQty>0||l.mTotal>0;
       var amenityD=[],amenityM=[];
-      if(l.dBreakfast)amenityD.push('🍳');if(l.dWifi)amenityD.push('📶');if(l.dAc)amenityD.push('❄️');if(l.dTv)amenityD.push('📺');if(l.dFridge)amenityD.push('🧊');if(l.dWasher)amenityD.push('🫧');if(l.dShower)amenityD.push('🚿');if(l.dPillow)amenityD.push('🛌');if(l.dBlanket)amenityD.push('🧣');if(l.dTowel)amenityD.push('🏖️');if(l.dApp)amenityD.push('🔌');if(l.dPark)amenityD.push('🅿️');
-      if(l.mWifi)amenityM.push('📶');if(l.mAc)amenityM.push('❄️');if(l.mTv)amenityM.push('📺');if(l.mFridge)amenityM.push('🧊');if(l.mWasher)amenityM.push('🫧');if(l.mShower)amenityM.push('🚿');if(l.mPillow)amenityM.push('🛌');if(l.mBlanket)amenityM.push('🧣');if(l.mBedsheet)amenityM.push('🛏');if(l.mTowel)amenityM.push('🏖️');if(l.mApp)amenityM.push('🔌');if(l.mPark)amenityM.push('🅿️');
+      if(l.dBreakfast)amenityD.push('🍳');if(l.dWifi)amenityD.push('📶');if(l.dAc)amenityD.push('❄️');if(l.dTv)amenityD.push('📺');if(l.dFridge)amenityD.push('🧊');if(l.dWasher)amenityD.push('🧺');if(l.dShower)amenityD.push('🚿');if(l.dPillow)amenityD.push('🛌');if(l.dBlanket)amenityD.push('🧣');if(l.dTowel)amenityD.push('🏖️');if(l.dApp)amenityD.push('🔌');if(l.dPark)amenityD.push('🅿️');
+      if(l.mWifi)amenityM.push('📶');if(l.mAc)amenityM.push('❄️');if(l.mTv)amenityM.push('📺');if(l.mFridge)amenityM.push('🧊');if(l.mWasher)amenityM.push('🧺');if(l.mShower)amenityM.push('🚿');if(l.mPillow)amenityM.push('🛌');if(l.mBlanket)amenityM.push('🧣');if(l.mBedsheet)amenityM.push('🛏');if(l.mTowel)amenityM.push('🏖️');if(l.mApp)amenityM.push('🔌');if(l.mPark)amenityM.push('🅿️');
       var parsedMapUrl=l.mapUrl?(l.mapUrl.startsWith('http')?l.mapUrl:'https://maps.google.com/?q='+encodeURIComponent(l.mapUrl)):'';
       // one compact row per rate type: [type] rooms · amenities | total | approve
       var rateRow=function(kind,isApp,rooms,amen,total,extras){
@@ -544,7 +544,7 @@ window.showLdForm=function(pid,ldId){
     ${lbl('ld-d-tv','📺','ทีวี',l&&l.dTv)}
     ${lbl('ld-d-ac','❄️','แอร์',l&&l.dAc)}
     ${lbl('ld-d-fridge','🧊','ตู้เย็น',l&&l.dFridge)}
-    ${lbl('ld-d-washer','🫧','ซักผ้า',l&&l.dWasher)}
+    ${lbl('ld-d-washer','🧺','ซักผ้า',l&&l.dWasher)}
     ${lbl('ld-d-shower','🚿','น้ำอุ่น',l&&l.dShower)}
     ${lbl('ld-d-towel','🏖️','ผ้าเช็ดตัว',l&&l.dTowel)}
   </div>`;
@@ -554,7 +554,7 @@ window.showLdForm=function(pid,ldId){
     ${lbl('ld-m-tv','📺','ทีวี',l&&l.mTv)}
     ${lbl('ld-m-ac','❄️','แอร์',l&&l.mAc)}
     ${lbl('ld-m-fridge','🧊','ตู้เย็น',l&&l.mFridge)}
-    ${lbl('ld-m-washer','🫧','ซักผ้า',l&&l.mWasher)}
+    ${lbl('ld-m-washer','🧺','ซักผ้า',l&&l.mWasher)}
     ${lbl('ld-m-shower','🚿','น้ำอุ่น',l&&l.mShower)}
     ${lbl('ld-m-pillow','🛌','หมอน',l&&l.mPillow)}
     ${lbl('ld-m-blanket','🧣','ผ้าห่ม',l&&l.mBlanket)}

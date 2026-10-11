@@ -141,6 +141,10 @@ window.renderLeave=function(){
     var depts=[...new Set(window.STAFF.filter(s=>s.active!==false&&s.dept).map(s=>s.dept))].sort();
     depts.forEach(function(d){dSel.insertAdjacentHTML('beforeend','<option value="'+esc(d)+'">'+esc(d)+'</option>');});
   }
+  // ขอบเขตการลางานตามกลุ่มสิทธิ์ (permScope): own = เฉพาะของตัวเอง · dept = ทั้งแผนกของตัวเอง (ล็อกช่องแผนก) · all = ทั้งหมด
+  var lvScope=window.permScope('leave');
+  var myDept=lvScope==='dept'?((window.staffByRef(window.cu.staffId)||{}).dept||''):'';
+  if(dSel){if(myDept)dSel.value=myDept;dSel.disabled=!!myDept;}
   // Init staff dropdown once (filtered by current dept)
   var sfEl=document.getElementById('leave-filter-staff');
   if(sfEl&&!sfEl.dataset.loaded){var initDept=(document.getElementById('reg-dept')||{value:''}).value||'';window.regRefreshStaff(sfEl,initDept);}
@@ -152,22 +156,24 @@ window.renderLeave=function(){
   var statusSel=document.getElementById('leave-filter-status');
   // ไม่ติ๊ก "แสดงทั้งหมด" = เฉพาะ "รออนุมัติ" · ติ๊ก = ทุกสถานะ (แล้วค่อยเลือกกรองสถานะเฉพาะเจาะจงต่อได้
   // จาก dropdown) ปิด dropdown ไว้ตอนไม่ติ๊ก กันเลือกสถานะขัดกับโหมดรออนุมัติ
-  // ค่าเริ่มต้นตามผู้ใช้ (ตั้งครั้งเดียวต่อผู้ใช้ที่ล็อกอิน — หลังจากนั้นผู้ใช้ติ๊กเองได้): Role PM/Admin เห็นเฉพาะ
-  // "รออนุมัติ" ที่ต้องจัดการ · Role อื่น (viewer ฯลฯ) ติ๊ก "แสดงทั้งหมด" ไว้ให้เห็นประวัติการลาครบ — ดูจาก Role
-  // ไม่ใช่สิทธิ์แก้ไขการลา (ระบบจริงอาจให้สิทธิ์แก้ไขกับ Role พนักงานไว้ แก้ใบลาของตัวเอง)
+  // ค่าเริ่มต้นตามผู้ใช้ (ตั้งครั้งเดียวต่อผู้ใช้ที่ล็อกอิน — หลังจากนั้นผู้ใช้ติ๊กเองได้): ผู้ที่เห็นใบลาของคนอื่น
+  // (ขอบเขตแผนก/ทั้งหมด) เห็นเฉพาะ "รออนุมัติ" ที่ต้องจัดการ · ขอบเขตของตัวเอง ติ๊ก "แสดงทั้งหมด" ไว้ให้เห็นประวัติการลาครบ
+  // — ดูจากขอบเขต ไม่ใช่สิทธิ์แก้ไขการลา (กลุ่มพนักงานอาจได้สิทธิ์แก้ไขไว้ แก้ใบลาของตัวเอง)
   var showAllEl=document.getElementById('leave-show-all');
   var _cuKey=window.cu?String(window.cu.id||window.cu.username||''):'';
-  if(showAllEl&&showAllEl.dataset.user!==_cuKey){showAllEl.dataset.user=_cuKey;showAllEl.checked=!window.ce();}
+  if(showAllEl&&showAllEl.dataset.user!==_cuKey){showAllEl.dataset.user=_cuKey;showAllEl.checked=lvScope==='own';}
   var showAllLV=!!(showAllEl||{}).checked;
   if(statusSel){statusSel.disabled=!showAllLV;statusSel.parentElement.style.opacity=showAllLV?'':'.55';}
   var fStatus=showAllLV?((statusSel||{}).value||''):'pending';
-  // VIEWER: force own-staff filter + hide dept/staff filter controls (but keep add button)
-  var _isViewer=window.cu&&window.cu.role==='viewer';
+  // ขอบเขตของตัวเอง: บังคับกรองเฉพาะพนักงานที่ผูกกับบัญชี + ซ่อนตัวกรองแผนก/พนักงาน (ยังกดเพิ่มใบลาได้)
+  // ไม่ได้ผูกพนักงาน = ไม่เห็นใบลาของใคร · ขอบเขตแผนก: บังคับแผนกของตัวเอง
+  var _isOwn=lvScope==='own';
   var _deptPar=document.getElementById('reg-dept')?document.getElementById('reg-dept').parentElement:null;
   var _staffPar=document.getElementById('leave-filter-staff')?document.getElementById('leave-filter-staff').parentElement:null;
-  if(_deptPar)_deptPar.style.display=_isViewer?'none':'';
-  if(_staffPar)_staffPar.style.display=_isViewer?'none':'';
-  if(_isViewer&&window.cu.staffId)fStaff=window.cu.staffId;
+  if(_deptPar)_deptPar.style.display=_isOwn?'none':'';
+  if(_staffPar)_staffPar.style.display=_isOwn?'none':'';
+  if(_isOwn)fStaff=window.cu.staffId||'-';
+  if(lvScope==='dept'){if(myDept)fDept=myDept;else fStaff='-';} // ไม่ได้ผูกพนักงาน/พนักงานไม่มีแผนก = ไม่เห็นใบลาของใคร
   // ดัชนีพนักงานตาม id (ตัวแรกที่เจอ = ผลเดียวกับ .find) — ใช้ซ้ำทั้งกรองแผนก/จัดกลุ่ม/ผู้ทำงานแทน
   var sm=new Map();window.STAFF.forEach(function(s){if(!sm.has(s.id))sm.set(s.id,s);});
   var list=(window.LEAVES||[]).filter(function(lv){
@@ -398,13 +404,16 @@ window.openLeaveForm=function(id){
     if(lv.status==='rejected'&&!window.canEdit('leave')){window.showAlert('คุณไม่มีสิทธิ์แก้ไขรายการที่ไม่อนุมัติ','warn');return;}
   }
   document.getElementById('leave-edit-id').value=lv?lv.id:'';
-  var _isViewerForm=window.cu&&window.cu.role==='viewer';
-  var _viewerStaffId=_isViewerForm?window.cu.staffId:'';
-  var _autoStaff=lv?lv.staffId:(_viewerStaffId||'');
-  var staffOpts='<option value="">-- เลือกพนักงาน --</option>'+window.staffOptionsGrouped(window.STAFF.filter(s=>s.active),_autoStaff);
+  // ขอบเขตการลางาน: own = ล็อกเป็นพนักงานของตัวเอง · dept = เลือกได้เฉพาะคนในแผนกตัวเอง
+  var _lvScope=window.permScope('leave');
+  var _isOwnForm=_lvScope==='own';
+  var _ownStaffId=_isOwnForm?window.cu.staffId:'';
+  var _myDeptForm=_lvScope==='dept'?((window.staffByRef(window.cu.staffId)||{}).dept||''):'';
+  var _autoStaff=lv?lv.staffId:(_ownStaffId||'');
+  var staffOpts='<option value="">-- เลือกพนักงาน --</option>'+window.staffOptionsGrouped(window.STAFF.filter(s=>s.active&&(_lvScope!=='dept'||(_myDeptForm&&s.dept===_myDeptForm))),_autoStaff);
   var staffEl=document.getElementById('leavef-staff');
   staffEl.innerHTML=staffOpts;
-  if(_isViewerForm){staffEl.disabled=!!_viewerStaffId;staffEl.parentElement.style.opacity=_viewerStaffId?'.7':'1';}
+  if(_isOwnForm){staffEl.disabled=!!_ownStaffId;staffEl.parentElement.style.opacity=_ownStaffId?'.7':'1';}
   else{staffEl.disabled=false;staffEl.parentElement.style.opacity='';}
 
   var subOpts='<option value="">-- ไม่มี --</option>'+window.staffOptionsGrouped(window.STAFF.filter(s=>s.active),lv&&lv.substituteId);
@@ -416,7 +425,7 @@ window.openLeaveForm=function(id){
   var today=new Date();var todayStr=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
   document.getElementById('leavef-start').value=lv?lv.startDate:todayStr;
   document.getElementById('leavef-end').value=lv?lv.endDate:'';
-  // สถานะ: Viewer เห็นแค่รออนุมัติ
+  // สถานะ: ไม่มีสิทธิ์แก้ไขการลา เห็นแค่รออนุมัติ
   var stSel=document.getElementById('leavef-status');
   var stGroup=document.getElementById('leavef-status-group');
   if(!window.canEdit('leave')){
@@ -441,7 +450,7 @@ window._updateLeaveSubLabel=function(leaveType){
 };
 
 window.approveLeave=function(id){
-  if(!window.canEdit('leave')){window.showAlert('เฉพาะ DM/PM เท่านั้นที่อนุมัติได้','warn');return;}
+  if(!window.canEdit('leave')){window.showAlert('คุณไม่มีสิทธิ์อนุมัติการลา','warn');return;}
   var lv=window.LEAVES.find(function(x){return x.id===id;});
   if(!lv){return;}
   var stName=(window.STAFF.find(s=>s.id===lv.staffId)||{name:'?'}).name;

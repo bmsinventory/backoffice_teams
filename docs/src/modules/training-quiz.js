@@ -22,7 +22,7 @@ const _tqaUsedIn=id=>_tqaUse[id]?.sites||0; // จำนวนโครงกา
 // งานที่ต้องใช้เฉลย / แก้คลังกลาง — ส่ง session ของ Backoffice ไปให้ฐานข้อมูลตรวจ
 async function _tqaAdmin(action,data){
   const s=window.BmsSession.get()||{};
-  const {data:r,error}=await _sb.rpc('trn_quiz_admin',{p_uid:String(s.uid||''),p_sig:s.sig||'',p_action:action,p_data:data});
+  const {data:r,error}=await _sb.rpc('trn_quiz_admin',{p_uid:String(s.uid||''),p_sig:s.tok||'',p_action:action,p_data:data});
   if(error)throw new Error(error.message);
   return r;
 }

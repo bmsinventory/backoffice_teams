@@ -7,10 +7,25 @@ window.askDel=function(type,id,label){window.delTarget={type:type,id:id};documen
 window.execDelete=async function(){
   if(!window.delTarget)return;if(!window.auth.currentUser)return;
   var t=window.delTarget.type,id=window.delTarget.id;
-  var _delModMap={project:'projects',advance:'advance',lodging:'lodging',timesheet:'timesheet',leave:'leave',contract:'contract',imt_project:'impl_tracker',imt_phase:'impl_tracker',imt_task:'impl_tracker',imt_issue:'impl_tracker',imt_template:'impl_tracker',form_group:'impl_tracker',form_item:'impl_tracker',form_template:'impl_tracker',hdcat:'helpdesk'};
+  var _delModMap={project:'projects',advance:'advance',lodging:'lodging',timesheet:'timesheet',leave:'leave',contract:'contract',imt_project:'impl_tracker',imt_phase:'impl_tracker',imt_task:'impl_tracker',imt_issue:'impl_tracker',imt_template:'impl_tracker',form_group:'impl_tracker',form_item:'impl_tracker',form_items:'impl_tracker',form_template:'impl_tracker',hdcat:'helpdesk'};
   if(['staff','type','position','group','user','stage','department'].includes(t)){if(!window.canDel('admin'))return;}
   else if(_delModMap[t]){if(!window.canDel(_delModMap[t]))return;}
   else{if(!window.isAdmin())return;}
+  // ── ลบแบบฟอร์มหลายรายการที่ติ๊กเลือกไว้ (id = array) ──
+  if(t==='form_items'){
+    var ids=id;
+    window.FORM_ITEMS=window.FORM_ITEMS.filter(x=>ids.indexOf(x.id)<0);
+    window.ftkSel={};
+    window.closeM('m-del');window.delTarget=null;window.renderAll();
+    Promise.all(ids.map(i=>deleteDoc(getDocRef('FORM_ITEMS',i)))).catch(e=>window.showDbError(e));
+    return;
+  }
+  // ลบบัญชี Admin (กลุ่ม is_super) คนสุดท้ายไม่ได้ — ไม่งั้นไม่มีใครเข้าหน้าจัดการสิทธิ์ได้อีก
+  if(t==='user'){
+    var isSup=function(u){return window.rolesOf(u).some(function(r){return r.super;});};
+    var target=window.USERS.find(function(u){return u.id===id;});
+    if(target&&isSup(target)&&!window.USERS.some(function(u){return u.id!==id&&u.active!==false&&isSup(u);})){window.closeM('m-del');window.showAlert('ต้องมีผู้ใช้กลุ่ม Admin อย่างน้อย 1 คน','warn');return;}
+  }
   var sheetMap={project:'PROJECTS',advance:'ADVANCES',staff:'STAFF',type:'PTYPES',user:'USERS',position:'POSITIONS',group:'PGROUPS',lodging:'LODGINGS',stage:'STAGES',timesheet:'TIMESHEETS',department:'DEPARTMENTS',contract:'CONTRACTS',imt_project:'IMPL_PROJECTS',imt_phase:'IMPL_PHASES',imt_task:'IMPL_TASKS',imt_issue:'IMPL_ISSUES',imt_template:'IMPL_TEMPLATES',form_group:'FORM_GROUPS',form_item:'FORM_ITEMS',form_template:'FORM_TEMPLATES',hdcat:'HELPDESK_CATEGORIES'};
   function _ftkCascadeGroup(groupId){
     window.FORM_ITEMS.filter(x=>x.groupId===groupId).forEach(i=>deleteDoc(getDocRef('FORM_ITEMS',i.id)));
@@ -218,10 +233,14 @@ window.updateImportPreview=function(){
   const schema=window.IMPORT_SCHEMAS[type];
   if(schema&&formatBox)formatBox.textContent=schema.headers.join(', ');
 }
+// ── ปุ่ม "นำเข้า" มุมขวาบน — เลือกประเภทข้อมูลให้ตามหน้าที่เปิดอยู่ (หน้า Admin ดูตามแท็บ) · ไม่ตรงหน้าไหน = ให้เลือกเอง ──
+var IMPORT_TYPE_BY_VIEW={projects:'PROJECTS',advance:'ADVANCES',contract:'CONTRACTS',hospital:'HOSPITALS',helpdesk:'HELPDESK',impl_tracker:'IMPL_ISSUES',server_request:'SERVER_REQUESTS'};
+var IMPORT_TYPE_BY_ADM_TAB={staff:'STAFF',dept:'DEPARTMENTS',positions:'POSITIONS',groups:'PGROUPS',types:'PTYPES',users:'USERS'};
 window.openImportModal=function(){
   document.getElementById('import-file').value='';window._importFileChanged();
   window._importProgress(null);
-  document.getElementById('import-type').value='';
+  var view=document.body.getAttribute('data-view');
+  document.getElementById('import-type').value=(view==='admin'?IMPORT_TYPE_BY_ADM_TAB[window.admCur]:IMPORT_TYPE_BY_VIEW[view])||'';
   window.updateImportPreview();
   window.openM('m-import');
 }
@@ -286,6 +305,8 @@ const _refByLabel=list=>v=>{const x=(list()||[]).find(o=>o.id===v||o.label===v);
 const _IMPORT_REF={
   STAFF:{department:_refByLabel(()=>window.DEPT_LIST),position:_refByLabel(()=>window.POSITIONS)},
   PROJECTS:{site_owner:v=>{const s=window.staffByRef(v)||window.staffByName(v);return s?s.id:'';}},
+  // กลุ่มสิทธิ์: ชื่อหรือรหัสกลุ่ม หลายกลุ่มคั่นด้วย | (เช่น "ผู้จัดการ|หัวหน้าทีม") → [roles.id] · ไม่พบสักกลุ่ม → ''
+  USERS:{roles:v=>{const ids=v.split('|').map(x=>x.trim()).filter(Boolean).map(x=>(window.ROLES.find(r=>r.id===x||r.name===x)||{}).id).filter(Boolean);return ids.length?ids:'';}},
 };
 window.execImport=async function(){
   const fileInput=document.getElementById('import-file');const selType=document.getElementById('import-type').value;const schema=window.IMPORT_SCHEMAS[selType];const isClearFirst=document.getElementById('import-clear-first').checked;

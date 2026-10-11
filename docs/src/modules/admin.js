@@ -112,12 +112,21 @@ function renderAdm(){
       if(deptOrder.includes(s.dept))grouped[s.dept].push(s);
       else grouped['ไม่ระบุแผนก'].push(s);
     });
+    // ตัวกรองแผนก ('' = ทุกแผนก) — จำค่าไว้จนรีเฟรช · แผนกที่ถูกลบไปแล้วกลับเป็นทุกแผนก
+    var fDept=window._admDeptFilter||'';
+    if(fDept&&fDept!=='ไม่ระบุแผนก'&&!deptOrder.includes(fDept))fDept=window._admDeptFilter='';
+    var inDept=function(s){return!fDept||(fDept==='ไม่ระบุแผนก'?!deptOrder.includes(s.dept):s.dept===fDept);};
     var sections='';
     var ci=0;
-    deptOrder.forEach(function(dept){if(grouped[dept]&&grouped[dept].length)sections+=deptSection(dept,grouped[dept],ci++,false);});
-    if(grouped['ไม่ระบุแผนก'].length)sections+=deptSection('ไม่ระบุแผนก',grouped['ไม่ระบุแผนก'],ci++,false);
-    if(inactiveStaff.length)sections+=deptSection('พ้นสภาพ / ไม่ใช้งาน',inactiveStaff,ci,true);
-    admActions(window.canAdd('admin')?`<button class="btn btn-ghost" onclick="window.openStaffImport()">📥 นำเข้าข้อมูล</button><button class="btn btn-pri" onclick="window.admStaffForm(null)">+ เพิ่มพนักงาน</button>`:'');
+    deptOrder.forEach(function(dept){if(grouped[dept]&&grouped[dept].length){if(!fDept||fDept===dept)sections+=deptSection(dept,grouped[dept],ci,false);ci++;}});
+    if(grouped['ไม่ระบุแผนก'].length&&(!fDept||fDept==='ไม่ระบุแผนก'))sections+=deptSection('ไม่ระบุแผนก',grouped['ไม่ระบุแผนก'],ci,false);
+    var inactShown=inactiveStaff.filter(inDept);
+    if(inactShown.length)sections+=deptSection('พ้นสภาพ / ไม่ใช้งาน',inactShown,ci,true);
+    if(!sections)sections=`<div style="padding:40px 16px;text-align:center;color:var(--txt3);font-size:13px;">ไม่มีพนักงานในแผนกนี้</div>`;
+    var deptOpts=deptOrder.concat(grouped['ไม่ระบุแผนก'].length||fDept==='ไม่ระบุแผนก'?['ไม่ระบุแผนก']:[]);
+    var deptSel=`<select class="t-sel" title="กรองตามแผนก" onchange="window._admDeptFilter=this.value;window.admTab('staff')"><option value="">🏢 ทุกแผนก</option>`+
+      deptOpts.map(function(d){return`<option value="${esc(d)}"${d===fDept?' selected':''}>${esc(d)}</option>`;}).join('')+`</select>`;
+    admActions(deptSel+(window.canAdd('admin')?`<button class="btn btn-pri" onclick="window.admStaffForm(null)">+ เพิ่มพนักงาน</button>`:''));
     c.innerHTML=sections;
   }
   else if(window.admCur==='dept'){
@@ -202,7 +211,7 @@ function renderAdm(){
     admActions(canA?`<button class="btn btn-pri" onclick="window.openHspProductEdit(null);window.openM('m-hsp-products')">+ เพิ่ม Product</button>`:'');
     c.innerHTML=rows;
   }
-  else if(window.admCur==='users'){if(titleEl)titleEl.innerHTML=`🔑 ผู้ใช้งานระบบ`;admActions(window.canAdd('admin')?`<button class="btn btn-pri" onclick="window.admUserForm(null)">+ เพิ่มบัญชีผู้ใช้</button>`:'');c.innerHTML=`<div class="dtable-inner" style="border:1px solid var(--border);"><table><thead><tr><th>Username</th><th>ชื่อ</th><th>Role</th><th style="width:90px"></th></tr></thead><tbody>`+window.USERS.map(function(u,i){var rc={admin:'rgba(255,107,107,.15)',pm:'rgba(255,166,43,.15)',viewer:'rgba(6,214,160,.15)'};var rt={admin:'var(--coral)',pm:'var(--amber)',viewer:'var(--teal)'};return`<tr class="fade"><td style="font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--violet)">${esc(u.username)}${u.resetRequestedAt?`<div><span class="tag" style="background:rgba(255,166,43,.15);color:var(--amber);font-family:inherit;margin-top:4px" title="กด ✏️ แล้วกรอกรหัสผ่านใหม่ คำขอจะหายเอง">🔑 ขอรีเซ็ตรหัสผ่าน</span></div>`:''}</td><td style="font-weight:600;">${esc(u.name)}</td><td><span class="tag" style="background:${rc[u.role]||'var(--surface2)'};color:${rt[u.role]||'var(--txt2)'}">${window.roleLabel(u.role)}</span></td><td><div style="display:flex;gap:6px">${window.canEdit('admin')?`<button class="btn btn-ghost btn-sm" onclick="window.admUserForm('${u.id}')">✏️</button>`:''} ${window.canDel('admin')?`<button class="btn btn-red btn-sm" onclick="window.askDel('user','${u.id}','${esc(u.username)}')">🗑</button>`:''}</div></td></tr>`;}).join('')+`</tbody></table></div>`;}
+  else if(window.admCur==='users'){if(titleEl)titleEl.innerHTML=`🔑 ผู้ใช้งานระบบ`;admActions(window.canAdd('admin')?`<button class="btn btn-pri" onclick="window.admUserForm(null)">+ เพิ่มบัญชีผู้ใช้</button>`:'');c.innerHTML=`<div class="dtable-inner" style="border:1px solid var(--border);"><table><thead><tr><th>Username</th><th>ชื่อ</th><th>ผูกกับพนักงาน</th><th style="width:90px"></th></tr></thead><tbody>`+usersByRole().map(function(g){return`<tr class="usr-grp" style="--rc:${esc(g.color)}"><td colspan="4"><span class="rl-dot"></span>${esc(g.name)}<span class="rl-cnt">${g.users.length} คน</span></td></tr>`+g.users.map(function(u){return`<tr class="fade"><td style="font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--violet)">${esc(u.username)}${u.resetRequestedAt?`<div><span class="tag" style="background:rgba(255,166,43,.15);color:var(--amber);font-family:inherit;margin-top:4px" title="กด ✏️ แล้วกรอกรหัสผ่านใหม่ คำขอจะหายเอง">🔑 ขอรีเซ็ตรหัสผ่าน</span></div>`:''}</td><td style="font-weight:600;">${esc(u.name)}</td><td>${staffLinkTag(u)}</td><td><div style="display:flex;gap:6px">${window.canEdit('admin')?`<button class="btn btn-ghost btn-sm" onclick="window.admUserForm('${u.id}')">✏️</button>`:''} ${window.canDel('admin')?`<button class="btn btn-red btn-sm" onclick="window.askDel('user','${u.id}','${esc(u.username)}')">🗑</button>`:''}</div></td></tr>`;}).join('');}).join('')+`</tbody></table></div>`;}
   if(window.initMobileTable)window.initMobileTable(c); // มือถือ: ตารางใน Admin Panel (เช่น Users) → การ์ด
 }
 
@@ -372,13 +381,6 @@ window.saveAdmStage=async function(){
 }
 window.stgDragId=null;window.stgDrag=function(e,id){window.stgDragId=id;}
 window.stgDrop=async function(e,targetId){e.preventDefault();if(!window.stgDragId||window.stgDragId===targetId||!window.canEdit('admin'))return;let arr=[...window.STAGES];let fromIdx=arr.findIndex(x=>x.id===window.stgDragId);let toIdx=arr.findIndex(x=>x.id===targetId);if(fromIdx<0||toIdx<0)return;let[moved]=arr.splice(fromIdx,1);arr.splice(toIdx,0,moved);arr.forEach((s,i)=>s.order=i+1);window.STAGES=arr;window.admTab('stages');try{const batch=writeBatch();arr.forEach(s=>{batch.update(getDocRef('STAGES',s.id),{order:s.order});});await batch.commit();}catch(err){window.showDbError(err);}window.stgDragId=null;}
-window.openStaffImport=function(){
-  document.getElementById('import-file').value='';window._importFileChanged&&window._importFileChanged();
-  document.getElementById('import-msg').innerHTML='รองรับเฉพาะไฟล์ .csv เท่านั้น';
-  document.getElementById('import-type').value='STAFF';
-  window.updateImportPreview();
-  window.openM('m-import');
-}
 window._editStaffId = null;
 window.admStaffForm=function(id){
   var realId = (id && id !== 'null' && id !== '') ? id : null;
@@ -439,18 +441,92 @@ window.admUserForm=function(id){
   document.getElementById('m-user-title').textContent=u?'แก้ไขบัญชีผู้ใช้':'เพิ่มบัญชีผู้ใช้';
   setIdBadge('m-user-id-badge', realId);
   document.getElementById('auf-u').value=u?u.username:'';
-  document.getElementById('auf-p').value='';
+  // รหัสตั้งต้น 123456 (PwPolicy.DEFAULT) — ผู้ใช้เข้าระบบครั้งแรกถูกบังคับตั้งรหัสใหม่เอง (auth.service.js)
+  // บัญชีใหม่ / มีคำขอรีเซ็ต ("ลืมรหัสผ่าน?") → ใส่ให้เลย · แก้ไขทั่วไป → ว่าง (ไม่เปลี่ยน) กดปุ่มรีเซ็ตได้
+  document.getElementById('auf-p').value=(!u||u.resetRequestedAt)?window.PwPolicy.DEFAULT:'';
   document.getElementById('auf-p').placeholder=u?'(ว่างไว้ = ไม่เปลี่ยนรหัสผ่าน)':'กำหนดรหัสผ่าน...';
   document.getElementById('auf-n').value=u?u.name:'';
-  var sel=document.getElementById('auf-r');
-  var role=u?u.role:'viewer';
-  for(var i=0;i<sel.options.length;i++){sel.options[i].selected=(sel.options[i].value===role);}
+  // กลุ่มสิทธิ์ — ติ๊กได้หลายกลุ่ม · บัญชีใหม่เริ่มที่ "เจ้าหน้าที่ปฏิบัติงาน" (ถ้ามีกลุ่มนี้)
+  var cur=u?u.roles:(window.ROLES.some(function(r){return r.id==='staff';})?['staff']:[]);
+  document.getElementById('auf-roles').innerHTML=window.ROLES.map(function(r){
+    return'<label class="auf-role" style="--rc:'+esc(r.color)+'"><input type="checkbox" value="'+esc(r.id)+'"'+(cur.indexOf(r.id)>-1?' checked':'')+' onchange="window._aufRolesPreview()"><span>'+esc(r.name)+'</span></label>';
+  }).join('');
+  window._aufRolesPreview();
   var stfSel=document.getElementById('auf-staff');
   if(stfSel){
     stfSel.innerHTML='<option value="">-- ไม่ผูก --</option>'+window.staffOptionsGrouped(window.STAFF.filter(function(s){return s.active!==false;}),u&&u.staffId);
+    // ผูกไว้แล้ว = ถือว่าเลือกเองแล้ว ไม่ให้ตัวจับคู่อัตโนมัติเปลี่ยน
+    _aufStaffManual=!!(u&&u.staffId);
+    stfSel.onchange=function(){_aufStaffManual=true;window._aufStaffSuggest();};
   }
+  window._aufStaffSuggest();
   window.openM('m-user');
 }
+
+// ── จับคู่ "ผูกกับพนักงาน" อัตโนมัติ จากชื่อที่แสดง + Username ──
+// เทียบกับ ชื่อ-นามสกุล / ชื่อเล่น / Email ของพนักงาน (ประมวลผลในเบราว์เซอร์ ไม่เรียก API ภายนอก)
+// มั่นใจ (คะแนนสูงและทิ้งห่างอันดับสอง) → เลือกให้เลย · ไม่ชัด → แสดงตัวเลือกให้กดเลือกเอง
+var _aufStaffManual=false;
+var AUF_TITLE_RE=/^(?:นางสาว|นาย|นาง|น\.ส\.|ดร\.|คุณ(?=\s)|(?:mrs|mr|ms|miss|dr)(?:\.|\s))\s*/i;
+function aufNorm(s){return String(s||'').toLowerCase().trim().replace(AUF_TITLE_RE,'').replace(/[\s._\-]+/g,'');}
+function aufTokens(s){return String(s||'').toLowerCase().split(/[\s._\-@]+/).map(function(t){return t.replace(AUF_TITLE_RE,'');}).filter(function(t){return t.length>=2;});}
+function aufSim(a,b){ // ความคล้ายของสตริง 0–1 (Levenshtein)
+  if(!a||!b)return 0;if(a===b)return 1;
+  var m=a.length,n=b.length,prev=[],cur,i,j;
+  for(j=0;j<=n;j++)prev[j]=j;
+  for(i=1;i<=m;i++){cur=[i];for(j=1;j<=n;j++)cur[j]=Math.min(prev[j]+1,cur[j-1]+1,prev[j-1]+(a[i-1]===b[j-1]?0:1));prev=cur;}
+  return 1-prev[n]/Math.max(m,n);
+}
+function aufScoreStaff(s,name,user){
+  var nm=aufNorm(name),un=aufNorm(user),full=aufNorm(s.name),nick=aufNorm(s.nickname);
+  var first=aufNorm(String(s.name||'').replace(AUF_TITLE_RE,'').split(/\s+/)[0]);
+  var mail=aufNorm(String(s.email||'').split('@')[0]);
+  var best=[0,''];
+  function hit(sc,why){if(sc>best[0])best=[sc,why];}
+  if(nm&&full){
+    if(nm===full)hit(100,'ชื่อ-นามสกุลตรงกัน');
+    else if(nm.length>=4&&(full.indexOf(nm)>-1||nm.indexOf(full)>-1))hit(88,'ชื่อตรงบางส่วน');
+    else{var r=aufSim(nm,full);if(r>=0.8)hit(Math.round(r*85),'ชื่อใกล้เคียง');}
+  }
+  if(un&&mail&&un===mail)hit(95,'Username ตรงกับ Email');
+  if(un&&full&&un===full)hit(95,'Username ตรงกับชื่อ');
+  var toks=aufTokens(name).concat(aufTokens(user)).map(aufNorm);
+  toks.forEach(function(t){
+    if(first&&t===first)hit(72,'ชื่อต้นตรงกัน');
+    if(nick&&t===nick)hit(65,'ชื่อเล่นตรงกัน');
+    if(mail&&t.length>=3&&t===mail)hit(90,'ตรงกับ Email');
+  });
+  return{s:s,score:best[0],why:best[1]};
+}
+window._aufStaffSuggest=function(){
+  var sel=document.getElementById('auf-staff'),box=document.getElementById('auf-staff-ai');
+  if(!sel||!box)return;
+  var name=(document.getElementById('auf-n')||{}).value||'',user=(document.getElementById('auf-u')||{}).value||'';
+  // พนักงานที่ผูกกับบัญชีอื่นอยู่แล้ว ไม่นำมาแนะนำ
+  var taken={};(window.USERS||[]).forEach(function(x){if(x.staffId&&x.id!==window._editUserId)taken[x.staffId]=1;});
+  var list=(name.trim()||user.trim())?window.STAFF.filter(function(s){return s.active!==false&&!taken[s.id];})
+    .map(function(s){return aufScoreStaff(s,name,user);}).filter(function(r){return r.score>=60;})
+    .sort(function(a,b){return b.score-a.score;}).slice(0,3):[];
+  if(_aufStaffManual){
+    box.innerHTML=(!sel.value&&list.length)?aufChipsHtml(list,'🤖 พนักงานที่น่าจะใช่:'):'';
+    return;
+  }
+  var top=list[0],sure=top&&top.score>=70&&(!list[1]||top.score-list[1].score>=10);
+  sel.value=sure?top.s.id:'';
+  box.innerHTML=sure?'🤖 จับคู่อัตโนมัติ: <b>'+esc(top.s.name)+'</b> <span style="opacity:.75">('+esc(top.why)+')</span>'
+    :(list.length?aufChipsHtml(list,'🤖 พบหลายคนที่ใกล้เคียง — กดเลือก:'):'');
+};
+function aufChipsHtml(list,label){
+  return label+' '+list.map(function(r){
+    return'<button type="button" class="auf-ai-chip" onclick="window._aufPickStaff(\''+esc(r.s.id)+'\')" title="'+esc(r.why)+'">'+esc(r.s.name)+(r.s.nickname?' ('+esc(r.s.nickname)+')':'')+'</button>';
+  }).join(' ');
+}
+window._aufPickStaff=function(id){
+  var sel=document.getElementById('auf-staff');if(!sel)return;
+  sel.value=id;_aufStaffManual=true;
+  var s=window.STAFF.find(function(x){return x.id===id;});
+  document.getElementById('auf-staff-ai').innerHTML=s?'✅ ผูกกับ <b>'+esc(s.name)+'</b>':'';
+};
 window.saveAdmUser=async function(){
   if(!window.canEdit('admin')||!window.auth.currentUser)return;
   var un=(document.getElementById('auf-u')||{}).value||'';
@@ -460,216 +536,303 @@ window.saveAdmUser=async function(){
   var id=window._editUserId;
   var ex=id?window.USERS.find(function(x){return x.id===id;}):null;
   var uid2=id||'U'+Date.now();
-  var dbUsr={user_id:uid2,username:un.trim(),name:nm.trim(),role:document.getElementById('auf-r').value,password:pw?pw:(ex?ex.password:''),is_active:true,staff_id:(document.getElementById('auf-staff')||{value:''}).value||''};
+  var roles=aufCheckedRoles();
+  // ต้องเหลือผู้ใช้กลุ่ม Admin (is_super) ที่ใช้งานอยู่อย่างน้อย 1 คน — กันไม่มีใครเข้าหน้าจัดการสิทธิ์ได้อีก
+  var isSup=function(ids){return window.ROLES.some(function(r){return r.super&&ids.indexOf(r.id)>-1;});};
+  if(ex&&isSup(ex.roles)&&!isSup(roles)&&!window.USERS.some(function(x){return x.id!==uid2&&x.active!==false&&isSup(x.roles);})){
+    window.showAlert('ต้องมีผู้ใช้กลุ่ม Admin อย่างน้อย 1 คน','warn');return;
+  }
+  // password: ฐานข้อมูลแปลงเป็น bcrypt แล้วล้างช่องทิ้งเอง (trigger ใน db-schema.sql SECURITY) · ว่าง = ไม่เปลี่ยนรหัส
+  var dbUsr={user_id:uid2,username:un.trim(),name:nm.trim(),roles:roles,password:pw||'',is_active:true,staff_id:(document.getElementById('auf-staff')||{value:''}).value||''};
   // ตั้งรหัสผ่านใหม่ให้คนที่ขอรีเซ็ตไว้ ("ลืมรหัสผ่าน?" หน้า Login) → ล้างคำขอ (ใส่เฉพาะตอนมีคำขอ — คอลัมน์ต้องมีอยู่แล้ว)
   if(pw&&ex&&ex.resetRequestedAt)dbUsr.pw_reset_requested_at=null;
   window._applyLocalDoc('USERS',uid2,dbUsr);
   window.closeM('m-user');
   window.admTab('users');
-  setDoc(getDocRef('USERS',uid2),dbUsr).catch(e=>window.showDbError(e));
+  setDoc(getDocRef('USERS',uid2),dbUsr).then(function(){
+    // ตั้งรหัสใหม่ = session เดิมของบัญชีนั้นถูกปิด — บัญชีตัวเอง → ขอ session ใหม่ด้วยรหัสใหม่ ใช้งานต่อได้เลย
+    if(pw&&window.cu&&uid2===window.cu.id)window.BmsSession.login(window.getDb(),un.trim(),pw,window.BmsSession.persisted()).catch(function(){});
+  }).catch(e=>window.showDbError(e));
 }
 
-// ── ROLE PERMISSIONS ──
-// ── สิทธิ์ "อนุมัติ" แยกจาก "แก้" — module ที่มีปุ่มอนุมัติ (ใช้ทั้ง renderAdmRoles และ saveRolePerms) ──
-const APPROVE_MODS = [
-  { id:'lodging',        title:'สิทธิ์กดอนุมัติที่พัก', desc:'แยกจากสิทธิ์ "แก้" — กำหนดว่า Role ไหนกดปุ่ม ✅ อนุมัติ/ยกเลิกอนุมัติ ในหน้าที่พักได้บ้าง' },
-  { id:'server_request', title:'สิทธิ์อนุมัติคำขอใช้งานทีม Server (DM/PM)', desc:'แยกจากสิทธิ์ "แก้" — กำหนดว่า Role ไหนกด อนุมัติ/ไม่อนุมัติ คำขอใช้งานทีม Server ได้ (การจัดคนใช้สิทธิ์ "แก้")' },
-];
-
-function renderAdmRoles(c, titleEl) {
-  if(titleEl) titleEl.innerHTML = (window.appIcon ? window.appIcon('shield-lock') : '') + ' สิทธิ์การใช้งาน (Role Permissions)';
-  var mods = window.PERM_MODULES || [];
-  // roles ที่ configurable ได้ (ไม่รวม admin เพราะ full access เสมอ)
-  var roles = (window.USERS || []).map(function(u){return u.role;}).filter(function(r){return r&&r!=='admin';});
-  roles = [...new Set(roles)];
-  if(!roles.length) roles = ['pm','viewer'];
-  roles.sort();
-
-  var rp = window.ROLE_PERMISSIONS || {};
-
-  // helper: get perm value
-  function getPerm(role, modId, action) {
-    if(rp[role] && rp[role][modId] && rp[role][modId][action] !== undefined) return !!rp[role][modId][action];
-    // fallback default — เรียก _roleDefaultPerms ตัวจริงจาก permission.util.js ตรง ๆ (เดิมมีสำเนาแยกไว้ที่นี่
-    // แต่ตกยุคไม่มี impl_tracker/helpdesk/hospital/contract/expense_form/targets ทำให้ checkbox ในหน้านี้
-    // โชว์ "ปิด" ผิดจากสิทธิ์จริงที่แอปใช้ตอน render — พอกด "บันทึกสิทธิ์" ทั้งที่ไม่ได้ตั้งใจแตะ module พวกนี้เลย
-    // ก็จะเขียนทับเป็น false ถาวรใน DB (ต่างจาก undefined ที่ยัง fallback เป็น default ได้) ──
-    var def = (window._roleDefaultPerms && window._roleDefaultPerms(role)) || {};
-    return !!(def[modId]||{})[action];
-  }
-  // ── สิทธิ์ "อนุมัติที่พัก" แยกจาก edit — ถ้ายังไม่เคยตั้งค่านี้ไว้ชัดเจน (undefined) ยึดตามสิทธิ์ "แก้" เดิม
-  // ไปก่อน (ดู logic เดียวกันใน permission.util.js window.can) กันปุ่มอนุมัติหายไปทันทีตอน deploy ครั้งแรก ──
-  function getApprove(role, modId) {
-    if(rp[role] && rp[role][modId] && rp[role][modId].approve !== undefined) return !!rp[role][modId].approve;
-    return getPerm(role, modId, 'edit');
-  }
-
-  var actions = [{id:'view',label:'ดู',color:'var(--teal)'},{id:'add',label:'เพิ่ม',color:'var(--violet)'},{id:'edit',label:'แก้',color:'var(--amber)'},{id:'del',label:'ลบ',color:'var(--coral)'}];
-
-  // Role header cells
-  var roleHeadCells = roles.map(function(r){
-    var rc={pm:'var(--violet)',viewer:'var(--teal)'};
-    return `<th colspan="4" style="text-align:center;padding:10px 6px;background:${rc[r]||'var(--violet)'}18;color:${rc[r]||'var(--violet)'};font-size:13px;font-weight:700;border-bottom:2px solid ${rc[r]||'var(--violet)'}40;">${window.roleLabel(r)}</th>`;
-  }).join('');
-
-  // Action sub-header cells
-  var actionHeadCells = roles.map(function(){
-    return actions.map(function(a){
-      return `<th style="text-align:center;font-size:10px;font-weight:600;color:${a.color};padding:5px 4px;white-space:nowrap;">${a.label}</th>`;
-    }).join('');
-  }).join('');
-
-  // Module rows
-  var rows = mods.map(function(mod){
-    var cells = roles.map(function(role){
-      return actions.map(function(a){
-        var checked = getPerm(role,mod.id,a.id) ? 'checked' : '';
-        // view ถูกเช็คอัตโนมัติถ้า add/edit/del ถูกเปิด
-        var onchange = a.id!=='view' ? `onchange="window._permAutoView(this,'${role}','${mod.id}')"` : `onchange="window._permViewOff(this,'${role}','${mod.id}')"`;
-        return `<td style="text-align:center;padding:6px 4px;">
-          <input type="checkbox" class="perm-cb" ${checked}
-            data-role="${role}" data-mod="${mod.id}" data-act="${a.id}"
-            style="width:16px;height:16px;accent-color:${a.color};cursor:pointer;"
-            id="pcb-${role}-${mod.id}-${a.id}" ${onchange}>
-        </td>`;
-      }).join('');
-    }).join('');
-
-    // Admin column (read-only, always on)
-    var adminCells = `<td class="adm-perm-admin" colspan="${actions.length}" style="text-align:center;font-size:11px;color:var(--txt3);padding:6px 8px;">
-      ${actions.map(function(){return '<span style="color:var(--teal);font-size:14px;">✓</span>';}).join(' ')}
-    </td>`;
-
-    return `<tr style="border-bottom:1px solid var(--border);" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
-      <td class="adm-perm-mod" style="padding:10px 14px;font-size:13px;font-weight:500;white-space:nowrap;">${window.appIcon ? window.appIcon(mod.icon) : ''} ${esc(mod.label)}</td>
-      ${adminCells}
-      ${cells}
-    </tr>`;
-  }).join('');
-
-  c.innerHTML = `
-    <div style="max-width:900px;">
-      <div style="background:rgba(124,92,252,.07);border:1px solid rgba(124,92,252,.2);border-radius:10px;padding:12px 16px;margin-bottom:18px;font-size:12px;color:var(--txt2);">
-        ${window.appIcon ? window.appIcon('bulb') : ''} <b>Admin</b> มีสิทธิ์เต็มทุก Module เสมอ — กำหนดสิทธิ์ได้สำหรับ Role อื่นๆ
-      </div>
-      <div style="overflow-x:auto;border:1px solid var(--border);border-radius:14px;">
-        <table class="adm-perm-tbl" style="width:100%;border-collapse:collapse;min-width:560px;">
-          <thead>
-            <tr style="border-bottom:1px solid var(--border);">
-              <th class="adm-perm-mod" style="text-align:left;padding:10px 14px;font-size:12px;color:var(--txt3);">Module</th>
-              <th class="adm-perm-admin" colspan="${actions.length}" style="text-align:center;padding:10px 6px;background:rgba(255,107,107,.08);color:var(--coral);font-size:13px;font-weight:700;">Admin</th>
-              ${roleHeadCells}
-            </tr>
-            <tr style="border-bottom:2px solid var(--border);background:var(--surface2);">
-              <th class="adm-perm-mod"></th>
-              <th class="adm-perm-admin" colspan="${actions.length}" style="text-align:center;font-size:10px;color:var(--txt3);padding:5px;">เต็ม</th>
-              ${actionHeadCells}
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </div>
-      ${APPROVE_MODS.map(function(am){ return `
-      <div style="margin-top:20px;border:1px solid var(--border);border-radius:14px;padding:16px 18px;">
-        <div style="font-size:13px;font-weight:700;margin-bottom:4px;">🔑 ${am.title}</div>
-        <div style="font-size:11.5px;color:var(--txt3);margin-bottom:12px;">${am.desc} (Role ที่ยังไม่เคยตั้งค่านี้จะยึดตามสิทธิ์ "แก้" เดิมไปก่อน)</div>
-        <div style="display:flex;gap:18px;flex-wrap:wrap;">
-          ${roles.map(function(role){
-            var rc={pm:'var(--violet)',viewer:'var(--teal)'};
-            var checked = getApprove(role, am.id) ? 'checked' : '';
-            return `<label style="display:flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer;">
-              <input type="checkbox" class="perm-cb" ${checked}
-                data-role="${role}" data-mod="${am.id}" data-act="approve"
-                id="pcb-${role}-${am.id}-approve" style="width:16px;height:16px;accent-color:${rc[role]||'var(--indigo)'};cursor:pointer;">
-              <span style="color:${rc[role]||'var(--txt)'};font-weight:600;">${window.roleLabel(role)}</span>
-            </label>`;
-          }).join('')}
-        </div>
-      </div>`; }).join('')}
-      <div style="margin-top:18px;display:flex;gap:10px;justify-content:flex-end;">
-        <button class="btn btn-ghost" onclick="window.resetRolePerms()">↩️ รีเซ็ตเป็นค่าเริ่มต้น</button>
-        <button class="btn btn-pri" onclick="window.saveRolePerms()">💾 บันทึกสิทธิ์</button>
-      </div>
-    </div>`;
-}
-
-// auto-check view เมื่อเปิด add/edit/del
-window._permAutoView = function(cb, role, modId) {
-  if(cb.checked) {
-    var viewCb = document.getElementById('pcb-'+role+'-'+modId+'-view');
-    if(viewCb) viewCb.checked = true;
-  }
-};
-// auto-uncheck add/edit/del เมื่อปิด view
-window._permViewOff = function(cb, role, modId) {
-  if(!cb.checked) {
-    ['add','edit','del'].forEach(function(a){
-      var el=document.getElementById('pcb-'+role+'-'+modId+'-'+a);
-      if(el) el.checked=false;
-    });
-  }
-};
-
-window.saveRolePerms = async function() {
-  if(!window.canEdit('admin')||!window.auth.currentUser) return;
-  var mods = window.PERM_MODULES || [];
-  var roles = [...new Set((window.USERS||[]).map(function(u){return u.role;}).filter(function(r){return r&&r!=='admin';}))];
-  if(!roles.length) roles=['pm','viewer'];
-  var data = {};
-  roles.forEach(function(role){
-    data[role]={};
-    mods.forEach(function(mod){
-      data[role][mod.id]={};
-      ['view','add','edit','del'].forEach(function(a){
-        var el=document.getElementById('pcb-'+role+'-'+mod.id+'-'+a);
-        data[role][mod.id][a]=el?el.checked:false;
-      });
-    });
-    APPROVE_MODS.forEach(function(am){
-      var apEl=document.getElementById('pcb-'+role+'-'+am.id+'-approve');
-      if(apEl && data[role][am.id]) data[role][am.id].approve = apEl.checked;
-    });
+// ── กลุ่มสิทธิ์ (ตาราง roles) ──
+// ผู้ใช้มีได้หลายกลุ่ม (users.roles) → สิทธิ์รวมกัน (permission.util.js) · กลุ่ม is_super = สิทธิ์เต็ม (แก้ไม่ได้จากหน้านี้)
+function rlIcon(n){return window.appIcon?window.appIcon(n):'';}
+// ตารางผู้ใช้งานระบบ: จัดกลุ่มตามกลุ่มสิทธิ์ (เรียงตาม sort_order) · ผู้ใช้หลายกลุ่มแสดงซ้ำในทุกกลุ่มที่สังกัด
+function usersByRole(){
+  var groups=window.ROLES.map(function(r){return{name:r.name,color:r.color,users:[]};}),none={name:'ไม่มีกลุ่มสิทธิ์',color:'var(--txt3)',users:[]};
+  window.USERS.forEach(function(u){
+    var rs=window.rolesOf(u);
+    if(!rs.length)none.users.push(u);
+    rs.forEach(function(r){groups[window.ROLES.indexOf(r)].users.push(u);});
   });
-  try {
-    await setDoc(getDocRef('SETTINGS','role_permissions'), data);
-    window.showAlert('บันทึกสิทธิ์สำเร็จ','success');
-  } catch(e) { window.showDbError(e); }
+  return groups.concat([none]).filter(function(g){
+    g.users=window.sortUsersByRank(g.users);
+    return g.users.length;
+  });
+}
+// พนักงานที่ผูกกับบัญชี (ตารางผู้ใช้งานระบบ)
+function staffLinkTag(u){
+  var s=u.staffId&&window.STAFF.find(function(x){return x.id===u.staffId;});
+  if(!s)return'<span class="tag" style="background:rgba(245,158,11,.12);color:#b45309">ยังไม่ผูก</span>';
+  return'<span style="font-weight:600">'+esc(s.name)+'</span>'+(s.dept?'<div style="font-size:11px;color:var(--txt3)">'+esc(s.dept)+'</div>':'');
+}
+function aufCheckedRoles(){
+  return Array.prototype.map.call(document.querySelectorAll('#auf-roles input:checked'),function(el){return el.value;});
+}
+// ฟอร์มผู้ใช้: สรุปเมนูที่จะเห็นจากกลุ่มที่ติ๊ก (สิทธิ์รวม)
+window._aufRolesPreview=function(){
+  var el=document.getElementById('auf-roles-sum');if(!el)return;
+  var ids=aufCheckedRoles();
+  el.classList.remove('warn');
+  if(!ids.length){el.classList.add('warn');el.innerHTML='⚠️ ไม่ได้เลือกกลุ่ม — เข้าระบบได้แต่ไม่เห็นเมนูใดเลย';return;}
+  var eff=window.permsForRoles(window.ROLES.filter(function(r){return ids.indexOf(r.id)>-1;}));
+  if(eff.superUser){el.innerHTML='🛡️ สิทธิ์เต็มทุกเมนู';return;}
+  var mods=window.PERM_MODULES.filter(function(m){return eff.perms[m.id]&&eff.perms[m.id].view;});
+  el.innerHTML='<div class="auf-sum-h">เมนูที่เห็น <b>'+mods.length+'</b> เมนู</div><div class="auf-sum-list">'+(mods.map(function(m){return'<span>'+esc(m.label)+'</span>';}).join('')||'—')+'</div>';
 };
 
-window.resetRolePerms = function() {
-  if(!window.canEdit('admin')) return;
-  window.showConfirm('รีเซ็ตสิทธิ์ทั้งหมดเป็นค่าเริ่มต้น?',function(){
-    window.ROLE_PERMISSIONS = {};
+var RL_ACTS=[{id:'view',label:'ดู'},{id:'add',label:'เพิ่ม'},{id:'edit',label:'แก้'},{id:'del',label:'ลบ'},{id:'approve',label:'อนุมัติ'}];
+var RL_SCOPES=[{id:'own',label:'ของตัวเอง'},{id:'dept',label:'ทั้งแผนก'},{id:'all',label:'ทั้งหมด'}];
+// draft = สำเนากลุ่มที่กำลังแก้ (id null = กลุ่มใหม่ยังไม่บันทึก) · dirty = มีการแก้ที่ยังไม่บันทึก
+var _rl={draft:null,dirty:false};
+
+function rlMembers(id){return window.sortUsersByRank(window.USERS.filter(function(u){return u.roles.indexOf(id)>-1;}));}
+function rlClone(r){return{id:r.id,name:r.name,color:r.color,order:r.order,super:r.super,home:r.home,perms:JSON.parse(JSON.stringify(r.perms||{}))};}
+function rlSort(a,b){return a.order-b.order||a.name.localeCompare(b.name,'th');}
+function rlNextOrder(){return window.ROLES.reduce(function(m,r){return Math.max(m,r.order<99?r.order:0);},0)+1;}
+function rlGroups(){
+  var gs=[];
+  window.PERM_MODULES.forEach(function(m){var g=gs.find(function(x){return x.g===m.g;});if(!g)gs.push(g={g:m.g,mods:[]});g.mods.push(m);});
+  return gs;
+}
+function rlModActs(m){return RL_ACTS.filter(function(a){return a.id!=='approve'||m.approve;}).map(function(a){return a.id;});}
+
+function renderAdmRoles(c,titleEl){
+  if(titleEl)titleEl.innerHTML=rlIcon('shield-lock')+' กลุ่มสิทธิ์การใช้งาน';
+  admActions('<button class="btn btn-pri" onclick="window.rlNew()">+ เพิ่มกลุ่มสิทธิ์</button>');
+  var d=_rl.draft,live=d&&d.id&&window.ROLES.find(function(r){return r.id===d.id;});
+  // ยังไม่เลือก / กลุ่มที่เลือกถูกลบไปแล้ว → กลุ่มแรก · ไม่ได้แก้ค้างไว้ → ใช้ข้อมูลล่าสุดจากฐานข้อมูล
+  if(!d||(d.id&&!live)){var first=window.ROLES[0];_rl.draft=first?rlClone(first):null;_rl.dirty=false;}
+  else if(live&&!_rl.dirty)_rl.draft=rlClone(live);
+  c.innerHTML='<div class="rl-wrap"><div class="rl-list" id="rl-list"></div><div class="rl-edit" id="rl-edit"></div></div>';
+  rlRenderList();rlRenderEdit();
+}
+function rlRenderList(){
+  var el=document.getElementById('rl-list');if(!el)return;
+  var d=_rl.draft;
+  el.innerHTML=window.ROLES.map(function(r){
+    var on=d&&d.id===r.id,name=on?d.name:r.name,color=on?d.color:r.color;
+    return'<div class="rl-item'+(on?' on':'')+'" style="--rc:'+esc(color)+'" onclick="window.rlSelect(\''+esc(r.id)+'\')">'
+      +'<span class="rl-dot"></span><span class="rl-name">'+esc(name||'—')+'</span>'
+      +(r.super?'<span class="rl-badge">เต็ม</span>':'')
+      +'<span class="rl-cnt">'+rlMembers(r.id).length+' คน</span></div>';
+  }).join('')
+  +(d&&!d.id?'<div class="rl-item on" style="--rc:'+esc(d.color)+'"><span class="rl-dot"></span><span class="rl-name">'+esc(d.name||'กลุ่มใหม่')+'</span><span class="rl-badge">ใหม่</span></div>':'');
+}
+function rlRenderEdit(){
+  var el=document.getElementById('rl-edit');if(!el)return;
+  var d=_rl.draft;
+  if(!d){el.innerHTML='<div class="rl-empty">ยังไม่มีกลุ่มสิทธิ์ · กด + เพิ่มกลุ่มสิทธิ์</div>';return;}
+  var homeOpts='<option value="">— เมนูแรกที่เห็น —</option>'+window.PERM_MODULES.filter(function(m){return window.ROUTE_MAP[m.id];}).map(function(m){
+    return'<option value="'+m.id+'"'+(d.home===m.id?' selected':'')+'>'+esc(m.label)+'</option>';
+  }).join('');
+  var mem=d.id?rlMembers(d.id):[];
+  el.innerHTML='<div class="rl-head">'
+      +'<input type="color" class="rl-color" value="'+esc(d.color)+'" oninput="window.rlSet(\'color\',this.value)" title="สีของกลุ่ม">'
+      +'<input class="f-input rl-name-in" value="'+esc(d.name)+'" placeholder="ชื่อกลุ่มสิทธิ์" oninput="window.rlSet(\'name\',this.value)">'
+    +'</div>'
+    +'<div class="rl-meta">'
+      +'<label><span>หน้าแรกหลัง Login</span><select class="f-input" onchange="window.rlSet(\'home\',this.value)">'+homeOpts+'</select></label>'
+      +'<label title="ผู้ใช้หลายกลุ่ม: กลุ่มลำดับน้อยกว่ากำหนดหน้าแรกและสีอวาตาร์"><span>ลำดับ</span><input type="number" class="f-input" min="1" value="'+(d.order<99?d.order:'')+'" oninput="window.rlSet(\'order\',Number(this.value)||99)"></label>'
+    +'</div>'
+    +(d.super?'<div class="rl-super">🛡️ กลุ่มนี้มีสิทธิ์เต็มทุกเมนู ไม่ต้องกำหนดรายเมนู — ให้เฉพาะผู้ดูแลระบบ</div>':rlTable(d))
+    +'<div class="rl-sec">ผู้ใช้ในกลุ่มนี้ ('+mem.length+')</div>'
+    +'<div class="rl-members">'+(mem.map(function(u){return'<span class="rl-mem">'+esc(window.userNameById(u.id)||u.username)+'</span>';}).join('')||'<span class="rl-none">'+(d.id?'ยังไม่มี':'บันทึกกลุ่มก่อน')+' — กำหนดกลุ่มให้ผู้ใช้ได้ที่ ผู้ใช้งานระบบ</span>')+'</div>'
+    +'<div class="rl-foot" id="rl-foot"></div>';
+  rlRenderFoot();
+}
+function rlRenderFoot(){
+  var el=document.getElementById('rl-foot');if(!el)return;
+  var d=_rl.draft;
+  el.innerHTML=(d.id&&!d.super?'<button class="btn btn-red" onclick="window.rlDelete()">🗑 ลบกลุ่ม</button>':'')
+    +(d.id&&!d.super?'<button class="btn btn-ghost" onclick="window.rlCopy()">⧉ คัดลอกเป็นกลุ่มใหม่</button>':'')
+    +'<span style="flex:1"></span>'
+    +(_rl.dirty?'<button class="btn btn-ghost" onclick="window.rlRevert()">ยกเลิกการแก้ไข</button>':'')
+    +'<button class="btn btn-pri" onclick="window.rlSave()"'+(_rl.dirty?'':' disabled')+'>💾 บันทึก</button>';
+}
+function rlTable(d){
+  var head='<tr><th class="rl-mod adm-perm-mod">เมนู</th>'+RL_ACTS.map(function(a){
+    return'<th class="rl-act" onclick="window.rlCol(\''+a.id+'\')" title="กดเพื่อเปิด/ปิดทั้งคอลัมน์">'+a.label+'</th>';
+  }).join('')+'<th>ขอบเขตข้อมูล</th></tr>';
+  var rows=rlGroups().map(function(g,i){
+    return'<tr class="rl-grp"><td colspan="'+(RL_ACTS.length+2)+'" onclick="window.rlGroup('+i+')" title="กดเพื่อเปิด/ปิดทั้งหมวด">'+esc(g.g)+'</td></tr>'
+      +g.mods.map(function(m){return rlRow(d,m);}).join('');
+  }).join('');
+  return'<div class="rl-tbl-wrap"><table class="rl-tbl adm-perm-tbl"><thead>'+head+'</thead><tbody>'+rows+'</tbody></table></div>'
+    +'<div class="rl-hint">ติ๊ก เพิ่ม/แก้/ลบ/อนุมัติ จะเปิด "ดู" ให้เอง · เอา "ดู" ออก = ปิดทั้งแถว · กดหัวคอลัมน์ ชื่อหมวด หรือชื่อเมนู เพื่อเปิด/ปิดทั้งชุด'
+    +'<br>ขอบเขตข้อมูล: <b>ของตัวเอง</b> = เห็นเฉพาะรายการของพนักงานที่ผูกกับบัญชี · <b>ทั้งแผนก</b> = เฉพาะแผนกของพนักงานที่ผูกไว้</div>';
+}
+function rlRow(d,m){
+  var p=d.perms[m.id]||{};
+  var cells=RL_ACTS.map(function(a){
+    if(a.id==='approve'&&!m.approve)return'<td class="rl-na">—</td>';
+    return'<td><input type="checkbox" class="perm-cb"'+(p[a.id]?' checked':'')+' onchange="window.rlToggle(\''+m.id+'\',\''+a.id+'\',this.checked)"></td>';
+  }).join('');
+  var scope=m.scope?'<select class="f-input rl-scope" onchange="window.rlScope(\''+m.id+'\',this.value)"'+(p.view?'':' disabled')+'>'
+    +RL_SCOPES.map(function(s){return'<option value="'+s.id+'"'+((p.scope||'all')===s.id?' selected':'')+'>'+s.label+'</option>';}).join('')+'</select>':'';
+  return'<tr data-row="'+m.id+'"><td class="rl-mod adm-perm-mod" onclick="window.rlRowAll(\''+m.id+'\')" title="กดเพื่อเปิด/ปิดทั้งแถว">'+rlIcon(m.icon)+' '+esc(m.label)+'</td>'+cells+'<td>'+scope+'</td></tr>';
+}
+function rlDirty(){_rl.dirty=true;rlRenderFoot();}
+// เปิด/ปิดสิทธิ์หนึ่งช่อง: เปิดอะไรก็ตาม = เปิด "ดู" ด้วย · ปิด "ดู" = ปิดทั้งแถว · ไม่เหลือสิทธิ์ = ลบ key ออก
+function rlApply(m,act,on){
+  var perms=_rl.draft.perms,p=perms[m.id]||(perms[m.id]={});
+  if(act==='view'&&!on)rlModActs(m).forEach(function(a){p[a]=false;});
+  else{p[act]=on;if(on)p.view=true;}
+  if(m.scope&&p.view&&!p.scope)p.scope='all';
+  if(!rlModActs(m).some(function(a){return p[a];}))delete perms[m.id];
+}
+function rlMod(id){return window.PERM_MODULES.find(function(m){return m.id===id;});}
+function rlFullRow(m){var p=_rl.draft.perms[m.id]||{};return rlModActs(m).every(function(a){return p[a];});}
+function rlRefreshRow(m){var tr=document.querySelector('#rl-edit tr[data-row="'+m.id+'"]');if(tr)tr.outerHTML=rlRow(_rl.draft,m);}
+window.rlToggle=function(modId,act,on){var m=rlMod(modId);rlApply(m,act,on);rlRefreshRow(m);rlDirty();};
+window.rlScope=function(modId,v){var p=_rl.draft.perms[modId];if(p)p.scope=v;rlDirty();};
+window.rlRowAll=function(modId){
+  var m=rlMod(modId),on=!rlFullRow(m);
+  if(on)rlModActs(m).forEach(function(a){rlApply(m,a,true);});else rlApply(m,'view',false);
+  rlRefreshRow(m);rlDirty();
+};
+window.rlCol=function(act){
+  var mods=window.PERM_MODULES.filter(function(m){return rlModActs(m).indexOf(act)>-1;});
+  var on=mods.some(function(m){return!(_rl.draft.perms[m.id]||{})[act];});
+  mods.forEach(function(m){rlApply(m,act,on);});
+  _rl.dirty=true;rlRenderEdit();
+};
+window.rlGroup=function(i){
+  var mods=rlGroups()[i].mods,on=!mods.every(rlFullRow);
+  mods.forEach(function(m){if(on)rlModActs(m).forEach(function(a){rlApply(m,a,true);});else rlApply(m,'view',false);});
+  _rl.dirty=true;rlRenderEdit();
+};
+window.rlSet=function(k,v){
+  _rl.draft[k]=v;
+  if(k==='name'||k==='color')rlRenderList();
+  rlDirty();
+};
+// มีการแก้ที่ยังไม่บันทึก → ถามก่อนทิ้ง
+function rlLeave(fn){
+  if(!_rl.dirty){fn();return;}
+  window.showConfirm('กลุ่มที่กำลังแก้ยังไม่ได้บันทึก — ทิ้งการแก้ไข?',fn,{icon:'⚠️',title:'ยังไม่ได้บันทึก',okColor:'var(--amber)',okText:'ทิ้งการแก้ไข'});
+}
+window.rlSelect=function(id){
+  if(_rl.draft&&_rl.draft.id===id)return;
+  rlLeave(function(){var r=window.ROLES.find(function(x){return x.id===id;});_rl.draft=r?rlClone(r):null;_rl.dirty=false;window.admTab('roles');});
+};
+window.rlNew=function(){
+  rlLeave(function(){_rl.draft={id:null,name:'กลุ่มใหม่',color:'#7c5cfc',order:rlNextOrder(),super:false,home:'',perms:{}};_rl.dirty=true;window.admTab('roles');});
+};
+window.rlCopy=function(){
+  var src=_rl.draft;
+  rlLeave(function(){var d=rlClone(src);d.id=null;d.name=src.name+' (สำเนา)';d.super=false;d.order=rlNextOrder();_rl.draft=d;_rl.dirty=true;window.admTab('roles');});
+};
+window.rlRevert=function(){
+  var d=_rl.draft,r=d&&d.id&&window.ROLES.find(function(x){return x.id===d.id;});
+  _rl.draft=r?rlClone(r):null;_rl.dirty=false;window.admTab('roles');
+};
+window.rlSave=async function(){
+  if(!window.isAdmin()||!window.auth.currentUser)return;
+  var d=_rl.draft;if(!d)return;
+  var name=(d.name||'').trim();
+  if(!name){window.showAlert('กรุณาตั้งชื่อกลุ่มสิทธิ์','warn');return;}
+  if(window.ROLES.some(function(r){return r.id!==d.id&&r.name.trim()===name;})){window.showAlert('มีกลุ่มชื่อนี้แล้ว','warn');return;}
+  var id=d.id||('R'+Date.now());
+  var row={name:name,color:d.color,sort_order:d.order||99,is_super:!!d.super,home_view:d.home||'',perms:d.super?{}:d.perms};
+  try{await setDoc(getDocRef('ROLES',id),row);}catch(e){window.showDbError(e);return;}
+  // อัปเดตในเครื่องทันที — แทนที่ทั้ง array (permission.util.js คำนวณสิทธิ์ใหม่เมื่อ reference เปลี่ยน)
+  var obj={id:id,name:name,color:row.color,order:row.sort_order,super:row.is_super,home:row.home_view,perms:row.perms};
+  window.ROLES=window.ROLES.filter(function(r){return r.id!==id;}).concat([obj]).sort(rlSort);
+  _rl.draft=rlClone(obj);_rl.dirty=false;
+  window.showAlert('บันทึกกลุ่มสิทธิ์แล้ว','success');
+  window.setupUser&&window.setupUser();
+  window.admTab('roles');
+};
+window.rlDelete=function(){
+  var d=_rl.draft;if(!d||!d.id||d.super||!window.isAdmin())return;
+  var n=rlMembers(d.id).length;
+  if(n){window.showAlert('ยังมีผู้ใช้ '+n+' คนในกลุ่มนี้ — นำออกจากกลุ่มก่อน (ผู้ใช้งานระบบ)','warn');return;}
+  window.showConfirm('ลบกลุ่มสิทธิ์ "'+d.name+'"?',async function(){
+    try{await window.deleteDoc(getDocRef('ROLES',d.id));}catch(e){window.showDbError(e);return;}
+    window.ROLES=window.ROLES.filter(function(r){return r.id!==d.id;});
+    _rl.draft=null;_rl.dirty=false;
     window.admTab('roles');
-  },{icon:'⚠️',title:'ยืนยันการรีเซ็ต',okColor:'var(--amber)',okText:'รีเซ็ต'});
+  },{icon:'🗑',title:'ยืนยันการลบ',okColor:'var(--coral)',okText:'ลบ'});
 };
 
 // ── CHANGE PASSWORD ──
+// ช่องรหัสใช้ type=text + -webkit-text-security (กัน browser เด้งบันทึกรหัส) · ปุ่มตา = สลับ class .show
+window.cpwToggle=function(btn){
+  var inp=btn.parentNode.querySelector('.cpw-input');
+  var on=inp.classList.toggle('show');
+  btn.innerHTML='<i class="ti ti-eye'+(on?'-off':'')+'"></i>';
+  inp.focus();
+};
+// ความแข็งแรง 0–4 + เช็กลิสต์เงื่อนไข + รหัสตรงกัน — อัปเดตทุกครั้งที่พิมพ์
+function cpwRefresh(){
+  var o=document.getElementById('cpw-old').value,n=document.getElementById('cpw-new').value,c=document.getElementById('cpw-confirm').value;
+  var kinds=[/[a-zA-Zก-๙]/,/\d/,/[^a-zA-Zก-๙\d]/].filter(function(r){return r.test(n);}).length;
+  var lv=!n?0:n.length<4?1:Math.min(4,1+(kinds>=2?1:0)+(kinds>=3?1:0)+(n.length>=8?1:0));
+  var m=document.getElementById('cpw-meter');m.dataset.lv=lv;
+  document.getElementById('cpw-meter-txt').textContent=['ความแข็งแรง','อ่อนมาก','พอใช้','ดี','แข็งแรงมาก'][lv];
+  var ok={len:n.length>=4,diff:!!n&&n!==o,safe:!window.PwPolicy.weak(n,window.cu&&window.cu.username),mix:kinds>=3};
+  document.querySelectorAll('#cpw-rules li').forEach(function(li){li.classList.toggle('ok',ok[li.dataset.r]);});
+  var mt=document.getElementById('cpw-match');
+  mt.className='cpw-match'+(c?(c===n?' ok':' bad'):'');
+  mt.innerHTML=!c?'':c===n?'<i class="ti ti-check"></i> รหัสผ่านตรงกัน':'<i class="ti ti-x"></i> รหัสผ่านไม่ตรงกัน';
+  var e=document.getElementById('cpw-err');if(e.style.display!=='none'){e.style.display='none';}
+}
 window.openChangePassword=function(){
-  ['cpw-old','cpw-new','cpw-confirm'].forEach(function(id){document.getElementById(id).value='';});
+  ['cpw-old','cpw-new','cpw-confirm'].forEach(function(id){
+    var el=document.getElementById(id);el.value='';el.classList.remove('show');
+    el.parentNode.querySelector('.cpw-eye').innerHTML='<i class="ti ti-eye"></i>';
+    if(!el.dataset.bound){el.dataset.bound='1';el.addEventListener('input',cpwRefresh);
+      el.addEventListener('keydown',function(ev){if(ev.key==='Enter')window.saveChangePassword();});}
+  });
   var e=document.getElementById('cpw-err');if(e){e.style.display='none';e.textContent='';}
+  cpwRefresh();
   window.openM('m-change-pw');
+  setTimeout(function(){document.getElementById('cpw-old').focus();},80);
 };
 window.saveChangePassword=async function(){
   var errEl=document.getElementById('cpw-err');
-  function showErr(msg){errEl.textContent=msg;errEl.style.display='block';}
+  var btn=document.getElementById('cpw-save');
+  if(btn.disabled)return;
+  function showErr(msg){
+    errEl.innerHTML='<i class="ti ti-alert-triangle"></i><span></span>';
+    errEl.lastChild.textContent=msg.replace(/^⚠\s*/,'');
+    errEl.style.display='flex';btn.disabled=false;
+  }
   var oldPw=document.getElementById('cpw-old').value;
   var newPw=document.getElementById('cpw-new').value;
   var cfPw=document.getElementById('cpw-confirm').value;
   if(!oldPw||!newPw||!cfPw){showErr('⚠ กรุณากรอกข้อมูลให้ครบ');return;}
-  if(oldPw!==window.cu.password){showErr('⚠ รหัสผ่านปัจจุบันไม่ถูกต้อง');return;}
   if(newPw===oldPw){showErr('⚠ รหัสผ่านใหม่ต้องไม่ซ้ำกับรหัสเดิม');return;}
   if(newPw!==cfPw){showErr('⚠ รหัสผ่านใหม่ไม่ตรงกัน');return;}
   if(newPw.length<4){showErr('⚠ รหัสผ่านต้องมีอย่างน้อย 4 ตัวอักษร');return;}
-  var ex=window.USERS.find(function(x){return x.id===window.cu.id;});
-  if(!ex){showErr('⚠ ไม่พบข้อมูลผู้ใช้');return;}
-  var dbUsr={user_id:ex.id,username:ex.username,name:ex.name,role:ex.role,is_active:true,password:newPw};
-  if(ex.staffId)dbUsr.staff_id=ex.staffId;
+  // รหัสเดาง่ายห้ามใช้ (src/utils/pw-policy.util.js) — เข้าระบบครั้งหน้าจะถูกบังคับเปลี่ยนอยู่ดี
+  if(window.PwPolicy.weak(newPw,window.cu&&window.cu.username)){showErr('⚠ รหัสผ่านนี้เดาง่ายเกินไป (เช่น เลขเรียง 1234, ตัวซ้ำ 0000, ชื่อผู้ใช้) กรุณาตั้งรหัสอื่น');return;}
+  btn.disabled=true;
+  // ฐานข้อมูลตรวจรหัสเดิม + ตั้งรหัสใหม่ (bo_change_password) · เครื่องอื่นที่ Login ค้างไว้ต้อง Login ใหม่ เครื่องนี้ใช้ต่อได้
   try{
-    await setDoc(getDocRef('USERS',ex.id),dbUsr);
-    window.cu.password=newPw;
+    var res=await window.getDb().rpc('bo_change_password',{p_token:window.BmsSession.token(),p_old:oldPw,p_new:newPw});
+    if(res.error)throw res.error;
+    var d=res.data||{};
+    if(!d.ok){showErr(d.error==='old'?'⚠ รหัสผ่านปัจจุบันไม่ถูกต้อง':d.error==='short'?'⚠ รหัสผ่านต้องมีอย่างน้อย 4 ตัวอักษร':'⚠ หมดเวลาการเข้าสู่ระบบ กรุณาเข้าสู่ระบบใหม่');return;}
+    btn.disabled=false;
     window.closeM('m-change-pw');
     window.showAlert('เปลี่ยนรหัสผ่านสำเร็จ','success');
+    // ติ๊ก "จดจำ" ไว้ → ให้ตัวจัดการรหัสผ่านของเบราว์เซอร์อัปเดตเป็นรหัสใหม่ (Chrome จะเลิกเตือนรหัสรั่ว · ผู้ใช้กดยืนยันเอง)
+    if(window.BmsSession.persisted()&&window.PasswordCredential&&navigator.credentials&&window.cu){
+      try{navigator.credentials.store(new window.PasswordCredential({id:window.cu.username,password:newPw,name:window.cu.name||window.cu.username})).catch(function(){});}catch(e3){}
+    }
   }catch(e2){showErr('⚠ บันทึกไม่สำเร็จ: '+e2.message);}
 };
 

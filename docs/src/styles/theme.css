@@ -12,18 +12,6 @@
 }
 
 /* ── Dark: Component Overrides ── */
-[data-theme="dark"] .lform          { background: #0d1117; }
-[data-theme="dark"] .lcard          { border-color: var(--border); }
-[data-theme="dark"] .lf-inp         { background: var(--surface2); border-color: var(--border); color: var(--txt); }
-[data-theme="dark"] .lf-inp:focus   { background: var(--surface3); }
-[data-theme="dark"] .lf-inp::placeholder { color: var(--txt3); }
-[data-theme="dark"] .lf-lbl         { color: var(--txt2); }
-[data-theme="dark"] .lf-chk         { color: var(--txt2); }
-[data-theme="dark"] .lf-chk-box     { background: var(--surface2); border-color: var(--border2); }
-[data-theme="dark"] .lcard-t1       { color: var(--txt); }
-[data-theme="dark"] .lcard-t2,
-[data-theme="dark"] .lcard-foot     { color: var(--txt3); }
-[data-theme="dark"] .login-err      { background: rgba(220,38,38,.15); border-color: rgba(220,38,38,.3); }
 
 [data-theme="dark"] .stat-c         { background: var(--surface); border-color: var(--border); }
 [data-theme="dark"] .kb-card        { background: var(--surface); border-color: var(--border); }
@@ -56,9 +44,6 @@
 
 /* ── System Dark: Mirror Overrides ── */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .lform  { background: #0d1117; }
-  :root:not([data-theme="light"]) .lcard  { border-color: var(--border); }
-  :root:not([data-theme="light"]) .lf-inp { background: var(--surface2); border-color: var(--border); color: var(--txt); }
   :root:not([data-theme="light"]) #sidebar      { background: var(--surface); border-color: var(--border); }
   :root:not([data-theme="light"]) #topbar       { background: var(--surface); border-color: var(--border); }
   :root:not([data-theme="light"]) .toolbar      { background: var(--surface); border-color: var(--border); }

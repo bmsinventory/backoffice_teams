@@ -1,4 +1,22 @@
 const { esc, fd, fc, fca, pd, gS, gT, gG, gSt, gC, avC, uid, getFY, getYearBE, getStaffOverlaps, overlapWarnText, getStaffLeaveConflicts, getColRef, getDocRef } = window;
+// ── สุขภาพโครงการ (ใช้ร่วมกับ overview-dash.js) — เทียบความคืบหน้ากับสัดส่วนเวลาที่ผ่านไปของโครงการ
+// ไม่ใช้เกณฑ์ "เหลือ ≤15 วัน" ตายตัว เพราะงานไซต์สั้น ๆ (เช่น 5 วัน) จะถูกนับว่าเสี่ยงตั้งแต่วันแรก
+// done = เสร็จ · late = เลยวันจบ · risk = ช้ากว่าแผน ≥25% หรือถึงวันสุดท้ายแล้วยังไม่ถึง 80% · ok = ปกติ ──
+var PH_GAP=25,PH_DAY=86400000;
+window.projectHealth=function(p,today){
+  var prog=Number(p.progress)||0;
+  if(prog>=100||p.stage==='close'||p.status==='completed')return{k:'done',expected:null,gap:0,reason:''};
+  if(!p.end)return{k:'ok',expected:null,gap:0,reason:''};
+  var t=today||new Date(new Date().toDateString()),e=pd(p.end),left=Math.round((e-t)/PH_DAY);
+  if(left<0)return{k:'late',expected:100,gap:100-prog,reason:'เลยกำหนด '+(-left)+' วัน'};
+  var s=p.start?pd(p.start):null;
+  if(!s||t<s)return{k:'ok',expected:s?0:null,gap:0,reason:''};
+  var total=Math.round((e-s)/PH_DAY)+1,elapsed=Math.round((t-s)/PH_DAY)+1;
+  var expected=Math.min(100,Math.round(elapsed/total*100)),gap=Math.max(0,expected-prog);
+  if(left===0&&prog<80)return{k:'risk',expected:expected,gap:gap,reason:'ครบกำหนดวันนี้ ทำได้ '+prog+'%'};
+  if(gap>=PH_GAP)return{k:'risk',expected:expected,gap:gap,reason:'ช้ากว่าแผน '+gap+'%'};
+  return{k:'ok',expected:expected,gap:gap,reason:''};
+};
 // ── OVERVIEW ──
 window.renderOverview = function(){
   var yf=document.getElementById('ov-yr');
@@ -14,300 +32,22 @@ window.renderOverview = function(){
   var now=new Date();now.setHours(0,0,0,0);
   // ── health ──
   var health={onTrack:0,atRisk:0,delayed:0,completed:0};
-  var activeStaff=new Set();
   fProjs.forEach(p=>{
     if(p.progress===100||p.stage==='close'||p.status==='completed'){health.completed++;return;}
-    if(!p.end){health.onTrack++;return;}
-    var diffDays=Math.ceil((pd(p.end)-now)/(1000*60*60*24));
-    if(diffDays<0)health.delayed++;else if(diffDays<=15&&p.progress<80)health.atRisk++;else health.onTrack++;
-    (p.members&&p.members.length>0?p.members:p.team.map(id=>({sid:id}))).forEach(m=>{if(m.sid)activeStaff.add(m.sid);});
+    var k=window.projectHealth(p,now).k;
+    if(k==='late')health.delayed++;else if(k==='risk')health.atRisk++;else health.onTrack++;
   });
-  var totalStaff=window.STAFF.filter(s=>s.active).length;
-  var totalActive=fProjs.length-health.completed;var issueCount=health.delayed+health.atRisk;
-  var resourceEff=totalStaff>0?Math.round((activeStaff.size/totalStaff)*100):0;
   var critCount=fProjs.filter(p=>{if(p.progress===100||p.stage==='close'||!p.end)return false;var d=Math.ceil((pd(p.end)-now)/(1000*60*60*24));return d<=30;}).length;
-  // ── KPI cards ──
-  var stats=[
-    {k:'Budget Health',tip:'ผลรวม "มูลค่าโครงการ" ของทุกโครงการที่ผ่านตัวกรอง (ปีที่เริ่มโครงการ / กลุ่ม / ประเภท)',v:fc(totalBudget),s:'Total Budget '+(yr||'ทุกปี'),sub:totalBudget>0?'<span style="color:#06d6a0;font-size:11px;font-weight:700;">↑ On Target</span>':'',icon:'💵',g1:'#06d6a0',g2:'#4cc9f0'},
-    {k:'Project Velocity',tip:'โครงการที่ยังไม่เสร็จ / โครงการทั้งหมดที่ผ่านตัวกรอง\nถือว่า "เสร็จ" เมื่อ ความคืบหน้า 100% หรือ ขั้นตอน = ปิดโครงการ หรือ สถานะ = เสร็จสิ้น',v:`${totalActive} / ${fProjs.length}`,s:'Active Projects Now',sub:`<span style="color:#4361ee;font-size:11px;font-weight:700;">↑ ${health.completed} Completed</span>`,icon:'⚡',g1:'#4361ee',g2:'#7209b7'},
-    {k:'Resource Efficiency',tip:'จำนวนพนักงานในทีมของโครงการที่ยังไม่เสร็จ (ไม่นับซ้ำ) ÷ พนักงานที่ใช้งานอยู่ทั้งหมด × 100',v:`${resourceEff}%`,s:`${activeStaff.size} of ${totalStaff} Members Active`,sub:`<span style="font-size:11px;font-weight:700;color:${resourceEff===100?'#06d6a0':'#ffa62b'};">${resourceEff===100?'Full Utilization':'Partial Utilization'}</span>`,icon:'👥',g1:'#7209b7',g2:'#f72585'},
-    {k:'Critical Alerts',tip:'จำนวนโครงการที่ยังไม่เสร็จ และวันสิ้นสุดเหลือไม่เกิน 30 วัน (รวมที่เลยกำหนดแล้ว)\n"Action Required" = มีโครงการล่าช้า (เลยวันสิ้นสุด) หรือเสี่ยง (เหลือ ≤ 15 วันแต่คืบหน้า < 80%)',v:critCount,s:`Projects Ending < 30 Days`,sub:`<span style="color:${issueCount>0?'var(--coral)':'#06d6a0'};font-size:11px;font-weight:700;">${issueCount>0?'⚠ Action Required':'✓ All on track'}</span>`,icon:'🚨',g1:critCount>0?'#ff6b6b':'#06d6a0',g2:critCount>0?'#ffa62b':'#4cc9f0'},
-  ];
-  document.getElementById('stat-row').innerHTML=stats.map(function(s,i){
-    return `<div class="stat-c fade" style="animation-delay:${i*60}ms;display:flex;flex-direction:column;gap:2px;">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px;">
-        <div class="stat-k">${s.k}${window.calcTip(s.tip)}</div>
-        <div class="stat-icon" style="background:linear-gradient(135deg,${s.g1}18,${s.g2}18);width:36px;height:36px;flex-shrink:0;">${s.icon}</div>
-      </div>
-      <div class="stat-v" style="background:linear-gradient(135deg,${s.g1},${s.g2});-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-size:26px;">${s.v}</div>
-      <div class="stat-s">${s.s}</div>
-      <div style="margin-top:4px;">${s.sub}</div>
-    </div>`;
-  }).join('');
   var annualProjs=window.PROJECTS.filter(function(p){return(!yr||getYearBE(p.start)==yr)&&(!grp.length||grp.includes(p.groupId));});
   window.renderAnnualTarget(annualProjs, yr);
-  Chart.defaults.color='#9ba3b8';
-  // ── Monthly Workload Trend ──
-  if(window.cWLTrend)window.cWLTrend.destroy();
-  var ctxWL=document.getElementById('chart-workload-trend');
-  if(ctxWL){
-    var months=[];for(var mi=0;mi<12;mi++)months.push(new Date(yr?Number(yr)-543:now.getFullYear(),mi,1));
-    // แปลงวันที่โครงการครั้งเดียว + จัดกลุ่มตามประเภท (เดิม parse ซ้ำทุกประเภท×ทุกเดือน)
-    var mEnds=months.map(function(mDate){return new Date(mDate.getFullYear(),mDate.getMonth()+1,0,23,59,59);});
-    var wlByType=new Map();
-    fProjs.forEach(function(p){
-      if(!p.start||!p.end)return;
-      var l=wlByType.get(p.typeId);if(!l){l=[];wlByType.set(p.typeId,l);}
-      l.push({ps:pd(p.start),pe:pd(p.end)});
-    });
-    var typeDatasets=window.PTYPES.map(function(t,ti){
-      var tl=wlByType.get(t.id)||[];
-      return{label:t.label,data:months.map(function(mDate,mi2){
-        var mEnd=mEnds[mi2],c=0;
-        for(var k=0;k<tl.length;k++){if(tl[k].ps<=mEnd&&tl[k].pe>=mDate)c++;}
-        return c;
-      }),backgroundColor:t.color+'cc',stack:'s'};
-    });
-    window.cWLTrend=new Chart(ctxWL,{type:'bar',data:{labels:window.THMON.map(m=>m.slice(0,3)),datasets:typeDatasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:10,usePointStyle:true}}},scales:{x:{grid:{display:false},stacked:true,ticks:{font:{size:10}}},y:{stacked:true,grid:{color:'rgba(0,0,0,.06)'},ticks:{font:{size:10},stepSize:1}}}}});
-  }
-  // ── Resource Status ring ──
-  if(window.cResource)window.cResource.destroy();
-  var ctxRes=document.getElementById('chart-resource');
-  var ovLoad=[],actStaff=[],availStaff=[];
-  // นับจำนวนโครงการต่อคนครั้งเดียว (เดิม: ทุกคน × ทุกโครงการ × สมาชิก)
-  var projCnt=new Map();
-  fProjs.forEach(p=>{
-    if(p.status==='cancelled'||p.status==='completed')return;
-    var mems=p.members&&p.members.length>0?p.members:p.team.map(id=>({sid:id}));
-    new Set(mems.map(m=>m.sid)).forEach(sid=>{projCnt.set(sid,(projCnt.get(sid)||0)+1);});
-  });
-  window.STAFF.filter(s=>s.active).forEach(s=>{
-    var cnt=projCnt.get(s.id)||0;
-    if(cnt===0)availStaff.push(s);else if(cnt>3)ovLoad.push(s);else actStaff.push(s);
-  });
-  if(ctxRes){window.cResource=new Chart(ctxRes,{type:'doughnut',data:{labels:['Overload (>3)','Active (1-3)',`Available (${availStaff.length})`],datasets:[{data:[ovLoad.length,actStaff.length,availStaff.length],backgroundColor:['#ff6b6b','#4361ee','#06d6a0'],borderWidth:3,borderColor:'var(--surface)'}]},options:{responsive:true,maintainAspectRatio:false,cutout:'70%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>' '+c.label+': '+c.parsed+' คน'}}}}});}
-  var leg=document.getElementById('ov-resource-legend');
-  if(leg){leg.innerHTML=`<span style="color:#ff6b6b;font-weight:700;">● Overload (>${3}) ${ovLoad.length}</span><span style="color:#4361ee;font-weight:700;">● Active (1-3) ${actStaff.length}</span><span style="color:#06d6a0;font-weight:700;">● Available ${availStaff.length}</span>`;}
-  // chart center label total
-  // ── Budget bar ──
-  if(window.cBudgetBar)window.cBudgetBar.destroy();
-  var tps=window.PTYPES.filter(function(t){return fProjs.some(function(p){return p.typeId===t.id;});});
-  var ctxBB=document.getElementById('chart-budget-bar');
-  if(ctxBB){window.cBudgetBar=new Chart(ctxBB,{type:'bar',data:{labels:tps.map(t=>t.label),datasets:[{data:tps.map(function(t){return fProjs.filter(p=>p.typeId===t.id).reduce((s,p)=>s+p.cost,0);}),backgroundColor:tps.map(t=>t.color+'cc'),borderColor:tps.map(t=>t.color),borderWidth:1.5,borderRadius:6,barThickness:22}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>' '+fc(c.parsed)}}},scales:{x:{grid:{color:'rgba(0,0,0,.06)'},ticks:{font:{size:10},callback:v=>v>=1000000?'฿'+(v/1000000).toFixed(1)+'M':v>=1000?'฿'+(v/1000).toFixed(0)+'K':'฿'+v}},y:{grid:{display:false},ticks:{font:{size:11,weight:'600'}}}}}});}
-  // ── Health donut ──
-  if(window.cHealth)window.cHealth.destroy();
-  var ctxH=document.getElementById('chart-health');
-  if(ctxH){window.cHealth=new Chart(ctxH,{type:'doughnut',data:{labels:['ปกติ','เสี่ยง','ล่าช้า','เสร็จ'],datasets:[{data:[health.onTrack,health.atRisk,health.delayed,health.completed],backgroundColor:['#06d6a0','#ffa62b','#ff6b6b','#9ba3b8'],borderWidth:2,borderColor:'var(--surface)'}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{position:'right',labels:{font:{size:10,weight:'600'},boxWidth:10,usePointStyle:true}}}}});}
-  // ── Stage bar ──
-  if(window.cStage)window.cStage.destroy();
-  var ctxSt=document.getElementById('chart-stage');
-  if(ctxSt){window.cStage=new Chart(ctxSt,{type:'bar',data:{labels:window.STAGES.map(s=>s.label),datasets:[{data:window.STAGES.map(s=>fProjs.filter(p=>p.stage===s.id).length),backgroundColor:window.STAGES.map(s=>s.color+'44'),borderColor:window.STAGES.map(s=>s.color),borderWidth:2,borderRadius:6,barThickness:18}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:10},maxRotation:40,minRotation:30}},y:{grid:{color:'rgba(0,0,0,.06)'},ticks:{font:{size:10},stepSize:1}}}}});}
-  // ── Critical timeline ──
-  var critProjs=fProjs.filter(function(p){if(p.progress===100||p.stage==='close'||p.status==='completed'||!p.end)return false;return Math.ceil((pd(p.end)-now)/(1000*60*60*24))<=30;}).sort((a,b)=>pd(a.end)-pd(b.end));
-  var staffIdx=_ovIdIdx(window.STAFF);
-  var cntEl=document.getElementById('ov-crit-count');if(cntEl)cntEl.textContent=critProjs.length+' โครงการ';
-  var ovCrit=document.getElementById('ov-critical');
-  if(ovCrit){ovCrit.innerHTML=critProjs.map(function(p){
-    var diffDays=Math.ceil((pd(p.end)-now)/(1000*60*60*24));
-    var color=diffDays<0?'var(--coral)':'var(--amber)';
-    var dayText=diffDays<0?`ล่าช้า ${Math.abs(diffDays)} วัน`:diffDays===0?'วันนี้':`${diffDays} วัน`;
-    var pt=gT(p.typeId);
-    var mems=(p.members&&p.members.length>0?p.members:p.team.map(id=>({sid:id}))).map(m=>{var s=staffIdx.get(m.sid);return s?s.nickname||s.name.split(' ')[0]:'';}).filter(Boolean);
-    return`<div onclick="window.openProjModal('${p.id}')" style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:.15s" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(p.name)}</div>
-        <div style="font-size:10px;color:var(--txt3);margin-top:3px;display:flex;gap:8px;flex-wrap:wrap;">
-          <span style="background:${pt.color}18;color:${pt.color};padding:1px 6px;border-radius:8px;font-weight:600;">${esc(pt.label)}</span>
-          ${mems.length>0?`<span>👥 ${mems.slice(0,3).join(', ')}${mems.length>3?'+'+(mems.length-3):''}</span>`:''}
-        </div>
-      </div>
-      <div style="text-align:right;flex-shrink:0;">
-        <div style="font-size:11px;font-weight:800;color:${color};background:${color}15;padding:2px 8px;border-radius:6px;">${dayText}</div>
-        <div style="font-size:10px;color:var(--txt3);margin-top:3px;">End: ${fd(p.end)}</div>
-      </div>
-    </div>`;
-  }).join('')||'<div style="font-size:12px;color:var(--txt3);text-align:center;padding:30px;">🎉 ไม่มีโครงการใกล้สิ้นสุด</div>';}
   // ── Advance alerts ──
   var advKey=new Map();aPnd.forEach(a=>{advKey.set(a,+pd(a.ddate));});
   var advAlerts=[...aPnd].sort((a,b)=>advKey.get(a)-advKey.get(b)).slice(0,8);
   var ovAdv=document.getElementById('ov-adv-alerts');
   if(ovAdv){ovAdv.innerHTML=advAlerts.map(function(a){var p=window.PROJECTS.find(x=>x.id===a.pid);var isOv=a.ddate&&pd(a.ddate)<now;var color=isOv?'var(--coral)':'var(--amber)';return`<div onclick="window.goView('advance')" style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px dashed var(--border);cursor:pointer;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''"><div style="width:28px;height:28px;border-radius:8px;background:${color}15;color:${color};display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">${isOv?'⚠':'💳'}</div><div style="flex:1;min-width:0;"><div style="font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p?esc(p.name):'—'}</div><div style="font-size:10px;color:var(--txt3);">${fd(a.ddate)} · <span style="color:${color};font-weight:600;">${isOv?'เกินกำหนด':'รอเคลียร์'}</span></div></div><div style="font-size:12px;font-weight:800;">${fc(a.amount)}</div></div>`;}).join('')||'<div style="font-size:12px;color:var(--txt3);text-align:center;padding:20px;">ไม่มีรายการค้าง</div>';}
-  // ── render project table ──
-  window.renderOvTable();
+  // ── พยากรณ์ / KPI / กราฟ 3D / popup → overview-dash.js ──
+  if(window.ovDash)window.ovDash.render({yr:yr,grp:grp,typ:ovTyp,now:now,fProjs:fProjs,fAdvs:fAdvs,health:health,critCount:critCount,totalBudget:totalBudget});
 }
-// index id → แถวแรก (เทียบเท่า .find ตัวแรกที่เจอ)
-function _ovIdIdx(arr){var m=new Map();(arr||[]).forEach(function(x){if(!m.has(x.id))m.set(x.id,x);});return m;}
-window.renderOvTable = function() {
-  // Populate stage filter
-  var sf=document.getElementById('ov-tbl-stg');
-  if(sf&&sf.options.length<=1){window.STAGES.forEach(function(s){var o=document.createElement('option');o.value=s.id;o.textContent=s.label;sf.appendChild(o);});}
-  // Populate year filter (default current BE year)
-  var yf=document.getElementById('ov-tbl-yr');
-  if(yf&&yf.options.length<=1){var yrs=[...new Set(window.PROJECTS.map(function(p){return getYearBE(p.start);}).filter(Boolean))].sort(function(a,b){return b-a;});yrs.forEach(function(y){var o=document.createElement('option');o.value=y;o.textContent='ปี พ.ศ. '+y;yf.appendChild(o);});var curBE=(new Date().getFullYear()+543).toString();if(yrs.map(String).includes(curBE))yf.value=curBE;}
-  // Populate type filter
-  window.msFilter('ov-tbl-type',window.PTYPES,{placeholder:'ทุกประเภท',onChange:window.renderOvTable});
-  var yr=(document.getElementById('ov-tbl-yr')||{}).value||(document.getElementById('ov-yr')||{}).value||'';
-  var grp=window.msValues('ov-grp');
-  var typeF=window.msValues('ov-tbl-type');
-  var q=((document.getElementById('ov-tbl-q')||{}).value||'').toLowerCase();
-  var stg=(document.getElementById('ov-tbl-stg')||{}).value||'';
-  var sort=(document.getElementById('ov-tbl-sort')||{}).value||'end_asc';
-  var rows=window.PROJECTS.filter(function(p){
-    return (!yr||getYearBE(p.start)==yr)&&(!grp.length||grp.includes(p.groupId))&&(!typeF.length||typeF.includes(p.typeId))&&(!stg||p.stage===stg)&&(!q||p.name.toLowerCase().includes(q));
-  });
-  // แปลงวันที่ครั้งเดียวต่อแถวก่อน sort (เดิม pd() ซ้ำทุกครั้งที่เปรียบเทียบ)
-  var sKey=new Map();
-  if(sort==='end_asc')rows.forEach(function(p){sKey.set(p,p.end?+pd(p.end):9e12);});
-  else if(sort==='start_desc')rows.forEach(function(p){sKey.set(p,p.start?+pd(p.start):0);});
-  rows.sort(function(a,b){
-    if(sort==='end_asc'){return sKey.get(a)-sKey.get(b);}
-    if(sort==='start_desc'){return sKey.get(b)-sKey.get(a);}
-    if(sort==='progress_asc')return a.progress-b.progress;
-    if(sort==='name_asc')return a.name.localeCompare(b.name,'th');
-    return 0;
-  });
-  var now=new Date();now.setHours(0,0,0,0);
-  window._ovTableRows = rows;
-  var tb=document.getElementById('ov-tbl-rows');if(!tb)return;
-  // Pagination — back to page 1 whenever the filters/sort change
-  var PER=50;
-  var sig=[yr,grp.join(','),typeF.join(','),q,stg,sort].join('|');
-  if(window._ovTblSig!==sig){window._ovTblSig=sig;window._ovTblPage=1;}
-  var pages=Math.max(1,Math.ceil(rows.length/PER));
-  var page=Math.min(Math.max(1,window._ovTblPage||1),pages);window._ovTblPage=page;
-  var off=(page-1)*PER;
-  renderOvPager(rows.length,page,pages,off,PER);
-  var staffIdx=_ovIdIdx(window.STAFF);
-  tb.innerHTML=rows.slice(off,off+PER).map(function(p,_ri){
-    var sg=gS(p.stage);var pt=gT(p.typeId);var pg=gG(p.groupId);
-    var endDate=p.end?pd(p.end):null;
-    var diffDays=endDate?Math.ceil((endDate-now)/(1000*60*60*24)):null;
-    var urgColor=diffDays===null?'':diffDays<0?'var(--coral)':diffDays<=15?'var(--amber)':'';
-    var mems=(p.members&&p.members.length>0?p.members:p.team.map(function(id){return{sid:id};}));
-    var nicknames=mems.map(function(m){var s=staffIdx.get(m.sid);return s?s.nickname||s.name.split(' ')[0]:'';}).filter(Boolean);
-    var teamStr=nicknames.length>0?nicknames.join(', '):'<span style="color:var(--txt3)">—</span>';
-    var pbarW=Math.max(4,p.progress);
-    return `<tr class="fade" onclick="window.openProjModal('${p.id}')" style="cursor:pointer;">
-      <td style="text-align:center;font-size:11px;font-weight:700;color:var(--txt3);">${off+_ri+1}</td>
-      <td><div style="font-weight:600;font-size:12px;">${esc(p.name)}</div>${p.siteOwner?`<div style="font-size:10px;color:var(--txt3);">🏢 ${esc(p.siteOwner)}</div>`:''}</td>
-      <td><div style="display:flex;flex-direction:column;gap:3px;">
-        <span class="tag" style="background:${pt.color}18;color:${pt.color};font-size:9px;">${esc(pt.label)}</span>
-        ${pg?`<span class="tag" style="background:${pg.color}18;color:${pg.color};font-size:9px;">${esc(pg.label)}</span>`:''}
-      </div></td>
-      <td><span class="tag" style="background:${sg.color}18;color:${sg.color};font-size:10px;">${sg.label}</span></td>
-      <td style="font-size:11px;color:var(--txt2);white-space:nowrap;">${p.start?fd(p.start):'<span style="color:var(--txt3)">—</span>'}</td>
-      <td style="font-size:11px;white-space:nowrap;${urgColor?'color:'+urgColor+';font-weight:700':''}">${p.end?fd(p.end):'<span style="color:var(--txt3)">—</span>'}${diffDays!==null&&diffDays>=0&&diffDays<=15?'<br><span style="font-size:10px;">เหลือ '+diffDays+' วัน</span>':''}</td>
-      <td style="font-size:11px;color:var(--violet);">${teamStr}</td>
-      <td>
-        <div style="display:flex;align-items:center;gap:6px;">
-          <div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden;"><div style="width:${pbarW}%;height:100%;background:${sg.color};border-radius:3px;transition:width .3s;"></div></div>
-          <span style="font-size:11px;font-weight:700;color:${sg.color};min-width:30px;">${p.progress}%</span>
-        </div>
-      </td>
-      <td style="text-align:right;font-size:12px;font-weight:700;">${p.cost?fc(p.cost):'<span style="color:var(--txt3)">—</span>'}</td>
-    </tr>`;
-  }).join('')||'<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--txt3);">ไม่พบข้อมูล</td></tr>';
-};
-
-function renderOvPager(total,page,pages,off,per){
-  var el=document.getElementById('ov-tbl-pager');if(!el)return;
-  if(!total){el.innerHTML='';el.style.display='none';return;}
-  el.style.display='flex';
-  var btn=function(label,to,opts){opts=opts||{};
-    var st='min-width:32px;justify-content:center;'+(opts.active?'background:var(--violet);color:#fff;border-color:var(--violet);font-weight:700;':'');
-    return `<button class="btn btn-ghost btn-sm" style="${st}" ${opts.disabled?'disabled':''} onclick="window.ovTblGo(${to})">${label}</button>`;};
-  // Page numbers: first, last, and a window around the current page
-  var nums=[];for(var i=1;i<=pages;i++){if(i===1||i===pages||Math.abs(i-page)<=2)nums.push(i);}
-  var parts=[],prev=0;
-  nums.forEach(function(n){if(n-prev>1)parts.push('<span style="color:var(--txt3);padding:0 2px;">…</span>');parts.push(btn(n,n,{active:n===page}));prev=n;});
-  el.innerHTML=`<span style="font-size:12px;color:var(--txt3);">แสดง ${off+1}–${Math.min(off+per,total)} จาก ${total} รายการ</span>
-    <div style="margin-left:auto;display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
-      ${btn('‹ ก่อนหน้า',page-1,{disabled:page<=1})}${parts.join('')}${btn('ถัดไป ›',page+1,{disabled:page>=pages})}
-    </div>`;
-}
-window.ovTblGo=function(n){
-  window._ovTblPage=n;window.renderOvTable();
-  var tb=document.getElementById('ov-tbl-rows');var card=tb&&tb.closest('.ov-card');
-  if(card)card.scrollIntoView({behavior:'smooth',block:'start'});
-};
-
-window.exportOvExcel = async function() {
-  if(!(await window.LibLoader.need('xlsx'))) return;
-  var rows = window._ovTableRows || [];
-  if(!rows.length){ window.showAlert('ไม่มีข้อมูลโครงการตามตัวกรองที่เลือก','info'); return; }
-
-  var now = new Date(); now.setHours(0,0,0,0);
-
-  // Build header
-  var headers = [
-    'ลำดับ','ชื่อโครงการ','กลุ่มโครงการ','ประเภทโครงการ',
-    'เจ้าของไซต์','ชื่อผู้ติดตั้ง',
-    'Stage','วันเริ่มต้น','วันสิ้นสุด','Revisit 1','Revisit 2','คงเหลือ (วัน)',
-    'พื้นที่ชายแดน','งบประมาณ (฿)','ความคืบหน้า (%)','ทีมงาน','สถานะ','หมายเหตุ'
-  ];
-
-  var data = rows.map(function(p, i) {
-    var sg = gS(p.stage);
-    var pt = gT(p.typeId);
-    var pg = gG(p.groupId);
-    var pmStaff = window.STAFF.find(function(s){ return s.id === p.pm; });
-    var mems = (p.members && p.members.length > 0 ? p.members : p.team.map(function(id){ return {sid:id}; }));
-    var teamNames = mems.map(function(m){
-      var s = window.STAFF.find(function(x){ return x.id === m.sid; });
-      return s ? s.name : '';
-    }).filter(Boolean).join(', ');
-    var endDate = p.end ? pd(p.end) : null;
-    var diffDays = endDate ? Math.ceil((endDate - now) / (1000*60*60*24)) : null;
-    var statusText = p.status === 'cancelled' ? 'ยกเลิก'
-      : p.progress === 100 || p.stage === 'close' ? 'เสร็จสิ้น'
-      : diffDays === null ? 'ไม่ระบุ'
-      : diffDays < 0 ? 'ล่าช้า ' + Math.abs(diffDays) + ' วัน'
-      : diffDays <= 15 ? 'เสี่ยง (' + diffDays + ' วัน)'
-      : 'ปกติ';
-
-    return [
-      i + 1,
-      p.name || '',
-      pg ? pg.label : '',
-      pt ? pt.label : '',
-      p.siteOwner || '',
-      p.installer || '',
-      sg ? sg.label : '',
-      p.start || '',
-      p.end || '',
-      p.revisit1 || '',
-      p.revisit2 || '',
-      diffDays !== null ? diffDays : '',
-      p.isBorder ? 'ใช่' : 'ไม่ใช่',
-      p.cost || 0,
-      p.progress || 0,
-      teamNames,
-      statusText,
-      p.note || '',
-    ];
-  });
-
-  var wsData = [headers].concat(data);
-  var ws = window.XLSX.utils.aoa_to_sheet(wsData);
-
-  // Column widths
-  ws['!cols'] = [
-    {wch:6},{wch:35},{wch:18},{wch:18},
-    {wch:20},{wch:20},
-    {wch:14},{wch:14},{wch:14},{wch:14},{wch:14},{wch:12},
-    {wch:14},{wch:16},{wch:14},{wch:35},{wch:16},{wch:30}
-  ];
-
-  var wb = window.XLSX.utils.book_new();
-  window.XLSX.utils.book_append_sheet(wb, ws, 'Projects');
-
-  // File name: projects_YYYY-MM-DD.xlsx
-  var today = new Date();
-  var fname = 'projects_' + today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0') + '.xlsx';
-  window.XLSX.writeFile(wb, fname);
-  window.showAlert('Export ' + rows.length + ' โครงการเรียบร้อย ✓', 'success');
-};
-
 // ── ANNUAL TARGET TRACKER ──────────────────────────────────────────────────────
 // ── HELPER: build display rows (กลุ่ม + ประเภทเดี่ยว) ─────────────────────────
 function _buildAnnualTargetRows(fProjs, byType, useGroups) {
@@ -331,7 +71,7 @@ function _buildAnnualTargetRows(fProjs, byType, useGroups) {
       var t=(window.PTYPES||[]).find(function(x){return x.id===tid;});
       return '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+(t?t.color:'#9ba3b8')+';margin-right:3px;vertical-align:middle;"></span>';
     }).join('');
-    rows.push({id:g.id,isGroup:true,label:dots+'<b style="vertical-align:middle;">'+esc(g.label)+'</b>',
+    rows.push({id:g.id,isGroup:true,name:g.label,typeIds:gTypeIds,color:(((window.PTYPES||[]).find(function(x){return x.id===gTypeIds[0];})||{}).color)||'#7c5cfc',label:dots+'<b style="vertical-align:middle;">'+esc(g.label)+'</b>',
       tgt,total,closed,pctT,pctC,needFind:Math.max(0,tgt-total),needClose:Math.max(0,tgt-closed)});
   });
   // Ungrouped type rows — แสดงทุกประเภทที่ไม่อยู่ในกลุ่ม ถ้ามีการตั้งกลุ่มไว้ในระบบ (ไม่ว่ามุมมองปัจจุบันจะรวมกลุ่มหรือแยกประเภท) หรือมีข้อมูล
@@ -344,7 +84,7 @@ function _buildAnnualTargetRows(fProjs, byType, useGroups) {
     var pctT = tgt>0?Math.min(100,Math.round(total/tgt*100)):0;
     var pctC = tgt>0?Math.min(100,Math.round(closed/tgt*100)):0;
     var c=t.color||'#4361ee';
-    rows.push({id:t.id,isGroup:false,label:'<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+c+';margin-right:6px;vertical-align:middle;"></span><span style="vertical-align:middle;">'+esc(t.label)+'</span>',
+    rows.push({id:t.id,isGroup:false,name:t.label,typeIds:[t.id],color:c,label:'<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+c+';margin-right:6px;vertical-align:middle;"></span><span style="vertical-align:middle;">'+esc(t.label)+'</span>',
       tgt,total,closed,pctT,pctC,needFind:Math.max(0,tgt-total),needClose:Math.max(0,tgt-closed)});
   });
   return rows;
@@ -363,6 +103,7 @@ window.renderAnnualTarget = function(fProjs, yr) {
   var grouped = hasGroups && (localStorage.getItem('tgt_grouped') !== '0');
 
   var rows = _buildAnnualTargetRows(fProjs, byType, grouped ? undefined : []);
+  window._ovTgtRows = rows; // กราฟเป้าหมาย 3D ใน overview-dash.js
 
   // toggle handler
   window._setTgtGrouped = function(val) {
@@ -703,7 +444,7 @@ function _ovAiFacts() {
   var active = (window.PROJECTS || []).filter(function (p) { return p.status !== 'cancelled' && p.status !== 'completed'; });
   var advOf = function (pid) { return (window.ADVANCES || []).filter(function (a) { return a.pid === pid && a.status !== 'cleared'; }); };
   var advLbl = function (st) { return ((window.AFLW || []).find(function (x) { return x.id === st; }) || { label: st }).label; };
-  var mems = function (p) { return (p.members && p.members.length ? p.members.map(function (m) { return m.sid; }) : (p.team || [])).map(_ovNick).filter(Boolean); };
+  var mems = function (p) { return window.sortByStaffRank(p.members && p.members.length ? p.members.map(function (m) { return m.sid; }) : (p.team || [])).map(_ovNick).filter(Boolean); };
   var L = ['วันนี้: ' + fd(tIso)], n = 0;
   var sec = function (title, rows) { if (!rows.length) return; n += rows.length; L.push('', '## ' + title + ' (' + rows.length + ')'); rows.slice(0, 12).forEach(function (r) { L.push('- ' + r); }); if (rows.length > 12) L.push('- และอีก ' + (rows.length - 12) + ' รายการ'); };
 

@@ -30,7 +30,8 @@
       phaseId: d.phase_id || '', start: d.start_date || '', end: d.end_date || '',
       headcount: Number(d.headcount) || 1, note: d.note || '', status: d.status || 'pending',
       decidedById: d.decided_by || '', decidedAt: d.decided_at || '', decisionNote: d.decision_note || '',
-      assignees: Array.isArray(d.assignees) ? d.assignees : [],
+      // ผู้รับงาน — เรียงตามตำแหน่งตอนอ่าน (STAFF อาจโหลดทีหลังรายการคำขอ)
+      get assignees() { return window.sortByStaffRank(Array.isArray(d.assignees) ? d.assignees : []); },
       assignedById: d.assigned_by || '', assignedAt: d.assigned_at || '',
       projectId: d.project_id || '', createdAt: d.created_at || '', updatedAt: d.updated_at || '',
       _raw: d,
@@ -130,13 +131,15 @@
     nb.textContent = n; nb.style.display = n ? '' : 'none';
   }
 
-  // ── แจ้งเตือน BMS Notify (Token ตั้งที่ Admin › ตั้งค่าการแจ้งเตือน — settings.app.notify_server_token) ──
+  // ── แจ้งเตือน BMS Notify ช่อง server (Token ตั้งที่ Admin › ตั้งค่าการแจ้งเตือน · เซิร์ฟเวอร์อ่าน Token เอง — ดู notify.js) ──
   window.srvNotify = async function (content) {
-    var token = window.NOTIFY_SERVER_TOKEN || '';
-    if (!token || !content) return;
+    if (!content) return;
     try {
-      var url = (window.NOTIFY_PROXY_URL || '').trim() || 'https://api-notify.bmscloud.in.th/api/v1/push-notify';
-      var res = await fetch(url, { method: 'POST', headers: { 'Token': token, 'Content-Type': 'application/json' }, body: JSON.stringify({ content: content, receiver: null }) });
+      var res = await fetch('/api/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-bo-session': (window.BmsSession && window.BmsSession.token()) || '' },
+        body: JSON.stringify({ channel: 'server', content: content })
+      });
       if (!res.ok) console.warn('Server request notify HTTP ' + res.status);
     } catch (e) { console.warn('Server request notify error:', e); }
   };
@@ -918,10 +921,10 @@
     var r = byId(_asg.id);
     var list = document.getElementById('srv-asg-list');
     // คนว่างตลอดช่วงขึ้นก่อน แล้วตามด้วยคนที่ถูกเลือกไว้
-    // คำนวณคะแนนติดงาน/ชื่อไว้ก่อนเรียง — เดิมเรียก busyScore (ไล่โครงการ+ลาทั้งหมด) ซ้ำทุกครั้งที่เทียบ
-    var thColl = new Intl.Collator('th');
-    var rows = _asg.rows.map(function (x) { return { x: x, busy: busyScore(x, r), name: staffShort(x.sid) }; }).sort(function (a, b) {
-      return (b.x.on - a.x.on) || (a.busy - b.busy) || thColl.compare(a.name, b.name);
+    // คำนวณคะแนนติดงาน/ลำดับตำแหน่งไว้ก่อนเรียง — เดิมเรียก busyScore (ไล่โครงการ+ลาทั้งหมด) ซ้ำทุกครั้งที่เทียบ
+    var rk = window.staffOrderIdx();
+    var rows = _asg.rows.map(function (x) { return { x: x, busy: busyScore(x, r), rank: rk(x.sid) }; }).sort(function (a, b) {
+      return (b.x.on - a.x.on) || (a.busy - b.busy) || (a.rank - b.rank);
     }).map(function (k) { return k.x; });
     list.innerHTML = rows.map(function (x) {
       var s = window.staffByRef(x.sid) || {};
@@ -1057,12 +1060,13 @@
     var y = Number(_calMonth.slice(0, 4)), m = Number(_calMonth.slice(5, 7));
     var map = freeMap(_calMonth + '-01', window.srvIso(new Date(y, m, 0)));
     var days = Object.keys(map);
-    var team = teamStaff().slice().sort(function (a, b) { return staffShort(a.id).localeCompare(staffShort(b.id), 'th'); });
+    var team = teamStaff(); // เรียงตามตำแหน่ง (STAFF เรียงไว้แล้ว)
     var q = _calQ.trim().toLowerCase();
     var shown = q ? team.filter(function (s) { return [s.nickname, s.name, s.id].join(' ').toLowerCase().indexOf(q) >= 0; }) : team;
     var today = window.srvIso(new Date());
-    var dayCls = function (d) { var x = map[d]; return (x.holiday || x.weekend ? ' off' : '') + (d === today ? ' today' : ''); };
-    var cols = 'grid-template-columns:150px repeat(' + days.length + ',minmax(28px,1fr));';
+    var wk = function (d) { return new Date(d + 'T00:00:00').getDay() === 1 && d !== days[0] ? ' wk' : ''; };
+    var dayCls = function (d) { var x = map[d]; return (x.holiday || x.weekend ? ' off' : '') + (d === today ? ' today' : '') + wk(d); };
+    var cols = 'grid-template-columns:180px repeat(' + days.length + ',minmax(28px,1fr));';
     var row = function (cls, left, cells) { return '<div class="srv-tl-row ' + cls + '" style="' + cols + '"><div class="srv-tl-l">' + left + '</div>' + cells + '</div>'; };
     // หัวตาราง: วันที่ + ชื่อวัน
     var html = row('head', 'พนักงาน', days.map(function (d) {
@@ -1073,7 +1077,7 @@
     html += row('sum', 'คนว่าง', days.map(function (d) {
       var x = map[d];
       var cls = x.holiday || x.weekend ? 'off' : x.free === 0 ? 'none' : x.free <= Math.max(1, Math.floor(x.total / 4)) ? 'low' : 'ok';
-      return '<div class="srv-tl-s ' + cls + (d === today ? ' today' : '') + '" title="' + fd(d) + ' · ว่าง ' + x.free + '/' + x.total + ' คน' + (x.reserved ? ' · กันไว้ ' + x.reserved + ' คน (อนุมัติแล้ว รอจัดคน)' : '') + '">' + x.free + '</div>';
+      return '<div class="srv-tl-s ' + cls + (d === today ? ' today' : '') + wk(d) + '" title="' + fd(d) + ' · ว่าง ' + x.free + '/' + x.total + ' คน' + (x.reserved ? ' · กันไว้ ' + x.reserved + ' คน (อนุมัติแล้ว รอจัดคน)' : '') + '">' + x.free + '</div>';
     }).join(''));
     // แถวคำขอ: จุดสีตามสถานะ กดเปิดคำขอ
     html += row('req', 'คำขอ', days.map(function (d) {
@@ -1112,15 +1116,16 @@
       var cells = days.map(function (d, i) {
         var x = map[d], k = x.holiday || x.weekend ? 'off' : x.busy[s.id] ? 'busy' : 'free';
         var tip = staffShort(s.id) + ' · ' + fd(d) + ' · ' + (x.busy[s.id] ? (x.why[s.id] || []).join(', ') : k === 'off' ? 'วันหยุด' : 'ว่าง');
-        return '<div class="srv-tl-c ' + k + (d === today ? ' today' : '') + '" style="grid-column:' + (i + 2) + ';grid-row:1/-1;" title="' + esc(tip) + '"></div>';
+        return '<div class="srv-tl-c ' + k + (d === today ? ' today' : '') + wk(d) + '" style="grid-column:' + (i + 2) + ';grid-row:1/-1;" title="' + esc(tip) + '"></div>';
       }).join('');
       var bars = evs.map(function (ev) {
         var tip = ev.t + ' | ' + fd(days[ev.a]) + (ev.a !== ev.b ? ' – ' + fd(days[ev.b]) : '');
         return '<div class="srv-tl-bar' + (ev.leave ? ' leave' : '') + '" style="grid-column:' + (ev.a + 2) + '/' + (ev.b + 3) + ';grid-row:' + (ev.lane + 2) + ';'
           + (ev.leave ? '' : 'background:' + ev.color + ';') + '" title="' + esc(tip) + '" onclick="' + ev.click + '">' + esc(ev.t) + '</div>';
       }).join('');
-      return '<div class="srv-tl-row srv-tl-pr" style="' + cols + 'grid-template-rows:4px repeat(' + nl + ',28px) 4px;">'
-        + '<div class="srv-tl-l" style="grid-column:1;grid-row:1/-1;"><b>' + esc(staffShort(s.id)) + '</b><small>' + esc(s.name || '') + ' · ว่าง ' + nFree + ' วัน</small></div>'
+      return '<div class="srv-tl-row srv-tl-pr" style="' + cols + 'grid-template-rows:minmax(4px,1fr) repeat(' + nl + ',28px) minmax(4px,1fr);">'
+        + '<div class="srv-tl-l" style="grid-column:1;grid-row:1/-1;"><b>' + esc(staffShort(s.id)) + ' <small class="srv-tl-free">· ว่าง ' + nFree + ' วัน</small></b>'
+        + (s.name ? '<small title="' + esc(s.name) + '">' + esc(s.name) + '</small>' : '') + '</div>'
         + cells + bars + '</div>';
     }).join('');
     grid.innerHTML = '<div class="srv-tl">' + html + '</div>'

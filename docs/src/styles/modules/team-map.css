@@ -1,0 +1,131 @@
+/* ================================================================
+   TEAM-MAP.CSS — 🗺 แผนที่ทีม (src/modules/team-map.js)
+   แผงซ้ายใช้สีตามธีมระบบ · พื้นที่แผนที่เป็นโทนกลางคืนเสมอ (สีคงที่ทั้งโหมดสว่าง/มืด)
+================================================================ */
+
+#view-team-map {
+  --tm-ink: #0a1220;
+  --tm-ink2: rgba(15, 26, 44, .88);
+  --tm-line: #23334d;
+  --tm-fg: #e7edf6;
+  --tm-muted: #8b9cb6;
+  --tm-heat: #f5a524;
+}
+
+.tm-wrap { display: grid; grid-template-columns: minmax(250px, 300px) 1fr; gap: 16px; height: calc(100dvh - 120px); min-height: 560px; }
+.tm-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 14px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; min-width: 0; font-size: 12px; }
+.tm-panel > * { flex-shrink: 0; } /* แผงสูงคงที่ + เลื่อนได้ — ห้ามบีบส่วนย่อยจนหาย */
+.tm-main { display: flex; flex-direction: column; gap: 10px; min-width: 0; min-height: 0; }
+
+#tm-dept { width: 100%; }
+
+.tm-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.tm-kpis > div { background: var(--surface); padding: 8px 10px; }
+.tm-kpis b { display: block; font-size: 17px; font-weight: 700; color: var(--txt); font-variant-numeric: tabular-nums; line-height: 1.2; }
+.tm-kpis span { font-size: 11px; color: var(--txt2); }
+
+.tm-h2 { font-size: 11px; font-weight: 700; color: var(--txt2); margin-bottom: 8px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.tm-h2 small { font-weight: 400; color: var(--txt3); }
+.tm-mute { color: var(--txt2); }
+.tm-sm { font-size: 10px; }
+
+.tm-rbar { display: grid; grid-template-columns: 56px 1fr 36px; align-items: center; gap: 8px; font-size: 12px; color: var(--txt); margin-bottom: 4px; }
+.tm-track { height: 6px; background: var(--surface3); border-radius: 4px; overflow: hidden; }
+.tm-fill { height: 100%; background: var(--amber); border-radius: 4px; transition: width .4s ease; }
+.tm-v { text-align: right; font-size: 11px; color: var(--txt2); font-variant-numeric: tabular-nums; }
+
+.tm-staff { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.tm-staff li { display: grid; grid-template-columns: 9px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 5px 8px; line-height: 1.35; border-radius: 8px; cursor: pointer; border: 1px solid transparent; color: var(--txt); }
+.tm-staff li:hover { background: var(--surface2); }
+.tm-staff li.on { background: var(--surface2); border-color: var(--border); }
+.tm-staff li.off { opacity: .45; }
+.tm-staff li:focus-visible { outline: 2px solid var(--amber); outline-offset: 1px; }
+.tm-staff li.tm-empty { display: block; cursor: default; color: var(--txt3); font-size: 12px; text-align: center; padding: 16px; }
+.tm-dot { width: 9px; height: 9px; border-radius: 50%; }
+.tm-nm { font-weight: 700; font-size: 12.5px; }
+.tm-staff small { font-size: 10.5px; }
+.tm-st { display: block; font-size: 11px; color: var(--txt2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tm-meta { text-align: right; font-size: 10.5px; color: var(--txt2); line-height: 1.3; font-variant-numeric: tabular-nums; }
+.tm-meta b { color: var(--txt); }
+
+.tm-itin { border: 1px solid var(--border); border-radius: 10px; padding: 12px; background: var(--surface2); }
+.tm-itin ol { list-style: none; margin: 0; padding: 0; }
+.tm-itin li { display: grid; grid-template-columns: 14px 1fr; gap: 8px; padding: 4px 0; position: relative; font-size: 11px; line-height: 1.35; }
+.tm-itin li::before { content: ""; position: absolute; left: 6px; top: 18px; bottom: -6px; width: 2px; background: var(--border); }
+.tm-itin li:last-child::before { display: none; }
+.tm-pin { width: 14px; height: 14px; border-radius: 50%; border: 3px solid var(--c); background: var(--surface2); margin-top: 2px; z-index: 1; }
+.tm-pin.hq { border-color: var(--txt3); }
+.tm-h { font-weight: 600; font-size: 12px; color: var(--txt); }
+.tm-note { margin-top: auto; font-size: 10.5px; color: var(--txt3); border-top: 1px solid var(--border); padding-top: 10px; line-height: 1.6; }
+
+/* ── พื้นที่แผนที่ ── */
+.tm-stage { position: relative; flex: 1; min-height: 0; border-radius: var(--r); overflow: hidden; background: radial-gradient(120% 90% at 55% 40%, #13233b 0%, var(--tm-ink) 70%); color: var(--tm-fg); }
+.tm-canvas, .tm-labels { position: absolute; inset: 0; }
+.tm-canvas canvas { display: block; }
+.tm-labels { pointer-events: none; overflow: hidden; }
+.tm-loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--tm-muted); font-size: 14px; text-align: center; padding: 16px; }
+.tm-lbl { position: absolute; transform: translate(-50%, -100%); font-size: 10.5px; white-space: nowrap; color: var(--tm-fg); text-shadow: 0 1px 3px #000, 0 0 8px #000; font-weight: 500; padding-bottom: 4px; }
+.tm-lbl.tm-hq { color: var(--tm-muted); }
+.tm-lbl.tm-av { font-weight: 700; font-size: 11px; padding: 1px 7px; border-radius: 999px; color: #0a1220; text-shadow: none; transform: translate(-50%, -150%); }
+
+.tm-tip { position: absolute; z-index: 5; pointer-events: none; background: rgba(10, 18, 32, .96); border: 1px solid var(--tm-line); border-radius: 10px; padding: 10px 12px; font-size: 12px; max-width: 290px; box-shadow: 0 8px 24px rgba(0, 0, 0, .4); color: var(--tm-fg); }
+.tm-tip .tm-mute { color: var(--tm-muted); }
+.tm-tip-t { font-weight: 800; font-size: 15px; }
+.tm-tip-row { display: flex; gap: 6px; align-items: flex-start; padding: 2px 0; }
+.tm-tip-row i { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex: none; }
+
+.tm-legend { position: absolute; top: 12px; left: 12px; background: var(--tm-ink2); border: 1px solid var(--tm-line); border-radius: 10px; padding: 7px 10px; font-size: 10.5px; color: var(--tm-muted); display: flex; flex-direction: column; gap: 5px; }
+.tm-ramp { height: 6px; width: 130px; border-radius: 4px; background: linear-gradient(90deg, #26364d, var(--tm-heat)); }
+.tm-ends { display: flex; justify-content: space-between; width: 130px; font-variant-numeric: tabular-nums; }
+.tm-tools { position: absolute; top: 12px; right: 12px; display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; max-width: calc(100% - 200px); }
+.tm-chip { border: 1px solid var(--tm-line); background: var(--tm-ink2); color: var(--tm-fg); border-radius: 999px; padding: 3px 10px; font-size: 11px; cursor: pointer; }
+.tm-chip[aria-pressed="true"] { border-color: var(--tm-heat); color: var(--tm-heat); }
+.tm-dayplay { position: absolute; left: 12px; right: 12px; bottom: 12px; display: flex; align-items: center; gap: 12px; background: var(--tm-ink2); border: 1px solid var(--tm-line); border-radius: 12px; padding: 8px 12px; }
+.tm-play { width: 32px; height: 32px; flex: none; border-radius: 50%; border: none; background: var(--tm-heat); color: #1b1200; cursor: pointer; display: grid; place-items: center; font-size: 14px; }
+.tm-daylbl { font-weight: 700; font-size: 13px; min-width: 84px; font-variant-numeric: tabular-nums; }
+.tm-dayplay input { flex: 1; min-width: 0; accent-color: var(--tm-heat); }
+.tm-hint { font-size: 11px; color: var(--tm-muted); white-space: nowrap; }
+
+/* ── แถบเดือน ── */
+.tm-months { display: grid; grid-template-columns: 28px repeat(12, minmax(0, 1fr)) max-content 28px; gap: 4px; align-items: end; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 8px 10px; }
+.tm-mbtn { border: 1px solid transparent; background: none; border-radius: 8px; padding: 4px 2px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+.tm-mbtn:hover { background: var(--surface2); }
+.tm-mbtn.on { border-color: var(--border); background: var(--surface2); }
+.tm-bar { width: 60%; max-width: 30px; background: var(--border2); border-radius: 3px 3px 0 0; }
+.tm-mbtn.on .tm-bar { background: var(--amber); }
+.tm-ml { font-size: 10.5px; color: var(--txt2); white-space: nowrap; }
+.tm-mbtn.on .tm-ml { color: var(--txt); font-weight: 700; }
+.tm-now { font-size: 10px; color: var(--amber); height: 13px; line-height: 13px; }
+
+@media (max-width: 900px) {
+  .tm-wrap { grid-template-columns: 1fr; height: auto; min-height: 0; }
+  .tm-main { order: -1; }
+  .tm-stage { flex: none; height: 62vh; min-height: 380px; }
+  .tm-months { overflow-x: auto; grid-template-columns: 28px repeat(12, 54px) max-content 28px; }
+  .tm-legend, .tm-hint { display: none; }
+  .tm-tools { max-width: calc(100% - 24px); }
+}
+
+/* ── เต็มจอ (ปุ่ม เต็มจอ บนแผนที่) ── */
+.tm-wrap:fullscreen { height: 100vh; padding: 12px; background: var(--bg); }
+.tm-wrap.tm-full { position: fixed; inset: 0; z-index: 1000; height: 100%; min-height: 0; padding: 12px; padding-top: calc(12px + env(safe-area-inset-top, 0px)); background: var(--bg); overflow-y: auto; }
+.tm-chip i { font-size: 13px; vertical-align: -2px; }
+
+/* หัวกลุ่มแผนกในรายชื่อทีมงาน */
+.tm-staff li.tm-grp { display: flex; justify-content: space-between; cursor: default; padding: 8px 8px 3px; font-size: 11px; font-weight: 700; color: var(--txt2); border-bottom: 1px solid var(--border); border-radius: 0; margin-bottom: 2px; }
+.tm-staff li.tm-grp:hover { background: none; }
+.tm-staff li.tm-grp:not(:first-child) { margin-top: 6px; }
+.tm-staff li.tm-grp span { font-weight: 400; color: var(--txt3); }
+
+/* ปุ่ม ทั้งปี ท้ายแถบเดือน */
+.tm-ybtn { border-left: 1px solid var(--border); border-radius: 0 8px 8px 0; margin-left: 4px; padding-left: 6px; padding-right: 6px; }
+.tm-ybtn i { font-size: 22px; color: var(--txt3); line-height: 1; }
+.tm-ybtn.on i { color: var(--amber); }
+
+/* ปุ่มเลื่อนปี ‹ › สองข้างแถบเดือน */
+.tm-yarr { align-self: center; width: 28px; height: 28px; padding: 0; font-size: 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface2); color: var(--txt); cursor: pointer; display: grid; place-items: center; }
+.tm-yarr:hover { border-color: var(--amber); }
+
+/* ปุ่ม ดูทั้งทีม ในกล่องเส้นทางของคนที่เลือก */
+.tm-allbtn { margin-top: 8px; width: 100%; border: 1px solid var(--border); background: var(--surface); color: var(--txt); border-radius: 8px; padding: 5px 8px; font-size: 11.5px; cursor: pointer; }
+.tm-allbtn:hover { border-color: var(--amber); }

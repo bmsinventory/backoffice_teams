@@ -35,7 +35,7 @@ window.renderProjects=function(){
   }
   var fyf=document.getElementById('proj-fy');
   if(fyf&&fyf.options.length<=1){var fys=[...new Set(window.PROJECTS.map(p=>getYearBE(p.start)).filter(Boolean))].sort((a,b)=>b-a);fys.forEach(function(fy){var o=document.createElement('option');o.value=fy;o.textContent='ปี พ.ศ. '+fy;fyf.appendChild(o);});var _cbe=(new Date().getFullYear()+543).toString();if(!fyf.value||fyf.value==='')fyf.value=_cbe;}
-  window.msFilter('proj-type',window.PTYPES,{placeholder:'ทุกประเภท',onChange:window.renderProjects});
+  window.msFilter('proj-type',window.PTYPES,{placeholder:'ทุกประเภทโครงการ',onChange:window.renderProjects});
   var sf=document.getElementById('proj-stg');
   if(sf&&sf.options.length<=1){window.STAGES.forEach(function(s){var o=document.createElement('option');o.value=s.id;o.textContent=s.label;sf.appendChild(o);});}
   var grp=window.projGrpTab||'';
@@ -88,15 +88,16 @@ window.renderProjects=function(){
   window.STAFF.forEach(function(s){if(!staffIdx.has(s.id))staffIdx.set(s.id,s);});
   (window.PROJECTS||[]).forEach(function(rp){if(!projIdx.has(rp.id))projIdx.set(rp.id,rp);if(rp.groupId==='GRP17733355541904'&&rp.revisitRound==99)revDoneParents.add(rp.parentProjectId);});
   (window.CONTRACTS||[]).forEach(function(c){if(!ctIdx.has(c.id))ctIdx.set(c.id,c);});
-  tb.innerHTML=rows.map(function(p,i){
-    var sg=gS(p.stage);var pt=gT(p.typeId);var pg=gG(p.groupId);
+  var today=new Date();today.setHours(0,0,0,0);
+  var rowHtml=function(p,i){
+    var sg=gS(p.stage);var pg=gG(p.groupId);
     var pAdvs=advByPid.get(p.id)||[];
     var adv=pAdvs.find(function(a){return a.status!=='cleared';})||pAdvs[pAdvs.length-1];
     var advRdate=adv&&adv.rdate?fd(adv.rdate):'<span style="color:var(--txt3)">-</span>';
     var advDdate=adv&&adv.ddate?fd(adv.ddate):'<span style="color:var(--txt3)">-</span>';
     var advStat=adv?window.AFLW.find(function(x){return x.id===adv.status;}):null;
     var advStatHtml=advStat?`<span class="tag" style="background:${advStat.color}18;color:${advStat.color};font-size:10px;">${advStat.icon} ${advStat.label}</span>`:'<span style="color:var(--txt3)">—</span>';
-    var mems=(p.members||p.team.map(function(id){return{sid:id};})).map(function(m){return staffIdx.get(m.sid)||{name:'?',dept:''};});
+    var mems=window.sortByStaffRank(p.members||p.team.map(function(id){return{sid:id};})).map(function(m){return staffIdx.get(m.sid)||{name:'?',dept:''};});
     var nicknames=mems.map(function(m){return m.nickname||m.name.split(' ')[0];}).filter(Boolean).join(', ')||'<span style="color:var(--txt3)">ไม่มีทีม</span>';
     var pgHtml=pg?`<span class="tag" style="background:${pg.color}18;color:${pg.color};font-size:9px;padding:2px 6px">${esc(pg.label)}</span>`:'';
     var parentCells='';
@@ -115,20 +116,41 @@ window.renderProjects=function(){
     var _revEmpty=!_revBadge&&!p.revisit1&&!p.revisit2;
     var revisitCell=showRevisit?('<td'+(_revEmpty?' data-empty="1"':'')+' style="font-size:11px;color:var(--txt2);line-height:1.6">'+_revBadge+'📅 '+(p.revisit1?fd(p.revisit1):'<span style="color:var(--txt3)">-</span>')+'<br>📅 '+(p.revisit2?fd(p.revisit2):'<span style="color:var(--txt3)">-</span>')+'</td>'):'';
     var advCells=showAdv?`<td${adv?'':' data-empty="1"'} style="font-size:11px;color:var(--txt2);line-height:1.6">📅 ${advRdate}<br>⏰ ${advDdate}</td><td${adv?'':' data-empty="1"'}>${advStatHtml}</td>`:'';
+    // ระยะสัญญา: แถบเวลาที่ผ่านไป + เหลือ/เลย N วัน (เฉพาะโครงการที่ยังไม่ปิด)
+    var _periodHtml='';
+    if(p.start&&p.end&&p.progress<100){
+      var _ps=+pd(p.start),_pe=+pd(p.end),_now=+today;
+      var _pct=_pe>_ps?Math.max(0,Math.min(100,Math.round((_now-_ps)/(_pe-_ps)*100))):100;
+      var _dl=Math.round((_pe-_now)/864e5);
+      var _txt=_now<_ps?'เริ่มใน '+Math.round((_ps-_now)/864e5)+' วัน':_dl>=0?'เหลือ '+_dl+' วัน':'เลยกำหนด '+(-_dl)+' วัน';
+      var _col=_dl<0?'var(--coral)':_dl<=15?'var(--amber)':'var(--txt3)';
+      _periodHtml='<div class="proj-period"><span class="proj-period-bar"><span style="width:'+_pct+'%;background:'+(_dl<0?'var(--coral)':'var(--accent)')+'"></span></span><span style="color:'+_col+'">'+_txt+'</span></div>';
+    }
     var hasLinked=advByPid.has(p.id)||ldByPid.has(p.id);
     var _exLd=['GRP17733355541905','GRP17733355541906'];
     var ldStatusCell='<td data-empty="1" style="font-size:11px;color:var(--txt3);">—</td>';
     if(!_exLd.includes(p.groupId)){var _pLds=ldByPid.get(p.id)||[];if(!_pLds.length){ldStatusCell='<td data-empty="1" style="font-size:11px;color:var(--txt3);">—</td>';}else{var _appD=_pLds.some(function(l){return l.approvedDaily==='yes';});var _appM=_pLds.some(function(l){return l.approvedMonthly==='yes';});if(_appD&&_appM){ldStatusCell='<td><div style="display:flex;flex-direction:column;gap:2px;"><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:#4361ee18;color:var(--indigo);border:1px solid #4361ee30;white-space:nowrap;">✅ รายวัน</span><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:var(--coral)18;color:var(--coral);border:1px solid var(--coral)30;white-space:nowrap;">✅ รายเดือน</span></div></td>';}else if(_appD){ldStatusCell='<td><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:#4361ee18;color:var(--indigo);border:1px solid #4361ee30;white-space:nowrap;">✅ รายวัน</span></td>';}else if(_appM){ldStatusCell='<td><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:var(--coral)18;color:var(--coral);border:1px solid var(--coral)30;white-space:nowrap;">✅ รายเดือน</span></td>';}else{ldStatusCell='<td><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:var(--amber)18;color:var(--amber);border:1px solid var(--amber)30;white-space:nowrap;">⏳ รออนุมัติ</span></td>';}}}
 
     return`<tr class="fade" onclick="window.openProjModal('${p.id}')">
-      <td><div class="proj-title-line"><span class="proj-row-index" aria-label="ลำดับ ${i+1}">${i+1}</span><div class="proj-row-title">${esc(p.name)}</div></div>${p.siteOwner?`<div style="font-size:10px;color:var(--txt3);margin-top:2px;">🏢 ${esc(p.siteOwner)}</div>`:''}<div style="display:flex;align-items:center;gap:6px;margin-top:4px;">${pgHtml}<span class="tag" style="background:${pt.color}18;color:${pt.color};font-size:9px;padding:2px 6px">${esc(pt.label)}</span><span class="tag" style="background:${sg.color}18;color:${sg.color};font-size:9px;padding:2px 6px">${sg.label}</span><span style="font-size:10px;font-weight:700;color:${sg.color}">${p.progress}%</span></div><div style="font-size:11px;color:var(--violet);margin-top:6px;font-weight:600;">👥 ${nicknames}</div>${p.note?`<div style="font-size:11px;color:var(--amber);margin-top:4px;">⚠ ${esc(p.note)}</div>`:''}${_ctInfo}</td>
+      <td><div class="proj-title-line"><span class="proj-row-index" aria-label="ลำดับ ${i+1}">${i+1}</span><div class="proj-row-title">${esc(p.name)}</div></div>${p.siteOwner?`<div style="font-size:10px;color:var(--txt3);margin-top:2px;">🏢 ${esc(p.siteOwner)}</div>`:''}<div style="display:flex;align-items:center;gap:6px;margin-top:4px;">${pgHtml}<span class="tag" style="background:${sg.color}18;color:${sg.color};font-size:9px;padding:2px 6px">${sg.label}</span><span style="font-size:10px;font-weight:700;color:${sg.color}">${p.progress}%</span></div><div style="font-size:11px;color:var(--violet);margin-top:6px;font-weight:600;">👥 ${nicknames}</div>${p.note?`<div style="font-size:11px;color:var(--amber);margin-top:4px;">⚠ ${esc(p.note)}</div>`:''}${_ctInfo}</td>
       ${parentCells}
-      <td style="font-size:11px;color:var(--txt2);line-height:1.6">📅 ${p.start?fd(p.start):'<span style="color:var(--txt3)">-</span>'}<br>⏰ ${p.end?fd(p.end):'<span style="color:var(--txt3)">-</span>'}</td>
+      <td style="font-size:11px;color:var(--txt2);line-height:1.6">📅 ${p.start?fd(p.start):'<span style="color:var(--txt3)">-</span>'}<br>⏰ ${p.end?fd(p.end):'<span style="color:var(--txt3)">-</span>'}${_periodHtml}</td>
       ${revisitCell}
       ${advCells}
       ${ldStatusCell}
       <td onclick="event.stopPropagation()"><div style="display:flex;gap:4px">${window.canDel('projects')&&!hasLinked?`<button class="btn btn-red btn-sm" onclick="window.askDel('project','${p.id}','${esc(p.name)}')">🗑</button>`:''}</div></td>
     </tr>`;
+  };
+  // จัดกลุ่มตามประเภทโครงการ (PTYPES) — เรียงตามลำดับประเภท, ไม่ระบุประเภทไว้ท้าย · ภายในกลุ่มคงลำดับตามตัวเรียง
+  var tyOrder=new Map();window.PTYPES.forEach(function(t,i){tyOrder.set(t.id,i);});
+  var byType=new Map();
+  rows.forEach(function(p){var k=tyOrder.has(p.typeId)?p.typeId:'';var l=byType.get(k);if(!l){l=[];byType.set(k,l);}l.push(p);});
+  var tyKeys=[...byType.keys()].sort(function(a,b){return(a===''?1e9:tyOrder.get(a))-(b===''?1e9:tyOrder.get(b));});
+  var no=0;
+  tb.innerHTML=tyKeys.map(function(k){
+    var t=k?gT(k):{label:'ไม่ระบุประเภท',color:'#9ba3b8'};var list=byType.get(k);
+    return`<tr class="proj-grp-head"><td colspan="${colSpan}"><div class="proj-grp-title"><span class="proj-grp-bar" style="background:${t.color}"></span>${esc(t.label)}<span class="proj-grp-cnt">${list.length} โครงการ</span></div></td></tr>`
+      +list.map(function(p){return rowHtml(p,no++);}).join('');
   }).join('');
   if(!rows.length)tb.innerHTML=`<tr><td colspan="${colSpan}" style="text-align:center;padding:48px;color:var(--txt3);">ไม่พบข้อมูล</td></tr>`;
 }
@@ -284,7 +306,7 @@ window.openProjModal=function(id){
   window.editPid=id;
   var p=id?window.PROJECTS.find(function(x){return x.id===id;}):null;
   document.getElementById('m-proj-title').textContent=p?'แก้ไขโครงการ':'เพิ่มโครงการใหม่';
-  var mems=p?(p.members||p.team.map(function(tid){return{id:'M'+uid(),sid:tid,s:p.start,e:p.end};})):[];
+  var mems=p?window.sortByStaffRank(p.members||p.team.map(function(tid){return{id:'M'+uid(),sid:tid,s:p.start,e:p.end};})):[];
   var grpOpts='<option value="">-- ไม่ระบุกลุ่ม --</option>'+window.PGROUPS.map(function(g){return`<option value="${g.id}"${p&&p.groupId===g.id?' selected':''}>${esc(g.label)}</option>`;}).join('');
   var typOpts='<option value="">-- เลือกประเภท --</option>'+window.PTYPES.map(function(t){return`<option value="${t.id}"${p&&p.typeId===t.id?' selected':''}>${t.label}</option>`;}).join('');
   var staffSorted=window.STAFF.filter(function(s){return s.active!==false;}).sort(window.sortStaffByDeptRank);
@@ -443,7 +465,7 @@ window.pkuSelect=function(sid){
     +window.beDateField('me-'+mid,edt,{onchange:"window.checkMemOverlap('"+mid+"')",dispStyle:'padding:4px 6px;font-size:10px;'})
     +'</div>'
     +'<div id="mwarn-'+mid+'" style="font-size:10px;margin-top:3px;padding-left:33px;display:'+(combinedWarn?'block':'none')+'">'+combinedWarn+'</div>';
-  list.appendChild(div);
+  window.insertByStaffRank(list,div);
   // Dim item in left panel
   var avItem=document.querySelector('#pku-avail .pku-avail-item[data-sid="'+sid+'"]');
   if(avItem){avItem.style.opacity='0.35';avItem.style.pointerEvents='none';var plus=avItem.querySelector('span:last-child');if(plus)plus.textContent='✓';}
@@ -894,7 +916,7 @@ window.buildVisitsSection = function(p) {
     p.visits.forEach(function(v,i){
       var stColor={'planned':'var(--amber)','ongoing':'var(--violet)','done':'var(--teal)'}[v.status]||'var(--txt3)';
       var stLabel={'planned':'วางแผน','ongoing':'กำลังดำเนินการ','done':'เสร็จแล้ว'}[v.status]||v.status;
-      var team=window._vtMembers(v.team||[],v.start,v.end).map(function(m){var s=window.STAFF.find(function(x){return x.id===m.sid;});return s?s.nickname||s.name.split(' ')[0]:'';}).filter(Boolean).join(', ');
+      var team=window.sortByStaffRank(window._vtMembers(v.team||[],v.start,v.end)).map(function(m){var s=window.STAFF.find(function(x){return x.id===m.sid;});return s?s.nickname||s.name.split(' ')[0]:'';}).filter(Boolean).join(', ');
       html+=`<div style="background:var(--surface2);border-radius:10px;padding:12px 14px;border-left:3px solid ${stColor}">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
           <span style="font-size:12px;font-weight:600;color:var(--txt)">รอบที่ ${i+1}${v.purpose?' — '+esc(v.purpose):''}</span>
@@ -926,7 +948,7 @@ window.buildVisitsSection = function(p) {
 window._buildVisitRow = function(v, no) {
   var vid = v?v.id:('V'+Date.now()+(window._visitCounter++));
   // normalize team to [{sid,s,e}]
-  var preSel = window._vtMembers(v&&v.team||[], v&&v.start||'', v&&v.end||'');
+  var preSel = window.sortByStaffRank(window._vtMembers(v&&v.team||[], v&&v.start||'', v&&v.end||''));
   var preSelIds = preSel.map(function(m){ return m.sid; });
   // build available staff list
   var staffSorted=window.STAFF.filter(function(s){return s.active!==false;}).sort(window.sortStaffByDeptRank);
@@ -1032,7 +1054,7 @@ window.vtPkuAdd=function(vid,sid){
     +'<span style="color:var(--txt3);font-size:9px;flex-shrink:0;">→</span>'
     +window.beDateField('',ve,{inputCls:'v-mem-e',oninput:"this.closest('.v-team-tag').setAttribute('data-e',this.value)",wrapStyle:'flex:1;min-width:0',dispStyle:'padding:2px 4px;font-size:9px;height:22px;'})
   +'</div>';
-  selBox.appendChild(tag);
+  window.insertByStaffRank(selBox,tag);
   var avItem=document.querySelector('#vt-avail-'+vid+' .vt-avail-item[data-sid="'+sid+'"]');
   if(avItem){avItem.style.opacity='0.3';avItem.style.pointerEvents='none';avItem.querySelector('span:last-child').textContent='✓';}
   var cnt=document.getElementById('vt-cnt-'+vid);if(cnt){var n=selBox.querySelectorAll('.v-team-tag').length;cnt.textContent=n>0?'('+n+')':'';}

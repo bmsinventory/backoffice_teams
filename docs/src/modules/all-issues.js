@@ -455,7 +455,7 @@
 
     // ── กันเข้าถึงตรงในฟังก์ชัน render เอง — เผื่อกรณี URL hash ตรงเข้ามาโดยไม่ผ่าน goView ──
     if (window.canView && !window.canView('all_issues')) {
-      mount.innerHTML = '<div class="aio-guard">🔒 Role ของคุณยังไม่ได้รับสิทธิ์ดูหน้านี้ (ติดต่อ Admin)</div>';
+      mount.innerHTML = '<div class="aio-guard">🔒 กลุ่มสิทธิ์ของคุณยังไม่ได้รับสิทธิ์ดูหน้านี้ (ติดต่อ Admin)</div>';
       return;
     }
 

@@ -208,7 +208,7 @@ window.renderAvailability = function() {
   var _avPre = _availPre(pd(startStr), _avE);
   var results = staffList.map(function(s, i) {
     return { s:s, i:i, info:_calcAvailability(s.id, startStr, endStr, _avPre) };
-  }).sort(function(a, b) { return b.info.freeDays - a.info.freeDays; });
+  }); // คงลำดับตำแหน่งจาก STAFF — แบ่งกลุ่ม ว่างทั้งช่วง/บางส่วน/ไม่ว่าง ด้านล่าง
 
   var fullyFree = results.filter(function(r) { return r.info.freeDays > 0 && r.info.freeDays === r.info.totalDays; });
   var partial   = results.filter(function(r) { return r.info.freeDays > 0 && r.info.freeDays < r.info.totalDays; });

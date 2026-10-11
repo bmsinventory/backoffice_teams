@@ -4,7 +4,7 @@ const { esc, fc, uid, getColRef, getDocRef } = window;
 window.HOSPITALS = window.HOSPITALS || [];
 
 // ── MOPH HCODE API ─────────────────────────────────────────────────────────
-const HCODE_BASE        = 'https://hcode.moph.go.th/api';
+const HCODE_BASE        = '/api/hcode'; // ผ่าน backend (nginx.conf) → https://hcode.moph.go.th/api
 const HCODE_TOKEN_KEY   = 'hcode_access';
 const HCODE_EXPIRY_KEY  = 'hcode_expiry';
 const HCODE_REFRESH_KEY = 'hcode_refresh';
@@ -152,7 +152,7 @@ window.hspApiLogin = async function() {
 
   } catch(e) {
     if (e.name === 'TypeError' && e.message.toLowerCase().includes('fetch')) {
-      showErr('เชื่อมต่อไม่ได้ (Network error / CORS) — ตรวจสอบว่า browser อนุญาต cross-origin request ไปยัง hcode.moph.go.th');
+      showErr('เชื่อมต่อไม่ได้ — เซิร์ฟเวอร์ติดต่อ hcode.moph.go.th ไม่ได้ ลองใหม่อีกครั้ง');
     } else {
       showErr(e.message);
     }
@@ -616,7 +616,7 @@ window._hspBuildProdMulti = function() {
     'border-radius:10px;padding:7px 12px;font-size:12px;font-family:inherit;cursor:pointer;' +
     'display:flex;align-items:center;gap:6px;white-space:nowrap;transition:all .2s;min-height:36px;">' +
     btnLabel + '<span style="font-size:10px;color:var(--txt-muted);">▾</span></button>' +
-    '<div id="hsp-prod-panel" style="display:none;position:absolute;top:calc(100% + 4px);right:0;min-width:240px;max-height:310px;overflow-y:auto;' +
+    '<div id="hsp-prod-panel" style="display:none;position:absolute;top:calc(100% + 4px);left:0;min-width:240px;max-height:310px;overflow-y:auto;' +
     'background:var(--surface);border:1px solid var(--border);border-radius:12px;' +
     'box-shadow:0 4px 24px rgba(0,0,0,.14);z-index:999;padding:6px;">' +
     panelHtml + '</div>';
@@ -701,9 +701,12 @@ function _hspFiltered() {
   var typ  = document.getElementById('hsp-type')?.value || '';
   var selectedProds = window._hspSelectedProds || [];
   var prodUsage = document.getElementById('hsp-prod-usage-filter')?.value || '';
+  var geo  = document.getElementById('hsp-geo-filter')?.value || '';
 
   return (window.HOSPITALS || []).filter(h => {
     if (prov && h.province !== prov) return false;
+    if (geo === 'has'  && !_hspHasGeo(h)) return false;
+    if (geo === 'none' &&  _hspHasGeo(h)) return false;
     if (dist && h.district !== dist) return false;
     if (typ  && h.type    !== typ)   return false;
     if (selectedProds.length) {
@@ -774,6 +777,9 @@ window.renderHospital = function() {
       '<span style="font-family:var(--mono);color:var(--primary);font-size:12px;font-weight:700;">' + esc(h.code||'—') + '</span>' +
       '<span style="font-weight:700;color:var(--txt);font-size:13px;flex:1;min-width:140px;">' + esc(h.name) + '</span>' +
       (locStr ? '<span class="hsp-card-loc" style="font-size:11px;color:var(--txt-muted);white-space:nowrap;">' + locStr + '</span>' : '') +
+      (_hspHasGeo(h)
+        ? '<a href="' + _hspMapsUrl(h.lat, h.lng) + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="มีพิกัดแล้ว ' + h.lat + ', ' + h.lng + ' — เปิดใน Google Maps" style="background:#06d6a022;color:#06d6a0;padding:2px 8px;border-radius:7px;font-size:11px;font-weight:700;white-space:nowrap;text-decoration:none;">📍 มีพิกัด</a>'
+        : '<span title="ยังไม่มีพิกัด — แผนที่ทีมจะวางหมุดไว้กลางจังหวัด" style="background:var(--bg);border:1px dashed var(--border);color:var(--txt-muted);padding:1px 8px;border-radius:7px;font-size:11px;white-space:nowrap;">ไม่มีพิกัด</span>') +
       editBtns +
       '</div>';
 
@@ -884,8 +890,8 @@ var HSP_SUMMARY_PAGE_SIZE = 40;
 function _hspHasContactInfo(h) {
   if ((h.contacts || []).length) return true;
   var sys = h.systems || {};
-  var hasAnydesk = (sys.anydesk  || []).some(function(a) { return a.label || a.ip || a.password; });
-  var hasDb      = (sys.database || []).some(function(d) { return d.label || d.ip || d.database || d.user || d.password; });
+  var hasAnydesk = (sys.anydesk  || []).some(function(a) { return a.label || a.ip || _hspHasPw(a); });
+  var hasDb      = (sys.database || []).some(function(d) { return d.label || d.ip || d.database || d.user || _hspHasPw(d); });
   var hasCfg     = (sys.config   || []).some(function(c) { return c.label || c.hosxp || c.inv; });
   return hasAnydesk || hasDb || hasCfg;
 }
@@ -940,7 +946,7 @@ window.renderHspSummary = function() {
       '</div>' + _hspContactsHtmlCompact(cs) + '</div>' +
       '<div style="padding:8px 14px;">' +
       '<div style="font-size:10px;font-weight:700;color:var(--txt-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;">🖥️ ระบบ / Anydesk</div>' +
-      _hspSystemsHtmlCompact(h.systems) + '</div>' +
+      _hspSystemsHtmlCompact(h.systems, h.id) + '</div>' +
       '</div>';
 
     var clickable = canEdit ? ' onclick="window.openHospitalModal(\'' + esc(h.id) + '\')" style="cursor:pointer;"' : '';
@@ -1037,6 +1043,7 @@ window.openHospitalDetail = function(id) {
       ${_detailRow('🌐', 'Website', h.website)}
     </div>
     ${fullAddr ? `<div style="margin-top:12px;padding:10px 12px;background:var(--bg);border-radius:8px;font-size:12px;color:var(--txt-muted);"><b>📮 ที่อยู่:</b> ${esc(fullAddr)}</div>` : ''}
+    ${h.lat != null && h.lng != null ? `<div style="margin-top:10px;padding:10px 12px;background:var(--bg);border-radius:8px;font-size:12px;color:var(--txt-muted);display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><b>🗺 พิกัด:</b> <span style="font-family:var(--mono);">${h.lat}, ${h.lng}</span><a href="${_hspMapsUrl(h.lat, h.lng)}" target="_blank" rel="noopener" style="color:var(--primary);margin-left:auto;">เปิดใน Google Maps ↗</a></div>` : ''}
     ${h.note ? `<div style="margin-top:10px;padding:10px 12px;background:var(--warn)11;border-radius:8px;font-size:12px;color:var(--txt-muted);"><b>หมายเหตุ:</b> ${esc(h.note)}</div>` : ''}`;
 
   // ── Panel: ผู้ติดต่อ ──
@@ -1048,7 +1055,7 @@ window.openHospitalDetail = function(id) {
   var dbRows  = sysObj.database || [];
   var cfgRows = sysObj.config   || [];
 
-  document.getElementById('m-hsp-detail-panel-systems').innerHTML = _hspSystemsHtml(sysObj);
+  document.getElementById('m-hsp-detail-panel-systems').innerHTML = _hspSystemsHtml(sysObj, h.id);
 
   // ── Panel: Product ──
   var prodPanel = document.getElementById('m-hsp-detail-panel-products');
@@ -1113,22 +1120,54 @@ function _detailRow(icon, label, val) {
   </div>`;
 }
 
-function _detailPwRow(icon, label, val) {
-  if (!val) return '';
+// ── รหัสผ่านระบบของ รพ. (Anydesk/Database) — ฐานข้อมูลเก็บแบบเข้ารหัส (hospital_secrets ใน db-schema.sql)
+// ข้อมูล รพ. ที่โหลดมามีแค่ sid + has_pw · กด 👁 = ขอจากฐานข้อมูล (bo_hospital_secrets: ต้องมีสิทธิ์ดูเมนูนี้
+// ลงบันทึกทุกครั้ง) · จำไว้ 5 นาทีต่อ รพ. ไม่ขอซ้ำทุกครั้งที่กด ──
+var _hspSecretCache = {};
+function _hspHasPw(e) { return !!(e && (e.has_pw || e.password)); }
+function _hspSecrets(hid) {
+  var c = _hspSecretCache[hid];
+  if (c && Date.now() - c.at < 300000) return c.p;
+  var p = window.getDb().rpc('bo_hospital_secrets', { p_token: window.BmsSession.token(), p_hospital_id: hid })
+    .then(function(r) { if (r.error) throw r.error; return r.data || {}; });
+  _hspSecretCache[hid] = { at: Date.now(), p: p };
+  p.catch(function() { delete _hspSecretCache[hid]; });
+  return p;
+}
+async function _hspSecretOf(hid, e) {
+  if (e.password) return e.password; // ข้อมูลที่ยังไม่ได้ย้ายเข้าฐานข้อมูลแบบเข้ารหัส
+  var all = await _hspSecrets(hid);
+  return all[e.sid] || '';
+}
+
+function _detailPwRow(icon, label, hid, e) {
+  if (!_hspHasPw(e)) return '';
   var id = 'hsp-pw-' + Math.random().toString(36).slice(2, 9);
   return `<div style="background:var(--bg);border-radius:8px;padding:10px 12px;">
     <div style="font-size:10px;color:var(--txt-muted);margin-bottom:2px;">${icon} ${label}</div>
     <div style="display:flex;align-items:center;gap:8px;">
-      <span id="${id}" data-val="${esc(String(val))}" style="font-size:13px;color:var(--txt);font-weight:500;font-family:var(--mono);">••••••••</span>
+      <span id="${id}" data-hid="${esc(hid || '')}" data-sid="${esc(e.sid || '')}" data-val="${esc(e.password || '')}" style="font-size:13px;color:var(--txt);font-weight:500;font-family:var(--mono);">••••••••</span>
       <button type="button" onclick="event.stopPropagation();window._hspToggleReveal('${id}')" style="background:none;border:none;cursor:pointer;font-size:13px;padding:0;">👁</button>
     </div>
   </div>`;
 }
 
-window._hspToggleReveal = function(id) {
+// span: data-hid / data-sid = รายการไหน · ข้อความตอนซ่อน = จุดตามที่วาดไว้ครั้งแรก (จำไว้ใน data-mask)
+window._hspToggleReveal = async function(id) {
   var el = document.getElementById(id);
-  if (!el) return;
-  el.textContent = el.textContent.indexOf('•') > -1 ? el.dataset.val : '••••••••';
+  if (!el || el.dataset.busy) return;
+  if (!el.dataset.mask) el.dataset.mask = el.textContent;
+  if (el.dataset.shown) { el.textContent = el.dataset.mask; delete el.dataset.shown; return; }
+  el.dataset.busy = '1';
+  el.textContent = '…';
+  try {
+    var pw = await _hspSecretOf(el.dataset.hid, { sid: el.dataset.sid, password: el.dataset.val });
+    el.textContent = pw || '(ไม่มีรหัสผ่าน)';
+    el.dataset.shown = '1';
+  } catch (err) {
+    el.textContent = el.dataset.mask;
+    window.showAlert('เปิดดูรหัสผ่านไม่สำเร็จ: ' + (err.message || err), 'warn');
+  } finally { delete el.dataset.busy; }
 };
 
 // ── ผู้ติดต่อ + ระบบ/Anydesk แบบ read-only (ใช้ร่วมกันทั้ง Detail popup และแถบสรุปข้อมูล) ──
@@ -1152,7 +1191,7 @@ function _hspContactsHtml(cs) {
     `</div>`;
 }
 
-function _hspSystemsHtml(sysObj) {
+function _hspSystemsHtml(sysObj, hid) {
   sysObj = sysObj || {};
   var adRows  = sysObj.anydesk  || [];
   var dbRows  = sysObj.database || [];
@@ -1166,7 +1205,7 @@ function _hspSystemsHtml(sysObj) {
           ${a.label ? `<div style="font-size:13px;font-weight:700;color:var(--txt);margin-bottom:6px;">${esc(a.label)}</div>` : ''}
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
             ${_detailRow('🖥️', 'IP', a.ip)}
-            ${_detailPwRow('🔑', 'Password', a.password)}
+            ${_detailPwRow('🔑', 'Password', hid, a)}
           </div>
         </div>`;
       }).join('') + '</div>'
@@ -1181,7 +1220,7 @@ function _hspSystemsHtml(sysObj) {
             ${_detailRow('🗄️', 'IP Server', d.ip)}
             ${_detailRow('💾', 'Database', d.database)}
             ${_detailRow('👤', 'User', d.user)}
-            ${_detailPwRow('🔑', 'Password', d.password)}
+            ${_detailPwRow('🔑', 'Password', hid, d)}
           </div>
         </div>`;
       }).join('') + '</div>'
@@ -1204,10 +1243,10 @@ function _hspSystemsHtml(sysObj) {
 }
 
 // ── เวอร์ชันย่อ (การ์ดในแถบสรุปข้อมูล — เน้นประหยัดพื้นที่ ดูได้หลาย รพ. ในหน้าจอเดียว) ──
-function _hspCompactPw(val) {
-  if (!val) return '—';
+function _hspCompactPw(hid, e) {
+  if (!_hspHasPw(e)) return '—';
   var id = 'hsp-cpw-' + Math.random().toString(36).slice(2, 9);
-  return '<span id="' + id + '" data-val="' + esc(String(val)) + '" style="font-family:var(--mono);">••••••</span>' +
+  return '<span id="' + id + '" data-hid="' + esc(hid || '') + '" data-sid="' + esc(e.sid || '') + '" data-val="' + esc(e.password || '') + '" style="font-family:var(--mono);">••••••</span>' +
     ' <button type="button" onclick="event.stopPropagation();window._hspToggleReveal(\'' + id + '\')" style="background:none;border:none;cursor:pointer;font-size:11px;padding:0;vertical-align:middle;">👁</button>';
 }
 
@@ -1225,7 +1264,7 @@ function _hspContactsHtmlCompact(cs) {
   }).join('');
 }
 
-function _hspSystemsHtmlCompact(sysObj) {
+function _hspSystemsHtmlCompact(sysObj, hid) {
   sysObj = sysObj || {};
   var adRows  = sysObj.anydesk  || [];
   var dbRows  = sysObj.database || [];
@@ -1234,18 +1273,18 @@ function _hspSystemsHtmlCompact(sysObj) {
 
   var parts = [];
   adRows.forEach(function(a) {
-    if (!a.label && !a.ip && !a.password) return;
-    var fields = [a.ip ? '🌐 ' + esc(a.ip) : '', '🔑 ' + _hspCompactPw(a.password)].filter(Boolean).join('&nbsp;&nbsp;&nbsp;');
+    if (!a.label && !a.ip && !_hspHasPw(a)) return;
+    var fields = [a.ip ? '🌐 ' + esc(a.ip) : '', '🔑 ' + _hspCompactPw(hid, a)].filter(Boolean).join('&nbsp;&nbsp;&nbsp;');
     parts.push('<div style="' + lineStyle + '"><b>🖥️ ' + esc(a.label || 'Anydesk') + '</b>' +
       '<div style="color:var(--txt-muted);margin-top:1px;">' + fields + '</div></div>');
   });
   dbRows.forEach(function(d) {
-    if (!d.label && !d.ip && !d.database && !d.user && !d.password) return;
+    if (!d.label && !d.ip && !d.database && !d.user && !_hspHasPw(d)) return;
     var fields = [
       d.ip       ? '🖥️ ' + esc(d.ip)       : '',
       d.database ? '💾 ' + esc(d.database) : '',
       d.user     ? '👤 ' + esc(d.user)     : '',
-      '🔑 ' + _hspCompactPw(d.password),
+      '🔑 ' + _hspCompactPw(hid, d),
     ].filter(Boolean).join('&nbsp;&nbsp;&nbsp;');
     parts.push('<div style="' + lineStyle + '"><b>🗄️ ' + esc(d.label || 'Database') + '</b>' +
       '<div style="color:var(--txt-muted);margin-top:1px;">' + fields + '</div></div>');
@@ -1345,18 +1384,45 @@ function _hspUpdateSystemBadge() {
   badge.style.display = count ? '' : 'none';
 }
 
-window._hspTogglePw = function(btn) {
+// ช่องรหัสผ่านที่มีรหัสเก็บไว้แล้ว (data-pending) — กด 👁 ครั้งแรก = ขอรหัสจริงจากฐานข้อมูลมาใส่ช่อง · พิมพ์ทับ = ตั้งรหัสใหม่
+window._hspTogglePw = async function(btn) {
   var inp = btn.previousElementSibling;
-  if (!inp) return;
+  if (!inp || btn.disabled) return;
+  if (inp.dataset.pending) {
+    btn.disabled = true;
+    try {
+      var row = inp.closest('[data-sid]');
+      inp.value = await _hspSecretOf(document.getElementById('m-hsp-id').value, { sid: row && row.dataset.sid });
+      delete inp.dataset.pending;
+      inp.placeholder = inp.dataset.ph || '';
+    } catch (err) {
+      window.showAlert('เปิดดูรหัสผ่านไม่สำเร็จ: ' + (err.message || err), 'warn');
+      return;
+    } finally { btn.disabled = false; }
+  }
   inp.type = inp.type === 'password' ? 'text' : 'password';
   btn.textContent = inp.type === 'password' ? '👁' : '🙈';
 };
 
-function _hspPwField(placeholder, cf, val) {
+function _hspPwField(placeholder, cf, e) {
+  var pending = !!(e && e.has_pw && !e.password);
   return '<div style="position:relative;">' +
-    '<input class="f-input" placeholder="' + placeholder + '" type="password" data-cf="' + cf + '" value="' + esc(val||'') + '" style="margin:0;padding-right:32px;">' +
+    '<input class="f-input" placeholder="' + (pending ? '•••••••• (กด 👁 เพื่อดู)' : placeholder) + '" data-ph="' + placeholder + '" type="password" data-cf="' + cf + '"' +
+      (pending ? ' data-pending="1" oninput="delete this.dataset.pending"' : '') + ' value="' + esc((e && e.password) || '') + '" style="margin:0;padding-right:32px;">' +
     '<button type="button" onclick="window._hspTogglePw(this)" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:14px;">👁</button>' +
   '</div>';
+}
+
+// รหัสประจำรายการ (sid) — สร้างที่หน้าจอสำหรับรายการใหม่ เพื่อให้ตรงกับฐานข้อมูลตั้งแต่บันทึกครั้งแรก
+function _hspNewSid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+// รหัสผ่านของแถวในฟอร์ม → e.password เฉพาะที่เปิดดู/พิมพ์แล้ว · ยังไม่เปิด = ไม่ส่งรหัส (ฐานข้อมูลคงรหัสเดิม)
+function _hspPwCollect(row, e) {
+  var inp = row.querySelector('[data-cf="password"]');
+  e.sid = row.dataset.sid;
+  if (inp.dataset.pending) e.has_pw = true;
+  else e.password = (inp.value || '').trim();
+  return e;
 }
 
 // -- Anydesk --
@@ -1368,12 +1434,13 @@ window._hspAddAnydesk = function(a) {
 
   var row = document.createElement('div');
   row.className = 'hsp-anydesk-row';
+  row.dataset.sid = (a && a.sid) || _hspNewSid();
   row.style.cssText = 'background:var(--bg);border-radius:8px;padding:10px 12px;margin-bottom:8px;border:1px solid var(--border);';
   row.innerHTML =
     '<div class="m-2col" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;align-items:start;">' +
       '<input class="f-input" placeholder="ชื่อเครื่อง/หมายเหตุ" data-cf="label" value="' + esc(a?.label||'') + '" style="margin:0;">' +
       '<input class="f-input" placeholder="Anydesk IP" data-cf="ip" value="' + esc(a?.ip||'') + '" style="margin:0;">' +
-      _hspPwField('Anydesk Password', 'password', a?.password) +
+      _hspPwField('Anydesk Password', 'password', a) +
     '</div>' +
     '<div style="text-align:right;margin-top:8px;">' +
       '<button type="button" class="btn btn-ghost btn-sm" onclick="window._hspRemoveAnydesk(this)" style="color:var(--coral);font-size:11px;">🗑 ลบ</button>' +
@@ -1396,8 +1463,8 @@ function _hspGetAnydesk() {
   document.querySelectorAll('#hsp-anydesk-list .hsp-anydesk-row').forEach(function(row) {
     var label    = (row.querySelector('[data-cf="label"]').value    || '').trim();
     var ip       = (row.querySelector('[data-cf="ip"]').value       || '').trim();
-    var password = (row.querySelector('[data-cf="password"]').value || '').trim();
-    if (label || ip || password) out.push({ label, ip, password });
+    var e = _hspPwCollect(row, { label, ip });
+    if (label || ip || e.password || e.has_pw) out.push(e);
   });
   return out;
 }
@@ -1411,6 +1478,7 @@ window._hspAddDb = function(d) {
 
   var row = document.createElement('div');
   row.className = 'hsp-db-row';
+  row.dataset.sid = (d && d.sid) || _hspNewSid();
   row.style.cssText = 'background:var(--bg);border-radius:8px;padding:10px 12px;margin-bottom:8px;border:1px solid var(--border);';
   row.innerHTML =
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">' +
@@ -1418,7 +1486,7 @@ window._hspAddDb = function(d) {
       '<input class="f-input" placeholder="IP Server" data-cf="ip" value="' + esc(d?.ip||'') + '" style="margin:0;">' +
       '<input class="f-input" placeholder="Database" data-cf="database" value="' + esc(d?.database||'') + '" style="margin:0;">' +
       '<input class="f-input" placeholder="User" data-cf="user" value="' + esc(d?.user||'') + '" style="margin:0;">' +
-      _hspPwField('Password', 'password', d?.password) +
+      _hspPwField('Password', 'password', d) +
     '</div>' +
     '<div style="text-align:right;">' +
       '<button type="button" class="btn btn-ghost btn-sm" onclick="window._hspRemoveDb(this)" style="color:var(--coral);font-size:11px;">🗑 ลบ</button>' +
@@ -1443,8 +1511,7 @@ function _hspGetDb() {
     var ip       = (row.querySelector('[data-cf="ip"]').value       || '').trim();
     var database = (row.querySelector('[data-cf="database"]').value || '').trim();
     var user     = (row.querySelector('[data-cf="user"]').value     || '').trim();
-    var password = (row.querySelector('[data-cf="password"]').value || '').trim();
-    if (label || ip || database) out.push({ label, ip, database, user, password });
+    if (label || ip || database) out.push(_hspPwCollect(row, { label, ip, database, user }));
   });
   return out;
 }
@@ -1529,8 +1596,10 @@ window.openHospitalModal = function(id) {
   document.getElementById('m-hsp-website').value     = h?.website || '';
   document.getElementById('m-hsp-affiliation').value = h?.affiliation || '';
   document.getElementById('m-hsp-note').value        = h?.note || '';
+  document.getElementById('m-hsp-geo').value         = h && h.lat != null && h.lng != null ? h.lat + ', ' + h.lng : '';
+  window._hspGeoInput();
 
-  // ── ผู้ติดต่อ ────────────────────────────────────────────────────────────
+  // ── ผู้ติดต่อ────────────────────────────────────────────────────────────
   var cl = document.getElementById('hsp-contacts-list');
   var ce = document.getElementById('hsp-contacts-empty');
   if (cl) cl.innerHTML = '';
@@ -1636,6 +1705,14 @@ window.saveHospital = async function() {
   var dup = (window.HOSPITALS || []).find(function(h) { return h.code === code && h.id !== id; });
   if (dup) { window.showAlert('รหัส ' + code + ' มีอยู่แล้ว (' + dup.name + ')', 'warn'); return; }
 
+  var geoRaw = document.getElementById('m-hsp-geo').value.trim();
+  var geo    = geoRaw ? _hspParseGeo(geoRaw) : null;
+  if (geoRaw && (!geo || geo.short)) {
+    window.showAlert(geo && geo.short ? 'ลิงก์ย่อของ Google Maps อ่านพิกัดไม่ได้ — คลิกขวาที่ตำแหน่งในแผนที่แล้วคัดลอกตัวเลขพิกัดมาวางแทน' : 'พิกัดไม่ถูกต้อง — ใส่เป็น ละติจูด, ลองจิจูด ในประเทศไทย เช่น 13.6723, 100.5087', 'warn');
+    return;
+  }
+  var hadGeo = !!(id && (window.HOSPITALS || []).some(function(h) { return h.id === id && h.lat != null; }));
+
   var btn = document.getElementById('m-hsp-save');
   try {
     if (btn) { btn.disabled = true; btn.textContent = 'กำลังบันทึก...'; }
@@ -1710,6 +1787,14 @@ window.saveHospital = async function() {
       }
     }
 
+    // ── ยังไม่มีพิกัด → หาจากข้อมูล สธ. ให้อัตโนมัติ (ใช้เฉพาะที่ตรงชัด) ──
+    if (!geoRaw && !hadGeo && fProvince) {
+      try {
+        var gc = _hspGeoCandidates({ name: fName, province: fProvince, district: fDistrict }, await _hspGeoDb());
+        if (_hspGeoClass(gc) === 'ok') geo = { lat: gc[0].r.lat, lng: gc[0].r.lng };
+      } catch (e) { /* โหลดข้อมูล สธ. ไม่ได้ — บันทึกโดยไม่มีพิกัด */ }
+    }
+
     if (btn) btn.textContent = 'กำลังบันทึก...';
 
     var data = {
@@ -1730,8 +1815,19 @@ window.saveHospital = async function() {
       products:    fProducts,
       systems:     fSystems,
     };
+    // ส่ง lat/lng เฉพาะเมื่อมีพิกัด หรือกำลังล้างพิกัดเดิม
+    if (geo || hadGeo) { data.lat = geo ? geo.lat : null; data.lng = geo ? geo.lng : null; }
 
     await window.setDoc(getDocRef('HOSPITALS', data.hospital_id), data);
+    // ฐานข้อมูลย้ายรหัสผ่านไปเก็บแบบเข้ารหัสแล้ว (trigger) — ข้อมูลในเครื่องเก็บแค่ has_pw เหมือนที่ฐานข้อมูลส่งกลับมา
+    ['anydesk', 'database'].forEach(function(k) {
+      fSystems[k] = fSystems[k].map(function(e) {
+        var x = Object.assign({}, e, { has_pw: !!(e.has_pw || e.password) });
+        delete x.password;
+        return x;
+      });
+    });
+    delete _hspSecretCache[data.hospital_id];
     window._applyLocalDoc('HOSPITALS', data.hospital_id, data);
     window.closeM('m-hsp');
 
@@ -2625,10 +2721,7 @@ window._hspPopulateFilters = function() {
     usedProvs.map(p => `<option value="${esc(p)}"${p===curProv?' selected':''}>${esc(p)}</option>`).join('');
   _hspUpdateDistrictFilter();
 
-  // single select no longer used — multi-wrap replaces it for all views
   var prods = window.HSP_PRODUCTS || [];
-  var prodSel = document.getElementById('hsp-product-filter');
-  if (prodSel) prodSel.style.display = 'none';
   var usageSel = document.getElementById('hsp-prod-usage-filter');
   if (usageSel) usageSel.style.display = prods.length ? '' : 'none';
   // rebuild multi-checkbox when in list or analysis mode
@@ -2668,6 +2761,51 @@ window._hspDistChanged = function() {
   if (window._hspViewMode === 'analysis')  window.renderHspAnalysis  && window.renderHspAnalysis();
   if (window._hspViewMode === 'dashboard') window.renderHspDashboard && window.renderHspDashboard();
   if (window._hspViewMode === 'summary')   window.renderHspSummary   && window.renderHspSummary();
+};
+
+// ค้นหา / ระดับ เปลี่ยน → render มุมมองปัจจุบัน
+window._hspFilterChanged = function() {
+  window._hspPage = 1;
+  window.renderHospital();
+  if (window._hspViewMode === 'analysis') window.renderHspAnalysis && window.renderHspAnalysis();
+  if (window._hspViewMode === 'summary')  window.renderHspSummary  && window.renderHspSummary();
+};
+
+// ── ปุ่ม "ล้างตัวกรอง" — แสดงเมื่อมีตัวกรองใดทำงานอยู่ ──
+var _HSP_FILTER_IDS = ['hsp-q', 'hsp-prov', 'hsp-dist', 'hsp-type', 'hsp-geo-filter', 'hsp-prod-usage-filter'];
+window._hspUpdateClearBtn = function() {
+  var btn = document.getElementById('hsp-clear-filters');
+  if (!btn) return;
+  var on = (window._hspSelectedProds || []).length > 0 || _HSP_FILTER_IDS.some(function(id) {
+    var el = document.getElementById(id);
+    return el && el.value;
+  });
+  btn.style.display = on ? '' : 'none';
+};
+window._hspClearFilters = function() {
+  _HSP_FILTER_IDS.forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ''; });
+  window._hspSelectedProds = [];
+  if (window._hspViewMode === 'list' || window._hspViewMode === 'analysis') window._hspBuildProdMulti();
+  window._hspAnalysisPage = 1;
+  window._hspAnalysisLastFilter = '';
+  window._hspProvChanged();
+  window._hspUpdateClearBtn();
+};
+document.addEventListener('input',  function(e) { if (e.target.closest && e.target.closest('.hsp-filters')) window._hspUpdateClearBtn(); });
+document.addEventListener('change', function(e) { if (e.target.closest && e.target.closest('.hsp-filters')) window._hspUpdateClearBtn(); });
+
+// ── เมนู "เครื่องมือ" (ผู้ดูแล): MOPH API / เติมข้อมูล / เติมพิกัด ──
+window._hspCloseTools = function() {
+  var m = document.getElementById('hsp-tools-menu');
+  if (m) m.style.display = 'none';
+};
+window._hspToggleTools = function(e) {
+  if (e) e.stopPropagation();
+  var m = document.getElementById('hsp-tools-menu');
+  if (!m) return;
+  var open = m.style.display === 'none';
+  m.style.display = open ? '' : 'none';
+  if (open) setTimeout(function() { document.addEventListener('click', window._hspCloseTools, { once: true }); }, 0);
 };
 
 // ── CASCADE ในฟอร์ม Add/Edit ─────────────────────────────────────────────────
@@ -3215,36 +3353,31 @@ window.goHspView = function(mode) {
   if (summArea)  summArea.style.display  = mode === 'summary'   ? '' : 'none';
   [['list', tabList], ['dashboard', tabDash], ['analysis', tabAnaly], ['summary', tabSumm]].forEach(function(p) {
     if (!p[1]) return;
-    var active = mode === p[0];
-    p[1].style.color            = active ? 'var(--violet)' : 'var(--txt-muted)';
-    p[1].style.borderBottomColor = active ? 'var(--violet)' : 'transparent';
+    p[1].classList.toggle('on', mode === p[0]);
   });
   var multiWrap  = document.getElementById('hsp-prod-multi-wrap');
-  var singleSel  = document.getElementById('hsp-product-filter');
   var usageSel   = document.getElementById('hsp-prod-usage-filter');
+  var geoSel     = document.getElementById('hsp-geo-filter');
+  if (geoSel) geoSel.style.display = mode === 'list' ? '' : 'none';
 
   var hasProds = (window.HSP_PRODUCTS||[]).length > 0;
   if (mode === 'list') {
     if (multiWrap) window._hspBuildProdMulti();
-    if (singleSel) singleSel.style.display = 'none';
     if (usageSel)  usageSel.style.display = hasProds ? '' : 'none';
     window.renderHospital();
   }
   if (mode === 'analysis') {
     if (multiWrap) window._hspBuildProdMulti();
-    if (singleSel) singleSel.style.display = 'none';
     if (usageSel)  usageSel.style.display = hasProds ? '' : 'none';
     window._hspPopulateFilters();
     window.renderHspAnalysis();
   }
   if (mode === 'dashboard') {
     if (multiWrap) multiWrap.style.display = 'none';
-    if (singleSel) singleSel.style.display = 'none';
     window.renderHspDashboard();
   }
   if (mode === 'summary') {
     if (multiWrap) multiWrap.style.display = 'none';
-    if (singleSel) singleSel.style.display = 'none';
     if (usageSel)  usageSel.style.display = 'none';
     window.renderHspSummary();
   }
@@ -4264,5 +4397,279 @@ window._execHspProdImport = async function() {
     window.showAlert('อัปเดต Products สำเร็จ ' + toUpdate.length + ' โรงพยาบาล', 'success');
   } catch(err) {
     window.showAlert('เกิดข้อผิดพลาด: ' + err.message, 'warn');
+  }
+};
+
+// ── พิกัด รพ. (lat/lng) — ใช้กับแผนที่ทีม · เติมจากข้อมูล สธ. (data/moph-hospitals.json จาก data.go.th) หรือวางพิกัด Google Maps ──
+
+function _hspInTh(lat, lng) { return lat >= 5 && lat <= 21 && lng >= 97 && lng <= 106; }
+function _hspHasGeo(h) { return h.lat != null && h.lng != null; }
+function _hspMapsUrl(lat, lng) { return 'https://www.google.com/maps?q=' + lat + ',' + lng; }
+
+// รับ "13.67, 100.50" หรือลิงก์ Google Maps แบบเต็ม → { lat, lng } · ลิงก์ย่อ → { short:true } · อ่านไม่ได้ → null
+function _hspParseGeo(s) {
+  s = String(s || '').trim();
+  if (!s) return null;
+  if (/maps\.app\.goo\.gl|goo\.gl\/maps/i.test(s)) return { short: true };
+  var N = '(-?\\d+(?:\\.\\d+)?)';
+  var pats = [
+    new RegExp('!3d' + N + '!4d' + N),                                      // หมุดสถานที่ในลิงก์ /place/
+    new RegExp('[?&](?:q|query|ll|destination)=' + N + '\\s*,\\s*' + N),
+    new RegExp('@' + N + ',' + N),                                          // จุดกลางจอแผนที่
+    new RegExp('^\\(?\\s*' + N + '\\s*[,\\s]\\s*' + N + '\\s*\\)?$')        // ตัวเลขล้วน
+  ];
+  for (var i = 0; i < pats.length; i++) {
+    var m = s.match(pats[i]);
+    if (!m) continue;
+    var lat = Number(m[1]), lng = Number(m[2]);
+    if (!_hspInTh(lat, lng) && _hspInTh(lng, lat)) { var t = lat; lat = lng; lng = t; } // ใส่สลับกัน
+    return _hspInTh(lat, lng) ? { lat: +lat.toFixed(6), lng: +lng.toFixed(6) } : null;
+  }
+  return null;
+}
+
+window._hspGeoInput = function() {
+  var inp  = document.getElementById('m-hsp-geo');
+  var hint = document.getElementById('m-hsp-geo-hint');
+  var open = document.getElementById('m-hsp-geo-open');
+  if (!inp || !hint) return;
+  var v = inp.value.trim(), g = _hspParseGeo(v);
+  if (open) { open.style.display = g && !g.short ? '' : 'none'; if (g && !g.short) open.href = _hspMapsUrl(g.lat, g.lng); }
+  if (!v)            hint.innerHTML = 'ยังไม่มีพิกัด — แผนที่ทีมจะวางหมุดไว้กลางจังหวัดแทน';
+  else if (!g)       hint.innerHTML = '<span style="color:var(--coral);">อ่านพิกัดไม่ได้ — ใส่เป็น ละติจูด, ลองจิจูด เช่น 13.6723, 100.5087</span>';
+  else if (g.short)  hint.innerHTML = '<span style="color:#ffa62b;">ลิงก์ย่อ (maps.app.goo.gl) อ่านพิกัดไม่ได้ — คลิกขวาที่ตำแหน่งใน Google Maps แล้วคลิกตัวเลขพิกัดเพื่อคัดลอกมาวาง</span>';
+  else {
+    if (/https?:/i.test(v)) inp.value = g.lat + ', ' + g.lng; // วางลิงก์ → เก็บเป็นตัวเลข
+    hint.innerHTML = '<span style="color:#06d6a0;">✓ พิกัด ' + g.lat + ', ' + g.lng + '</span>';
+  }
+};
+
+// ── ข้อมูลพิกัดสถานพยาบาลของรัฐ (โหลดครั้งแรกที่ใช้ ~230 KB) ──
+var _hspGeoDbP = null;
+function _hspGeoKind(s) {
+  if (/ส่งเสริมสุขภาพ|รพ\.?\s*สต|สถานีอนามัย/.test(s)) return 'pcu';
+  if (/ศูนย์บริการสาธารณสุข/.test(s)) return 'bkk';
+  return /โรงพยาบาล|รพ\./.test(s) ? 'hosp' : '';
+}
+function _hspGeoCore(s) {
+  return String(s || '').toLowerCase()
+    .replace(/\(.*?\)/g, ' ')
+    .replace(/โรงพยาบาลส่งเสริมสุขภาพตำบล|รพ\.?\s*สต\.?|สถานีอนามัย|ศูนย์บริการสาธารณสุข(ที่)?/g, ' ')
+    .replace(/โรงพยาบาล|รพ\./g, ' ')
+    .replace(/(จังหวัด|ตำบล|อำเภอ)\s*\S+/g, ' ')
+    .replace(/\s+กรุงเทพมหานคร\s*$/, ' ')
+    .replace(/[\s.,\-–()'"\/]/g, '');
+}
+function _hspBigrams(s) { var m = {}; for (var i = 0; i < s.length - 1; i++) { var k = s.substr(i, 2); m[k] = (m[k] || 0) + 1; } return m; }
+function _hspDice(a, b, ba, bb) {
+  if (a === b) return 1;
+  if (a.length < 2 || b.length < 2) return 0;
+  var n = 0; for (var k in ba) if (bb[k]) n += Math.min(ba[k], bb[k]);
+  return 2 * n / ((a.length - 1) + (b.length - 1));
+}
+function _hspDistNorm(d) { return String(d || '').replace(/^(อำเภอ|อ\.|เขต)\s*/, '').replace(/\s/g, ''); }
+function _hspDistEq(a, b) { return a === b || (a === 'เมือง' && b.indexOf('เมือง') === 0) || (b === 'เมือง' && a.indexOf('เมือง') === 0); }
+
+function _hspGeoDb() {
+  if (!_hspGeoDbP) {
+    _hspGeoDbP = fetch('data/moph-hospitals.json').then(function(r) {
+      if (!r.ok) throw new Error('โหลดข้อมูลพิกัดไม่สำเร็จ (HTTP ' + r.status + ')');
+      return r.json();
+    }).then(function(j) {
+      var p = {};
+      Object.keys(j.p).forEach(function(prov) {
+        p[prov] = j.p[prov].map(function(x) {
+          var core = _hspGeoCore(x[0]);
+          return { name: x[0], dist: x[1], tam: x[2], lat: x[3], lng: x[4], kind: _hspGeoKind(x[0]), core: core, bg: _hspBigrams(core) };
+        });
+      });
+      return { meta: j.meta, p: p };
+    }).catch(function(e) { _hspGeoDbP = null; throw e; });
+  }
+  return _hspGeoDbP;
+}
+
+// คู่ที่เป็นไปได้ของ รพ. นี้ในจังหวัดเดียวกัน (มากสุด 4) — คะแนน 1 = ชื่อตรงกัน, +0.08 ถ้าอำเภอตรง
+function _hspGeoCandidates(h, db) {
+  var rows = h.province && db.p[h.province];
+  var core = _hspGeoCore(h.name);
+  if (!rows || core.length < 2) return [];
+  var kind = _hspGeoKind(h.name), bh = _hspBigrams(core), dist = _hspDistNorm(h.district);
+  return rows.map(function(r) {
+    var s = _hspDice(core, r.core, bh, r.bg);
+    var lo = Math.min(core.length, r.core.length), hi = Math.max(core.length, r.core.length);
+    if (s < 1 && lo >= 3 && lo / hi >= .5 && (r.core.indexOf(core) >= 0 || core.indexOf(r.core) >= 0)) s = Math.max(s, .86); // ชื่อย่อ/ชื่อเต็ม
+    if (kind && r.kind && kind !== r.kind) s *= .6;
+    if (dist && r.dist && _hspDistEq(dist, _hspDistNorm(r.dist))) s += .08;
+    return { r: r, s: s };
+  }).filter(function(x) { return x.s >= .55; })
+    .sort(function(a, b) { return b.s - a.s; }).slice(0, 4);
+}
+function _hspGeoClass(c) {
+  if (!c.length) return 'none';
+  return c[0].s >= .92 && c[0].s - (c[1] ? c[1].s : 0) >= .08 ? 'ok' : 'pick';
+}
+function _hspGeoPct(s) { return Math.min(100, Math.round(s * 100)) + '%'; }
+function _hspGeoSearchUrl(h) { return 'https://www.google.com/maps/search/' + encodeURIComponent(h.name + ' ' + (h.province || '')); }
+
+// ── ปุ่ม "ค้นจาก สธ." ในฟอร์ม ──
+window._hspGeoFindForm = async function() {
+  var hint = document.getElementById('m-hsp-geo-hint');
+  var h = {
+    name:     document.getElementById('m-hsp-name').value.trim(),
+    province: document.getElementById('m-hsp-province').value.trim(),
+    district: document.getElementById('m-hsp-district').value.trim()
+  };
+  if (!h.name || !h.province) { hint.innerHTML = '<span style="color:#ffa62b;">กรอกชื่อโรงพยาบาลและเลือกจังหวัดก่อน</span>'; return; }
+  hint.textContent = '⏳ กำลังค้นในข้อมูล สธ....';
+  try {
+    var c = _hspGeoCandidates(h, await _hspGeoDb());
+    window._hspGeoFormCands = c;
+    if (!c.length) {
+      hint.innerHTML = 'ไม่พบใน สธ. (มีเฉพาะสถานพยาบาลรัฐ) — <a href="' + _hspGeoSearchUrl(h) + '" target="_blank" rel="noopener" style="color:var(--primary);">ค้นใน Google Maps ↗</a> แล้วคลิกขวาที่ รพ. → คัดลอกพิกัดมาวาง';
+      return;
+    }
+    if (_hspGeoClass(c) === 'ok') { window._hspGeoPickForm(0); return; }
+    hint.innerHTML = 'เลือกรายการที่ตรง: ' + c.map(function(x, i) {
+      return '<button type="button" class="btn btn-ghost btn-sm" style="margin:2px 4px 0 0;" onclick="window._hspGeoPickForm(' + i + ')">' +
+        esc(x.r.name) + (x.r.dist ? ' · อ.' + esc(x.r.dist) : '') + ' <span style="opacity:.6;">' + _hspGeoPct(x.s) + '</span></button>';
+    }).join('');
+  } catch (e) { hint.innerHTML = '<span style="color:var(--coral);">' + esc(e.message) + '</span>'; }
+};
+window._hspGeoPickForm = function(i) {
+  var x = (window._hspGeoFormCands || [])[i];
+  if (!x) return;
+  document.getElementById('m-hsp-geo').value = x.r.lat + ', ' + x.r.lng;
+  window._hspGeoInput();
+  document.getElementById('m-hsp-geo-hint').innerHTML += ' <span style="color:var(--txt-muted);">· จาก สธ.: ' + esc(x.r.name) + (x.r.dist ? ' อ.' + esc(x.r.dist) : '') + '</span>';
+};
+
+// ── เติมพิกัดทีละหลายแห่ง ──
+window.openHspGeoFill = async function() {
+  if (!window.canEdit('hospital')) { window.showAlert('คุณไม่มีสิทธิ์แก้ไขข้อมูล รพ.', 'warn'); return; }
+  var body = document.getElementById('m-hsp-geo-body');
+  document.getElementById('m-hsp-geo-confirm-btn').disabled = true;
+  document.getElementById('m-hsp-geo-foot-note').textContent = '';
+  body.innerHTML = '<div style="padding:32px;text-align:center;color:var(--txt-muted);">⏳ กำลังโหลดข้อมูลพิกัดของ สธ. และจับคู่...</div>';
+  window.openM('m-hsp-geo');
+  try {
+    var db = await _hspGeoDb();
+    var all = window.HOSPITALS || [];
+    var order = { pick: 0, ok: 1, none: 2 };
+    window._hspGeoRows = all.filter(function(h) { return h.lat == null || h.lng == null; }).map(function(h) {
+      var c = _hspGeoCandidates(h, db), cls = _hspGeoClass(c);
+      // ตรงชัด + ต้องเลือกที่อันดับแรกคะแนนสูง → ติ๊กไว้ให้เลย กดบันทึกครั้งเดียวจบ
+      return { h: h, c: c, cls: cls, sel: cls === 'ok' || (cls === 'pick' && c[0].s >= .8) ? 0 : -1 };
+    }).sort(function(a, b) { return order[a.cls] - order[b.cls] || _hspThCmp(a.h.province || '', b.h.province || '') || _hspThCmp(a.h.name, b.h.name); });
+    window._hspGeoHave = all.length - window._hspGeoRows.length;
+    window._hspGeoFilter = '';
+    window._hspGeoRender();
+  } catch (e) {
+    body.innerHTML = '<div style="padding:32px;text-align:center;color:var(--coral);">' + esc(e.message) + '</div>';
+  }
+};
+
+window._hspGeoRender = function() {
+  var rows = window._hspGeoRows || [], f = window._hspGeoFilter || '';
+  var n = { ok: 0, pick: 0, none: 0 };
+  rows.forEach(function(x) { n[x.cls]++; });
+  var stat = function(key, label, val, color) {
+    var on = key && f === key;
+    return '<button type="button"' + (key ? ' onclick="window._hspGeoFilter=\'' + (on ? '' : key) + '\';window._hspGeoRender()"' : '') +
+      ' style="background:var(--surface);border:1px solid ' + (on ? color : 'transparent') + ';border-radius:10px;padding:10px 16px;flex:1;min-width:100px;text-align:center;cursor:' + (key ? 'pointer' : 'default') + ';">' +
+      '<div style="font-size:22px;font-weight:800;color:' + color + ';">' + val + '</div>' +
+      '<div style="font-size:11px;color:var(--txt-muted);">' + label + '</div></button>';
+  };
+  var head =
+    '<div style="padding:16px 20px;border-bottom:1px solid var(--border);background:var(--bg);">' +
+      '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;">' +
+        stat('', 'มีพิกัดแล้ว', window._hspGeoHave, 'var(--txt)') +
+        stat('ok', 'ตรงชัด', n.ok, '#06d6a0') +
+        stat('pick', 'ต้องเลือก', n.pick, '#ffa62b') +
+        stat('none', 'ไม่พบใน สธ.', n.none, '#ff6b6b') +
+      '</div>' +
+      (n.ok + n.pick ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">' +
+        '<button type="button" class="btn btn-ghost btn-sm" onclick="window._hspGeoSelAll(true)">☑ เลือกอันดับแรกทุกแถว (' + (n.ok + n.pick) + ')</button>' +
+        '<button type="button" class="btn btn-ghost btn-sm" onclick="window._hspGeoSelAll(false)">☐ ล้างที่เลือก</button>' +
+      '</div>' : '') +
+      '<div style="font-size:11px;color:var(--txt-muted);line-height:1.6;">ติ๊กไว้ให้แล้ว: ตรงชัดทั้งหมด + ต้องเลือกที่คะแนน 80% ขึ้นไป — ตรวจแถวสีส้มคร่าว ๆ แล้วกดบันทึกครั้งเดียว · จับคู่ด้วยชื่อ + จังหวัด + อำเภอ กับข้อมูลพิกัดสถานพยาบาลของรัฐ (data.go.th · CC BY 4.0) · เติมเฉพาะ รพ. ที่ยังไม่มีพิกัด · ' +
+      'ไม่พบ = ส่วนใหญ่เป็นเอกชน ให้กรอกพิกัดเองในหน้าแก้ไข รพ. · คลิกตัวเลขด้านบนเพื่อกรอง</div>' +
+    '</div>';
+  var th = 'padding:7px 12px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;';
+  var list = rows.map(function(x, i) { return { x: x, i: i }; }).filter(function(o) { return !f || o.x.cls === f; });
+  var table = !rows.length
+    ? '<div style="padding:32px;text-align:center;color:#06d6a0;font-weight:600;">✅ ทุกโรงพยาบาลมีพิกัดแล้ว</div>'
+    : '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;">' +
+      '<thead><tr style="background:var(--bg);color:var(--txt-muted);font-size:11px;position:sticky;top:0;z-index:1;">' +
+        '<th style="' + th + 'width:28px;"></th><th style="' + th + '">โรงพยาบาลในระบบ</th><th style="' + th + '">ตรงกับข้อมูล สธ.</th>' +
+      '</tr></thead><tbody>' +
+      list.map(function(o) {
+        var x = o.x, h = x.h, i = o.i, match;
+        if (x.cls === 'none') {
+          match = '<span style="color:#ff6b6b;">ไม่พบ</span> · <a href="' + _hspGeoSearchUrl(h) + '" target="_blank" rel="noopener" style="color:var(--primary);">ค้นใน Google Maps ↗</a>';
+        } else if (x.cls === 'ok') {
+          var r = x.c[0].r;
+          match = '<span style="color:#06d6a0;">✓</span> ' + esc(r.name) + (r.dist ? ' <span style="color:var(--txt-muted);">อ.' + esc(r.dist) + '</span>' : '') +
+            ' <a href="' + _hspMapsUrl(r.lat, r.lng) + '" target="_blank" rel="noopener" title="ดูตำแหน่ง" style="color:var(--primary);">↗</a>';
+        } else {
+          match = '<select class="t-sel" style="max-width:100%;" onchange="window._hspGeoSel(' + i + ',this.value)">' +
+            '<option value="-1">— เลือกรายการที่ตรง —</option>' +
+            x.c.map(function(c, k) {
+              return '<option value="' + k + '"' + (x.sel === k ? ' selected' : '') + '>' + esc(c.r.name) + (c.r.dist ? ' · อ.' + esc(c.r.dist) : '') + ' (' + _hspGeoPct(c.s) + ')</option>';
+            }).join('') + '</select>';
+        }
+        return '<tr style="border-bottom:1px solid var(--border);">' +
+          '<td style="padding:7px 12px;"><input type="checkbox" ' + (x.sel >= 0 ? 'checked' : '') + (x.cls === 'none' ? ' disabled' : '') +
+            ' onchange="window._hspGeoSel(' + i + ',this.checked?0:-1)" aria-label="เลือก ' + esc(h.name) + '"></td>' +
+          '<td style="padding:7px 12px;"><div style="font-weight:600;color:var(--txt);">' + esc(h.name) + '</div>' +
+            '<div style="font-size:11px;color:var(--txt-muted);">' + esc([h.code, h.district ? 'อ.' + h.district : '', h.province || 'ไม่ระบุจังหวัด'].filter(Boolean).join(' · ')) + '</div></td>' +
+          '<td style="padding:7px 12px;">' + match + '</td>' +
+        '</tr>';
+      }).join('') + '</tbody></table></div>';
+  document.getElementById('m-hsp-geo-body').innerHTML = head + table;
+  window._hspGeoFoot();
+};
+
+// sel = ลำดับรายการ สธ. ที่จะใช้ · -1 = ไม่บันทึกแถวนี้ (ติ๊กแถวที่ต้องเลือก = ใช้อันดับแรก)
+window._hspGeoSel = function(i, v) {
+  var x = window._hspGeoRows[i];
+  if (!x) return;
+  x.sel = Number(v);
+  window._hspGeoRender();
+};
+window._hspGeoSelAll = function(on) {
+  (window._hspGeoRows || []).forEach(function(x) { if (x.cls !== 'none') x.sel = on ? 0 : -1; });
+  window._hspGeoRender();
+};
+window._hspGeoFoot = function() {
+  var cnt = (window._hspGeoRows || []).filter(function(x) { return x.sel >= 0; }).length;
+  document.getElementById('m-hsp-geo-foot-note').textContent = cnt ? 'จะบันทึกพิกัด ' + cnt + ' โรงพยาบาล' : 'ยังไม่ได้เลือกรายการ';
+  document.getElementById('m-hsp-geo-confirm-btn').disabled = !cnt;
+};
+
+window.confirmHspGeoFill = async function() {
+  var todo = (window._hspGeoRows || []).filter(function(x) { return x.sel >= 0 && x.c[x.sel]; });
+  if (!todo.length) return;
+  var btn = document.getElementById('m-hsp-geo-confirm-btn'), note = document.getElementById('m-hsp-geo-foot-note');
+  btn.disabled = true;
+  var ok = 0;
+  try {
+    // บันทึกทีละ 10 แห่งพร้อมกัน — รพ. หลายร้อยแห่งไม่ต้องรอนาน
+    for (var i = 0; i < todo.length; i += 10) {
+      note.textContent = 'กำลังบันทึก ' + Math.min(i + 10, todo.length) + ' / ' + todo.length;
+      await Promise.all(todo.slice(i, i + 10).map(function(x) {
+        var r = x.c[x.sel].r;
+        return window.updateDoc(getDocRef('HOSPITALS', x.h.id), { lat: r.lat, lng: r.lng })
+          .then(function() { x.h.lat = r.lat; x.h.lng = r.lng; ok++; });
+      }));
+    }
+    window.closeM('m-hsp-geo');
+    window.showAlert('บันทึกพิกัดแล้ว ' + ok + ' โรงพยาบาล', 'success');
+    if (window._hspViewMode === 'list' || !window._hspViewMode) window.renderHospital && window.renderHospital();
+  } catch (e) {
+    var noCol = /lat|lng|column|PGRST204/i.test(String(e && (e.message || e.code)));
+    window.showAlert((ok ? 'บันทึกได้ ' + ok + ' แห่ง แล้วหยุด — ' : '') +
+      (noCol ? 'ฐานข้อมูลยังไม่มีคอลัมน์พิกัด — รันบล็อก [2026-10-12] ท้าย db-schema.sql ก่อน' : 'เกิดข้อผิดพลาด: ' + (e && e.message)), 'warn');
+    if (ok) window.openHspGeoFill(); else btn.disabled = false;
   }
 };

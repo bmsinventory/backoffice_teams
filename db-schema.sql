@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS users (
   password     TEXT DEFAULT '',
   name         TEXT DEFAULT '',
   display_name TEXT DEFAULT '',
-  role         TEXT DEFAULT 'viewer',
+  roles        JSONB DEFAULT '[]',               -- กลุ่มสิทธิ์ (roles.id) — มีได้หลายกลุ่ม สิทธิ์รวมกัน
   is_active    BOOLEAN DEFAULT true,
   staff_id     TEXT DEFAULT '',
   created_at   TIMESTAMPTZ DEFAULT NOW()
@@ -316,11 +316,15 @@ CREATE TABLE IF NOT EXISTS hospitals (
   contacts    JSONB DEFAULT '[]',
   products    JSONB DEFAULT '[]',
   systems     JSONB DEFAULT '{}',
+  lat         DOUBLE PRECISION,           -- พิกัด รพ. (ว่าง = แผนที่ใช้กลางจังหวัด)
+  lng         DOUBLE PRECISION,
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 -- systems = { anydesk:[{label,ip,password}], database:[{label,ip,database,user,password}], config:[{label,hosxp,inv}] }
 -- migration for existing DB:
 -- ALTER TABLE hospitals ADD COLUMN IF NOT EXISTS systems JSONB DEFAULT '{}';
+ALTER TABLE hospitals ADD COLUMN IF NOT EXISTS lat DOUBLE PRECISION;
+ALTER TABLE hospitals ADD COLUMN IF NOT EXISTS lng DOUBLE PRECISION;
 
 -- ── WORK_LOGS ───────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS work_logs (
@@ -343,33 +347,113 @@ CREATE TABLE IF NOT EXISTS work_logs (
 );
 
 -- ── SETTINGS ────────────────────────────────────────────────
--- row id='app'              → การตั้งค่าระบบ
--- row id='role_permissions' → สิทธิ์ตาม role (admin/pm/viewer เป็น JSONB)
+-- row id='app' → การตั้งค่าระบบ
 CREATE TABLE IF NOT EXISTS settings (
   id                         TEXT PRIMARY KEY,
-  -- app settings
-  notify_token               TEXT DEFAULT '',
-  notify_advance_token       TEXT DEFAULT '',
-  notify_project_token       TEXT DEFAULT '',
-  notify_helpdesk_token      TEXT DEFAULT '',
-  notify_training_token      TEXT DEFAULT '',
+  -- app settings (Token แจ้งเตือนอยู่ที่ notify_tokens — ดู NOTIFY TOKENS ท้ายไฟล์)
   helpdesk_ai_auto_reply     JSONB DEFAULT '{}',
-  year_targets               JSONB DEFAULT '[]',
+  worklog_categories         JSONB DEFAULT '[]',   -- หมวดบันทึกงาน [{id,emoji,label,hidden}] · ว่าง = ใช้หมวดเริ่มต้นใน worklog.js
+  year_targets              JSONB DEFAULT '[]',
   tgt_grouped                BOOLEAN DEFAULT false,
   allowance_weekday_normal   NUMERIC DEFAULT 350,
   allowance_holiday_normal   NUMERIC DEFAULT 650,
   allowance_weekday_border   NUMERIC DEFAULT 650,
   allowance_holiday_border   NUMERIC DEFAULT 1250,
-  -- role permissions (each role stored as JSONB)
-  admin                      JSONB,
-  pm                         JSONB,
-  viewer                     JSONB,
   created_at                 TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- seed default settings rows
-INSERT INTO settings (id) VALUES ('app')              ON CONFLICT (id) DO NOTHING;
-INSERT INTO settings (id) VALUES ('role_permissions') ON CONFLICT (id) DO NOTHING;
+INSERT INTO settings (id) VALUES ('app') ON CONFLICT (id) DO NOTHING;
+
+-- ── ROLES (กลุ่มสิทธิ์) ─────────────────────────────────────
+-- ผู้ใช้หนึ่งคนมีได้หลายกลุ่ม (users.roles) → สิทธิ์ = รวมของทุกกลุ่ม (กลุ่มไหนให้ = ได้ · ไม่มีการห้ามทับ)
+-- perms = { "<module>": { "view":bool, "add":bool, "edit":bool, "del":bool, "approve":bool, "scope":"own|dept|all" } }
+--   module ตาม PERM_MODULES ใน docs/src/config/routes.config.js · ไม่มี key = ไม่มีสิทธิ์
+-- is_super = สิทธิ์เต็มทุกเมนู (กลุ่ม Admin) · home_view = หน้าแรกหลัง Login (module id, ว่าง = เมนูแรกที่เห็น)
+CREATE TABLE IF NOT EXISTS roles (
+  id          TEXT PRIMARY KEY,
+  name        TEXT DEFAULT '',
+  color       TEXT DEFAULT '#7c5cfc',
+  sort_order  INTEGER DEFAULT 99,
+  is_super    BOOLEAN DEFAULT false,
+  home_view   TEXT DEFAULT '',
+  perms       JSONB DEFAULT '{}',
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS roles JSONB DEFAULT '[]';
+
+-- กลุ่มเริ่มต้น 5 กลุ่ม + ย้ายจากระบบเดิม (users.role เดี่ยว + settings.role_permissions คอลัมน์ admin/pm/viewer)
+--   admin → admin · pm (DM/PM) → manager · viewer → staff · สิทธิ์ที่ Admin เคยตั้งไว้ทับค่าเริ่มต้น
+-- รันซ้ำได้: สร้างกลุ่มเฉพาะที่ยังไม่มี (ไม่ทับที่ Admin แก้แล้ว) · ย้าย/ลบคอลัมน์เดิมเฉพาะตอนยังมีอยู่
+DO $$
+DECLARE
+  ro   CONSTANT JSONB := '{"view":true,"add":false,"edit":false,"del":false}';
+  fu   CONSTANT JSONB := '{"view":true,"add":true,"edit":true,"del":true}';
+  va   CONSTANT JSONB := '{"view":true,"add":true,"edit":false,"del":false}';
+  p_mgr   JSONB;
+  p_staff JSONB;
+  old_pm  JSONB;
+  old_vw  JSONB;
+  m       TEXT;
+BEGIN
+  p_mgr := jsonb_build_object(
+    'overview',ro,'kanban',fu,'projects',fu,'advance',fu,'expense_form',fu,'lodging',fu,
+    'workload',ro,'calendar',fu,'leave',fu,'timesheet',ro,'cost',ro,'budget',ro,
+    'availability',ro,'holiday',ro,'hospital',ro,'contract',fu,'impl_tracker',fu,'all_issues',ro,
+    'helpdesk','{"view":true,"add":true,"edit":true,"del":false}'::jsonb,'assist',fu,'training',fu,'server_request',fu,'team_showcase',fu);
+  p_staff := jsonb_build_object(
+    'overview',ro,'kanban',ro,'advance',fu,'expense_form',fu,'lodging',fu,
+    'workload',ro,'calendar',ro,'leave',va,'timesheet',ro,'cost',ro,
+    'availability',ro,'hospital',ro,'contract',ro,'impl_tracker',ro,'helpdesk',ro,'assist',ro,'server_request',ro,'team_showcase',ro);
+
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'settings' AND column_name = 'pm') THEN
+    EXECUTE 'SELECT pm, viewer FROM settings WHERE id = ''role_permissions''' INTO old_pm, old_vw;
+    p_mgr   := p_mgr   || COALESCE(old_pm, '{}');
+    p_staff := p_staff || COALESCE(old_vw, '{}');
+  END IF;
+  -- สิทธิ์ "อนุมัติ" ที่ยังไม่เคยตั้ง → ยึดตามสิทธิ์ "แก้" (แบบเดียวกับระบบเดิม)
+  FOREACH m IN ARRAY ARRAY['lodging','server_request'] LOOP
+    IF p_mgr ? m AND NOT (p_mgr -> m ? 'approve') THEN
+      p_mgr := jsonb_set(p_mgr, ARRAY[m,'approve'], COALESCE(p_mgr -> m -> 'edit', 'false'));
+    END IF;
+    IF p_staff ? m AND NOT (p_staff -> m ? 'approve') THEN
+      p_staff := jsonb_set(p_staff, ARRAY[m,'approve'], COALESCE(p_staff -> m -> 'edit', 'false'));
+    END IF;
+  END LOOP;
+  -- ขอบเขตการลางาน: ระบบเดิม Viewer เห็นเฉพาะของตัวเอง
+  IF p_staff ? 'leave' THEN p_staff := jsonb_set(p_staff, '{leave,scope}', '"own"'); END IF;
+  IF p_mgr ? 'leave'   THEN p_mgr   := jsonb_set(p_mgr,   '{leave,scope}', '"all"'); END IF;
+
+  INSERT INTO roles (id, name, color, sort_order, is_super, perms) VALUES
+    ('admin',   'Admin',                  '#ff6b6b', 1, true,  '{}'),
+    ('manager', 'ผู้จัดการ',               '#7c5cfc', 2, false, p_mgr),
+    ('lead',    'หัวหน้าทีม',              '#ffa62b', 3, false,
+       jsonb_set(p_mgr - 'admin', '{leave,scope}', '"dept"', true)),
+    ('staff',   'เจ้าหน้าที่ปฏิบัติงาน',     '#06d6a0', 4, false, p_staff),
+    ('server',  'เจ้าหน้าที่ Server',        '#4cc9f0', 5, false,
+       p_staff || jsonb_build_object('server_request', '{"view":true,"add":true,"edit":true,"del":false,"approve":false}'::jsonb,
+                                     'helpdesk', '{"view":true,"add":true,"edit":true,"del":false}'::jsonb))
+  ON CONFLICT (id) DO NOTHING;
+
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'role') THEN
+    EXECUTE $q$
+      UPDATE users SET roles = jsonb_build_array(CASE role WHEN 'admin' THEN 'admin' WHEN 'pm' THEN 'manager' ELSE 'staff' END)
+      WHERE roles IS NULL OR roles = '[]'::jsonb
+    $q$;
+    ALTER TABLE users DROP COLUMN role;
+  END IF;
+END $$;
+
+-- ตรวจไฟล์ข้อมูลพื้นฐาน (โมดูล 'datacheck' — แถบในเมนู ผู้ช่วยทีม · ตรวจในเบราว์เซอร์ ไม่มีตาราง): กลุ่มที่ดูผู้ช่วยทีมได้ → ดูได้ด้วย
+-- รันซ้ำได้: เพิ่มเฉพาะกลุ่มที่ยังไม่เคยตั้งสิทธิ์ datacheck (Admin ปิดไปแล้วจะไม่ถูกเปิดคืน)
+UPDATE roles SET perms = perms || jsonb_build_object('datacheck', '{"view":true,"add":false,"edit":false,"del":false}'::jsonb)
+WHERE NOT is_super AND NOT (perms ? 'datacheck') AND COALESCE((perms -> 'assist' ->> 'view')::boolean, false);
+
+ALTER TABLE settings DROP COLUMN IF EXISTS admin;
+ALTER TABLE settings DROP COLUMN IF EXISTS pm;
+ALTER TABLE settings DROP COLUMN IF EXISTS viewer;
+DELETE FROM settings WHERE id = 'role_permissions';
 
 -- =============================================================
 -- INDEXES
@@ -412,13 +496,15 @@ ALTER TABLE hsp_products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE hospitals    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE work_logs    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE settings     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE roles        ENABLE ROW LEVEL SECURITY;
 
 -- อนุญาต anon ทำได้ทุก operation (ระบบใช้ app-level auth ไม่ใช่ Supabase Auth)
+-- users / roles ไม่อยู่ในนี้ — อ่านได้ แต่เขียนได้เฉพาะผู้มีสิทธิ์ Admin Panel (ดู SECURITY ท้ายไฟล์)
 DO $$
 DECLARE
   tbl TEXT;
   tbls TEXT[] := ARRAY[
-    'stages','ptypes','pgroups','positions','departments','staff','users',
+    'stages','ptypes','pgroups','positions','departments','staff',
     'projects','advances','lodgings','holidays','leaves','timesheets','costs',
     'contracts','hsp_products','hospitals','work_logs','settings'
   ];
@@ -441,7 +527,7 @@ DECLARE
   tbls TEXT[] := ARRAY[
     'stages','ptypes','pgroups','positions','departments','staff','users',
     'projects','advances','lodgings','holidays','leaves','timesheets','costs',
-    'contracts','hsp_products','hospitals','work_logs','settings'
+    'contracts','hsp_products','hospitals','work_logs','settings','roles'
   ];
 BEGIN
   FOREACH tbl IN ARRAY tbls LOOP
@@ -463,8 +549,10 @@ CREATE TABLE IF NOT EXISTS impl_templates (
   template_name TEXT DEFAULT '',
   description   TEXT DEFAULT '',
   structure     JSONB DEFAULT '{}'::jsonb,
+  ptype_id      TEXT DEFAULT '',   -- ประเภทโครงการ (ptypes.type_id) · ว่าง = ใช้ร่วมทุกประเภท
   created_at    TIMESTAMPTZ DEFAULT NOW()
 );
+ALTER TABLE impl_templates ADD COLUMN IF NOT EXISTS ptype_id TEXT DEFAULT '';
 
 CREATE TABLE IF NOT EXISTS impl_projects (
   id               TEXT PRIMARY KEY,
@@ -681,10 +769,12 @@ CREATE TABLE IF NOT EXISTS form_items (
   project_id      TEXT NOT NULL,
   group_id        TEXT NOT NULL,
   form_name       TEXT DEFAULT '',
+  contract_name   TEXT DEFAULT '',          -- ชื่อแบบฟอร์มตามสัญญา (ใช้ในใบส่งมอบแบบฟอร์ม)
   form_type       TEXT DEFAULT '',
   status          TEXT DEFAULT 'not_started',
   owner           TEXT DEFAULT '',          -- ผู้จัดทำ (staff.id)
   received_date   DATE,
+  done_date       DATE,                     -- วันที่ดำเนินการแล้ว (ตั้งเองได้ · กดเสร็จแล้วลงวันนี้ให้)
   description     TEXT DEFAULT '',
   sort_order      INTEGER DEFAULT 99,
   created_at      TIMESTAMPTZ DEFAULT NOW(),
@@ -693,15 +783,42 @@ CREATE TABLE IF NOT EXISTS form_items (
 
 -- ── Migration: เพิ่มคอลัมน์ "วันที่รับเอกสาร" ให้ตารางที่สร้างไปแล้วก่อนมีคอลัมน์นี้ ──
 ALTER TABLE form_items ADD COLUMN IF NOT EXISTS received_date DATE;
+-- ── Migration: "ชื่อตามสัญญา" ของแบบฟอร์ม/Template — พิมพ์ลงคอลัมน์ "ชื่อแบบฟอร์มตามสัญญา" ในใบส่งมอบแบบฟอร์ม ──
+ALTER TABLE form_items ADD COLUMN IF NOT EXISTS contract_name TEXT DEFAULT '';
+-- ── Migration: "วันที่ดำเนินการแล้ว" เก็บแยก (เดิมใช้ updated_at) — ย้ายค่าเดิมของใบที่เสร็จแล้วมาให้ ──
+ALTER TABLE form_items ADD COLUMN IF NOT EXISTS done_date DATE;
+UPDATE form_items SET done_date = (updated_at AT TIME ZONE 'Asia/Bangkok')::date WHERE status = 'done' AND done_date IS NULL;
 
--- ── Template: รายชื่อเอกสารแบบฟอร์มมาตรฐาน (ใช้ร่วมกันทุกโครงการ/ทุกคลัง — ไม่ผูกกับ project_id/group_id)
--- ตั้งไว้ล่วงหน้าเพื่อดึงมาเพิ่มเป็นแบบฟอร์มในคลังไหนก็ได้แบบเร็ว แทนพิมพ์ชื่อเองทีละใบ ──
+-- ── Template: รายชื่อเอกสารแบบฟอร์ม (ไม่ผูกกับ project_id/group_id — ผูกประเภทโครงการได้ 1 ประเภท: ptype_id = ptypes.type_id, ว่าง = ใช้ร่วมทุกประเภท)
+-- ตั้งไว้ล่วงหน้าเพื่อดึงมาเพิ่มเป็นแบบฟอร์มในคลังไหนก็ได้แบบเร็ว แทนพิมพ์ชื่อเองทีละใบ
+-- kind แยก 2 รายการไม่ปนกัน: 'standard' = แบบฟอร์มมาตรฐาน (ใช้แค่ name → ดึงไปเป็นประเภท form_base) ·
+-- 'contract' = แบบฟอร์มตามสัญญา (name + contract_name → ดึงไปเป็นประเภท form_contract พร้อมชื่อตามสัญญา) ──
 CREATE TABLE IF NOT EXISTS form_templates (
   id         TEXT PRIMARY KEY,
   name       TEXT DEFAULT '',
+  contract_name TEXT DEFAULT '',
+  kind       TEXT DEFAULT 'standard',
+  ptype_id   TEXT DEFAULT '',
   sort_order INTEGER DEFAULT 99,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+ALTER TABLE form_templates ADD COLUMN IF NOT EXISTS contract_name TEXT DEFAULT '';
+ALTER TABLE form_templates ADD COLUMN IF NOT EXISTS kind TEXT DEFAULT 'standard';
+ALTER TABLE form_templates ADD COLUMN IF NOT EXISTS ptype_id TEXT DEFAULT '';
+-- ── Migration: เดิม "ชื่อตามสัญญา" ตั้งคู่กับ Template มาตรฐาน → คัดลอกคู่ (ชื่อเอกสาร, ชื่อตามสัญญา) เป็นรายการ
+-- kind='contract' แล้วล้าง contract_name ของแถวมาตรฐาน (มาตรฐานไม่ใช้คอลัมน์นี้) — รันซ้ำได้ ──
+INSERT INTO form_templates (id, name, contract_name, kind, sort_order)
+SELECT 'FTC' || s.id, s.name, TRIM(s.contract_name), 'contract',
+       (SELECT COUNT(*) FROM form_templates c WHERE c.kind = 'contract') + ROW_NUMBER() OVER (ORDER BY s.sort_order)
+FROM form_templates s
+WHERE s.kind = 'standard' AND TRIM(COALESCE(s.contract_name, '')) <> ''
+  AND NOT EXISTS (SELECT 1 FROM form_templates c WHERE c.kind = 'contract' AND LOWER(TRIM(c.name)) = LOWER(TRIM(s.name)))
+ON CONFLICT (id) DO NOTHING;
+UPDATE form_templates SET contract_name = '' WHERE kind = 'standard' AND contract_name <> '';
+-- ── แก้ข้อมูล: SQL รุ่นก่อน (2026-10-10) ย้ายชื่อตามสัญญาไปเป็น name ของแถว FTC* แล้วลบคอลัมน์ contract_name
+-- → ย้ายกลับมาไว้ใน contract_name (name คงไว้ให้แก้เป็นชื่อเอกสารเองในหน้า Template) — รันซ้ำได้ ──
+UPDATE form_templates SET contract_name = name
+WHERE kind = 'contract' AND id LIKE 'FTC%' AND COALESCE(contract_name, '') = '';
 
 CREATE INDEX IF NOT EXISTS idx_form_groups_project_id ON form_groups (project_id);
 CREATE INDEX IF NOT EXISTS idx_form_items_project_id  ON form_items (project_id);
@@ -1103,6 +1220,7 @@ ALTER TABLE settings ADD COLUMN IF NOT EXISTS helpdesk_priority_overrides JSONB 
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS helpdesk_status_overrides   JSONB DEFAULT '{}';
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS helpdesk_urgency_overrides  JSONB DEFAULT '{}';
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS helpdesk_ai_auto_reply JSONB DEFAULT '{}';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS worklog_categories JSONB DEFAULT '[]';
 
 -- ── Migration: ปุ่ม "โทรด่วน" (Jitsi) — เก็บเวลาที่ลูกค้ากดเข้าห้องคุยสดสำเร็จจริง
 -- ใช้แยกแยะ "กดปุ่ม" กับ "เข้าห้องสำเร็จ" เพื่อยิง BMS Notify เฉพาะตอนเข้าห้องจริง ──
@@ -1112,16 +1230,6 @@ ALTER TABLE helpdesk_tickets ADD COLUMN IF NOT EXISTS call_joined_at TIMESTAMPTZ
 -- อัปเดตเมื่อทีมงาน/ผู้แจ้งเปิดบทสนทนาที่มีข้อความใหม่จากอีกฝั่ง (ไม่แก้ updated_at ของ Ticket) ──
 ALTER TABLE helpdesk_tickets ADD COLUMN IF NOT EXISTS agent_last_read_at TIMESTAMPTZ;
 ALTER TABLE helpdesk_tickets ADD COLUMN IF NOT EXISTS reporter_last_read_at TIMESTAMPTZ;
-
--- ── Migration: token แจ้งเตือน Helpdesk (ตั๋วด่วนที่สุด / ลูกค้าเข้าห้องคุยสดแล้ว) — ตั้งค่าที่
--- Admin Panel → 🔔 ตั้งค่าการแจ้งเตือน เหมือน notify_token/notify_advance_token/notify_project_token
--- หมายเหตุ: RLS ของตารางนี้เปิดกว้าง (FOR ALL TO anon) เหมือน 3 token เดิม — anon key รู้ค่านี้ได้
--- ถ้า query ตรง (ความเสี่ยงเดิมของโปรเจกต์ ไม่ใช่สิ่งใหม่ที่ token นี้เพิ่มขึ้นมา) ──
-ALTER TABLE settings ADD COLUMN IF NOT EXISTS notify_helpdesk_token TEXT DEFAULT '';
-
--- ── Migration: token กลาง แจ้งเตือนเมื่อมีคนลงทะเบียนอบรม (ใช้กับทุกโครงการ) — ตั้งค่าที่ Admin Panel → 🔔 ตั้งค่าการแจ้งเตือน
--- โครงการที่ต้องการแยกกลุ่ม/ปิดแจ้งเตือน ตั้งทับได้ที่ ⚙️ ตั้งค่าโครงการ (trn_settings.site_notify_tokens) ──
-ALTER TABLE settings ADD COLUMN IF NOT EXISTS notify_training_token TEXT DEFAULT '';
 
 -- ── Storage bucket สำหรับไฟล์แนบ HelpDesk (รูปหน้าจอ / ไฟล์ error) ──
 -- ต้องมี schema `storage` ของ Storage service อยู่แล้ว (self-hosted Supabase stack)
@@ -1867,8 +1975,6 @@ CREATE INDEX IF NOT EXISTS idx_srvreq_token      ON server_requests (access_toke
 
 -- ค่าตั้งของโมดูล: { teamDeptIds:[], teamStaffIds:[], groupId, typeId, intro }
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS srv_req_config JSONB DEFAULT '{}';
--- BMS Notify Token ของคำขอใช้งานทีม Server (ตั้งที่ Admin › ตั้งค่าการแจ้งเตือน)
-ALTER TABLE settings ADD COLUMN IF NOT EXISTS notify_server_token TEXT DEFAULT '';
 
 -- ตัวเลือกเริ่มต้น (ตาม Google Form เดิม) — ใส่ครั้งแรกเท่านั้น แก้ภายหลังในแอปได้
 INSERT INTO server_request_options (id, kind, label, sort) VALUES
@@ -1970,4 +2076,594 @@ BEGIN
   END LOOP;
 END $$;
 
+-- ================================================================
+-- แนะนำทีม (โมดูล 'team_showcase') — หน้าแนะนำสมาชิกทีมแบบตัวการ์ตูน 3D หมุนสลับ (src/modules/team-showcase.js)
+-- team_showcases = ทีมที่จัดไว้ (เลือกคนเอง ไม่ผูกกับแผนก) · staff_figures = รูปตัวการ์ตูนของพนักงาน 1 คน 1 รูป
+-- ใช้ซ้ำได้ทุกทีม · ไฟล์รูปอยู่ใน Storage bucket team-figures · idempotent รันซ้ำได้
+-- ================================================================
+CREATE TABLE IF NOT EXISTS team_showcases (
+  id          TEXT PRIMARY KEY,
+  name        TEXT DEFAULT '',             -- ชื่อทีม เช่น ทีม Implement
+  ghost_text  TEXT DEFAULT 'OUR TEAM',     -- ตัวอักษรใหญ่ด้านหลังตัวการ์ตูน (อังกฤษ ตัวพิมพ์ใหญ่)
+  members     JSONB DEFAULT '[]',          -- [{ staff_id, color, title, desc, speech }] · staff_id = staff.id · หน้าจอเรียงตามระดับตำแหน่งเอง · speech = บทพูด AI เฉพาะคน
+  voice       JSONB DEFAULT '{}',          -- คำพูด AI แนะนำตัว { intro, member, outro } · member = แม่แบบ ({ชื่อเล่น} ฯลฯ) ว่าง = ค่าเริ่มต้น
+  sort_order  INTEGER DEFAULT 99,
+  created_by  TEXT DEFAULT '',             -- users.id
+  updated_by  TEXT DEFAULT '',             -- users.id
+  share_token TEXT UNIQUE,                 -- กุญแจลิงก์แชร์สาธารณะ team.html?t=<token> (ไม่ต้อง login ไว้ใส่สไลด์) · ว่าง = ยังไม่เคยแชร์
+  created_at  TIMESTAMPTZ DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE team_showcases ADD COLUMN IF NOT EXISTS voice JSONB DEFAULT '{}';
+ALTER TABLE team_showcases ADD COLUMN IF NOT EXISTS share_token TEXT UNIQUE;
+
+CREATE TABLE IF NOT EXISTS staff_figures (
+  id          TEXT PRIMARY KEY,            -- = staff.id (1 คน 1 รูป)
+  image_url   TEXT DEFAULT '',             -- public URL ใน bucket team-figures
+  file_path   TEXT DEFAULT '',             -- path ในบัคเก็ต (ใช้ลบไฟล์เก่าตอนเปลี่ยนรูป)
+  updated_by  TEXT DEFAULT '',             -- users.id
+  updated_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE team_showcases ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "anon_all_team_showcases" ON team_showcases;
+CREATE POLICY "anon_all_team_showcases" ON team_showcases FOR ALL TO anon USING (true) WITH CHECK (true);
+ALTER TABLE staff_figures ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "anon_all_staff_figures" ON staff_figures;
+CREATE POLICY "anon_all_staff_figures" ON staff_figures FOR ALL TO anon USING (true) WITH CHECK (true);
+
+DO $$
+DECLARE t TEXT;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['team_showcases','staff_figures'] LOOP
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_publication_tables
+      WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = t
+    ) THEN
+      EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE %I', t);
+    END IF;
+  END LOOP;
+END $$;
+
+-- ── Storage bucket รูปตัวการ์ตูน (PNG/WebP/JPG ไม่เกิน 5MB) ──
+DO $$
+BEGIN
+  INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+  VALUES ('team-figures', 'team-figures', true, 5242880, ARRAY['image/png','image/webp','image/jpeg'])
+  ON CONFLICT (id) DO NOTHING;
+
+  EXECUTE 'DROP POLICY IF EXISTS "team_figures_all" ON storage.objects';
+  EXECUTE 'CREATE POLICY "team_figures_all" ON storage.objects FOR ALL TO anon '
+        || 'USING (bucket_id = ''team-figures'') WITH CHECK (bucket_id = ''team-figures'')';
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'ข้าม storage bucket/policy (%) — ให้สร้าง bucket team-figures (public) + policy anon เองใน Studio', SQLERRM;
+END $$;
+
+NOTIFY pgrst, 'reload schema';
+
+-- ================================================================
+-- SECURITY (ISO 27001 ระยะที่ 0) — รหัสผ่าน · session · รหัสผ่านระบบของ รพ. · สิทธิ์เขียน users/roles
+-- • รหัสผ่านผู้ใช้เก็บแบบ bcrypt ใน user_credentials (หน้าเว็บอ่านไม่ได้) · ตรวจรหัสที่ฐานข้อมูล (bo_login) ไม่ส่งรหัสของใครมาที่เบราว์เซอร์
+--   users.password ว่างเสมอ — Admin ตั้งรหัสใหม่ / นำเข้า Excel ยังเขียนช่องนี้ได้ตามเดิม แล้ว trigger แปลงเป็น bcrypt + ล้างทิ้งทันที
+-- • session = token สุ่ม (เบราว์เซอร์เก็บตัวจริง · ฐานข้อมูลเก็บแค่ SHA-256) · หน้าเว็บส่งมากับทุกคำขอใน header x-bo-session
+--   session แบบเดิม { uid, sig } แลกเป็น token ได้ภายใน 30 วันหลังรันไฟล์นี้ครั้งแรก (bo_session_upgrade) → ผู้ใช้ไม่ต้อง Login ใหม่
+-- • ใส่รหัสผิด 10 ครั้งติด → ล็อกบัญชี 15 นาที · ทุกการ Login / ตั้งรหัส / เปิดดูรหัส รพ. ลง security_audit_log (หน้าเว็บแก้/ลบไม่ได้)
+-- • รหัสผ่าน Anydesk/Database ของ รพ. เข้ารหัสใน hospital_secrets · hospitals.systems เหลือแค่ sid + has_pw
+--   เปิดดูผ่าน bo_hospital_secrets (ต้อง Login + สิทธิ์ดูเมนูรายชื่อ รพ.) · หน้าบันทึกยังส่ง password มาใน systems ได้ตามเดิม
+-- ตารางในส่วนนี้ไม่มี policy ให้ anon = หน้าเว็บอ่าน/เขียนตรงไม่ได้ ใช้ผ่านฟังก์ชันด้านล่างเท่านั้น · idempotent รันซ้ำได้
+-- ================================================================
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
+
+CREATE TABLE IF NOT EXISTS user_credentials (
+  user_id        TEXT PRIMARY KEY,                 -- users.id
+  pw_hash        TEXT NOT NULL,                    -- bcrypt
+  legacy_sig     TEXT,                             -- ลายเซ็น session แบบเดิม djb2(uid|รหัสผ่าน) — ใช้แลก session ใหม่ถึง legacy_until
+  legacy_until   TIMESTAMPTZ,
+  failed_count   INTEGER NOT NULL DEFAULT 0,
+  locked_until   TIMESTAMPTZ,
+  pw_changed_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS user_sessions (
+  token_hash    TEXT PRIMARY KEY,                  -- SHA-256 ของ token
+  user_id       TEXT NOT NULL,                     -- users.id
+  persist       BOOLEAN NOT NULL DEFAULT false,    -- ติ๊ก "จดจำ" = 30 วัน · ไม่ติ๊ก = 7 วัน (ต่ออายุเองทุกครั้งที่ตรวจ session)
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_seen_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at    TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON user_sessions (user_id);
+
+CREATE TABLE IF NOT EXISTS security_audit_log (
+  id        BIGSERIAL PRIMARY KEY,
+  at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  user_id   TEXT DEFAULT '',                       -- users.id (ว่าง = ไม่ทราบ เช่น Login ด้วยชื่อที่ไม่มีในระบบ)
+  username  TEXT DEFAULT '',
+  action    TEXT NOT NULL,                         -- login · login_failed · login_locked · logout · session_upgrade · password_set · password_change · pw_reset_request · hospital_secret_view
+  target    TEXT DEFAULT '',
+  ip        TEXT DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_security_audit_at ON security_audit_log (at);
+
+CREATE TABLE IF NOT EXISTS hospital_secrets (
+  hospital_id  TEXT NOT NULL,                      -- hospitals.id
+  sid          TEXT NOT NULL,                      -- = sid ของรายการใน hospitals.systems.anydesk / .database
+  secret       BYTEA NOT NULL,                     -- pgp_sym_encrypt(รหัสผ่าน, app_keys.hospital_secret)
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (hospital_id, sid)
+);
+
+CREATE TABLE IF NOT EXISTS app_keys (
+  name  TEXT PRIMARY KEY,
+  key   TEXT NOT NULL
+);
+INSERT INTO app_keys (name, key) VALUES ('hospital_secret', encode(extensions.gen_random_bytes(32), 'hex'))
+ON CONFLICT (name) DO NOTHING;
+
+DO $$
+DECLARE t TEXT;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['user_credentials','user_sessions','security_audit_log','hospital_secrets','app_keys'] LOOP
+    EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
+    EXECUTE format('REVOKE ALL ON %I FROM anon, authenticated', t);
+  END LOOP;
+END $$;
+REVOKE ALL ON SEQUENCE security_audit_log_id_seq FROM anon, authenticated;
+
+-- ── ตัวช่วยภายใน (หน้าเว็บเรียกตรงไม่ได้) ──
+
+-- djb2 แบบเดียวกับ session แบบเดิมของหน้าเว็บ (ใช้คำนวณ legacy_sig ตอนย้ายรหัสผ่านเท่านั้น)
+CREATE OR REPLACE FUNCTION _bo_djb2(s TEXT) RETURNS TEXT LANGUAGE plpgsql IMMUTABLE AS $$
+DECLARE h BIGINT := 5381; b36 TEXT := ''; i INT;
+BEGIN
+  FOR i IN 1 .. length(s) LOOP h := (h * 33 + ascii(substr(s, i, 1))) % 4294967296; END LOOP;
+  LOOP
+    b36 := substr('0123456789abcdefghijklmnopqrstuvwxyz', (h % 36)::int + 1, 1) || b36;
+    h := h / 36;
+    EXIT WHEN h = 0;
+  END LOOP;
+  RETURN b36;
+END $$;
+
+CREATE OR REPLACE FUNCTION _bo_sha(p TEXT) RETURNS TEXT LANGUAGE sql IMMUTABLE AS $$
+  SELECT encode(sha256(convert_to(COALESCE(p, ''), 'UTF8')), 'hex');
+$$;
+
+-- token จาก header x-bo-session ของคำขอนี้ (PostgREST) · ไม่มี = NULL
+CREATE OR REPLACE FUNCTION _bo_req_token() RETURNS TEXT LANGUAGE sql STABLE AS $$
+  SELECT NULLIF(NULLIF(current_setting('request.headers', true), '')::json ->> 'x-bo-session', '');
+$$;
+
+CREATE OR REPLACE FUNCTION _bo_req_ip() RETURNS TEXT LANGUAGE sql STABLE AS $$
+  SELECT COALESCE(split_part(NULLIF(current_setting('request.headers', true), '')::json ->> 'x-forwarded-for', ',', 1), '');
+$$;
+
+-- ผู้ใช้ของ session (ยังไม่หมดอายุ + บัญชียังเปิดอยู่) · ไม่พบ = แถวว่าง (id IS NULL)
+CREATE OR REPLACE FUNCTION _bo_session_user(p_token TEXT) RETURNS users
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
+DECLARE u users;
+BEGIN
+  IF COALESCE(p_token, '') = '' THEN RETURN u; END IF;
+  SELECT x.* INTO u FROM user_sessions s JOIN users x ON x.id = s.user_id
+   WHERE s.token_hash = _bo_sha(p_token) AND s.expires_at > now() AND x.is_active IS NOT FALSE;
+  RETURN u;
+END $$;
+
+CREATE OR REPLACE FUNCTION _bo_audit(p_user users, p_action TEXT, p_target TEXT DEFAULT '', p_username TEXT DEFAULT NULL)
+RETURNS VOID LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
+  INSERT INTO security_audit_log (user_id, username, action, target, ip)
+  VALUES (COALESCE(p_user.id, ''), COALESCE(p_username, p_user.username, ''), p_action, COALESCE(p_target, ''), _bo_req_ip());
+$$;
+
+-- สิทธิ์ตามกลุ่มของผู้ใช้ — แบบเดียวกับ docs/src/utils/permission.util.js (กลุ่ม is_super = ทุกอย่าง · กลุ่มใดให้ = ได้)
+CREATE OR REPLACE FUNCTION _bo_user_can(p_user users, p_module TEXT, p_acts TEXT[]) RETURNS BOOLEAN
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT p_user.id IS NOT NULL AND EXISTS (
+    SELECT 1 FROM roles r
+     WHERE r.id IN (SELECT jsonb_array_elements_text(CASE WHEN jsonb_typeof(p_user.roles) = 'array' THEN p_user.roles ELSE '[]'::jsonb END))
+       AND (r.is_super OR EXISTS (SELECT 1 FROM unnest(p_acts) a WHERE (r.perms -> p_module ->> a) = 'true')));
+$$;
+
+-- ใช้ใน policy: คำขอนี้มาจากผู้ที่ Login อยู่และมีสิทธิ์ p_acts (อย่างใดอย่างหนึ่ง) ของเมนู p_module
+CREATE OR REPLACE FUNCTION bo_req_can(p_module TEXT, p_acts TEXT[]) RETURNS BOOLEAN
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT _bo_user_can(_bo_session_user(_bo_req_token()), p_module, p_acts);
+$$;
+
+-- สร้าง session ใหม่ → คืน token (ตัวจริงมีที่เบราว์เซอร์ที่เดียว)
+CREATE OR REPLACE FUNCTION _bo_new_session(p_user_id TEXT, p_persist BOOLEAN) RETURNS TEXT
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
+DECLARE tok TEXT := encode(gen_random_bytes(32), 'hex');
+BEGIN
+  INSERT INTO user_sessions (token_hash, user_id, persist, expires_at)
+  VALUES (_bo_sha(tok), p_user_id, COALESCE(p_persist, false),
+          now() + CASE WHEN p_persist THEN INTERVAL '30 days' ELSE INTERVAL '7 days' END);
+  IF random() < 0.05 THEN DELETE FROM user_sessions WHERE expires_at < now(); END IF;
+  RETURN tok;
+END $$;
+
+-- รหัสของผู้ใช้ที่หน้าเว็บใช้ (USERS[].id = user_id || id)
+CREATE OR REPLACE FUNCTION _bo_uid(p_user users) RETURNS TEXT LANGUAGE sql IMMUTABLE AS $$
+  SELECT COALESCE(NULLIF(p_user.user_id, ''), p_user.id);
+$$;
+
+-- ── ฟังก์ชันที่หน้าเว็บเรียก ──
+
+-- Login → { ok:true, token, uid } · { ok:false, error:'invalid' } · { ok:false, error:'locked', minutes }
+-- รหัสผิดคืนผลแทน RAISE (RAISE จะย้อนตัวนับครั้งที่ผิดกลับไปด้วย)
+CREATE OR REPLACE FUNCTION bo_login(p_username TEXT, p_password TEXT, p_persist BOOLEAN DEFAULT false) RETURNS JSONB
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
+DECLARE u users; c user_credentials; first_user users;
+BEGIN
+  FOR u IN SELECT * FROM users WHERE username = p_username AND is_active IS NOT FALSE ORDER BY created_at LOOP
+    IF first_user.id IS NULL THEN first_user := u; END IF;
+    SELECT * INTO c FROM user_credentials WHERE user_id = u.id FOR UPDATE;
+    CONTINUE WHEN NOT FOUND;
+    IF c.locked_until > now() THEN
+      PERFORM _bo_audit(u, 'login_locked');
+      RETURN jsonb_build_object('ok', false, 'error', 'locked', 'minutes', CEIL(EXTRACT(EPOCH FROM c.locked_until - now()) / 60));
+    END IF;
+    IF crypt(COALESCE(p_password, ''), c.pw_hash) = c.pw_hash THEN
+      UPDATE user_credentials SET failed_count = 0, locked_until = NULL WHERE user_id = u.id;
+      PERFORM _bo_audit(u, 'login');
+      RETURN jsonb_build_object('ok', true, 'token', _bo_new_session(u.id, p_persist), 'uid', _bo_uid(u));
+    END IF;
+  END LOOP;
+  IF first_user.id IS NULL THEN
+    PERFORM crypt(COALESCE(p_password, ''), gen_salt('bf', 10)); -- ใช้เวลาเท่ากันทั้งมี/ไม่มีชื่อผู้ใช้นี้
+    PERFORM _bo_audit(NULL, 'login_failed', '', LEFT(COALESCE(p_username, ''), 100));
+  ELSE
+    UPDATE user_credentials SET
+      failed_count = CASE WHEN failed_count + 1 >= 10 THEN 0 ELSE failed_count + 1 END,
+      locked_until = CASE WHEN failed_count + 1 >= 10 THEN now() + INTERVAL '15 minutes' ELSE locked_until END
+    WHERE user_id = first_user.id;
+    PERFORM _bo_audit(first_user, 'login_failed');
+  END IF;
+  RETURN jsonb_build_object('ok', false, 'error', 'invalid');
+END $$;
+
+-- ตรวจ session (ตอนเปิดแอป/ทุกชั่วโมง) + ต่ออายุ → { ok:true, uid } · { ok:false }
+CREATE OR REPLACE FUNCTION bo_session_check(p_token TEXT) RETURNS JSONB
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE u users := _bo_session_user(p_token);
+BEGIN
+  IF u.id IS NULL THEN RETURN jsonb_build_object('ok', false); END IF;
+  UPDATE user_sessions SET last_seen_at = now(),
+         expires_at = GREATEST(expires_at, now() + CASE WHEN persist THEN INTERVAL '30 days' ELSE INTERVAL '7 days' END)
+   WHERE token_hash = _bo_sha(p_token);
+  RETURN jsonb_build_object('ok', true, 'uid', _bo_uid(u));
+END $$;
+
+-- session แบบเดิม { uid, sig } → session ใหม่ (ใช้ได้ถึง legacy_until · ผิดเกิน 10 ครั้ง = ล็อกเหมือน Login)
+CREATE OR REPLACE FUNCTION bo_session_upgrade(p_uid TEXT, p_sig TEXT, p_persist BOOLEAN DEFAULT false) RETURNS JSONB
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE u users; c user_credentials;
+BEGIN
+  SELECT * INTO u FROM users x WHERE COALESCE(NULLIF(x.user_id, ''), x.id) = p_uid AND x.is_active IS NOT FALSE LIMIT 1;
+  IF u.id IS NULL THEN RETURN jsonb_build_object('ok', false); END IF;
+  SELECT * INTO c FROM user_credentials WHERE user_id = u.id FOR UPDATE;
+  IF NOT FOUND OR c.legacy_sig IS NULL OR c.legacy_until < now() OR c.locked_until > now() THEN
+    RETURN jsonb_build_object('ok', false);
+  END IF;
+  IF c.legacy_sig <> COALESCE(p_sig, '') THEN
+    UPDATE user_credentials SET
+      failed_count = CASE WHEN failed_count + 1 >= 10 THEN 0 ELSE failed_count + 1 END,
+      locked_until = CASE WHEN failed_count + 1 >= 10 THEN now() + INTERVAL '15 minutes' ELSE locked_until END
+    WHERE user_id = u.id;
+    RETURN jsonb_build_object('ok', false);
+  END IF;
+  PERFORM _bo_audit(u, 'session_upgrade');
+  RETURN jsonb_build_object('ok', true, 'token', _bo_new_session(u.id, p_persist), 'uid', _bo_uid(u));
+END $$;
+
+CREATE OR REPLACE FUNCTION bo_logout(p_token TEXT) RETURNS VOID
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE u users := _bo_session_user(p_token);
+BEGIN
+  DELETE FROM user_sessions WHERE token_hash = _bo_sha(p_token);
+  IF u.id IS NOT NULL THEN PERFORM _bo_audit(u, 'logout'); END IF;
+END $$;
+
+-- เปลี่ยนรหัสผ่านของตัวเอง → { ok:true } · { ok:false, error:'session'|'old'|'short' }
+-- session อื่นของผู้ใช้นี้ถูกปิด (เครื่องที่เปลี่ยนรหัสใช้ต่อได้)
+CREATE OR REPLACE FUNCTION bo_change_password(p_token TEXT, p_old TEXT, p_new TEXT) RETURNS JSONB
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
+DECLARE u users := _bo_session_user(p_token); c user_credentials;
+BEGIN
+  IF u.id IS NULL THEN RETURN jsonb_build_object('ok', false, 'error', 'session'); END IF;
+  SELECT * INTO c FROM user_credentials WHERE user_id = u.id;
+  IF NOT FOUND OR crypt(COALESCE(p_old, ''), c.pw_hash) <> c.pw_hash THEN RETURN jsonb_build_object('ok', false, 'error', 'old'); END IF;
+  IF length(COALESCE(p_new, '')) < 4 THEN RETURN jsonb_build_object('ok', false, 'error', 'short'); END IF;
+  UPDATE user_credentials SET pw_hash = crypt(p_new, gen_salt('bf', 10)), pw_changed_at = now(),
+         failed_count = 0, locked_until = NULL, legacy_sig = NULL, legacy_until = NULL
+   WHERE user_id = u.id;
+  DELETE FROM user_sessions WHERE user_id = u.id AND token_hash <> _bo_sha(p_token);
+  PERFORM _bo_audit(u, 'password_change');
+  RETURN jsonb_build_object('ok', true);
+END $$;
+
+-- "ลืมรหัสผ่าน?" หน้า Login → ตั้งคำขอให้ Admin (ตอบเหมือนกันทุกกรณี ไม่บอกว่ามีชื่อนี้หรือไม่)
+CREATE OR REPLACE FUNCTION bo_request_pw_reset(p_username TEXT) RETURNS VOID
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE u users;
+BEGIN
+  FOR u IN UPDATE users SET pw_reset_requested_at = now()
+            WHERE username = p_username AND is_active IS NOT FALSE RETURNING * LOOP
+    PERFORM _bo_audit(u, 'pw_reset_request');
+  END LOOP;
+END $$;
+
+-- รหัสผ่านระบบของ รพ. 1 แห่ง → { "<sid>": "<รหัสผ่าน>", ... } · ต้อง Login + สิทธิ์ดูเมนูรายชื่อ รพ. · ลงบันทึกทุกครั้ง
+CREATE OR REPLACE FUNCTION bo_hospital_secrets(p_token TEXT, p_hospital_id TEXT) RETURNS JSONB
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
+DECLARE u users := _bo_session_user(p_token); k TEXT; out JSONB;
+BEGIN
+  IF u.id IS NULL THEN RAISE EXCEPTION 'กรุณาเข้าสู่ระบบใหม่' USING ERRCODE = '42501'; END IF;
+  IF NOT _bo_user_can(u, 'hospital', ARRAY['view']) THEN RAISE EXCEPTION 'ไม่มีสิทธิ์ดูรหัสผ่านของ รพ.' USING ERRCODE = '42501'; END IF;
+  SELECT key INTO k FROM app_keys WHERE name = 'hospital_secret';
+  SELECT COALESCE(jsonb_object_agg(sid, pgp_sym_decrypt(secret, k)), '{}'::jsonb) INTO out
+    FROM hospital_secrets WHERE hospital_id = p_hospital_id;
+  PERFORM _bo_audit(u, 'hospital_secret_view', p_hospital_id);
+  RETURN out;
+END $$;
+
+-- ── trigger: รหัสผ่านที่เขียนลง users.password (Admin ตั้งรหัส / นำเข้า Excel) → bcrypt แล้วล้างช่องทิ้ง ──
+-- ตั้งรหัสใหม่ = session เดิมของผู้ใช้นั้นใช้ไม่ได้ทันที (ต้อง Login ด้วยรหัสใหม่)
+-- upsert: BEFORE INSERT ทำงานก่อนเสมอ (แม้ชนแถวเดิม) → ส่วน UPDATE ที่ตามมาได้ password ว่างแล้ว
+CREATE OR REPLACE FUNCTION _bo_users_pw() RETURNS TRIGGER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
+BEGIN
+  IF COALESCE(NEW.password, '') <> '' THEN
+    INSERT INTO user_credentials (user_id, pw_hash) VALUES (NEW.id, crypt(NEW.password, gen_salt('bf', 10)))
+    ON CONFLICT (user_id) DO UPDATE SET pw_hash = EXCLUDED.pw_hash, pw_changed_at = now(),
+      failed_count = 0, locked_until = NULL, legacy_sig = NULL, legacy_until = NULL;
+    DELETE FROM user_sessions WHERE user_id = NEW.id;
+    PERFORM _bo_audit(_bo_session_user(_bo_req_token()), 'password_set', NEW.id);
+    NEW.password := '';
+  END IF;
+  RETURN NEW;
+END $$;
+
+CREATE OR REPLACE FUNCTION _bo_users_gone() RETURNS TRIGGER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  DELETE FROM user_credentials WHERE user_id = OLD.id;
+  DELETE FROM user_sessions WHERE user_id = OLD.id;
+  RETURN OLD;
+END $$;
+
+-- ย้ายรหัสผ่านเดิม (ข้อความธรรมดา) → bcrypt + legacy_sig (ผู้ใช้ที่ Login ค้างอยู่ใช้ต่อได้โดยไม่ต้อง Login ใหม่) แล้วล้างทิ้ง
+-- ทำก่อนสร้าง trigger · รันซ้ำ = จัดการเฉพาะแถวที่ยังมีรหัสผ่านค้าง
+INSERT INTO user_credentials (user_id, pw_hash, legacy_sig, legacy_until)
+SELECT id, extensions.crypt(password, extensions.gen_salt('bf', 10)),
+       _bo_djb2(COALESCE(NULLIF(user_id, ''), id) || '|' || password), now() + INTERVAL '30 days'
+  FROM users WHERE COALESCE(password, '') <> ''
+ON CONFLICT (user_id) DO UPDATE SET pw_hash = EXCLUDED.pw_hash, legacy_sig = EXCLUDED.legacy_sig,
+  legacy_until = EXCLUDED.legacy_until, pw_changed_at = now();
+UPDATE users SET password = '' WHERE COALESCE(password, '') <> '';
+
+DROP TRIGGER IF EXISTS trg_bo_users_pw ON users;
+CREATE TRIGGER trg_bo_users_pw BEFORE INSERT OR UPDATE ON users FOR EACH ROW EXECUTE FUNCTION _bo_users_pw();
+DROP TRIGGER IF EXISTS trg_bo_users_gone ON users;
+CREATE TRIGGER trg_bo_users_gone AFTER DELETE ON users FOR EACH ROW EXECUTE FUNCTION _bo_users_gone();
+
+-- ── trigger: hospitals.systems — รหัสผ่านใน anydesk[] / database[] → hospital_secrets (เข้ารหัส) ──
+-- รายการมี key "password" = ตั้งค่าใหม่ (ว่าง = ลบรหัส) · ไม่มี key = คงรหัสเดิม · ทุกรายการได้ sid (รหัสประจำรายการ) + has_pw
+-- ลบรายการ = ลบรหัสของรายการนั้น (ตรวจตอน UPDATE เท่านั้น — BEFORE INSERT ของ upsert เห็นแค่ค่าที่ส่งมา ไม่ใช่ทั้งแถว)
+CREATE OR REPLACE FUNCTION _hsp_secrets_sync() RETURNS TRIGGER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
+DECLARE
+  sys JSONB; arr JSONB; e JSONB; out JSONB; kind TEXT; v_sid TEXT; k TEXT; keep TEXT[] := '{}';
+BEGIN
+  IF TG_OP = 'UPDATE' AND NEW.systems IS NOT DISTINCT FROM OLD.systems
+     AND position('"password"' IN COALESCE(NEW.systems::text, '')) = 0 THEN
+    RETURN NEW;
+  END IF;
+  IF jsonb_typeof(NEW.systems) IS DISTINCT FROM 'object' THEN RETURN NEW; END IF;
+  sys := NEW.systems;
+  SELECT key INTO k FROM app_keys WHERE name = 'hospital_secret';
+  FOREACH kind IN ARRAY ARRAY['anydesk', 'database'] LOOP
+    arr := sys -> kind;
+    CONTINUE WHEN jsonb_typeof(arr) IS DISTINCT FROM 'array';
+    out := '[]'::jsonb;
+    FOR e IN SELECT * FROM jsonb_array_elements(arr) LOOP
+      IF jsonb_typeof(e) IS DISTINCT FROM 'object' THEN out := out || jsonb_build_array(e); CONTINUE; END IF;
+      v_sid := COALESCE(NULLIF(e ->> 'sid', ''), encode(gen_random_bytes(6), 'hex'));
+      IF e ? 'password' THEN
+        IF COALESCE(e ->> 'password', '') <> '' THEN
+          INSERT INTO hospital_secrets (hospital_id, sid, secret) VALUES (NEW.id, v_sid, pgp_sym_encrypt(e ->> 'password', k))
+          ON CONFLICT (hospital_id, sid) DO UPDATE SET secret = EXCLUDED.secret, updated_at = now();
+        ELSE
+          DELETE FROM hospital_secrets WHERE hospital_id = NEW.id AND sid = v_sid;
+        END IF;
+      END IF;
+      keep := keep || v_sid;
+      out := out || jsonb_build_array((e - 'password' - 'has_pw') || jsonb_build_object('sid', v_sid,
+               'has_pw', EXISTS (SELECT 1 FROM hospital_secrets s WHERE s.hospital_id = NEW.id AND s.sid = v_sid)));
+    END LOOP;
+    sys := jsonb_set(sys, ARRAY[kind], out);
+  END LOOP;
+  IF TG_OP = 'UPDATE' THEN
+    DELETE FROM hospital_secrets WHERE hospital_id = NEW.id AND NOT (sid = ANY (keep));
+  END IF;
+  NEW.systems := sys;
+  RETURN NEW;
+END $$;
+
+CREATE OR REPLACE FUNCTION _hsp_secrets_gone() RETURNS TRIGGER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  DELETE FROM hospital_secrets WHERE hospital_id = OLD.id;
+  RETURN OLD;
+END $$;
+
+DROP TRIGGER IF EXISTS trg_hsp_secrets_sync ON hospitals;
+CREATE TRIGGER trg_hsp_secrets_sync BEFORE INSERT OR UPDATE ON hospitals FOR EACH ROW EXECUTE FUNCTION _hsp_secrets_sync();
+DROP TRIGGER IF EXISTS trg_hsp_secrets_gone ON hospitals;
+CREATE TRIGGER trg_hsp_secrets_gone AFTER DELETE ON hospitals FOR EACH ROW EXECUTE FUNCTION _hsp_secrets_gone();
+
+-- ย้ายรหัสผ่านที่ค้างใน hospitals.systems (trigger ด้านบนเป็นคนย้าย) · รันซ้ำ = ไม่มีแถวให้ทำ
+UPDATE hospitals SET systems = systems WHERE position('"password"' IN COALESCE(systems::text, '')) > 0;
+
+-- ── users / roles: อ่านได้ทุกคน (หน้า Login/หน้าสาธารณะยังต้องใช้) · เพิ่ม/แก้/ลบได้เฉพาะผู้มีสิทธิ์ Admin Panel ──
+DROP POLICY IF EXISTS "anon_all_users" ON users;
+DROP POLICY IF EXISTS "anon_all_roles" ON roles;
+DO $$
+DECLARE t TEXT;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['users', 'roles'] LOOP
+    EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
+    EXECUTE format('DROP POLICY IF EXISTS %I ON %I', t || '_read', t);
+    EXECUTE format('CREATE POLICY %I ON %I FOR SELECT TO anon USING (true)', t || '_read', t);
+    EXECUTE format('DROP POLICY IF EXISTS %I ON %I', t || '_insert', t);
+    EXECUTE format('CREATE POLICY %I ON %I FOR INSERT TO anon WITH CHECK (bo_req_can(%L, ARRAY[%L, %L]))',
+                   t || '_insert', t, 'admin', 'add', 'edit');
+    EXECUTE format('DROP POLICY IF EXISTS %I ON %I', t || '_update', t);
+    EXECUTE format('CREATE POLICY %I ON %I FOR UPDATE TO anon USING (bo_req_can(%L, ARRAY[%L, %L])) WITH CHECK (bo_req_can(%L, ARRAY[%L, %L]))',
+                   t || '_update', t, 'admin', 'add', 'edit', 'admin', 'add', 'edit');
+    EXECUTE format('DROP POLICY IF EXISTS %I ON %I', t || '_delete', t);
+    EXECUTE format('CREATE POLICY %I ON %I FOR DELETE TO anon USING (bo_req_can(%L, ARRAY[%L]))',
+                   t || '_delete', t, 'admin', 'del');
+  END LOOP;
+END $$;
+
+-- ── สิทธิ์เรียกฟังก์ชัน: หน้าเว็บเรียกได้เฉพาะ bo_* · ตัวช่วยภายใน (_bo_*, _hsp_*) ปิดหมด ──
+REVOKE ALL ON FUNCTION _bo_djb2(TEXT), _bo_sha(TEXT), _bo_req_token(), _bo_req_ip(), _bo_audit(users, TEXT, TEXT, TEXT),
+  _bo_session_user(TEXT), _bo_user_can(users, TEXT, TEXT[]), _bo_new_session(TEXT, BOOLEAN), _bo_uid(users),
+  _bo_users_pw(), _bo_users_gone(), _hsp_secrets_sync(), _hsp_secrets_gone()
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION bo_req_can(TEXT, TEXT[]), bo_login(TEXT, TEXT, BOOLEAN), bo_session_check(TEXT),
+  bo_session_upgrade(TEXT, TEXT, BOOLEAN), bo_logout(TEXT), bo_change_password(TEXT, TEXT, TEXT),
+  bo_request_pw_reset(TEXT), bo_hospital_secrets(TEXT, TEXT)
+  FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION bo_req_can(TEXT, TEXT[]), bo_login(TEXT, TEXT, BOOLEAN), bo_session_check(TEXT),
+  bo_session_upgrade(TEXT, TEXT, BOOLEAN), bo_logout(TEXT), bo_change_password(TEXT, TEXT, TEXT),
+  bo_request_pw_reset(TEXT), bo_hospital_secrets(TEXT, TEXT)
+  TO anon, authenticated;
+
+NOTIFY pgrst, 'reload schema';
+
+-- ================================================================
+-- NOTIFY TOKENS — Token BMS Notify (แจ้งเตือนกลุ่ม Line) อยู่ที่ฐานข้อมูลเท่านั้น หน้าเว็บอ่านไม่ได้
+-- • หน้าเว็บส่งแค่ { channel, content } ไป /api/notify → push-worker ใน frontend container อ่าน token เอง (notify_worker_token + รหัสลับของตัวส่ง)
+-- • ตั้ง/ลบ token: bo_notify_token_set (ต้อง Login + สิทธิ์ดู Admin Panel · token รายโครงการอบรม = สิทธิ์ระบบอบรม) · ทุกครั้งลง security_audit_log
+-- • ดูสถานะ: bo_notify_status (ต้อง Login · เห็นแค่ 4 ตัวท้าย)
+-- key: leave · advance · project · helpdesk · training · server · site:<รหัสโครงการอบรม> (token เฉพาะโครงการ หรือ 'off' = ไม่แจ้งเตือน)
+-- ช่อง leave/advance/project ส่งได้เฉพาะผู้ที่ Login · helpdesk/server/training ส่งจากหน้าสาธารณะได้ (แจ้งปัญหา / ขอใช้ทีม Server / ลงทะเบียนอบรม)
+-- idempotent รันซ้ำได้
+-- ================================================================
+CREATE TABLE IF NOT EXISTS notify_tokens (
+  key         TEXT PRIMARY KEY,
+  token       TEXT NOT NULL,
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_by  TEXT DEFAULT ''                      -- users.id
+);
+ALTER TABLE notify_tokens ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON notify_tokens FROM anon, authenticated;
+
+-- ย้าย token เดิมจากคอลัมน์ของ settings (หน้าเว็บอ่านได้) แล้วลบคอลัมน์ทิ้ง · รันซ้ำ = ไม่มีคอลัมน์ให้ย้าย
+DO $$
+DECLARE m TEXT[]; v TEXT;
+BEGIN
+  FOREACH m SLICE 1 IN ARRAY ARRAY[
+    ['notify_token', 'leave'], ['notify_advance_token', 'advance'], ['notify_project_token', 'project'],
+    ['notify_helpdesk_token', 'helpdesk'], ['notify_training_token', 'training'], ['notify_server_token', 'server']] LOOP
+    IF EXISTS (SELECT 1 FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'settings' AND column_name = m[1]) THEN
+      EXECUTE format('SELECT btrim(%I) FROM settings WHERE id = %L', m[1], 'app') INTO v;
+      IF COALESCE(v, '') <> '' THEN
+        INSERT INTO notify_tokens (key, token) VALUES (m[2], v) ON CONFLICT (key) DO NOTHING;
+      END IF;
+      EXECUTE format('ALTER TABLE settings DROP COLUMN %I', m[1]);
+    END IF;
+  END LOOP;
+END $$;
+
+CREATE OR REPLACE FUNCTION _notify_key_ok(p_key TEXT) RETURNS BOOLEAN LANGUAGE sql IMMUTABLE AS $$
+  SELECT COALESCE(p_key IN ('leave', 'advance', 'project', 'helpdesk', 'training', 'server')
+                  OR p_key ~ '^site:\S{1,80}$', false);
+$$;
+
+-- สถานะ token ทุกช่อง → { "<key>": "…abcd" | "off" } (ไม่มี key = ยังไม่ได้ตั้ง)
+CREATE OR REPLACE FUNCTION bo_notify_status(p_token TEXT) RETURNS JSONB
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE u users := _bo_session_user(p_token);
+BEGIN
+  IF u.id IS NULL THEN RAISE EXCEPTION 'กรุณาเข้าสู่ระบบใหม่' USING ERRCODE = '42501'; END IF;
+  RETURN COALESCE((SELECT jsonb_object_agg(n.key, CASE WHEN n.token = 'off' THEN 'off' ELSE '…' || right(n.token, 4) END)
+                     FROM notify_tokens n), '{}'::jsonb);
+END $$;
+
+-- ตั้ง token (ว่าง = ลบ · 'off' ใช้กับ site:<รหัส> = ไม่แจ้งเตือนโครงการนั้น)
+CREATE OR REPLACE FUNCTION bo_notify_token_set(p_token TEXT, p_key TEXT, p_value TEXT) RETURNS VOID
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE u users := _bo_session_user(p_token); v TEXT := btrim(COALESCE(p_value, ''));
+BEGIN
+  IF u.id IS NULL THEN RAISE EXCEPTION 'กรุณาเข้าสู่ระบบใหม่' USING ERRCODE = '42501'; END IF;
+  IF NOT _notify_key_ok(p_key) THEN RAISE EXCEPTION 'ไม่รู้จักช่องแจ้งเตือน: %', p_key USING ERRCODE = '22023'; END IF;
+  IF NOT _bo_user_can(u, CASE WHEN p_key LIKE 'site:%' THEN 'training' ELSE 'admin' END, ARRAY['view', 'add', 'edit']) THEN
+    RAISE EXCEPTION 'ไม่มีสิทธิ์ตั้งค่าการแจ้งเตือน' USING ERRCODE = '42501';
+  END IF;
+  IF v = '' THEN
+    DELETE FROM notify_tokens WHERE key = p_key;
+  ELSE
+    INSERT INTO notify_tokens (key, token, updated_at, updated_by) VALUES (p_key, v, now(), u.id)
+    ON CONFLICT (key) DO UPDATE SET token = EXCLUDED.token, updated_at = now(), updated_by = EXCLUDED.updated_by;
+  END IF;
+  PERFORM _bo_audit(u, 'notify_token_set', p_key);
+END $$;
+
+-- ตัวส่ง (push-worker): token ของช่องนี้ → { token: '…' | null, login: session ใช้ได้หรือไม่ }
+-- training + site → token เฉพาะโครงการ ('off' = ไม่แจ้งเตือน) · ไม่ได้ตั้ง = token กลาง
+CREATE OR REPLACE FUNCTION notify_worker_token(p_secret TEXT, p_channel TEXT, p_site TEXT DEFAULT '', p_session TEXT DEFAULT '')
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE t TEXT; u users;
+BEGIN
+  PERFORM _web_push_worker_check(p_secret);
+  IF p_channel = 'training' AND COALESCE(p_site, '') <> '' THEN
+    SELECT n.token INTO t FROM notify_tokens n WHERE n.key = 'site:' || p_site;
+  END IF;
+  IF t IS NULL AND _notify_key_ok(p_channel) AND p_channel NOT LIKE 'site:%' THEN
+    SELECT n.token INTO t FROM notify_tokens n WHERE n.key = p_channel;
+  END IF;
+  u := _bo_session_user(p_session);
+  RETURN jsonb_build_object('token', NULLIF(t, 'off'), 'login', u.id IS NOT NULL);
+END $$;
+
+REVOKE ALL ON FUNCTION _notify_key_ok(TEXT) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION bo_notify_status(TEXT), bo_notify_token_set(TEXT, TEXT, TEXT),
+  notify_worker_token(TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION bo_notify_status(TEXT), bo_notify_token_set(TEXT, TEXT, TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION notify_worker_token(TEXT, TEXT, TEXT, TEXT) TO anon;
+
+NOTIFY pgrst, 'reload schema';
+
+
+-- ################################################################
+-- ▼▼▼ ส่วนที่ต้องรัน (อัปเดตล่าสุด) — ไม่ต้องรันทั้งไฟล์ ▼▼▼
+-- ทุกครั้งที่ไฟล์นี้มีการแก้ จะคัดลอกเฉพาะส่วนที่เปลี่ยนมาไว้ตรงนี้ เป็นบล็อกแยกตามเวลา
+--   → รันเฉพาะบล็อกที่ยังไม่เคยรัน (เรียงจากเก่าไปใหม่) · รันเสร็จแจ้ง Claude ให้ลบบล็อกนั้นออก
+-- โค้ดด้านบนเป็นฉบับเต็ม (ใช้ตั้ง DB ใหม่) — ทุกบล็อกรันซ้ำได้ ไม่ทับข้อมูล
+-- ################################################################
+
+-- ── [2026-10-11] แนะนำทีม: ตั้งค่าคำพูด AI ต่อทีม (คำทักทาย / แม่แบบแนะนำตัว / คำปิดท้าย) ──
+ALTER TABLE team_showcases ADD COLUMN IF NOT EXISTS voice JSONB DEFAULT '{}';
+NOTIFY pgrst, 'reload schema';
+
+-- ── [2026-10-11] ติดตามแบบฟอร์ม: วันที่ดำเนินการแล้วแก้เองได้ + ตั้งวันรับ/วันเสร็จหลายรายการพร้อมกัน ──
+ALTER TABLE form_items ADD COLUMN IF NOT EXISTS done_date DATE;
+UPDATE form_items SET done_date = (updated_at AT TIME ZONE 'Asia/Bangkok')::date WHERE status = 'done' AND done_date IS NULL;
+NOTIFY pgrst, 'reload schema';
+
+-- ── [2026-10-11] แนะนำทีม: ลิงก์แชร์สาธารณะ team.html?t=<token> สำหรับใส่สไลด์นำเสนอ ──
+ALTER TABLE team_showcases ADD COLUMN IF NOT EXISTS share_token TEXT UNIQUE;
+NOTIFY pgrst, 'reload schema';
+
+-- ── [2026-10-11] บันทึกงาน: ตั้งค่าหมวดงานเพิ่ม/แก้/ซ่อนได้ ──
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS worklog_categories JSONB DEFAULT '[]';
+NOTIFY pgrst, 'reload schema';
+
+-- ── [2026-10-12] โรงพยาบาล: เก็บพิกัด (lat/lng) — เติมจากข้อมูล สธ. หรือวางพิกัด Google Maps เอง ──
+ALTER TABLE hospitals ADD COLUMN IF NOT EXISTS lat DOUBLE PRECISION;
+ALTER TABLE hospitals ADD COLUMN IF NOT EXISTS lng DOUBLE PRECISION;
 NOTIFY pgrst, 'reload schema';

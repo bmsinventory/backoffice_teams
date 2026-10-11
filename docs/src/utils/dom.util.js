@@ -9,9 +9,10 @@
     var el   = document.getElementById('sys-loader');
     var text = document.getElementById('sys-loader-text');
     var pulse = document.querySelector('#sys-loader .pulse');
-    if (text)  text.innerHTML = txt || 'กำลังโหลดข้อมูล...';
+    // จุด "..." ท้ายข้อความวาดเป็นแอนิเมชันด้วย CSS (topbar.css) — ตัดของเดิมออกไม่ให้ซ้ำ
+    if (text)  text.innerHTML = String(txt || 'กำลังโหลดข้อมูล').replace(/(\.{3}|…)\s*$/, '');
     if (pulse) pulse.style.display = 'inline-block';
-    if (el)    el.classList.add('on');
+    if (el)    { el.classList.remove('err'); el.classList.add('on'); }
   };
 
   window.hideLoader = function () {
@@ -20,33 +21,82 @@
   };
 
   // ── Database Error Display ──
+  // แยกประเภทข้อผิดพลาด → หัวข้อ/คำอธิบาย/ขั้นตอนแก้ที่ตรงกับสาเหตุ (สไตล์อยู่ใน topbar.css: .dbe-*)
+  var DBE_KIND = {
+    schema: {
+      title: 'โครงสร้างฐานข้อมูลยังไม่อัปเดต',
+      sub: 'ระบบเวอร์ชันนี้ต้องใช้ตารางที่ยังไม่มีในฐานข้อมูล',
+      steps: ['เปิด SQL Editor ของฐานข้อมูล', 'รัน <code>db-schema.sql</code> แล้วตามด้วย <code>db-training.sql</code>', 'กด “ลองใหม่” ด้านล่าง']
+    },
+    network: {
+      title: 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้',
+      sub: 'ส่งคำขอไปยังฐานข้อมูลไม่สำเร็จ อาจเป็นที่เครือข่ายหรือเซิร์ฟเวอร์',
+      steps: ['ตรวจสอบการเชื่อมต่ออินเทอร์เน็ต / VPN', 'ตรวจสอบว่าเซิร์ฟเวอร์ฐานข้อมูลทำงานอยู่', 'รอสักครู่แล้วกด “ลองใหม่”']
+    },
+    perm: {
+      title: 'ไม่มีสิทธิ์เข้าถึงข้อมูล',
+      sub: 'ฐานข้อมูลปฏิเสธคำขอ — สิทธิ์หรือ session อาจไม่ถูกต้อง',
+      steps: ['ออกจากระบบแล้วเข้าสู่ระบบใหม่', 'ตรวจสอบ RLS policy ของตารางที่แจ้งด้านล่าง', 'หากยังไม่หาย แจ้งผู้ดูแลระบบ']
+    },
+    other: {
+      title: 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้',
+      sub: 'เกิดข้อผิดพลาดระหว่างโหลดข้อมูลจากฐานข้อมูล',
+      steps: ['รัน <code>db-schema.sql</code> → <code>db-training.sql</code> แล้วหรือยัง', 'ตรวจสอบ <code>SUPABASE_URL</code> / <code>SUPABASE_ANON_KEY</code>', 'ตรวจสอบ RLS policy ว่าอนุญาตการเข้าถึง']
+    }
+  };
+  function dbeKind(raw) {
+    var s = String(raw || '').toLowerCase();
+    if (/42p01|pgrst205|does not exist|schema cache|relation/.test(s)) return 'schema';
+    if (/failed to fetch|networkerror|network request|timeout|timed out|load failed|econn|502|503|504/.test(s)) return 'network';
+    if (/42501|permission denied|row-level security|jwt|401|403/.test(s)) return 'perm';
+    return 'other';
+  }
+  var DBE_ICON = {
+    schema:  '🗄️',
+    network: '📵',
+    perm:    '🔒',
+    other:   '💾'
+  };
+
   window.showDbError = function (err) {
     console.error('Database Error:', err);
-    var errMsg   = err && err.message ? window.esc(err.message) : '';
-    var isNoTable = errMsg.includes('does not exist') || errMsg.includes('relation') || errMsg.includes('42P01');
+    var raw  = err ? String(err.message || err.code || err) : '';
+    var kind = dbeKind(raw + ' ' + (err && err.code ? err.code : ''));
+    var k    = DBE_KIND[kind];
+    var when = new Date().toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'medium' });
 
-    var msg = '<div style="color:var(--coral);font-weight:bold;font-size:16px;margin-bottom:10px;">❌ ไม่สามารถเชื่อมต่อฐานข้อมูลได้</div>';
-    msg += '<div style="font-size:13px;color:var(--txt);text-align:left;background:var(--surface2);padding:14px;border-radius:8px;border:1px solid var(--border);max-width:520px;line-height:1.7;">';
-
-    if (isNoTable) {
-      msg += '<strong style="color:var(--coral);">⚠ ตารางยังไม่ถูกสร้างในฐานข้อมูล</strong><br><br>';
-      msg += 'กรุณารัน <code>db-schema.sql</code> ใน SQL Editor ของฐานข้อมูลก่อน<br><br>';
-    } else {
-      msg += '<strong>ตรวจสอบ:</strong><br>';
-      msg += '1. รัน <code>db-schema.sql</code> ใน SQL Editor แล้วหรือไม่<br>';
-      msg += '2. <code>SUPABASE_URL</code> และ <code>SUPABASE_ANON_KEY</code> (ENV) ถูกต้อง<br>';
-      msg += '3. RLS policy อนุญาต <code>anon</code> หรือไม่<br>';
+    var msg = '<div class="dbe dbe-' + kind + '">'
+      + '<div class="dbe-head">'
+      +   '<div class="dbe-ic">' + DBE_ICON[kind] + '</div>'
+      +   '<div><div class="dbe-title">' + k.title + '</div><div class="dbe-sub">' + k.sub + '</div></div>'
+      + '</div>'
+      + '<div class="dbe-lbl">วิธีแก้ไข</div>'
+      + '<ol class="dbe-steps">' + k.steps.map(function (s) { return '<li>' + s + '</li>'; }).join('') + '</ol>';
+    if (raw) {
+      msg += '<details class="dbe-det"><summary>รายละเอียดทางเทคนิค</summary>'
+        + '<pre class="dbe-raw">' + window.esc(raw) + '</pre>'
+        + '<div class="dbe-when">เกิดเมื่อ ' + window.esc(when) + '</div></details>';
     }
-    if (errMsg) msg += '<code style="font-size:11px;color:var(--coral);word-break:break-all;">' + errMsg + '</code>';
-    msg += '</div>';
-    msg += '<button onclick="location.reload()" style="margin-top:14px;padding:8px 20px;background:var(--violet);color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">🔄 ลองใหม่</button>';
+    msg += '<div class="dbe-act">'
+      + '<button type="button" class="dbe-btn dbe-primary" onclick="location.reload()">'
+      +   '<span class="emo-ic" aria-hidden="true">🔄</span>ลองใหม่</button>'
+      + (raw ? '<button type="button" class="dbe-btn dbe-ghost" id="dbe-copy">'
+      +   '<span class="emo-ic" aria-hidden="true">📑</span>คัดลอกข้อผิดพลาด</button>' : '')
+      + '</div></div>';
 
     var text  = document.getElementById('sys-loader-text');
     var pulse = document.querySelector('#sys-loader .pulse');
     var el    = document.getElementById('sys-loader');
     if (text)  text.innerHTML = msg;
     if (pulse) pulse.style.display = 'none';
-    if (el)    el.classList.add('on');
+    if (el)    el.classList.add('on', 'err');
+
+    var cp = document.getElementById('dbe-copy');
+    if (cp) cp.onclick = function () {
+      var done = function () { cp.classList.add('ok'); cp.lastChild.textContent = 'คัดลอกแล้ว'; };
+      var txt = raw + '\n(' + when + ' · ' + location.href + ')';
+      if (navigator.clipboard) navigator.clipboard.writeText(txt).then(done, function () {});
+    };
   };
 
   // ── Toast Notifications (non-blocking, bottom-right, auto-dismiss) ──

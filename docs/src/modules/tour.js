@@ -25,7 +25,9 @@
     worklog:        'บันทึกงานที่ทำในแต่ละวัน',
     targets:        'ตั้งและติดตามเป้าหมายของทีม',
     helpdesk:       'ศูนย์ช่วยเหลือ — รับเรื่อง Ticket จากลูกค้า ตอบกลับ และติดตาม SLA',
-    assist:         'ผู้ช่วยทีม — พื้นที่สนทนาและช่วยเหลือกันภายในทีม',
+    assist:         'ผู้ช่วยทีม — ถามคำตอบ/โค้ดที่ทีมเก็บไว้ และตรวจไฟล์ข้อมูลพื้นฐาน (ซ้ำ/อักขระพิเศษ)',
+    team_showcase:  'แนะนำทีม — รู้จักสมาชิกแต่ละทีมผ่านตัวการ์ตูน 3D',
+    team_map:       'แผนที่ทีม — ทีมลงพื้นที่จังหวัดไหน เส้นทางเดินทางรายเดือน บนแผนที่ 3 มิติ',
     hospital:       'ข้อมูลโรงพยาบาลลูกค้าทั้งหมด',
     contract:       'ข้อมูลสัญญาของแต่ละโครงการ',
     admin:          'ตั้งค่าระบบ ผู้ใช้งาน สิทธิ์ และข้อมูลหลัก',
@@ -33,7 +35,7 @@
   };
 
   var TOPBAR_TIPS = [
-    { sel: '#btn-ask-ai',  icon: 'ti-sparkles',    title: 'ถาม AI', text: 'ค้นหาข้อมูลในระบบด้วยภาษาพูดได้เลย หรือกด Ctrl+K' },
+    { sel: '#ask-fab',     icon: 'ti-robot',       title: 'ผู้ช่วย AI', text: 'กดน้องบอทมุมขวาล่าง (หรือ Ctrl+K) แล้วพิมพ์ถามข้อมูลในระบบเป็นภาษาพูดได้เลย' },
     { sel: '#noti-bell',   icon: 'ti-bell',        title: 'การแจ้งเตือน', text: 'รวมเรื่องที่ต้องดำเนินการ เช่น Advance เกินกำหนด Ticket ใหม่ และเปิดรับแจ้งเตือนบนเครื่องได้ที่นี่' },
     { sel: '#dm-toggle',   icon: 'ti-moon',        title: 'โหมดมืด / สว่าง', text: 'สลับธีมหน้าจอตามที่ถนัด' },
     { sel: '.user-row',    icon: 'ti-user-circle', title: 'บัญชีผู้ใช้', text: 'เปลี่ยนรหัสผ่าน ออกจากระบบ หรือเปิดทัวร์แนะนำนี้อีกครั้ง', sidebar: true },
@@ -48,6 +50,47 @@
   function _isDone() { try { return !!localStorage.getItem(_key()); } catch (e) { return true; } }
   function _markDone() { try { localStorage.setItem(_key(), '1'); } catch (e) {} }
   function _isMobile() { return window.innerWidth <= 768; }
+  // ชื่อสั้น ๆ: ตัดคำนำหน้า (นาย/นาง/นางสาว/ดร. ฯลฯ) แล้วเอาคำแรก
+  function _shortName() {
+    var cu = window.cu || {};
+    return (cu.name || cu.username || '').trim()
+      .replace(/^(นางสาว|นาย|นาง|น\.ส\.|ดร\.|Mr\.?|Mrs\.?|Ms\.?)\s*/i, '').split(/\s+/)[0];
+  }
+
+  // ── AI พูดแนะนำทีละขั้น (src/services/tts.service.js) · ปิด/เปิดเสียงได้จากปุ่มลำโพงบนการ์ด — จำไว้ในเบราว์เซอร์ ──
+  var VOICE_KEY = '_bms_tour_voice';
+  function _voiceOn() { try { return localStorage.getItem(VOICE_KEY) !== '0'; } catch (e) { return true; } }
+  function _speechOf(s) {
+    if (!s) return [];
+    if (s.kind === 'hero') {
+      var name = _shortName();
+      return [
+        { text: 'สวัสดีค่ะ' + (name ? ' คุณ' + name : '') + ' ยินดีต้อนรับสู่ Backoffice Teams' },
+        { text: 'งานของทีมทั้งโครงการ ต้นทุน การลา และงานบริการลูกค้า อยู่ครบในที่เดียว' },
+        { text: 'ก่อนเริ่มใช้งาน เราพาไปรู้จักแต่ละเมนูแบบสั้น ๆ กันก่อนนะคะ พร้อมแล้วกดปุ่ม พาดูเมนู ได้เลยค่ะ' },
+      ];
+    }
+    if (s.kind === 'finale') return [
+      { text: 'ครบทุกเมนูแล้ว พร้อมเริ่มงานค่ะ' },
+      { text: 'อีกสามอย่างที่ช่วยให้ทำงานไวขึ้น' },
+      { text: 'กด Ctrl K เพื่อถาม AI ค้นข้อมูลได้จากทุกหน้า' },
+      { text: 'กดกระดิ่งมุมขวาบน เพื่อเปิดรับแจ้งเตือนบนเครื่อง' },
+      { text: 'และถ้าอยากดูคำแนะนำนี้อีก กดชื่อคุณมุมซ้ายล่าง แล้วเลือกแนะนำการใช้งานค่ะ' },
+    ];
+    return [{ text: s.title + ' ' + s.text.replace(/\s+—\s+/g, ' ') }];
+  }
+  function _speak(i) {
+    if (!window.TTS || !_voiceOn()) return;
+    window.TTS.play(_speechOf(_steps[i]), {
+      onError: function (err) { console.warn('[tour] voice:', err && err.message); },
+    });
+    window.TTS.preload(_speechOf(_steps[i + 1]));  // เตรียมเสียงขั้นถัดไป กดถัดไปแล้วพูดได้ทันที
+  }
+  function _voiceBtn() {
+    var on = _voiceOn();
+    return '<button type="button" class="tc-voice' + (on ? '' : ' off') + '" data-t="voice" title="' + (on ? 'ปิดเสียงแนะนำ' : 'เปิดเสียงแนะนำ') + '">'
+      + (on ? '🔊' : '🔇') + '</button>';
+  }
   function _visible(el) { return !!(el && el.offsetParent !== null && el.style.display !== 'none'); }
   function _calm() { return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
   function _iconOf(el) {
@@ -91,7 +134,13 @@
       var b = e.target.closest('button[data-t]');
       if (!b) return;
       var a = b.getAttribute('data-t');
-      if (a === 'skip' || a === 'done') _end();
+      if (a === 'voice') {
+        var on = !_voiceOn();
+        try { localStorage.setItem(VOICE_KEY, on ? '1' : '0'); } catch (err) {}
+        b.outerHTML = _voiceBtn();
+        if (on) _speak(_idx); else window.TTS && window.TTS.stop();
+      }
+      else if (a === 'skip' || a === 'done') _end();
       else if (a === 'next') _go(_idx + 1);
       else if (a === 'prev') _go(_idx - 1);
     });
@@ -117,9 +166,7 @@
   }
 
   function _heroHtml(s) {
-    // ชื่อสั้น ๆ: ตัดคำนำหน้า (นาย/นาง/นางสาว/ดร. ฯลฯ) แล้วเอาคำแรก
-    var cu = window.cu || {}, name = (cu.name || cu.username || '').trim()
-      .replace(/^(นางสาว|นาย|นาง|น\.ส\.|ดร\.|Mr\.?|Mrs\.?|Ms\.?)\s*/i, '').split(/\s+/)[0];
+    var name = _shortName();
     var total = _steps.length - 2;
     return '<div class="tc-hero">'
       + '<div class="tc-blob b1"></div><div class="tc-blob b2"></div><div class="tc-blob b3"></div>'
@@ -177,7 +224,7 @@
   function _render(s, animate) {
     var e = _ensureEls();
     var kind = s.kind || 'step';
-    e.card.innerHTML = kind === 'hero' ? _heroHtml(s) : kind === 'finale' ? _finaleHtml() : _stepHtml(s);
+    e.card.innerHTML = (kind === 'hero' ? _heroHtml(s) : kind === 'finale' ? _finaleHtml() : _stepHtml(s)) + _voiceBtn();
 
     var target = kind === 'step' && _visible(s.el) ? s.el : null;
     e.block.classList.toggle('blur', !target);  // หน้าต้อนรับ/หน้าจบ → เบลอพื้นหลัง · ขั้นชี้เมนูต้องเห็นเมนูชัด
@@ -212,6 +259,7 @@
     }
     if (animate) { void e.card.offsetWidth; e.card.classList.add('in'); }  // reflow ก่อน → แอนิเมชันเล่นใหม่ทุกขั้น
     if (kind === 'finale' && animate) _confetti();
+    if (animate) _speak(_idx);
     var focus = e.card.querySelector('[data-t="next"],[data-t="done"]');
     if (focus) focus.focus({ preventScroll: true });
   }
@@ -254,6 +302,7 @@
 
   function _end() {
     _markDone();
+    window.TTS && window.TTS.stop();
     if (_els) {
       var els = _els; _els = null;
       els.block.classList.remove('on');

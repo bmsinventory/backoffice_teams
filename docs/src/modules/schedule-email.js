@@ -142,7 +142,7 @@
 
   // ── ✨ AI: เรียบเรียงทีมงาน/วันหยุด/รอบเข้าไซต์ เป็น 2–4 บรรทัด — ข้อเท็จจริงคำนวณในโค้ด ──
   function facts(p) {
-    var mems = (p.members && p.members.length ? p.members : (p.team || []).map(function (id) { return { sid: id }; }));
+    var mems = window.sortByStaffRank(p.members && p.members.length ? p.members : (p.team || []).map(function (id) { return { sid: id }; }));
     var lines = mems.map(function (m) {
       var s = (window.STAFF || []).find(function (x) { return x.id === m.sid; });
       return '  • ' + (s ? s.name + (s.nickname ? ' (' + s.nickname + ')' : '') : 'ไม่ทราบชื่อ') + ' | ' + thRange(m.s || p.start, m.e || p.end);

@@ -241,7 +241,7 @@ window.snlInitCombos = function () {
   });
   window.initSuggestCombobox({
     wrapId: 'snl-requester-name-wrap', inputId: 'snl-requester-name', dropId: 'snl-requester-name-drop', listId: 'snl-requester-name-list',
-    getItems: function () { return (window.STAFF || []).filter(function (s) { return s.active !== false; }).sort(window.sortStaffByDeptRank).map(function (s) { return s.name; }); },
+    getItems: function () { return (window.STAFF || []).filter(function (s) { return s.active !== false; }).sort(window.sortStaffByRank).map(function (s) { return s.name; }); },
     onSelect: function () { window.snlOnRequesterNameChange(); }
   });
 };

@@ -15,14 +15,22 @@ const TS_VIEWS = [
   { id: 'month',   icon: '🗓', label: 'Heatmap รายเดือน' },
   { id: 'project', icon: '📁', label: 'ตามโครงการ' },
 ];
-const TS_SORTS = { util: 'Utilization มาก→น้อย', free: 'ว่างมาก→น้อย', hours: 'ชั่วโมงมาก→น้อย', name: 'ชื่อ ก→ฮ' };
+const TS_SORTS = { rank: 'ตำแหน่ง สูง→ต่ำ', util: 'Utilization มาก→น้อย', free: 'ว่างมาก→น้อย', hours: 'ชั่วโมงมาก→น้อย', name: 'ชื่อ ก→ฮ' };
 const TS_PAL   = ['#4361ee','#06d6a0','#ffa62b','#7c5cfc','#4cc9f0','#f72585','#ff6b6b','#2ec4b6','#8d99ae','#e9c46a'];
 const TS_DAY_H = 8;
 
-let _tsView = 'staff', _tsSort = 'util';
-try { _tsView = localStorage.getItem('ts-view') || 'staff'; _tsSort = localStorage.getItem('ts-sort') || 'util'; } catch (e) {}
+let _tsView = 'staff', _tsSort = 'rank';
+try { _tsView = localStorage.getItem('ts-view') || 'staff'; _tsSort = localStorage.getItem('ts-sort') || 'rank'; } catch (e) {}
 if (!TS_VIEWS.some(v => v.id === _tsView)) _tsView = 'staff';
-if (!TS_SORTS[_tsSort]) _tsSort = 'util';
+if (!TS_SORTS[_tsSort]) _tsSort = 'rank';
+// ตัวเรียงรายชื่อมุมมองภาระงานรายคน — ใช้ทั้งบนจอและตอน Export
+const TS_CMP = {
+  rank:  (a, b) => window.sortStaffByRank(a.s || {}, b.s || {}),
+  util:  (a, b) => (b.util ?? -1) - (a.util ?? -1),
+  free:  (a, b) => b.freeDays - a.freeDays,
+  hours: (a, b) => b.hours - a.hours,
+  name:  (a, b) => (a.s.name || '').localeCompare(b.s.name || '', 'th'),
+};
 
 const _n1  = v => { const r = Math.round(v * 10) / 10; return r.toLocaleString('en-US', { maximumFractionDigits: 1 }); };
 const _pad = n => String(n).padStart(2, '0');
@@ -308,7 +316,7 @@ function _tsHeat(d) {
     });
     const h = cells.reduce((s, x) => s + x.h, 0), cap = cells.reduce((s, x) => s + x.cap, 0);
     return { sid, s: _stById(sid), cells, h, cap, util: cap ? h / cap * 100 : null };
-  }).sort((a, b) => (b.util || 0) - (a.util || 0));
+  }).sort((a, b) => window.sortStaffByRank(a.s || {}, b.s || {}));
 
   const team = mDays.map((_, m) => {
     const h = staff.reduce((s, x) => s + x.cells[m].h, 0), cap = staff.reduce((s, x) => s + x.cells[m].cap, 0);
@@ -472,13 +480,7 @@ function _badBEChip(bad) {
 function _renderStaff(d) {
   if (!d.staff.length) return `<div class="ts-empty">ไม่มีข้อมูล Timesheet ในช่วงที่เลือก</div>`;
   const list = d.staff.slice();
-  const cmp = {
-    util:  (a, b) => (b.util ?? -1) - (a.util ?? -1),
-    free:  (a, b) => b.freeDays - a.freeDays,
-    hours: (a, b) => b.hours - a.hours,
-    name:  (a, b) => (a.s.name || '').localeCompare(b.s.name || '', 'th'),
-  }[_tsSort];
-  list.sort(cmp);
+  list.sort(TS_CMP[_tsSort]);
 
   const openSet = new Set(Array.from(document.querySelectorAll('.ts-srow.open')).map(el => el.dataset.sid));
   if (list.length === 1) openSet.add(list[0].sid);
@@ -684,7 +686,7 @@ window.tsExportData = function() {
     return {
       name: 'Timesheet_ภาระงานรายคน',
       headers: ['พนักงาน', 'ตำแหน่ง', 'ช่วงเวลา', 'ชม.จัดสรร', 'ชม.ทำงานได้', 'Utilization (%)', 'สถานะ', 'คน-วัน', 'จำนวนโครงการ', 'วันซ้อน', 'วันว่าง', 'วันลา', 'โครงการ (ชม.)'],
-      rows: d.staff.sort((a, b) => (b.util ?? -1) - (a.util ?? -1)).map(x => [
+      rows: d.staff.sort(TS_CMP[_tsSort]).map(x => [
         x.s.name || '', x.s.position || '', lbl, +x.hours.toFixed(1), x.cap,
         x.util === null ? '' : Math.round(x.util), _lvlLabel[_lvl(x.util)], +(x.hours / TS_DAY_H).toFixed(1),
         x.projs.length, x.overDays, x.freeDays, x.leaveDays,

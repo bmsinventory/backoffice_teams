@@ -13,108 +13,203 @@
   text-transform: uppercase; letter-spacing: .7px; margin-bottom: 14px;
 }
 
-/* Compact dashboard layout
-   Keep the shared card components untouched: these rules only apply to Overview. */
-#view-overview > div:first-child {
-  padding-top: 14px !important;
+
+/* ================================================================
+   แดชบอร์ดใหม่ (overview-dash.js) — prefix .ovd-
+   สีทั้งหมดอ้าง token ใน variables.css → โหมดมืดตามอัตโนมัติ
+================================================================ */
+#view-overview .ov-card { border-radius: 14px; }
+#view-overview .ov-card-title { margin-bottom: 9px; }
+#view-overview #annual-target-wrap > .ov-card { padding: 12px 16px !important; }
+#view-overview #annual-target-wrap > .ov-card > div:first-child { margin-bottom: 8px !important; }
+#view-overview #annual-target-wrap th { padding-top: 5px !important; padding-bottom: 5px !important; }
+#view-overview #annual-target-wrap td { padding-top: 6px !important; padding-bottom: 6px !important; }
+
+.ovd-pad { padding: 0 24px 16px; }
+.ovd-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 14px; }
+.ovd-c3 { grid-column: span 3; } .ovd-c4 { grid-column: span 4; } .ovd-c5 { grid-column: span 5; }
+.ovd-c7 { grid-column: span 7; } .ovd-c8 { grid-column: span 8; } .ovd-c12 { grid-column: span 12; }
+.ovd-grid > .ov-card { min-width: 0; padding: 14px; }
+.ovd-grid > .ov-card[hidden] { display: none; }
+.ovd-col { display: flex; flex-direction: column; }
+.ovd-chart { width: 100%; min-width: 0; position: relative; }
+.ovd-chart[hidden] { display: none; }
+.ovd-chart[data-loading]::after { content: attr(data-loading); position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--txt3); }
+#view-overview.ovd-3d .ovd-donut { background: radial-gradient(ellipse 34% 9% at 50% 84%, rgba(0,0,0,.22), rgba(0,0,0,0) 70%); }
+
+.ovd-sh { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; padding-top: 10px; padding-bottom: 10px; }
+.ovd-sh h2 { margin: 0; font-size: 15px; font-weight: 800; color: var(--txt); }
+.ovd-sh span { font-size: 12px; color: var(--txt3); }
+.ovd-eyebrow { margin: 0; font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--txt3); }
+.ovd-muted { color: var(--txt3); font-size: 12px; }
+.ovd-sub { font-size: 12px; color: var(--txt2); margin: -4px 0 4px; }
+.ovd-note { font-size: 11.5px; color: var(--txt3); margin: 0; line-height: 1.6; }
+.ovd-ok { color: var(--teal); } .ovd-warn { color: var(--amber); } .ovd-crit { color: var(--coral); }
+.ovd-card-h { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.ovd-ctrls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.ovd-ctrls [hidden] { display: none; }
+.ovd-sw { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 6px; vertical-align: middle; flex: none; }
+
+/* segmented / chips */
+.ovd-dept { height: 32px; max-width: 220px; padding: 0 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--txt); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.ovd-seg { display: inline-flex; background: var(--surface3); border-radius: 10px; padding: 3px; }
+.ovd-seg[hidden] { display: none; }
+.ovd-seg button { border: 0; background: transparent; color: var(--txt2); font-family: inherit; font-size: 12px; font-weight: 600; padding: 5px 11px; border-radius: 8px; cursor: pointer; }
+.ovd-seg button[aria-pressed="true"] { background: var(--surface); color: var(--txt); box-shadow: var(--sh-sm); }
+.ovd-chip { display: inline-flex; align-items: center; gap: 3px; font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; white-space: nowrap; line-height: 1.6; text-transform: none; letter-spacing: 0; }
+.ovd-chip.ok   { background: rgba(6,214,160,.14);  color: var(--teal); }
+.ovd-chip.warn { background: rgba(255,166,43,.16); color: var(--amber); }
+.ovd-chip.crit { background: rgba(255,107,107,.15); color: var(--coral); }
+.ovd-chip.info { background: rgba(67,97,238,.13);  color: var(--indigo); }
+.ovd-chip.mut  { background: var(--surface3); color: var(--txt2); }
+
+/* ── พยากรณ์ ── */
+.ovd-fc { padding: 18px !important; margin-top: 14px; }
+.ovd-fc-top { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: center; }
+.ovd-fc-when { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.ovd-fc-when b { font-size: 22px; font-weight: 800; color: var(--txt); font-variant-numeric: tabular-nums; }
+.ovd-fc-head { margin: 10px 0 0; font-size: 16px; font-weight: 700; line-height: 1.55; color: var(--txt); max-width: 80ch; text-wrap: balance; }
+.ovd-fc-head b { font-weight: 800; }
+.ovd-fc-key { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 10px; font-size: 12px; color: var(--txt2); }
+.ovd-fc-key span { display: inline-flex; align-items: center; gap: 6px; }
+.ovd-fc-body { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 16px; margin-top: 10px; }
+.ovd-fc-chart { min-width: 0; border-radius: 12px; background: radial-gradient(ellipse 65% 45% at 50% 68%, rgba(124,92,252,.07), transparent 72%); }
+.ovd-fc-side { min-width: 0; }
+.ovd-fk { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.ovd-fk div { background: var(--surface2); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ovd-fk span { font-size: 11px; font-weight: 700; color: var(--txt3); }
+.ovd-fk b { font-size: 20px; font-weight: 800; color: var(--txt); font-variant-numeric: tabular-nums; }
+.ovd-fk b.ovd-ok { color: var(--teal); } .ovd-fk b.ovd-warn { color: var(--amber); } .ovd-fk b.ovd-crit { color: var(--coral); }
+.ovd-fk small { font-size: 11.5px; color: var(--txt2); }
+.ovd-fins { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.ovd-ins { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.ovd-ins b { font-size: 13px; color: var(--txt); line-height: 1.45; }
+.ovd-ins small { grid-column: 2; font-size: 12px; color: var(--txt2); }
+.ovd-dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 5px; grid-row: span 2; }
+.ovd-sev-crit .ovd-dot { background: var(--coral); box-shadow: 0 0 0 4px rgba(255,107,107,.18); }
+.ovd-sev-warn .ovd-dot { background: var(--amber); box-shadow: 0 0 0 4px rgba(255,166,43,.18); }
+.ovd-sev-ok   .ovd-dot { background: var(--teal);  box-shadow: 0 0 0 4px rgba(6,214,160,.18); }
+.ovd-fc-slider { position: relative; margin-top: 16px; padding-bottom: 36px; }
+#ovd-fc-range { -webkit-appearance: none; appearance: none; width: 100%; height: 12px; border-radius: 99px; margin: 0; cursor: pointer; display: block; }
+#ovd-fc-range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 22px; height: 22px; border-radius: 50%; background: var(--surface); border: 4px solid var(--violet); box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+#ovd-fc-range::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--surface); border: 4px solid var(--violet); }
+#ovd-fc-range:focus-visible { outline: 2px solid var(--violet); outline-offset: 5px; }
+.ovd-fc-ticks { position: absolute; left: 0; right: 0; top: 18px; height: 32px; }
+.ovd-fc-ticks button { position: absolute; transform: translateX(-50%); border: 0; background: none; font-family: inherit; font-size: 10.5px; font-weight: 600; color: var(--txt3); cursor: pointer; padding: 2px 3px; white-space: nowrap; border-radius: 6px; }
+.ovd-fc-ticks button.on { color: var(--violet); background: rgba(124,92,252,.12); }
+.ovd-nowtag { position: absolute; top: 19px; transform: translateX(-50%); font-size: 10px; font-weight: 800; color: var(--violet); white-space: nowrap; }
+
+/* ── KPI ── */
+.ovd-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.ovd-kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 5px; min-width: 0; text-align: left; font: inherit; color: var(--txt); box-shadow: var(--sh-sm); }
+button.ovd-kpi { cursor: pointer; }
+button.ovd-kpi:hover { border-color: var(--border2); }
+.ovd-kpi-lb { display: flex; justify-content: space-between; gap: 8px; font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--txt3); }
+.ovd-kpi-v { font-size: 22px; font-weight: 800; letter-spacing: -.01em; font-variant-numeric: tabular-nums; line-height: 1.15; }
+.ovd-kpi-v small { font-size: 13px; color: var(--txt3); font-weight: 700; }
+.ovd-kpi-s { font-size: 11.5px; color: var(--txt2); }
+.ovd-meter { height: 7px; border-radius: 99px; background: var(--surface3); position: relative; }
+.ovd-meter i { position: absolute; inset: 0 auto 0 0; border-radius: 99px; }
+.ovd-pace { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--txt); opacity: .55; }
+
+/* ── legends / lists ── */
+.ovd-dl { display: grid; gap: 6px; font-size: 12px; margin-top: 6px; }
+.ovd-dl div { display: grid; grid-template-columns: auto 1fr auto auto; gap: 8px; align-items: center; color: var(--txt2); }
+.ovd-dl b { color: var(--txt); font-variant-numeric: tabular-nums; }
+.ovd-dl em { font-style: normal; color: var(--txt3); min-width: 36px; text-align: right; font-variant-numeric: tabular-nums; }
+.ovd-acts { display: flex; flex-direction: column; gap: 8px; }
+.ovd-act { display: grid; grid-template-columns: 4px 1fr auto; gap: 12px; align-items: center; padding: 10px 12px; border-radius: 10px; background: var(--surface2); border: 1px solid transparent; text-align: left; font: inherit; color: var(--txt); cursor: pointer; }
+.ovd-act:hover { border-color: var(--border2); }
+.ovd-act-bar { align-self: stretch; border-radius: 4px; }
+.ovd-act-n { font-weight: 700; font-size: 13px; }
+.ovd-act-m { font-size: 12px; color: var(--txt2); }
+.ovd-act-v { font-weight: 800; font-size: 16px; font-variant-numeric: tabular-nums; }
+
+/* ── ภาระงานรายบุคคล ── */
+.ovd-mseg { display: flex; gap: 4px; flex-wrap: wrap; margin: 4px 0; }
+.ovd-mseg button { border: 1px solid var(--border); background: var(--surface); color: var(--txt2); font-family: inherit; font-size: 11.5px; font-weight: 600; padding: 4px 9px; border-radius: 8px; cursor: pointer; }
+.ovd-mseg button[aria-pressed="true"] { background: var(--violet); border-color: var(--violet); color: #fff; }
+.ovd-mseg button.now::after { content: "\2022"; margin-left: 3px; }
+.ovd-psum { margin: 6px 0 10px; font-size: 12.5px; color: var(--txt2); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.ovd-people { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 12px 6px; }
+#ovd-people-view[hidden] { display: none; }
+.ovd-pf { display: flex; flex-direction: column; align-items: center; gap: 3px; text-align: center; min-width: 0; border: 0; background: none; font: inherit; color: var(--txt); cursor: pointer; padding: 6px 2px; border-radius: 12px; }
+.ovd-pf:hover { background: var(--surface2); }
+.ovd-pf svg { width: 54px; height: 90px; overflow: visible; }
+#view-overview.ovd-3d .ovd-pf svg { filter: drop-shadow(2px 4px 4px rgba(0,0,0,.18)); }
+.ovd-fill { transition: y .5s ease, height .5s ease; }
+.ovd-pf-n { font-weight: 700; font-size: 12px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ovd-pf-c { font-size: 11px; color: var(--txt2); }
+@media (prefers-reduced-motion: reduce) { .ovd-fill { transition: none; } }
+
+/* ── popup รายละเอียด ── */
+.ovd-modal { position: fixed; inset: 0; z-index: 9998; background: rgba(13,17,23,.45); backdrop-filter: blur(3px); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.ovd-modal[hidden] { display: none; }
+.ovd-mbox { background: var(--surface); color: var(--txt); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--sh-xl); width: min(640px, 100%); max-height: 86vh; overflow: auto; padding: 18px 20px 20px; animation: ovdPop .18s ease-out; }
+@keyframes ovdPop { from { transform: translateY(8px) scale(.98); opacity: .6; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .ovd-mbox { animation: none; } }
+.ovd-mh { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.ovd-mh h3 { margin: 2px 0 0; font-size: 17px; font-weight: 800; }
+.ovd-x { border: 1px solid var(--border); background: var(--surface2); color: var(--txt2); width: 32px; height: 32px; border-radius: 10px; cursor: pointer; flex: none; font-size: 14px; }
+.ovd-mstats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin: 14px 0 4px; }
+.ovd-mstats div { background: var(--surface2); border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ovd-mstats span { font-size: 11px; color: var(--txt3); font-weight: 600; }
+.ovd-mstats b { font-size: 14px; font-variant-numeric: tabular-nums; }
+.ovd-mstats b.crit { color: var(--coral); } .ovd-mstats b.ok { color: var(--teal); } .ovd-mstats b.warn { color: var(--amber); }
+.ovd-mbody h4 { margin: 14px 0 4px; font-size: 12.5px; color: var(--txt2); display: flex; gap: 6px; align-items: center; }
+.ovd-mbody h4 span { background: var(--surface3); border-radius: 99px; padding: 0 7px; font-size: 11px; }
+.ovd-mfoot { color: var(--txt3); font-size: 12px; margin: 8px 0 0; }
+.ovd-mgo { margin-top: 12px; }
+.ovd-list { display: flex; flex-direction: column; }
+.ovd-li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 9px 6px; border: 0; border-bottom: 1px solid var(--border); background: none; text-align: left; font: inherit; color: var(--txt); width: 100%; border-radius: 0; }
+.ovd-li:last-child { border-bottom: 0; }
+button.ovd-li { cursor: pointer; }
+button.ovd-li:hover { background: var(--surface2); }
+.ovd-li-n { font-weight: 600; font-size: 13px; min-width: 0; }
+.ovd-li-m { font-size: 11.5px; color: var(--txt2); display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 2px; font-weight: 400; }
+.ovd-li-r { text-align: right; font-size: 12px; display: flex; flex-direction: column; }
+.ovd-li-r b { font-size: 13px; font-variant-numeric: tabular-nums; }
+.ovd-li-r span { color: var(--txt3); }
+.ovd-strip { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 4px; height: 96px; margin-top: 12px; }
+.ovd-strip div { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 3px; border-radius: 6px; padding: 2px 0; }
+.ovd-strip div.on { background: rgba(124,92,252,.12); }
+.ovd-strip i { width: 70%; border-radius: 4px 4px 0 0; min-height: 2px; }
+.ovd-strip span { font-size: 9.5px; color: var(--txt3); }
+.ovd-tchips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+
+@media (max-width: 1100px) {
+  .ovd-c3 { grid-column: span 6; }
+  .ovd-c4, .ovd-c5, .ovd-c7, .ovd-c8 { grid-column: span 12; }
+  .ovd-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ovd-fc-body { grid-template-columns: minmax(0, 1fr); }
 }
-
-#view-overview #stat-row {
-  gap: 10px !important;
-  padding: 12px 24px !important;
-}
-
-#view-overview #stat-row .stat-c {
-  border-radius: 14px;
-  padding: 12px 14px;
-}
-
-#view-overview #stat-row .stat-c > div:first-child {
-  margin-bottom: 2px !important;
-}
-
-#view-overview #stat-row .stat-icon {
-  width: 30px !important;
-  height: 30px !important;
-  border-radius: 9px;
-  margin-bottom: 0;
-  font-size: 15px;
-}
-
-#view-overview #stat-row .stat-k {
-  font-size: 10px;
-  line-height: 1.25;
-  margin-bottom: 0;
-}
-
-#view-overview #stat-row .stat-v {
-  font-size: 22px !important;
-  line-height: 1.15;
-  margin-bottom: 1px;
-}
-
-#view-overview #stat-row .stat-s,
-#view-overview #stat-row .stat-c > div:last-child,
-#view-overview #stat-row .stat-c > div:last-child span {
-  font-size: 10.5px !important;
-  line-height: 1.25;
-}
-
-#view-overview #stat-row .stat-c > div:last-child {
-  margin-top: 1px !important;
-}
-
-#view-overview #annual-target-wrap {
-  padding-bottom: 12px !important;
-}
-
-#view-overview #annual-target-wrap > .ov-card {
-  padding: 12px 16px !important;
-}
-
-#view-overview #annual-target-wrap > .ov-card > div:first-child {
-  margin-bottom: 8px !important;
-}
-
-#view-overview #annual-target-wrap th {
-  padding-top: 5px !important;
-  padding-bottom: 5px !important;
-}
-
-#view-overview #annual-target-wrap td {
-  padding-top: 6px !important;
-  padding-bottom: 6px !important;
-}
-
-#view-overview .ov-row {
-  gap: 12px !important;
-  padding-bottom: 12px !important;
-}
-
-#view-overview .ov-card {
-  border-radius: 14px;
-}
-
-#view-overview .ov-row > .ov-card {
-  padding: 14px;
-}
-
-#view-overview .ov-card-title {
-  margin-bottom: 9px;
-}
-
-#view-overview .ov-card > div[style*="height:220px"] { height: 180px !important; }
-#view-overview .ov-card > div[style*="height:200px"] { height: 170px !important; }
-#view-overview .ov-card > div[style*="height:180px"] { height: 155px !important; }
-#view-overview .ov-card > div[style*="height:160px"] { height: 140px !important; }
-
-#view-overview #ov-critical { max-height: 180px !important; }
-#view-overview #ov-adv-alerts { max-height: 170px !important; }
-
 @media (max-width: 700px) {
-  #view-overview > div:first-child { padding-top: 12px !important; }
-  #view-overview #stat-row { padding: 10px 12px !important; gap: 8px !important; }
-  #view-overview #stat-row .stat-c { padding: 11px 12px; }
-  #view-overview #annual-target-wrap { padding: 0 12px 10px !important; }
-  #view-overview .ov-row > .ov-card { padding: 12px; }
+  .ovd-pad { padding: 0 12px 12px; }
+  .ovd-c3 { grid-column: span 12; }
+  .ovd-fc-ticks button.minor { display: none; }
+  .ovd-fc-head { font-size: 14.5px; }
 }
+@media (max-width: 420px) {
+  .ovd-kpis, .ovd-fk { grid-template-columns: minmax(0, 1fr); }
+}
+/* กลุ่มตามประเภทโครงการใน popup — สีของประเภท (--gc) แยกกลุ่มให้ชัด */
+.ovd-grp { --gc: var(--violet); margin-top: 10px; border: 1px solid color-mix(in srgb, var(--gc) 30%, var(--border)); border-left: 5px solid var(--gc); border-radius: 12px; background: color-mix(in srgb, var(--gc) 5%, var(--surface)); overflow: clip; }
+.ovd-grp:first-child { margin-top: 4px; }
+.ovd-gh { position: sticky; top: -18px; z-index: 1; display: flex; align-items: center; gap: 2px; flex-wrap: wrap; padding: 8px 12px; background: color-mix(in srgb, var(--gc) 16%, var(--surface)); border-bottom: 1px solid color-mix(in srgb, var(--gc) 30%, var(--border)); font-size: 12.5px; }
+.ovd-gh .ovd-sw { background: var(--gc); width: 10px; height: 10px; }
+.ovd-gh b { color: color-mix(in srgb, var(--gc) 65%, var(--txt)); margin-right: 8px; font-weight: 800; }
+.ovd-gh span:last-child { color: var(--txt2); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.ovd-grp .ovd-li { padding-left: 12px; padding-right: 12px; border-bottom-color: color-mix(in srgb, var(--gc) 15%, var(--border)); }
+.ovd-grp button.ovd-li:hover { background: color-mix(in srgb, var(--gc) 12%, var(--surface)); }
+/* กราฟค่อย ๆ ปรากฏครั้งแรก (แทนการโผล่ทันที) */
+.ovd-chart > div:first-child { animation: ovdFade .35s ease-out; }
+@keyframes ovdFade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .ovd-chart > div:first-child { animation: none; } }
+
+/* ── โครงการที่ต้องจับตา ── */
+.ovd-watch { padding: 14px !important; }
+.ovd-tabs { flex-wrap: wrap; }
+.ovd-tab-n { display: inline-block; min-width: 18px; padding: 0 6px; margin-left: 4px; border-radius: 99px; background: var(--surface2); color: var(--txt2); font-size: 11px; font-variant-numeric: tabular-nums; }
+.ovd-tabs button[aria-pressed="true"] .ovd-tab-n { background: var(--violet); color: #fff; }
+.ovd-watch .ovd-gh { position: static; }
+.ovd-watch-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; font-size: 12px; color: var(--txt3); }

@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<!-- แนะนำทีม (ลิงก์แชร์สาธารณะ) — team.html?t=<team_showcases.share_token> ไม่ต้อง login · ไว้ใส่สไลด์นำเสนอ
+     สร้างลิงก์: ทีม › แนะนำทีม › 🔗 แชร์ลิงก์ (src/modules/team-showcase.js tsShare)
+     ตัวเลือก: auto=0 ไม่เล่นอัตโนมัติ · ui=0 ซ่อนปุ่มควบคุม · voice=1 เปิดเสียงแนะนำตัวทันที (เบราว์เซอร์ให้เริ่มเสียงหลังแตะจอครั้งแรก)
+     เวที/ตำแหน่งตัวการ์ตูน + คำพูดแนะนำตัว ใช้ร่วมกับในระบบ: src/utils/team-stage.util.js · เสียง: src/services/tts.service.js (/api/tts) -->
+<title>แนะนำทีม</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#F4845F">
+<link rel="icon" type="image/png" href="img/icon_app.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css">
+<link rel="stylesheet" href="src/styles/modules/team-showcase.css">
+<style>
+  :root { color-scheme: light; --txt: #1a1d2e; --txt2: #52514e; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #F4845F; font-family: 'Noto Sans Thai', 'Inter', sans-serif; overflow: hidden; }
+  #app { height: 100%; display: flex; flex-direction: column; }
+  .ts-hero { min-height: 0; height: 100%; }
+  .ts-hero.no-ui .ts-nav { display: none; }
+  .ts-hero.no-ui .ts-copy { bottom: 56px; }
+  /* เบราว์เซอร์ยังไม่ให้เล่นเสียง → บอกให้แตะจอ */
+  .ts-tap { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); z-index: 70; padding: 8px 16px; border-radius: 999px;
+    background: rgba(26,29,46,.72); color: #fff; font-size: 13px; font-weight: 600; pointer-events: none; display: none; }
+  .ts-tap.on { display: block; }
+  .ts-empty { margin: auto; color: #fff; }
+  .ts-empty b { color: #fff; }
+  .ts-empty p { color: rgba(255,255,255,.9); }
+</style>
+</head>
+<body>
+<div id="app"><div class="ts-empty"><div class="ts-empty-ic">⏳</div><b>กำลังโหลด...</b></div></div>
+
+<script src="env-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="src/utils/team-stage.util.js"></script>
+<script src="src/services/tts.service.js"></script>
+<script>
+(function () {
+  var app = document.getElementById('app');
+  var S = window.TeamStage, AUTO_MS = 5000, VOICE_PAUSE = 1200;
+  var qs = new URLSearchParams(location.search);
+  var token = qs.get('t') || '', AUTO = qs.get('auto') !== '0', UI = qs.get('ui') !== '0';
+  var team = null, list = [], active = 0, anim = false, timer = null;
+  var voice = false, voiceTimer = null;
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function notice(icon, title, text) {
+    app.innerHTML = '<div class="ts-empty"><div class="ts-empty-ic">' + icon + '</div><b>' + esc(title) + '</b>' + (text ? '<p>' + esc(text) + '</p>' : '') + '</div>';
+  }
+  function rows(r) { if (r.error) throw r.error; return r.data || []; }
+
+  async function load() {
+    if (!token) return notice('🔗', 'ลิงก์ไม่ถูกต้อง', 'ขอลิงก์ใหม่จากผู้ดูแลทีม');
+    var db = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+    var t = rows(await db.from('team_showcases').select('id,name,ghost_text,members,voice').eq('share_token', token).limit(1))[0];
+    if (!t) return notice('🔗', 'ลิงก์นี้ใช้ไม่ได้แล้ว', 'ทีมอาจถูกลบ หรือผู้ดูแลสร้างลิงก์ใหม่แทน — ขอลิงก์ล่าสุดจากผู้ดูแลทีม');
+    // ดึงเฉพาะคอลัมน์ที่ใช้แสดง (ไม่ดึงอีเมล/เบอร์โทร/อัตราค่าจ้าง)
+    var got = await Promise.all([
+      db.from('staff').select('id,staff_id,full_name,nickname,department,position,is_active'),
+      db.from('positions').select('id,position_id,label_th,label,rank'),
+      db.from('departments').select('id,dept_id,label_th,label'),
+      db.from('staff_figures').select('id,image_url'),
+    ]);
+    var staff = {}, pos = {}, dept = {}, figs = {};
+    rows(got[1]).forEach(function (p) { pos[p.position_id || p.id] = { label: p.label_th || p.label || '', rank: Number(p.rank) || 99 }; });
+    rows(got[2]).forEach(function (d) { dept[d.dept_id || d.id] = d.label_th || d.label || ''; });
+    rows(got[3]).forEach(function (f) { if (f.image_url) figs[f.id] = f.image_url; });
+    rows(got[0]).forEach(function (d) {
+      var id = d.staff_id || d.id, name = d.full_name || '', p = pos[d.position] || { label: '', rank: 99 };
+      staff[id] = { id: id, name: name, nickname: d.nickname || name.split(' ')[0], role: p.label, rank: p.rank, dept: dept[d.department] || '',
+        active: d.is_active !== false && d.is_active !== 'FALSE' };
+    });
+    // เหมือน liveMembers ใน team-showcase.js: พนักงานถูกลบ/ปิดใช้งาน = ไม่แสดง · เรียงตามระดับตำแหน่ง → ชื่อ
+    list = (Array.isArray(t.members) ? t.members : []).map(function (m, i) {
+      var s = staff[m.staff_id];
+      if (!s || !s.active) return null;
+      return { staff: s, color: m.color || S.PALETTE[i % S.PALETTE.length], title: m.title || s.role || '', desc: m.desc || '',
+        speech: m.speech || '', fig: figs[s.id] || '' };
+    }).filter(Boolean).sort(function (a, b) { return a.staff.rank - b.staff.rank || a.staff.name.localeCompare(b.staff.name, 'th'); });
+    var v = t.voice || {};
+    team = { name: t.name || '', ghost: t.ghost_text || 'OUR TEAM',
+      voice: { intro: v.intro || '', member: v.member || '', outro: v.outro || '', polite: v.polite !== false } };
+    document.title = 'แนะนำทีม — ' + team.name;
+    if (!list.length) return notice('👥', 'ทีม "' + team.name + '" ยังไม่มีสมาชิก');
+    render();
+    if (qs.get('voice') === '1') window.tsVoice();
+  }
+
+  function figHtml(m) {
+    return m.fig ? '<img src="' + esc(m.fig) + '" alt="' + esc(m.staff.name) + '" draggable="false">' : S.placeholderSvg(m.staff.nickname);
+  }
+  function render() {
+    var many = list.length > 1;
+    app.innerHTML = '<div class="ts-hero' + (UI ? '' : ' no-ui') + '" id="ts-hero">'
+      + '<div class="ts-grain"></div>'
+      + '<div class="ts-ghost" style="--len:' + Math.max(4, team.ghost.length) + '">' + esc(team.ghost) + '</div>'
+      + '<div class="ts-brand">' + esc(team.name) + '</div>'
+      + '<div class="ts-tap" id="ts-tap">🔊 แตะหน้าจอเพื่อเริ่มเสียงแนะนำตัว</div>'
+      + '<div class="ts-stage">' + list.map(function (m, i) {
+        return '<div class="ts-fig" data-i="' + i + '" onclick="tsGoto(' + i + ')">' + figHtml(m) + '</div>';
+      }).join('') + '</div>'
+      + '<div class="ts-copy"><p class="ts-role" id="ts-role"></p><p class="ts-name" id="ts-name"></p><p class="ts-desc" id="ts-desc"></p>'
+      + '<div class="ts-nav">' + (many ? '<button type="button" aria-label="คนก่อนหน้า" onclick="tsNav(-1)"><i class="ti ti-arrow-left"></i></button>'
+        + '<button type="button" aria-label="คนถัดไป" onclick="tsNav(1)"><i class="ti ti-arrow-right"></i></button>'
+        + '<button type="button" class="ts-play" id="ts-play" onclick="tsAuto()"></button>' : '')
+      + '<button type="button" class="ts-play ts-voice" id="ts-voice" onclick="tsVoice()"></button>'
+      + '<button type="button" class="ts-play" id="ts-fs" onclick="tsFull()"></button>'
+      + (many ? '<span class="ts-count" id="ts-count"></span>' : '') + '</div></div>'
+      + '<div class="ts-total">' + String(list.length).padStart(2, '0') + '<small>MEMBERS</small></div>'
+      + '</div>';
+    apply();
+    tick();
+  }
+  function apply() {
+    var hero = document.getElementById('ts-hero');
+    if (!hero) return;
+    var mob = hero.clientWidth < 640, n = list.length, m = list[active];
+    hero.classList.toggle('mob', mob);
+    hero.querySelectorAll('.ts-fig').forEach(function (f) {
+      var role = S.roleOf(Number(f.getAttribute('data-i')), n, active);
+      Object.assign(f.style, S.styleFor(role, mob));
+      f.style.pointerEvents = role === 'center' || role === 'hidden' ? 'none' : '';
+    });
+    hero.style.backgroundColor = m.color;
+    document.body.style.backgroundColor = m.color;
+    var set = function (id, v) { var el = document.getElementById(id); if (el) el.textContent = v; };
+    set('ts-role', m.title || m.staff.nickname);
+    set('ts-name', m.staff.name + (m.staff.dept ? ' · ' + m.staff.dept : ''));
+    set('ts-desc', m.desc);
+    set('ts-count', (active + 1) + ' / ' + n);
+    var b = document.getElementById('ts-play');
+    if (b) {
+      b.innerHTML = '<i class="ti ti-player-' + (AUTO ? 'pause' : 'play') + '"></i>';
+      b.title = AUTO ? 'หยุดเล่นอัตโนมัติ' : 'เล่นอัตโนมัติ';
+      b.setAttribute('aria-label', b.title);
+      b.classList.toggle('on', AUTO);
+    }
+    var vb = document.getElementById('ts-voice');
+    if (vb) {
+      vb.textContent = voice ? '🔊' : '🔇';
+      vb.title = voice ? 'หยุดเสียงแนะนำตัว' : 'ให้ AI แนะนำตัวสมาชิกทีละคน ตั้งแต่คนแรกถึงคนสุดท้าย';
+      vb.setAttribute('aria-label', vb.title);
+      vb.classList.toggle('on', voice);
+    }
+    paintFs();
+  }
+  function step(to) {
+    if (anim || list.length < 2) return tick();
+    anim = true;
+    active = (to + list.length) % list.length;
+    apply();
+    setTimeout(function () { anim = false; }, S.DUR);
+    if (voice) speak(); // โหมดเสียง = แนะนำตัวคนใหม่ แล้วเลื่อนต่อเองเมื่อพูดจบ
+    tick(); // กดเลื่อนเอง = เริ่มนับเวลาใหม่
+  }
+  // เล่นอัตโนมัติ — ข้ามรอบตอนแท็บถูกซ่อน (สไลด์ยังไม่ถึงหน้านี้) แต่ยังนับต่อ · ระหว่างโหมดเสียง เสียงกำหนดจังหวะแทน
+  function tick() {
+    clearTimeout(timer);
+    if (!AUTO || voice || list.length < 2) return;
+    timer = setTimeout(function () { if (document.hidden) tick(); else step(active + 1); }, AUTO_MS);
+  }
+
+  // ── 🔊 เสียงแนะนำตัว — ลำดับเดียวกับในระบบ (team-showcase.js speakMember): ทักทาย + คนที่ 1 → พูดจบเลื่อนเอง
+  //    → คนสุดท้ายต่อคำปิดท้าย แล้วปิดเสียง · คำพูดตามที่ทีมตั้งไว้ (TeamStage.speechOf) ──
+  function voiceOff() {
+    if (!voice) return;
+    voice = false;
+    clearTimeout(voiceTimer);
+    window.TTS.stop();
+    tapHint(false);
+    apply();
+    tick();
+  }
+  function tapHint(on) { var el = document.getElementById('ts-tap'); if (el) el.classList.toggle('on', on); }
+  function speak(withIntro) {
+    clearTimeout(voiceTimer);
+    var i = active;
+    window.TTS.play(S.speechOf(team, list, i, withIntro), {
+      polite: team.voice.polite,
+      onWait: function () { tapHint(true); },
+      onPart: function () { tapHint(false); },
+      onEnd: function () {
+        if (!voice) return;
+        if (i >= list.length - 1) return voiceOff(); // คนสุดท้ายแล้ว
+        (function next(wait) {
+          voiceTimer = setTimeout(function () {
+            if (!voice) return;
+            if (anim) return next(S.DUR);
+            step(i + 1);
+          }, wait);
+        })(VOICE_PAUSE);
+      },
+      onError: function () { voiceOff(); },
+    });
+  }
+  window.tsVoice = function () {
+    if (voice) return voiceOff();
+    voice = true;
+    clearTimeout(timer);
+    active = 0; // เริ่มคนที่ 1 เสมอ
+    apply();
+    speak(true);
+  };
+
+  window.tsNav = function (d) { step(active + d); };
+  window.tsGoto = function (i) { if (i !== active) step(i); };
+  window.tsAuto = function () { AUTO = !AUTO; apply(); tick(); };
+  // ── เต็มจอ: ปุ่มในแถวควบคุม / ดับเบิลคลิกตรงไหนก็ได้ (ใช้ได้แม้ซ่อนปุ่ม) / ปุ่ม F · กดซ้ำ = ออกจากเต็มจอ
+  //    ฝังในสไลด์ (iframe) ที่ไม่อนุญาตเต็มจอ → เปิดหน้านี้ในแท็บใหม่แทน ──
+  function fsEl() { return document.fullscreenElement || document.webkitFullscreenElement; }
+  function paintFs() {
+    var b = document.getElementById('ts-fs');
+    if (!b) return;
+    b.innerHTML = '<i class="ti ti-' + (fsEl() ? 'minimize' : 'maximize') + '"></i>';
+    b.title = fsEl() ? 'ออกจากเต็มจอ (Esc)' : 'แสดงเต็มจอ (F หรือดับเบิลคลิก)';
+    b.setAttribute('aria-label', b.title);
+  }
+  window.tsFull = function () {
+    if (fsEl()) { (document.exitFullscreen || document.webkitExitFullscreen).call(document); return; }
+    var el = document.documentElement, req = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (!req || !(document.fullscreenEnabled || document.webkitFullscreenEnabled)) { window.open(location.href, '_blank'); return; }
+    var p = req.call(el);
+    if (p && p.catch) p.catch(function () {});
+  };
+  document.addEventListener('dblclick', function (e) { if (list.length && !e.target.closest('button')) window.tsFull(); });
+
+  document.addEventListener('keydown', function (e) {
+    if (!list.length) return;
+    if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); window.tsNav(1); }
+    if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); window.tsNav(-1); }
+    if (e.key === 'f' || e.key === 'F') window.tsFull();
+    if (e.key === 'v' || e.key === 'V') window.tsVoice();
+  });
+  // ปัดซ้าย/ขวาบนจอสัมผัส
+  var x0 = null;
+  document.addEventListener('touchstart', function (e) { x0 = e.touches[0].clientX; }, { passive: true });
+  document.addEventListener('touchend', function (e) {
+    if (x0 === null) return;
+    var dx = e.changedTouches[0].clientX - x0;
+    x0 = null;
+    if (Math.abs(dx) > 50) window.tsNav(dx < 0 ? 1 : -1);
+  });
+  window.addEventListener('resize', function () { if (list.length) apply(); });
+  ['fullscreenchange', 'webkitfullscreenchange'].forEach(function (ev) {
+    document.addEventListener(ev, function () { setTimeout(function () { if (list.length) apply(); }, 60); });
+  });
+
+  load().catch(function () { notice('⚠️', 'โหลดข้อมูลไม่สำเร็จ', 'ตรวจการเชื่อมต่อแล้วลองรีเฟรชหน้าอีกครั้ง'); });
+})();
+</script>
+</body>
+</html>

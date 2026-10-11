@@ -28,6 +28,9 @@
     targets: 'target-arrow',
     helpdesk: 'headset',
     assist: 'messages',
+    datacheck: 'file-search',
+    team_showcase: 'friends',
+    team_map: 'map-2',
     server_request: 'server',
     hospital: 'building-hospital',
     contract: 'file-description',
@@ -57,6 +60,9 @@
     targets:      { color:'#c026d3', bg:'rgba(192,38,211,.13)', end:'#e879f9', shadow:'rgba(192,38,211,.24)' },
     helpdesk:     { color:'#0e7490', bg:'rgba(14,116,144,.14)', end:'#22d3ee', shadow:'rgba(14,116,144,.25)' },
     assist:       { color:'#8b5cf6', bg:'rgba(139,92,246,.14)', end:'#c084fc', shadow:'rgba(139,92,246,.25)' },
+    datacheck:    { color:'#8b5cf6', bg:'rgba(139,92,246,.14)', end:'#c084fc', shadow:'rgba(139,92,246,.25)' },
+    team_showcase: { color:'#ea6a47', bg:'rgba(234,106,71,.14)', end:'#f79b7f', shadow:'rgba(234,106,71,.25)' },
+    team_map:     { color:'#d97706', bg:'rgba(217,119,6,.14)',  end:'#fbbf24', shadow:'rgba(217,119,6,.25)' },
     server_request: { color:'#0891b2', bg:'rgba(8,145,178,.14)', end:'#22d3ee', shadow:'rgba(8,145,178,.25)' },
     hospital:     { color:'#0369a1', bg:'rgba(3,105,161,.14)',  end:'#38bdf8', shadow:'rgba(3,105,161,.25)' },
     contract:     { color:'#475569', bg:'rgba(71,85,105,.14)',  end:'#94a3b8', shadow:'rgba(71,85,105,.25)' },
@@ -71,7 +77,7 @@
     'chart-bar':'📊', 'layout-kanban':'🗂️', 'folder':'📁', 'credit-card':'💳', 'receipt-2':'🧾', 'receipt':'💵',
     'bed':'🏨', 'timeline-event':'🛠️', 'alert-hexagon':'🩹', 'school':'🎓', 'clock-hour-4':'⏱️', 'wallet':'💰',
     'chart-arrows-vertical':'🏢', 'users-group':'👥', 'calendar-event':'📅', 'calendar-star':'🎌', 'calendar-off':'🏖️',
-    'notes':'📝', 'target-arrow':'🎯', 'headset':'🎧', 'messages':'💬', 'server':'🖥️', 'building-hospital':'🏥',
+    'notes':'📝', 'target-arrow':'🎯', 'headset':'🎧', 'messages':'💬', 'file-search':'🧹', 'server':'🖥️', 'building-hospital':'🏥',
     'file-description':'📄', 'settings':'⚙️', 'key':'🔑', 'layout-grid':'🧩', 'dashboard':'📊',
     // กราฟ / รายงาน
     'chart-line':'📈', 'trending-up':'📈', 'chart-pie':'🥧', 'chart-donut':'🍩', 'chart-donut-3':'🍩', 'chart-dots':'📉',
@@ -87,7 +93,7 @@
     'plus':'➕', 'circle-plus':'➕', 'edit':'✏️', 'pencil':'✏️', 'pencil-plus':'✏️', 'pencil-check':'✏️', 'edit-off':'✏️',
     'trash':'🗑️', 'trash-x':'🗑️', 'device-floppy':'💾', 'send':'📤', 'refresh':'🔄', 'restore':'♻️', 'repeat':'🔁',
     'arrow-back-up':'↩️', 'search':'🔍', 'search-off':'🔍', 'user-search':'🔍', 'calendar-search':'🔍', 'filter-off':'🧹',
-    'eye':'👁️', 'eye-off':'🙈', 'eye-check':'👀', 'sparkles':'✨', 'wand':'🪄', 'bulb':'💡', 'bolt':'⚡',
+    'eye':'👁️', 'eye-off':'🙈', 'eye-check':'👀', 'sparkles':'✨', 'wand':'✨', 'bulb':'💡', 'bolt':'⚡',
     'login':'🔐', 'git-merge':'🔀', 'arrows-shuffle':'🔀', 'adjustments':'🎛️', 'palette':'🎨', 'player-play':'▶️',
     'keyboard':'⌨️', 'volume':'🔊', 'brand-line':'💚', 'thumb-up':'👍', 'thumb-down':'👎', 'heart-filled':'❤️',
     'heart-handshake':'🤝', 'mood-sad':'😢', 'mood-empty':'😐', 'walk':'🚶', 'armchair':'🪑', 'environment':'🌿',
@@ -101,11 +107,17 @@
     'calendar':'📆', 'calendar-plus':'📆', 'calendar-x':'📆', 'calendar-check':'📆', 'calendar-time':'📆',
     'calendar-stats':'🗓️', 'calendar-month':'🗓️',
     // คน / องค์กร / สถานที่
-    'user':'👤', 'users':'👥', 'users-plus':'👥', 'users-minus':'👥', 'user-check':'👤', 'user-plus':'👤', 'user-x':'👤',
-    'user-question':'👤', 'user-star':'👨‍💼', 'id-badge':'🪪', 'id-badge-2':'🪪', 'briefcase':'💼', 'building':'🏢',
+    'friends':'🧸', 'user':'👤', 'users':'👥', 'users-plus':'👥', 'users-minus':'👥', 'user-check':'👤', 'user-plus':'👤', 'user-x':'👤',
+    'user-question':'👤', 'user-star':'👨‍💼', 'id-badge':'📛', 'id-badge-2':'📛', 'briefcase':'💼', 'building':'🏢',
     'building-community':'🏘️', 'building-warehouse':'🏭', 'building-off':'🏢', 'map-pin':'📍', 'map-2':'🗺️',
     'mail':'✉️', 'mail-forward':'📨', 'mail-check':'📨', 'mail-off':'✉️', 'message-2':'💬', 'ticket':'🎫',
-    'tool':'🔧', 'tools':'🛠️', 'heart-rate-monitor':'🩺', 'moon':'🌙', 'sun':'☀️'
+    'tool':'🔧', 'tools':'🛠️', 'heart-rate-monitor':'🩺', 'moon':'🌙', 'sun':'☀️',
+    'user-circle':'👤', 'phone':'📞', 'device-mobile':'📱', 'world':'🌐', 'robot':'🤖', 'radar-2':'📡', 'target':'🎯',
+    'car':'🚗', 'flag':'🚩', 'fingerprint':'🔏', 'lock-check':'🔒', 'ban':'🚫', 'power':'🔌',
+    // อื่นๆ
+    'qrcode':'🔳', 'scan':'📷', 'share':'🔗', 'note':'🗒️', 'book-2':'📗', 'file-invoice':'🧾', 'braces':'🧩',
+    'crop':'✂️', 'hand-move':'✋', 'filter':'🔽', 'rotate-360':'🔄', 'chart-bar-off':'📊', 'brand-apple':'🍎',
+    'player-play-filled':'▶️', 'player-pause':'⏸️', 'player-pause-filled':'⏸️', 'wave-sine':'🎵'
   };
 
   function cleanName(name) {

@@ -1,10 +1,11 @@
-// ตัวส่ง Web Push — รันอยู่ใน frontend container เดียวกับ nginx (docker-entrypoint.sh สั่ง start)
+// ตัวส่ง Web Push + แจ้งเตือน BMS Notify (notify-relay.js) — รันอยู่ใน frontend container เดียวกับ nginx (docker-entrypoint.sh สั่ง start)
 // ไม่ต้องตั้งค่าอะไรบน server เพิ่ม: ใช้ SUPABASE_ANON_KEY + API_UPSTREAM/SUPABASE_URL ที่ container มีอยู่แล้ว
 // VAPID key คำนวณจาก worker.secret (ฝังใน image ตอน build) — private key ไม่ถูกเก็บที่ไหนเลย
 // ฐานข้อมูลเก็บแค่ public key · RPC ของตัวส่งต้องแนบรหัสลับ (ดู WEB PUSH ใน db-schema.sql)
 import { createECDH, createHmac } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import webpush from 'web-push';
+import { serveNotify } from './notify-relay.js';
 // ตัวค้นคลังความรู้ชุดเดียวกับหน้าเว็บ — ใน image: Dockerfile คัดลอกมาไว้ข้างไฟล์นี้ · ในโฟลเดอร์โปรเจกต์: อ่านจาก docs/
 try { await import('./ai-knowledge.js'); } catch (_) { await import('../docs/src/services/ai-knowledge.js'); }
 const { aiKnowledge } = globalThis;
@@ -379,6 +380,8 @@ async function pollAi() {
 }
 
 async function start() {
+  // แจ้งเตือน BMS Notify (nginx /api/notify → พอร์ตนี้) — ต้องตรงกับ nginx.conf
+  serveNotify(rpc, Number(process.env.NOTIFY_PORT) || 8790);
   const keys = vapidKeys();
   webpush.setVapidDetails('mailto:admin@bmscloud.in.th', keys.publicKey, keys.privateKey);
   // ยังไม่ได้รัน SQL ส่วน Web Push / DB ยังไม่พร้อม → รอแล้วลองใหม่ (nginx ทำงานต่อปกติ)

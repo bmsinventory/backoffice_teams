@@ -966,9 +966,12 @@ window._initHdHospCombobox = (function () {
     }
     return out;
   }
-  return function (curId) {
-    var inp = document.getElementById('hdf-hosp-cmb-input'), drop = document.getElementById('hdf-hosp-cmb-drop'),
-      lst = document.getElementById('hdf-hosp-cmb-list'), hid = document.getElementById('hdf-hosp');
+  // pfx (ไม่บังคับ) = prefix ของ id (ค่าเริ่มต้น hdf-hosp · "วางแชท LINE" ใช้ prefix แยกต่อไฟล์/ต่อเรื่อง)
+  // opts.onPick(id) เรียกเมื่อผู้ใช้เลือกโรงพยาบาลใหม่
+  return function (curId, pfx, opts) {
+    pfx = pfx || 'hdf-hosp'; opts = opts || {};
+    var inp = document.getElementById(pfx + '-cmb-input'), drop = document.getElementById(pfx + '-cmb-drop'),
+      lst = document.getElementById(pfx + '-cmb-list'), hid = document.getElementById(pfx);
     if (!inp || !drop || !lst || !hid) return;
     var items = (window.HOSPITALS || []).slice()
       .sort(function (a, b) { return (a.name || '').localeCompare(b.name || '', 'th'); })
@@ -996,7 +999,12 @@ window._initHdHospCombobox = (function () {
     // หลุดจาก input ทันทีที่เลื่อนโมดัล (เจอบ่อยบนมือถือที่ฟิลด์เยอะจนต้องเลื่อน) ──
     function openDrop() { if (isOpen) return; isOpen = true; q = ''; fi = -1; flat = bFlat(''); lst.scrollTop = 0; render(); positionDrop(); drop.style.display = 'block'; window.addEventListener('resize', positionDrop); window.addEventListener('scroll', positionDrop, true); }
     function closeDrop() { if (!isOpen) return; isOpen = false; drop.style.display = 'none'; inp.value = selLabel; window.removeEventListener('resize', positionDrop); window.removeEventListener('scroll', positionDrop, true); }
-    function selItem(id, label) { selId = id; selLabel = label; hid.value = id; inp.classList.remove('hd-invalid'); closeDrop(); hid.dispatchEvent(new Event('change')); }
+    function selItem(id, label) {
+      var changed = id !== selId;
+      selId = id; selLabel = label; hid.value = id; inp.classList.remove('hd-invalid'); closeDrop(); hid.dispatchEvent(new Event('change'));
+      if (changed && opts.onPick) opts.onPick(id);
+    }
+    lst.addEventListener('mousedown', function (e) { e.preventDefault(); }); // คลิกในรายการไม่ให้ input เสีย focus
     lst.addEventListener('click', function (e) { var it = e.target.closest('.hdhc-i'); if (it) selItem(it.dataset.id, it.dataset.label); });
     lst.addEventListener('mousemove', function (e) { var it = e.target.closest('.hdhc-i'); if (it) { var ni = +it.dataset.idx; if (ni !== fi) { fi = ni; render(); } } });
     inp.addEventListener('click', function () { if (isOpen) closeDrop(); else openDrop(); });
@@ -1009,7 +1017,7 @@ window._initHdHospCombobox = (function () {
       else if (e.key === 'ArrowUp') { e.preventDefault(); fi = fi > 0 ? fi - 1 : 0; render(); }
       else if (e.key === 'Enter') { e.preventDefault(); if (flat[fi]) selItem(flat[fi].id, flat[fi].label); }
     });
-    document.addEventListener('mousedown', function onOut(e) { var wrap = document.getElementById('hdf-hosp-cmb-wrap'); if (!wrap) { document.removeEventListener('mousedown', onOut); return; } if (!wrap.contains(e.target) && !drop.contains(e.target)) closeDrop(); });
+    document.addEventListener('mousedown', function onOut(e) { var wrap = document.getElementById(pfx + '-cmb-wrap'); if (!wrap || !document.body.contains(inp)) { document.removeEventListener('mousedown', onOut); closeDrop(); return; } if (!wrap.contains(e.target) && !drop.contains(e.target)) closeDrop(); });
     // ให้โค้ดเลือกโรงพยาบาลแทนผู้ใช้ได้ (เช่น จับคู่จากชื่อกลุ่ม LINE) — ต้องตั้งทั้งค่าซ่อน (ที่ใช้บันทึก) และข้อความที่แสดง
     inp._hdSetHosp = function (id) {
       var it = items.find(function (x) { return x.id === id; });
@@ -1022,14 +1030,15 @@ window._initHdHospCombobox = (function () {
   };
 })();
 
-// ── Markup ของ combobox "โรงพยาบาล" ──
-function hdHospComboMarkup(hiddenValue) {
-  return '<div id="hdf-hosp-cmb-wrap" style="position:relative;">'
-    + '<input id="hdf-hosp-cmb-input" type="text" class="f-input" placeholder="พิมพ์ค้นหาชื่อโรงพยาบาล..." autocomplete="off" spellcheck="false" style="padding-right:28px;cursor:pointer;">'
+// ── Markup ของ combobox "โรงพยาบาล" — pfx/cls ไม่บังคับ (ค่าเริ่มต้น = ฟอร์ม "+ แจ้งแทน") ──
+function hdHospComboMarkup(hiddenValue, pfx, cls) {
+  pfx = pfx || 'hdf-hosp';
+  return '<div id="' + pfx + '-cmb-wrap" style="position:relative;">'
+    + '<input id="' + pfx + '-cmb-input" type="text" class="' + (cls || 'f-input') + '" placeholder="พิมพ์ค้นหาชื่อ / รหัสโรงพยาบาล..." autocomplete="off" spellcheck="false" style="width:100%;padding-right:28px;cursor:pointer;">'
     + '<span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:11px;color:var(--txt3);">▼</span>'
-    + '<input type="hidden" id="hdf-hosp" value="' + esc(hiddenValue || '') + '">'
-    + '<div id="hdf-hosp-cmb-drop" style="display:none;z-index:9500;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.15);overflow:hidden;">'
-    + '<div id="hdf-hosp-cmb-list" style="max-height:280px;overflow-y:auto;"></div>'
+    + '<input type="hidden" id="' + pfx + '" value="' + esc(hiddenValue || '') + '">'
+    + '<div id="' + pfx + '-cmb-drop" style="display:none;z-index:9500;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.15);overflow:hidden;">'
+    + '<div id="' + pfx + '-cmb-list" style="max-height:280px;overflow-y:auto;"></div>'
     + '</div>'
     + '</div>';
 }
@@ -1283,8 +1292,6 @@ function hdStaffComboMarkup(pfx, cls, disabled, ph, wrapStyle) {
 window.hdOpenModal = function (id) {
   window.hdEditId = id || null;
   var t = id ? hdTicket(id) : null;
-  var lineBody = document.getElementById('m-hd-line-body');
-  if (lineBody) lineBody.innerHTML = ''; // หน้าต่างแยกแชทใช้ id ช่องโรงพยาบาล/ระบบชุดเดียวกัน — ล้างทิ้งกัน id ซ้ำ
   var catOpts = '<option value="">--เลือกหมวดปัญหา--</option>' + (window.HELPDESK_CATEGORIES || [])
     .map(function (c) { return '<option value="' + c.id + '" data-pri="' + c.defaultPriority + '"' + (t && t.categoryId === c.id ? ' selected' : '') + '>' + esc(c.name) + '</option>'; }).join('');
   // ความเร่งด่วนเรียงจาก Priority ต่ำสุดมาก่อน (ป้องกันเลือก default เป็นเคสด่วนโดยไม่ตั้งใจ) — ค่าแรกในลิสต์ = ค่า default
@@ -1815,50 +1822,163 @@ function hdKbRenderList() {
       + (q || f.cat ? 'ไม่พบรายการที่ตรงกัน' : 'ยังไม่มีรายการ — เมื่อปิดงาน Ticket ระบบจะให้ AI ช่วยสรุปวิธีแก้เข้าคลังนี้') + '</div>');
 }
 
-// ══ วางแชท LINE → AI แยกเป็นหลาย Ticket ══════════════════════════════
-// อ่านแชท/เลือกช่วงวันที่ และขั้นตรวจทาน ใช้ตัวกลางใน src/utils/chat-import.util.js (lineChat / aiReview)
-// ส่วนนี้กำหนดเฉพาะของ Helpdesk: โรงพยาบาล/ระบบ/กลุ่ม LINE, คำสั่ง AI, ช่องของ Ticket และการสร้าง Ticket ──
-// ชื่อในแชท (เช่น "เอก BMS") → พนักงานในระบบ
+// ══ วางแชท LINE → AI แยกเป็นหลาย Ticket (หลายไฟล์ / หลายโรงพยาบาล) ══════════
+// อ่านแชท/เลือกช่วงวันที่ และขั้นตรวจทาน ใช้ตัวกลางใน src/utils/chat-import.util.js (lineChat โหมดหลายแหล่ง / aiReview)
+// ส่วนนี้กำหนดเฉพาะของ Helpdesk: จับคู่โรงพยาบาลต่อไฟล์, ระบบ/ผู้แจ้ง/หมวด, คำสั่ง AI, ช่องของ Ticket และการสร้าง Ticket
+// หลัก: ไม่ทราบโรงพยาบาลจริง ๆ = ถามผู้ใช้ก่อน (ต้องเลือกก่อนให้ AI แยกปัญหา) ไม่เดาเอง ──
+
+// ── จับคู่โรงพยาบาลจากชื่อกลุ่ม LINE / ชื่อไฟล์ ──
+// ตัดคำนำหน้า/ช่องว่าง/เครื่องหมายก่อนเทียบ: "โรงพยาบาลน่าน" / "รพ.น่าน" / "รพ. น่าน" → "น่าน" · "รพร.ปัว" → "สมเด็จพระยุพราชปัว"
+// ตัด "รพ" เฉพาะที่ไม่ได้อยู่กลางคำไทย (กัน "สรรพ..." ถูกตัด)
+function hdHospCore(s) {
+  return String(s || '').toLowerCase()
+    .replace(/โรงพยาบาลส่งเสริมสุขภาพตำบล|โรงพยาบาล/g, ' ')
+    .replace(/(^|[^ก-๙])รพร\.?\s?/g, '$1สมเด็จพระยุพราช')
+    .replace(/(^|[^ก-๙])ร\.?\s?พ\.?\s?(สต\.|ช\.)?/g, '$1')
+    .replace(/[\s()\[\]{}\-_.,|/\\:;'"`~!@#$%^&*+=<>?]+/g, '');
+}
+// → { id, how: 'history' | 'code' | 'name' | '', cands: [id] } — ตรงคนเดียวเท่านั้นถึงเลือกให้ · กำกวม = cands ให้ผู้ใช้เลือก
+function hdHospGuess(text) {
+  var t = String(text || ''), g = hdHospCore(t), hs = window.HOSPITALS || [];
+  var none = { id: '', how: '', cands: [] };
+  if (!g) return none;
+  // 1) เคยบันทึก Ticket จากกลุ่ม LINE ชื่อเดียวกันนี้ → โรงพยาบาลเดิม
+  var hist = {};
+  (window.HELPDESK_TICKETS || []).forEach(function (tk) {
+    if (tk.hospitalId && tk.lineGroupRef && hdHosp(tk.hospitalId) && hdHospCore(tk.lineGroupRef) === g) hist[tk.hospitalId] = 1;
+  });
+  var hk = Object.keys(hist);
+  if (hk.length === 1) return { id: hk[0], how: 'history', cands: [] };
+  // 2) รหัสโรงพยาบาล 5 หลักในชื่อ
+  var codes = []; t.replace(/(^|\D)(\d{5})(?!\d)/g, function (m, a, c) { codes.push(c); });
+  var byCode = hs.filter(function (h) { return h.code && codes.indexOf(String(h.code).trim()) > -1; });
+  if (byCode.length === 1) return { id: byCode[0].id, how: 'code', cands: [] };
+  // 3) ชื่อโรงพยาบาลอยู่ในชื่อกลุ่ม — ตัดชื่อที่เป็นส่วนหนึ่งของชื่อที่ยาวกว่าซึ่งก็ตรงด้วย (เช่น "ปัว" ใน "สมเด็จพระยุพราชปัว")
+  var hits = hs.map(function (h) { return { h: h, c: hdHospCore(h.name) }; })
+    .filter(function (x) { return x.c.length >= 3 && g.indexOf(x.c) > -1; });
+  hits = hits.filter(function (x) { return !hits.some(function (y) { return y.c.length > x.c.length && y.c.indexOf(x.c) > -1; }); });
+  if (hits.length === 1) return { id: hits[0].h.id, how: 'name', cands: [] };
+  var cands = [];
+  hk.concat(byCode.map(function (h) { return h.id; }), hits.map(function (x) { return x.h.id; }))
+    .forEach(function (id) { if (cands.indexOf(id) < 0) cands.push(id); });
+  return { id: '', how: '', cands: cands.slice(0, 6) };
+}
+// ผู้ส่งในแชทตรงกับรายชื่อผู้ติดต่อของโรงพยาบาล → ตรงแห่งเดียว = เลือกให้ (ให้ตรวจสอบ) · หลายแห่ง = เป็นตัวเลือก
+function hdHospByContacts(msgs) {
+  var names = [];
+  (msgs || []).forEach(function (x) { if (x.name && names.length < 40 && names.indexOf(x.name) < 0) names.push(x.name); });
+  var hits = !names.length ? [] : (window.HOSPITALS || []).filter(function (h) {
+    var cs = h.contacts || [];
+    return cs.length && names.some(function (n) { return window.lineChat.matchPerson(n, cs); });
+  }).map(function (h) { return h.id; });
+  return hits.length === 1 ? { id: hits[0], how: 'contact', cands: [] } : { id: '', how: '', cands: hits.slice(0, 6) };
+}
+// เดาโรงพยาบาลของแหล่งแชทใหม่เมื่อชื่อกลุ่ม/ไฟล์/ข้อความเปลี่ยน (ถ้าผู้ใช้เลือกเองแล้วไม่ทับ)
+function hdLineSrcGuess(s) {
+  var m = s.meta, key = (s.group || '') + '|' + s.label + '|' + ((s.p && s.p.msgs.length) || 0);
+  if (m.how === 'user' || m.key === key) return;
+  m.key = key;
+  var g = hdHospGuess(s.group);
+  if (!g.id && !g.cands.length && s.isFile) g = hdHospGuess(s.label.replace(/\.txt$/i, ''));
+  if (!g.id && !g.cands.length) g = hdHospByContacts(s.p && s.p.msgs);
+  m.hospId = g.id; m.how = g.how; m.cands = g.cands;
+}
+// [สถานะ, คำอธิบายเต็ม, คำอธิบายสั้นในแถวย่อ]
+var HD_LINE_HOW = {
+  user: ['ok', '✔ เลือกเอง', 'เลือกเอง'],
+  history: ['ok', '✅ เคยบันทึก Ticket จากกลุ่ม LINE นี้กับโรงพยาบาลนี้', 'เคยใช้กับกลุ่มนี้'],
+  code: ['ok', '✅ ตรงรหัสโรงพยาบาลในชื่อกลุ่ม/ไฟล์', 'ตรงรหัสในชื่อกลุ่ม'],
+  name: ['chk', '🔎 จับคู่จากชื่อกลุ่ม/ไฟล์ — ตรวจสอบให้ถูกต้อง', 'ตรงชื่อกลุ่ม — ตรวจสอบให้ถูกต้อง'],
+  contact: ['chk', '🔎 ผู้ส่งในแชทตรงกับผู้ติดต่อของโรงพยาบาลนี้ — ตรวจสอบให้ถูกต้อง', 'ผู้ส่งในแชทตรงกับผู้ติดต่อ — ตรวจสอบให้ถูกต้อง'],
+};
+// จับคู่โรงพยาบาลได้แล้ว = แถวย่อ (ชื่อ + เหตุผล + เปลี่ยน) · ยังไม่ทราบ / กดเปลี่ยน = ช่องค้นหา + ตัวเลือกที่ใกล้เคียง
+function hdLineSrcCompact(s) { return !!s.meta.hospId && !s.meta.edit; }
+function hdLineSrcHtml(s, n) {
+  var m = s.meta, how = HD_LINE_HOW[m.hospId ? m.how || 'user' : ''];
+  if (hdLineSrcCompact(s)) {
+    var h = hdHosp(m.hospId);
+    return '<span class="lc-src-ok ' + how[0] + '"><b>' + (how[0] === 'ok' ? '✔ ' : '🔎 ') + esc(h ? (h.code ? h.code + ' ' : '') + h.name : '') + '</b>'
+      + '<span>' + how[2] + '</span>'
+      + '<a href="javascript:void(0)" onclick="window.hdLineEditSrc(\'' + s.id + '\')">เปลี่ยน</a></span>';
+  }
+  var st = how || ['ask', (m.cands || []).length ? '❓ แชทนี้ของโรงพยาบาลไหน? เลือกจากที่ใกล้เคียง หรือค้นหาเอง' : '❓ ไม่ทราบโรงพยาบาลของแชทนี้ — กรุณาเลือก (ระบบไม่เดาให้)'];
+  return '<div class="lc-src-f"><span>โรงพยาบาล <b class="hd-req">*</b></span>'
+    + hdHospComboMarkup(m.hospId || '', 'hdl-h-' + s.id, 'f-input' + (!m.hospId && n ? ' air-bad' : '')) + '</div>'
+    + '<div class="lc-src-st ' + st[0] + '">' + st[1]
+    + (!m.hospId && (m.cands || []).length ? '<div class="lc-src-cands">' + m.cands.map(function (id) {
+        var h = hdHosp(id);
+        return h ? '<button type="button" class="btn btn-ghost btn-sm" onclick="window.hdLinePickHosp(\'' + s.id + '\',\'' + esc(id) + '\')">🏥 ' + esc((h.code ? h.code + ' ' : '') + h.name) + '</button>' : '';
+      }).join('') + '</div>' : '')
+    + '</div>';
+}
+window.hdLinePickHosp = function (sid, hid) {
+  var s = window.lineChat.sources('hdl').find(function (x) { return x.id === sid; });
+  if (!s) return;
+  s.meta.hospId = hid; s.meta.how = hid ? 'user' : ''; s.meta.edit = false;
+  window.lineChat.scan('hdl'); // เลือกแล้ว → กลับเป็นแถวย่อ
+};
+window.hdLineEditSrc = function (sid) {
+  var s = window.lineChat.sources('hdl').find(function (x) { return x.id === sid; });
+  if (!s) return;
+  s.meta.edit = true;
+  window.lineChat.scan('hdl');
+  var fi = document.getElementById('hdl-h-' + sid + '-cmb-input'); if (fi) fi.focus();
+};
+
+// ── จับคู่ระบบ / หมวด / ผู้แจ้ง / ทีมงาน ให้ตรงกับข้อมูลในระบบ ──
+function hdSysKey(s) { return String(s || '').toLowerCase().replace(/[\s\-_.()\/\\,:]+/g, ''); }
+function hdHospProdNames(h) {
+  var by = {}; (window.HSP_PRODUCTS || []).forEach(function (p) { by[p.id] = p.name; });
+  return ((h && h.products) || []).map(function (id) { return by[id]; }).filter(Boolean);
+}
+// ชื่อระบบที่ AI ตอบ → ชื่อ Product จริง: ตรงตัว (ไม่สนตัวพิมพ์/ช่องว่าง) → ตรงบางส่วนแบบมีคนเดียว (ระบบที่ รพ. ใช้ก่อน) · กำกวม = ว่าง
+function hdMatchSys(name, prefer) {
+  var k = hdSysKey(name); if (!k) return '';
+  var all = (window.HSP_PRODUCTS || []).map(function (p) { return p.name; }).filter(Boolean);
+  var ex = all.filter(function (n) { return hdSysKey(n) === k; });
+  if (ex.length === 1) return ex[0];
+  if (k.length < 3) return '';
+  var part = function (list) {
+    return list.filter(function (n) { var nk = hdSysKey(n); return nk.length >= 3 && (nk.indexOf(k) > -1 || k.indexOf(nk) > -1); });
+  };
+  var p1 = part(prefer || []); if (p1.length === 1) return p1[0];
+  var p2 = part(all); return p2.length === 1 ? p2[0] : '';
+}
+// หมวด: id ที่ AI ตอบ → ถ้า AI ตอบเป็นชื่อหมวดก็เทียบชื่อให้
+function hdMatchCat(v, cats) {
+  var s = String(v || '').trim(); if (!s) return '';
+  var byId = cats.find(function (c) { return c.id === s; }); if (byId) return byId.id;
+  var byName = cats.filter(function (c) { return hdSysKey(c.name) === hdSysKey(s); });
+  return byName.length === 1 ? byName[0].id : '';
+}
 // ทีมงานที่ดูแลเรื่องในแชท: id ที่ AI ตอบ (ต้องอยู่ในรายชื่อจริง) → ไม่มีค่อยเทียบชื่อแบบเข้ม (ต้องตรงคนเดียว)
 function hdLineStaff(id, name) {
   var list = (window.STAFF || []).filter(function (x) { return x.active; });
   return list.find(function (s) { return id && s.id === String(id).trim(); }) || window.lineChat.matchPerson(name, list);
 }
-function hdLineDefSys() { return (document.getElementById('hdf-sys') || {}).value || ''; }
 
 window.hdLineOpen = function () {
-  var mb = document.getElementById('m-hd-body');
-  if (mb) mb.innerHTML = ''; // ฟอร์ม "+ แจ้งแทน" ใช้ id ช่องโรงพยาบาล/ระบบชุดเดียวกัน — ล้างทิ้งกัน id ซ้ำ
-  window._hdLineHospAuto = false;
   document.getElementById('m-hd-line-body').innerHTML =
     '<div id="hdl-step1">'
-    + window.lineChat.panelHtml('hdl')
-    + '<div class="f-grid" style="margin-top:4px;">'
-    + '<div class="f-group" style="grid-column:span 2"><label class="f-label">โรงพยาบาล <span class="hd-req">*</span></label>' + hdHospComboMarkup('') + '</div>'
-    + '<div class="f-group"><label class="f-label">ระบบที่ใช้งาน (ค่าเริ่มต้น) <span class="hd-req">*</span></label>' + hdSysComboMarkup('') + '</div>'
-    + '<div class="f-group"><label class="f-label">กลุ่ม LINE</label><input id="hdl-line" class="f-input" placeholder="ดึงจากไฟล์แชทอัตโนมัติ หรือพิมพ์เอง"></div>'
-    + '</div>'
-    + '<button type="button" class="btn btn-ghost btn-sm" onclick="window.hdLineRun(this)">🤖 ให้ AI แยกปัญหา</button>'
+    + window.lineChat.panelHtml('hdl', { multi: true })
+    + '<div class="lc-run"><span>AI หาระบบ หมวด ผู้แจ้ง และผู้รับผิดชอบให้เอง — ที่ไม่แน่ใจจะให้เลือกในหน้าถัดไป</span>'
+    + '<button type="button" class="btn btn-pri" onclick="window.hdLineRun(this)">🤖 ให้ AI แยกเรื่อง</button></div>'
     + '<div id="hdl-out" style="margin-top:12px;"></div>'
     + '</div>'
     + '<div id="hdl-step2" class="air-step2" style="display:none;"><div id="hdl-review"></div></div>';
   window.aiReview.reset('m-hd-line', 'm-hd-line-foot');
   window.openM('m-hd-line');
-  window._initHdHospCombobox('');
-  window._initHdSysCombobox('');
   window.lineChat.bind('hdl', {
-    onFile: function (grp) { var el = document.getElementById('hdl-line'); if (el) el.value = grp; }, // เปิดไฟล์ใหม่ = ชื่อกลุ่มของไฟล์นั้น
-    onScan: function (grp) {
-      if (!grp) return;
-      var lineEl = document.getElementById('hdl-line');
-      if (lineEl && !lineEl.value) lineEl.value = grp;
-      // ชื่อกลุ่มมักมีชื่อ รพ. → เลือกโรงพยาบาลให้ (ครั้งเดียว ถ้ายังไม่ได้เลือก)
-      var hid = document.getElementById('hdf-hosp'), hInp = document.getElementById('hdf-hosp-cmb-input');
-      if (!hid || hid.value || window._hdLineHospAuto || !hInp || !hInp._hdSetHosp) return;
-      var core = function (s) { return String(s || '').toLowerCase().replace(/โรงพยาบาล|รพ\.?|\s+/g, ''); };
-      var g = core(grp), best = null;
-      (window.HOSPITALS || []).forEach(function (h) { var c = core(h.name); if (c.length >= 3 && g.indexOf(c) > -1 && (!best || c.length > core(best.name).length)) best = h; });
-      if (best) { window._hdLineHospAuto = true; hInp._hdSetHosp(best.id); }
+    multi: true,
+    onSources: function (list) { list.forEach(hdLineSrcGuess); },
+    onGroup: function (s) { hdLineSrcGuess(s); window.lineChat.refreshSource('hdl', s.id); },
+    sourceHtml: hdLineSrcHtml,
+    compact: hdLineSrcCompact,
+    afterSources: function (list) {
+      list.forEach(function (s) {
+        if (!document.getElementById('hdl-h-' + s.id)) return; // แถวย่อ — ไม่มีช่องค้นหา
+        window._initHdHospCombobox(s.meta.hospId || '', 'hdl-h-' + s.id, { onPick: function (id) { window.hdLinePickHosp(s.id, id); } });
+      });
     },
   });
 };
@@ -1867,81 +1987,78 @@ window.hdLineRun = async function (btn) {
   var out = document.getElementById('hdl-out');
   var c = window.lineChat.collect('hdl');
   if (c.error) { window.showAlert && window.showAlert(c.error, 'warn'); return; }
+  // ทุกแหล่งที่จะส่ง AI ต้องรู้โรงพยาบาลก่อน — ไม่ทราบ = ถามผู้ใช้ ไม่เดาเอง
+  var noH = c.sources.filter(function (x) { return !hdHosp(x.src.meta.hospId); });
+  if (noH.length) {
+    noH.forEach(function (x) { var el = document.getElementById('hdl-sc-' + x.src.id); if (el) el.classList.add('bad'); });
+    window.showAlert && window.showAlert('ยังไม่ทราบโรงพยาบาลของ: ' + noH.map(function (x) { return x.src.label; }).join(', ') + ' — กรุณาเลือกโรงพยาบาลก่อน', 'warn');
+    var first = document.getElementById('hdl-sc-' + noH[0].src.id);
+    if (first) { first.scrollIntoView({ block: 'center', behavior: 'smooth' }); var fi = document.getElementById('hdl-h-' + noH[0].src.id + '-cmb-input'); if (fi) setTimeout(function () { fi.focus(); }, 300); }
+    return;
+  }
   var cats = (window.HELPDESK_CATEGORIES || []).filter(function (x) { return x.active !== false; });
   var prods = (window.HSP_PRODUCTS || []).map(function (x) { return x.name; }).filter(Boolean);
   var staff = (window.STAFF || []).filter(function (s) { return s.active; });
   var sys = 'คุณเป็นผู้ช่วยทีม Helpdesk ซอฟต์แวร์โรงพยาบาล อ่านแชท LINE ระหว่างเจ้าหน้าที่โรงพยาบาลกับทีมงาน แล้วแยกเป็น "เรื่องแจ้งปัญหา/ขอความช่วยเหลือ" ทีละเรื่อง '
-    + (c.numbered ? 'แต่ละบรรทัดขึ้นต้นด้วยเลขข้อความ (#) ' : '')
-    + 'ตอบ "เฉพาะ JSON": {"items":[{"description":"<สรุปปัญหาให้ชัด 1–3 ประโยค ภาษาไทย>","reporter_name":"<ชื่อผู้แจ้งฝั่ง รพ. ตามชื่อในแชท>",'
-    + '"category_id":"<id หมวด หรือ empty>","priority":"p1|p2|p3|p4","system":"<ชื่อระบบจากรายการ หรือ empty>",'
+    + 'แต่ละบรรทัดขึ้นต้นด้วยเลขข้อความ (#) ถ้ามี · '
+    + 'ตอบ "เฉพาะ JSON": {"items":[{"description":"<สรุปปัญหาให้ชัด 1–3 ประโยค ภาษาไทย>","reporter_name":"<ชื่อผู้แจ้งฝั่ง รพ. คัดลอกตรงตัวตามชื่อผู้ส่งในแชท>",'
+    + '"category_id":"<id หมวดจากรายการ ไม่แน่ใจให้ empty>","priority":"p1|p2|p3|p4","system":"<ชื่อระบบคัดลอกตรงตัวจากรายการ — เฉพาะเมื่อแชทพูดถึงระบบนั้นชัดเจน ไม่ชัดให้ empty ห้ามเดา>",'
+    + '"other_hospital":"<ชื่อโรงพยาบาลตามที่เขียนในแชท เฉพาะเมื่อแชทระบุชัดว่าเรื่องนี้เป็นของโรงพยาบาลอื่นที่ไม่ใช่โรงพยาบาลของแชทนี้ ไม่งั้น empty>",'
     + '"first_msg":<เลขข้อความที่เริ่มแจ้ง>,"last_msg":<เลขข้อความสุดท้ายของเรื่องนี้>,"msgs":[<เลขข้อความที่เกี่ยวกับเรื่องนี้โดยตรงเท่านั้น — แจ้ง/ถาม-ตอบ/ส่งข้อมูล/ยืนยันว่าแก้แล้ว ไม่รวมทักทาย/ขอบคุณ/สติกเกอร์/เรื่องอื่นที่คุยแทรก>],"resolved":true|false,'
     + '"resolution":"<สิ่งที่ทีมทำจนแก้ได้ ถ้าแชทบอกว่าแก้แล้ว หรือ empty>","handled_by":"<ชื่อทีมงานที่ดูแลเรื่องนี้ ตามที่เห็นในแชท หรือ empty>",'
     + '"handled_by_id":"<id ของคนนั้นจากรายชื่อทีมงาน — ใส่เฉพาะเมื่อมั่นใจว่าเป็นคนเดียวกัน ไม่แน่ใจให้ empty ห้ามเดา>"}]} '
     + 'กฎ: ข้ามคำทักทาย/ขอบคุณ/สติกเกอร์/รูป/นัดหมาย/เรื่องที่ไม่ใช่ปัญหา · เรื่องเดียวกันที่คุยต่อเนื่องหลายข้อความ ให้รวมเป็นเรื่องเดียว · '
-    + 'ผู้แจ้งคือฝั่งโรงพยาบาล ไม่ใช่คนในรายชื่อทีมงาน · ห้ามแต่งข้อมูลที่ไม่มีในแชท';
-  var ctx = 'หมวดปัญหา (id — ชื่อ):\n' + cats.map(function (x) { return x.id + ' — ' + x.name; }).join('\n')
+    + 'ผู้แจ้งคือฝั่งโรงพยาบาล ไม่ใช่คนในรายชื่อทีมงาน · ห้ามแต่งข้อมูลที่ไม่มีในแชท · ค่า id/ชื่อระบบต้องมาจากรายการที่ให้เท่านั้น';
+  var ctxCommon = 'หมวดปัญหา (id — ชื่อ):\n' + cats.map(function (x) { return x.id + ' — ' + x.name; }).join('\n')
     + '\n\nPriority: ' + (window.HD_PRIORITY || []).map(function (x) { return x.id + ' = ' + x.label; }).join(' · ')
     + ' (p1 = ใช้งานไม่ได้ทั้งระบบ · p4 = สอบถาม/ขอปรับเล็กน้อย)'
-    + (prods.length ? '\n\nระบบที่ใช้งาน (ตอบชื่อให้ตรง):\n' + prods.slice(0, 150).join(', ') : '')
     + '\n\nรายชื่อทีมงานของเรา (ไม่ใช่ผู้แจ้ง) — id · ชื่อ (ชื่อเล่น):\n' + staff.map(function (s) { return s.id + ' · ' + s.name + (s.nickname ? ' (' + s.nickname + ')' : ''); }).join('\n');
 
-  var oldTxt = btn.textContent, raw = [];
+  var oldTxt = btn.textContent, items = [];
   btn.disabled = true;
   out.innerHTML = '';
   try {
-    for (var k = 0; k < c.chunks.length; k++) {
-      btn.textContent = '⏳ AI กำลังอ่านแชท' + (c.chunks.length > 1 ? ' ส่วนที่ ' + (k + 1) + '/' + c.chunks.length : '') + '...';
-      var res = await window.aiChatJson(sys, ctx + '\n\n--- แชท ---\n' + c.chunks[k], { maxTokens: 3500 });
-      (Array.isArray(res.items) ? res.items : []).forEach(function (x) { raw.push(x); });
+    for (var si = 0; si < c.sources.length; si++) {
+      var cs = c.sources[si], src = cs.src, h = hdHosp(src.meta.hospId), hProds = hdHospProdNames(h);
+      var ctx = 'โรงพยาบาลของแชทนี้: ' + h.name + (src.group ? ' (กลุ่ม LINE: ' + src.group + ')' : '')
+        + (hProds.length ? '\n\nระบบที่โรงพยาบาลนี้ใช้ (เลือกจากนี้ก่อน):\n' + hProds.join(', ') : '')
+        + (prods.length ? '\n\nระบบทั้งหมด (ตอบชื่อให้ตรงตัวอักษร):\n' + prods.slice(0, 150).join(', ') : '')
+        + ((h.contacts || []).length ? '\n\nผู้ติดต่อของโรงพยาบาลนี้ (ชื่อ · ชื่อเล่น · ตำแหน่ง):\n' + h.contacts.slice(0, 40).map(function (p) { return [p.name, p.nickname, p.position].filter(Boolean).join(' · '); }).join('\n') : '')
+        + '\n\n' + ctxCommon;
+      var raw = [];
+      for (var k = 0; k < cs.chunks.length; k++) {
+        btn.textContent = '⏳ AI กำลังอ่านแชท' + (c.sources.length > 1 ? ' แหล่งที่ ' + (si + 1) + '/' + c.sources.length : '')
+          + (cs.chunks.length > 1 ? ' ส่วนที่ ' + (k + 1) + '/' + cs.chunks.length : '') + '...';
+        var res = await window.aiChatJson(sys, ctx + '\n\n--- แชท ---\n' + cs.chunks[k], { maxTokens: 3500 });
+        (Array.isArray(res.items) ? res.items : []).forEach(function (x) { raw.push(x); });
+      }
+      raw.forEach(function (x) { var it = hdLineItem(x, cs, cats, hProds); if (it) items.push(it); });
     }
-    var catIds = cats.map(function (x) { return x.id; });
-    var prodBy = {}; prods.forEach(function (n) { prodBy[n.toLowerCase()] = n; });
-    var items = [];
-    raw.forEach(function (x) {
-      var desc = String(x.description || '').trim();
-      if (!desc) return;
-      var ex = window.lineChat.excerpt(c.msgs, x.first_msg, x.last_msg, x.msgs);
-      var createdAt = ex.createdAt || new Date().toISOString(), handler = hdLineStaff(x.handled_by_id, x.handled_by);
-      var it = {
-        description: desc,
-        reporterName: String(x.reporter_name || '').trim(),
-        categoryId: catIds.indexOf(x.category_id) > -1 ? x.category_id : '',
-        priority: ['p1', 'p2', 'p3', 'p4'].indexOf(x.priority) > -1 ? x.priority : 'p3',
-        system: prodBy[String(x.system || '').trim().toLowerCase()] || '',
-        resolved: x.resolved === true,
-        resolution: String(x.resolution || '').trim(),
-        createdAt: createdAt,
-        resolvedAt: x.resolved === true ? (ex.endAt || createdAt) : '',
-        whenLabel: ex.whenLabel, chat: ex.chat,
-        assigneeId: handler ? handler.id : '',
-        assignWhy: handler ? '💬 ดูแลเรื่องนี้ในแชท' : '',
-        dup: '',
-      };
-      // ซ้ำกับ Ticket เดิม (แจ้งใกล้วันเดียวกัน + ข้อความคล้าย) หรือซ้ำกับเรื่องก่อนหน้าในรอบนี้ (ก้อนแชทคาบเกี่ยว)
-      var t0 = new Date(createdAt).getTime();
+    if (!items.length) { out.innerHTML = '<div style="font-size:12px;color:var(--txt3);">AI ไม่พบเรื่องแจ้งปัญหาในช่วงนี้</div>'; return; }
+    // อาจซ้ำ: Ticket เดิมของโรงพยาบาลเดียวกัน (แจ้งใกล้วันเดียวกัน + ข้อความคล้าย) หรือเรื่องก่อนหน้าในรอบนี้ของโรงพยาบาลเดียวกัน
+    items.forEach(function (it, n) {
+      var t0 = new Date(it.createdAt).getTime();
       var old = (window.HELPDESK_TICKETS || []).find(function (t) {
-        return t.createdAt && Math.abs(new Date(t.createdAt).getTime() - t0) < 3 * 864e5 && window.aiTextSim(desc, t.description) >= 0.55;
+        return t.hospitalId === it.hospitalId && t.createdAt && Math.abs(new Date(t.createdAt).getTime() - t0) < 3 * 864e5 && window.aiTextSim(it.description, t.description) >= 0.55;
       });
       if (old) it.dup = 'อาจซ้ำกับ ' + old.ticketNo + ': ' + String(old.description || '').slice(0, 50);
-      else if (items.some(function (y) { return window.aiTextSim(desc, y.description) >= 0.7; })) it.dup = 'อาจซ้ำกับเรื่องก่อนหน้าในรายการนี้';
-      items.push(it);
+      else if (items.slice(0, n).some(function (y) { return y.hospitalId === it.hospitalId && window.aiTextSim(it.description, y.description) >= 0.7; })) it.dup = 'อาจซ้ำกับเรื่องก่อนหน้าในรายการนี้';
     });
-    if (!items.length) { out.innerHTML = '<div style="font-size:12px;color:var(--txt3);">AI ไม่พบเรื่องแจ้งปัญหาในช่วงนี้</div>'; return; }
     // ผู้รับผิดชอบ: ทีมงานที่ดูแลในแชท → ถ้าไม่มี แนะนำจากคนที่เคยแก้ระบบเดียวกัน → ไม่มีใครเคยแก้ ปล่อยว่างให้เลือกเอง
     var need = items.filter(function (it) { return !it.assigneeId; });
     if (need.length) {
       btn.textContent = '⏳ AI กำลังจัดผู้รับผิดชอบ...';
-      var hosp = (document.getElementById('hdf-hosp') || {}).value || '';
       try {
         var sug = await window.hdAiSuggestAssignees(need.map(function (it, n) {
-          return { id: 'L' + n, ticketNo: 'เรื่อง' + (n + 1), categoryId: it.categoryId, sourceSystem: it.system || hdLineDefSys(), hospitalId: hosp, priority: it.priority, description: it.description };
+          return { id: 'L' + n, ticketNo: 'เรื่อง' + (n + 1), categoryId: it.categoryId, sourceSystem: it.system, hospitalId: it.hospitalId, priority: it.priority, description: it.description };
         }));
         sug.forEach(function (r, n) { need[n].assigneeId = r.staffId; need[n].assignWhy = (r.staffId ? '🤖 ' : '❗ ') + r.reason; });
       } catch (e) {
         need.forEach(function (it) { it.assignWhy = '❗ แนะนำผู้รับผิดชอบไม่สำเร็จ — เลือกเอง'; });
       }
     }
-    hdLineReview(items);
+    if (c.idle.length) window.showAlert && window.showAlert('ข้าม ' + c.idle.length + ' แหล่งที่ไม่มีข้อความในช่วงวันที่ที่เลือก', 'warn');
+    hdLineReview(items, c.sources.length);
   } catch (e) {
     out.innerHTML = '<div class="ai-out" style="color:var(--coral);font-size:12px;">' + esc(String(e.message || e)) + '</div>';
   } finally {
@@ -1949,95 +2066,149 @@ window.hdLineRun = async function (btn) {
   }
 };
 
-// ── ขั้นตรวจทาน: กำหนดช่องของ Ticket ให้ aiReview ──
-function hdLineReview(items) {
+// ผล AI 1 เรื่อง → รายการตรวจทาน (ค่าทุกช่องผ่านการจับคู่กับข้อมูลจริงแล้ว ไม่ตรง = ว่างให้เลือกเอง)
+function hdLineItem(x, cs, cats, hProds) {
+  var desc = String(x.description || '').trim();
+  if (!desc) return null;
+  var src = cs.src, ex = window.lineChat.excerpt(cs.msgs, x.first_msg, x.last_msg, x.msgs);
+  var createdAt = ex.createdAt || new Date().toISOString(), handler = hdLineStaff(x.handled_by_id, x.handled_by);
+  // โรงพยาบาล: ของแหล่งแชท · แชทระบุ รพ. อื่นชัดเจน → จับคู่แบบเข้ม ไม่ตรงคนเดียว = ว่างให้ผู้ใช้เลือก (ไม่เดา)
+  var hid = src.meta.hospId, hospWhy = '', other = String(x.other_hospital || '').trim();
+  if (other && hdHospCore(other) && hdHospCore(other) !== hdHospCore((hdHosp(hid) || {}).name)) {
+    var g = hdHospGuess(other);
+    if (g.id && g.id !== hid) { hid = g.id; hospWhy = '💬 แชทระบุว่าเป็นเรื่องของ "' + other + '"'; }
+    else if (!g.id) { hid = ''; hospWhy = '❓ แชทระบุ "' + other + '" — ไม่ตรงโรงพยาบาลในระบบแบบชัดเจน กรุณาเลือก'; }
+  }
+  var h = hdHosp(hid), prefer = h && h.id !== src.meta.hospId ? hdHospProdNames(h) : hProds;
+  // ผู้แจ้ง: ตรงกับผู้ติดต่อของโรงพยาบาล (คนเดียว) → ใช้ชื่อเต็ม/เบอร์/ตำแหน่งจากข้อมูลโรงพยาบาล
+  var rep = String(x.reporter_name || '').trim(), contact = h && rep ? window.lineChat.matchPerson(rep, h.contacts || []) : null;
+  return {
+    description: desc,
+    hospitalId: hid, hospWhy: hospWhy, lineGroup: src.group || '', srcLabel: src.label,
+    reporterName: contact ? contact.name : rep,
+    reporterPhone: contact ? String(contact.phone || '') : '', reporterPosition: contact ? String(contact.position || '') : '',
+    reporterWhy: contact ? '📇 ตรงกับผู้ติดต่อของโรงพยาบาล' + (contact.name !== rep ? ' (ในแชท: ' + rep + ')' : '') : '',
+    categoryId: hdMatchCat(x.category_id, cats),
+    priority: ['p1', 'p2', 'p3', 'p4'].indexOf(x.priority) > -1 ? x.priority : 'p3',
+    // ระบบ: ชื่อที่ AI ตอบตรงกับระบบจริง · ไม่ตรง แต่โรงพยาบาลใช้ระบบเดียว = ใช้ระบบนั้น · นอกนั้นว่างให้เลือกในหน้าตรวจทาน
+    system: hdMatchSys(x.system, prefer) || (prefer.length === 1 ? prefer[0] : ''),
+    resolved: x.resolved === true,
+    resolution: String(x.resolution || '').trim(),
+    createdAt: createdAt,
+    resolvedAt: x.resolved === true ? (ex.endAt || createdAt) : '',
+    whenLabel: ex.whenLabel, chat: ex.chat, view: ex.view,
+    assigneeId: handler ? handler.id : '',
+    assignWhy: handler ? '💬 ดูแลเรื่องนี้ในแชท' : '',
+    dup: '',
+  };
+}
+
+// ── ขั้นตรวจทาน: แยกกลุ่มตามโรงพยาบาล · กำหนดช่องของ Ticket ให้ aiReview ──
+function hdLineReview(items, nSrc) {
   window.aiReview.mount({
     modalId: 'm-hd-line', step1Id: 'hdl-step1', step2Id: 'hdl-step2', reviewId: 'hdl-review', footId: 'm-hd-line-foot',
-    items: items, unit: 'Ticket',
-    ctxHtml: function () {
-      var h = hdHosp((document.getElementById('hdf-hosp') || {}).value), sys = hdLineDefSys();
-      var grp = ((document.getElementById('hdl-line') || {}).value || '').trim();
-      return '🏥 <b>' + esc((h && h.name) || 'ยังไม่เลือกโรงพยาบาล') + '</b>' + (sys ? ' · 💻 ' + esc(sys) : '') + (grp ? ' · 💬 ' + esc(grp) : '');
+    items: items, unit: 'Ticket', groupLabel: 'โรงพยาบาล',
+    group: function (x) {
+      var h = hdHosp(x.hospitalId);
+      return { key: h ? h.id : '_none', title: h ? h.name : '❓ ยังไม่ระบุโรงพยาบาล', sub: h ? x.lineGroup || x.srcLabel : 'เลือกโรงพยาบาลในแต่ละเรื่อง' };
     },
+    ctxHtml: function () {
+      var hs = {}; items.forEach(function (x) { if (x.hospitalId) hs[x.hospitalId] = 1; });
+      return 'จาก ' + nSrc + ' แหล่งแชท · ' + Object.keys(hs).length + ' โรงพยาบาล';
+    },
+    // ช่องที่เลือกได้ในการ์ดที่ข้อมูลไม่ครบ (ใช้กับเรื่องอื่นใน รพ. เดียวกันที่ยังว่างได้)
+    bulk: [
+      { k: 'system', label: 'ระบบที่ใช้งาน', miss: 'ระบบ', options: function () { return (window.HSP_PRODUCTS || []).map(function (p) { return p.name; }).filter(Boolean).sort(function (a, b) { return a.localeCompare(b, 'th'); }).map(function (n) { return [n, n]; }); } },
+      { k: 'assigneeId', label: 'ผู้รับผิดชอบ', options: function () { return (window.STAFF || []).filter(function (s) { return s.active && s.name; }).map(function (s) { return [s.id, s.name + (s.nickname ? ' (' + s.nickname + ')' : '')]; }); },
+        after: function (x) { x.assignWhy = '✔ เลือกเอง'; } },
+      { k: 'categoryId', label: 'หมวดปัญหา', options: function () { return (window.HELPDESK_CATEGORIES || []).filter(function (c) { return c.active !== false; }).map(function (c) { return [c.id, c.name]; }); } },
+      { k: 'hospitalId', label: 'โรงพยาบาล', options: function () { return (window.HOSPITALS || []).slice().sort(function (a, b) { return (a.name || '').localeCompare(b.name || '', 'th'); }).map(function (h) { return [h.id, (h.code ? h.code + ' ' : '') + h.name]; }); },
+        after: function (x) { Object.assign(x, { hospWhy: '✔ เลือกเอง', reporterWhy: '', reporterPhone: '', reporterPosition: '' }); } },
+    ],
     title: function (x) { return x.description; },
     card: function (x) {
-      var pr = hdPri(x.priority), cat = hdCat(x.categoryId), stName = hdStaffName(x.assigneeId), defSys = hdLineDefSys();
+      var pr = hdPri(x.priority), cat = hdCat(x.categoryId), stName = hdStaffName(x.assigneeId), h = hdHosp(x.hospitalId);
       return {
         done: !!x.resolved,
-        status: x.resolved ? '<span class="air-st done">✅ แก้แล้วในแชท</span>' : '<span class="air-st open">🔴 รอดำเนินการ</span>',
         badges: '<span class="hd-pill" style="color:' + pr.color + ';background:' + pr.color + '1e;">' + esc(pr.short) + '</span>',
         chips: [
-          ['👤', 'ผู้แจ้ง', x.reporterName],
+          ['👤', 'ผู้แจ้ง', x.reporterName && 'ผู้แจ้ง ' + x.reporterName, x.reporterWhy || ''],
           ['🗂', 'หมวด', cat && cat.name],
-          ['💻', 'ระบบ', x.system || (defSys ? defSys + ' (ค่าเริ่มต้น)' : '')],
-          ['👷', 'ผู้รับผิดชอบ', stName, x.assignWhy || ''],
+          ['💻', 'ระบบ', x.system],
+          ['👷', 'ผู้รับผิดชอบ', stName && 'ผู้รับผิดชอบ ' + stName, x.assignWhy || ''],
         ],
-        note: x.resolved && String(x.resolution || '').trim() ? '<div class="air-fix"><b>วิธีแก้:</b> ' + esc(x.resolution) + '</div>' : '',
+        note: (x.hospWhy && !h ? '<div class="air-warn">' + esc(x.hospWhy) + '</div>' : '')
+          + (x.resolved && String(x.resolution || '').trim() ? '<div class="air-fix"><b>วิธีแก้:</b> ' + esc(x.resolution) + '</div>' : ''),
       };
     },
     missing: function (x) {
       var m = [];
+      if (!hdHosp(x.hospitalId)) m.push('โรงพยาบาล');
       if (!String(x.description || '').trim()) m.push('รายละเอียด');
       if (!String(x.reporterName || '').trim()) m.push('ผู้แจ้ง');
       if (!x.categoryId) m.push('หมวดปัญหา');
-      if (!x.system && !hdLineDefSys()) m.push('ระบบ');
+      if (!x.system) m.push('ระบบ');
       if (!x.assigneeId) m.push('ผู้รับผิดชอบ');
       return m;
     },
     filters: [['open', '🔴 รอดำเนินการ', function (x) { return !x.resolved; }], ['done', '✅ แก้แล้วในแชท', function (x) { return !!x.resolved; }]],
     statusKey: 'resolved',
-    statuses: [{ v: false, label: '🔴 รอดำเนินการ', cls: 'open' }, { v: true, label: '✅ แก้แล้วในแชท (ปิดงาน)', cls: 'done' }],
+    statuses: [{ v: false, label: '🔴 รอดำเนินการ', cls: 'open' }, { v: true, label: '✅ แก้แล้วในแชท', cls: 'done' }],
     fields: function (x, i, h) {
       var cats = (window.HELPDESK_CATEGORIES || []).filter(function (c) { return c.active !== false; });
-      var defSys = hdLineDefSys();
-      return h.fld('รายละเอียดปัญหา', '<textarea class="f-input' + h.bad('รายละเอียด') + '" rows="3"' + h.txt('description', 1) + '>' + esc(x.description) + '</textarea>', 1)
+      // โรงพยาบาล / ระบบ / ผู้รับผิดชอบ = combobox ค้นหา (ผูกใน afterFields) — ใช้ div ไม่ใช่ <label> ของ h.fld
+      // เพราะคลิกรายการใน dropdown ที่อยู่ใน label จะถูกส่งต่อเป็นคลิกที่ช่อง ทำให้ dropdown เปิดซ้ำ
+      return '<div class="air-grid c2">'
+        +   '<div class="air-f full"><span>โรงพยาบาล <b class="air-req">*</b></span>' + hdHospComboMarkup(x.hospitalId || '', 'hdl-ih', 'f-input' + h.bad('โรงพยาบาล'))
+              + (x.hospWhy ? '<span class="air-why">' + esc(x.hospWhy) + '</span>' : '') + '</div>'
+        + '</div>'
+        + h.fld('รายละเอียดปัญหา', '<textarea class="f-input' + h.bad('รายละเอียด') + '" rows="3"' + h.txt('description', 1) + '>' + esc(x.description) + '</textarea>', 1)
         + '<div class="air-grid c2">'
-        +   h.fld('ผู้แจ้ง', '<input class="f-input' + h.bad('ผู้แจ้ง') + '" value="' + esc(x.reporterName) + '"' + h.txt('reporterName', 1) + '>', 1)
+        +   h.fld('ผู้แจ้ง', '<input class="f-input' + h.bad('ผู้แจ้ง') + '" value="' + esc(x.reporterName) + '"' + h.txt('reporterName', 1) + '>'
+              + (x.reporterWhy ? '<span class="air-why">' + esc(x.reporterWhy) + '</span>' : ''), 1)
         +   h.fld('Priority', '<select class="f-input"' + h.pick('priority') + '>' + (window.HD_PRIORITY || []).map(function (p) { return h.opt(p.id, p.label, p.id === x.priority); }).join('') + '</select>')
         +   h.fld('หมวดปัญหา', '<select class="f-input' + h.bad('หมวดปัญหา') + '"' + h.pick('categoryId') + '>' + h.opt('', '-- เลือก --', !x.categoryId) + cats.map(function (c) { return h.opt(c.id, c.name, c.id === x.categoryId); }).join('') + '</select>', 1)
-        // ระบบที่ใช้งาน = combobox ค้นหา/จัดกลุ่มตามกลุ่ม Product (ผูกใน afterFields) — ใช้ div เหตุผลเดียวกับผู้รับผิดชอบด้านล่าง
         +   '<div class="air-f"><span>ระบบที่ใช้งาน <b class="air-req">*</b></span>'
-        +     hdSysComboMarkup(x.system || '', 'hdl-sys', 'f-input' + h.bad('ระบบ'), defSys ? '(ค่าเริ่มต้น: ' + defSys + ') พิมพ์ค้นหา...' : 'พิมพ์ค้นหาระบบที่ใช้งาน...') + '</div>'
-        // ผู้รับผิดชอบ = combobox ค้นหา/จัดกลุ่มตามแผนก (ผูกใน afterFields) — ใช้ div ไม่ใช่ <label> ของ h.fld
-        // เพราะคลิกรายการใน dropdown ที่อยู่ใน label จะถูกส่งต่อเป็นคลิกที่ช่อง ทำให้ dropdown เปิดซ้ำ
+        +     hdSysComboMarkup(x.system || '', 'hdl-sys', 'f-input' + h.bad('ระบบ')) + '</div>'
+        +   h.fld('กลุ่ม LINE', '<input class="f-input" value="' + esc(x.lineGroup) + '"' + h.txt('lineGroup') + '>')
         +   '<div class="air-f full"><span>ผู้รับผิดชอบ <b class="air-req">*</b></span>' + hdStaffComboMarkup('hdl-as', 'f-input' + h.bad('ผู้รับผิดชอบ'))
               + (x.assignWhy ? '<span class="air-why">' + esc(x.assignWhy) + '</span>' : '') + '</div>'
         + '</div>'
         + (x.resolved ? h.fld('วิธีแก้ไข (เก็บเข้าคลังความรู้)', '<textarea class="f-input" rows="2"' + h.txt('resolution') + '>' + esc(x.resolution) + '</textarea>') : '');
     },
     afterFields: function (x, i) {
-      var defSys = hdLineDefSys();
+      window._initHdHospCombobox(x.hospitalId || '', 'hdl-ih', {
+        onPick: function (id) {
+          // เปลี่ยนโรงพยาบาล → ข้อมูลผู้ติดต่อเดิม (เบอร์/ตำแหน่ง) ไม่ใช่ของโรงพยาบาลใหม่แล้ว
+          Object.assign(items[i], { hospWhy: '✔ เลือกเอง', reporterWhy: '', reporterPhone: '', reporterPosition: '' });
+          window.aiReview.set(i, 'hospitalId', id);
+        },
+      });
       window._initHdSysCombobox(x.system || '', 'hdl-sys', {
-        emptyLabel: defSys ? '— ใช้ค่าเริ่มต้น: ' + defSys + ' —' : '— ไม่ระบุ —',
+        emptyLabel: '— ไม่ระบุ —',
         onPick: function (nm) { window.aiReview.set(i, 'system', nm); },
       });
       window._initHdStaffCombobox('hdl-as', x.assigneeId || '', function (sid) { window.aiReview.set(i, 'assigneeId', sid); });
     },
-    beforeSave: function () {
-      if ((document.getElementById('hdf-hosp') || {}).value) return true;
-      window.showAlert && window.showAlert('กรุณาเลือกโรงพยาบาลก่อน', 'warn'); // ช่องโรงพยาบาลอยู่ขั้นที่ 1 — พากลับไปเลือก
-      window.aiReview.back();
-      var hv = document.getElementById('hdf-hosp-cmb-input'); hdMarkInvalid(hv, true); if (hv) hv.focus();
-      return false;
-    },
     saveOne: function (x) {
       var desc = String(x.description).trim();
       return hdCreateTicket({
-        hospital_id: document.getElementById('hdf-hosp').value,
-        line_group_ref: ((document.getElementById('hdl-line') || {}).value || '').trim(),
-        reporter_name: String(x.reporterName).trim(), reporter_phone: '',
-        source_system: x.system || hdLineDefSys(), category_id: x.categoryId, subject: desc.slice(0, 60), description: desc,
+        hospital_id: x.hospitalId,
+        line_group_ref: String(x.lineGroup || '').trim(),
+        reporter_name: String(x.reporterName).trim(), reporter_phone: x.reporterPhone || '', reporter_position: x.reporterPosition || '',
+        source_system: x.system, category_id: x.categoryId, subject: desc.slice(0, 60), description: desc,
         priority: x.priority || 'p3', assignee_id: x.assigneeId, updated_at: new Date().toISOString(),
       }, {
         createdAt: x.createdAt, chat: x.chat, silent: true,
-        sysNote: 'สร้าง Ticket จากแชท LINE (AI แยกปัญหา)',
+        sysNote: 'สร้าง Ticket จากแชท LINE (AI แยกปัญหา)' + (x.srcLabel ? ' · ' + x.srcLabel : ''),
         resolvedAt: x.resolved ? (x.resolvedAt || x.createdAt) : '', resolution: x.resolved ? String(x.resolution || '').trim() : '',
       });
     },
     onDone: function (made, todo) {
-      var closedN = todo.filter(function (x) { return x.resolved; }).length;
+      var closedN = todo.filter(function (x) { return x.resolved; }).length, hs = {};
+      todo.forEach(function (x) { hs[x.hospitalId] = 1; });
       window.closeM('m-hd-line');
-      window.showAlert && window.showAlert('สร้าง Ticket จากแชท LINE ' + made + ' เรื่อง' + (closedN ? ' (ปิดงานแล้ว ' + closedN + ')' : ''), 'success');
+      window.showAlert && window.showAlert('สร้าง Ticket จากแชท LINE ' + made + ' เรื่อง · ' + Object.keys(hs).length + ' โรงพยาบาล' + (closedN ? ' (ปิดงานแล้ว ' + closedN + ')' : ''), 'success');
       window.renderHelpdesk();
     },
     onFail: function () { window.renderHelpdesk(); },
@@ -2738,7 +2909,7 @@ function hdWkHtml() {
     + '<select class="t-sel" onchange="window.hdWkSet(\'group\',this.value)">' + grpOpts + '</select>'
     + '<select class="t-sel" onchange="window.hdWkSet(\'hosp\',this.value)">' + hospOpts + '</select>'
     + (st.group || st.hosp ? '<button class="btn btn-ghost btn-sm" onclick="window.hdWk.group=\'\';window.hdWk.hosp=\'\';window.renderHelpdesk()" title="ล้างตัวกรอง" aria-label="ล้างตัวกรอง">'
-      + '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></button>' : '')
+      + '🧹</button>' : '')
     + '<div style="flex:1"></div>'
     + '<button class="btn btn-ghost btn-sm" onclick="window.print()">🖨️ พิมพ์ / PDF</button>'
     + '<button class="btn btn-pri btn-sm" onclick="window.hdWkRunAi()"' + (_hdWkAi && _hdWkAi.loading ? ' disabled' : '') + '>🤖 สรุปด้วย AI</button>'

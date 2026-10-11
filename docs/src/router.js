@@ -67,6 +67,8 @@
     if (id === 'budget' && window.canView && !window.canView('budget') && window.canView('cost')) id = 'cost';
     // เมนู ภาระงานทีม: ถ้าดูสรุปภาระงานไม่ได้แต่ดูทีมว่างได้ ให้เปิดแท็บทีมว่างแทน
     if (id === 'workload' && window.canView && !window.canView('workload') && window.canView('availability')) id = 'availability';
+    // เมนู ผู้ช่วยทีม: ถ้าดูถาม-ตอบไม่ได้แต่ตรวจไฟล์ข้อมูลพื้นฐานได้ ให้เปิดแท็บตรวจไฟล์แทน
+    if (id === 'assist' && window.canView && !window.canView('assist') && window.canView('datacheck')) id = 'datacheck';
     // Permission check with user-visible alert
     var _canSee = !window.canView || window.canView(id);
     if (!_canSee) {
@@ -124,9 +126,12 @@
         impl_tracker: 'renderImplTracker',
         helpdesk:   'renderHelpdesk',
         assist:     'renderAssist',
+        datacheck:  'renderDatacheck',
         server_request: 'renderServerRequest',
         all_issues: 'renderAllIssuesOverview',
         training:   'renderTraining',
+        team_showcase: 'renderTeamShowcase',
+        team_map:   'renderTeamMap',
         admin:      'renderAdminPage',
       };
       if (id === 'overview' || id === 'kanban' || id === 'projects') {
@@ -211,11 +216,16 @@
   };
 
   // ── Navigate to first accessible view after login ──
+  // หน้าแรกของกลุ่มสิทธิ์ (roles.home_view) ตามลำดับกลุ่ม → ไม่ตั้ง/ไม่มีสิทธิ์ดู = เมนูแรกที่เห็น
   window._goDefaultView = function () {
+    var home = window.myRoles().map(function (r) { return r.home; })
+      .find(function (m) { return m && window.ROUTE_MAP[m] && window.canView(m); });
+    if (home) { window.goView(home); return; }
     var modules = [
       'overview','kanban','projects','advance','lodging','workload',
       'availability','calendar','leave','timesheet','cost','budget',
       'targets','hospital','contract','worklog','holiday',
+      'impl_tracker','all_issues','helpdesk','assist','datacheck','server_request','training','team_showcase','team_map',
     ];
     var first = modules.find(function (m) {
       return !window.canView || window.canView(m);

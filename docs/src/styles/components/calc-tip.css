@@ -13,12 +13,29 @@
   color: var(--violet); -webkit-text-fill-color: var(--violet); border-color: var(--violet); outline: none;
 }
 .calc-tip-pop {
-  position: fixed; z-index: 100000; max-width: min(320px, calc(100vw - 16px));
-  padding: 9px 12px; border-radius: 10px; border: 1px solid var(--border);
+  position: fixed; z-index: 100000; max-width: min(360px, calc(100vw - 16px));
+  padding: 10px 12px; border-radius: 12px; border: 1px solid var(--border);
   background: var(--surface); color: var(--txt); box-shadow: var(--sh-lg);
-  font: 400 12px/1.6 'Plus Jakarta Sans', 'Noto Sans Thai', sans-serif;
-  white-space: pre-line; text-align: left; pointer-events: none;
+  font: 400 12px/1.55 'Plus Jakarta Sans', 'Noto Sans Thai', sans-serif;
+  text-align: left; pointer-events: none;
+  display: flex; flex-direction: column; gap: 6px;
   opacity: 0; visibility: hidden; transition: opacity .12s;
 }
 .calc-tip-pop.on { opacity: 1; visibility: visible; }
+/* โครงสร้างข้างในกล่อง (สร้างโดย format() ใน calc-tip.util.js) */
+.calc-tip-pop .ct-row { display: flex; flex-direction: column; gap: 2px; padding-left: 8px; border-left: 2px solid var(--violet); }
+.calc-tip-pop .ct-k { font-weight: 700; color: var(--violet); }
+.calc-tip-pop .ct-v { color: var(--txt); }
+.calc-tip-pop .ct-v-f, .calc-tip-pop .ct-f {
+  padding: 3px 8px; border-radius: 6px; background: var(--surface2); color: var(--txt);
+  font-weight: 500; align-self: flex-start;
+}
+.calc-tip-pop .ct-p { color: var(--txt2); }
+.calc-tip-pop .ct-dim { color: var(--txt3); }
+.calc-tip-pop .ct-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.calc-tip-pop .ct-chip {
+  padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border);
+  background: var(--surface2); font-size: 11px; color: var(--txt2);
+}
+.calc-tip-pop .ct-sep { height: 1px; background: var(--border); margin: 2px 0; }
 @media (pointer: coarse) { .calc-tip { width: 18px; height: 18px; font-size: 11px; } }

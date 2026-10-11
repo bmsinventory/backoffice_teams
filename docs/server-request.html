@@ -447,25 +447,24 @@
   function rows(r) { if (r.error) throw r.error; return r.data || []; }
   function $(id) { return document.getElementById(id); }
 
-  var CFG = {}, NOTIFY = '', OPTS = [], HOSP = [], STAFF = [];
+  var CFG = {}, OPTS = [], HOSP = [], STAFF = [];
   var TODAY = iso(new Date());
 
   async function loadBase() {
     var res = await Promise.all([
-      db.from('settings').select('srv_req_config,notify_server_token').eq('id', 'app').limit(1),
+      db.from('settings').select('srv_req_config').eq('id', 'app').limit(1),
       db.from('server_request_options').select('id,kind,label,sort,active').order('sort'),
     ]);
     var st = rows(res[0])[0] || {};
     CFG = st.srv_req_config || {};
-    NOTIFY = st.notify_server_token || '';
     OPTS = rows(res[1]);
   }
   function lab(id) { var o = OPTS.find(function (x) { return x.id === id; }); return o ? o.label : ''; }
 
+  // แจ้งเตือน BMS Notify ช่อง server — เซิร์ฟเวอร์ (/api/notify) อ่าน Token จากฐานข้อมูลเอง หน้านี้ไม่เห็น Token
   function notify(content) {
-    if (!NOTIFY) return;
-    fetch((window.NOTIFY_PROXY_URL || '').trim() || 'https://api-notify.bmscloud.in.th/api/v1/push-notify', {
-      method: 'POST', headers: { 'Token': NOTIFY, 'Content-Type': 'application/json' }, body: JSON.stringify({ content: content, receiver: null })
+    fetch('/api/notify', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ channel: 'server', content: content })
     }).catch(function () {});
   }
 

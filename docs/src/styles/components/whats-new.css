@@ -3,7 +3,7 @@
    #m-whats-new (index.html) · เนื้อหา render โดย src/app.js showWhatsNew
 ================================================================ */
 
-.wn-modal { max-width: 520px; overflow: hidden; border: none; }
+.wn-modal { max-width: 760px; overflow: hidden; border: none; }
 
 /* ── หัว: แถบไล่สี + เลขเวอร์ชันตัวใหญ่ ── */
 .wn-hero {
@@ -26,6 +26,29 @@
 .wn-kicker { font-size: 12px; font-weight: 600; letter-spacing: .02em; opacity: .85; }
 .wn-ver    { font-size: 28px; font-weight: 800; line-height: 1.15; margin: 2px 0 4px; }
 .wn-sub    { font-size: 12.5px; opacity: .9; }
+.wn-hero-txt { flex: 1; min-width: 0; }
+
+/* ปุ่ม AI อ่านให้ฟัง (เสียงสังเคราะห์ของเบราว์เซอร์) — กำลังอ่าน = .on มีคลื่นกระพริบ */
+.wn-speak {
+  flex-shrink: 0; align-self: flex-start;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px; border-radius: 99px; cursor: pointer;
+  font: inherit; font-size: 12.5px; font-weight: 700; color: #fff;
+  background: rgba(255,255,255,.18);
+  border: 1px solid rgba(255,255,255,.4);
+  backdrop-filter: blur(4px);
+  transition: background .15s;
+}
+.wn-speak:hover { background: rgba(255,255,255,.3); }
+.wn-speak.on    { background: #fff; color: var(--violet); }
+.wn-speak.on .wn-speak-ic { animation: wnPulse 1s ease-in-out infinite; }
+@keyframes wnPulse { 50% { transform: scale(1.25); } }
+
+/* รายการที่กำลังอ่านอยู่ */
+.wn-item.wn-reading {
+  box-shadow: 0 0 0 2px var(--wn-c);
+  background: color-mix(in srgb, var(--wn-c) 8%, var(--surface2));
+}
 
 /* ── รายการ ── */
 .wn-body {
@@ -87,6 +110,8 @@
   .wn-ver  { font-size: 24px; }
   .wn-body { padding: 14px 14px 4px; }
   .wn-item { padding: 12px; gap: 12px; }
+  .wn-speak { padding: 8px 10px; }
+  .wn-speak-lbl { display: none; }
 }
 
 /* มือถือ: modal เป็น bottom sheet มีขีดจับด้านบน (responsive.css .modal::before) — วางทับบนแถบไล่สีแทนการดันหัวลง */

@@ -1,52 +1,56 @@
 /**
- * permission.util.js — Role-Based Access Control Utilities
- * can(), canView(), canAdd(), canEdit(), canDel(), isAdmin(), ce()
+ * permission.util.js — สิทธิ์ตามกลุ่มสิทธิ์ (Role-Based Access Control)
+ * ผู้ใช้มีได้หลายกลุ่ม (cu.roles = [roles.id]) → สิทธิ์ = รวมของทุกกลุ่ม (กลุ่มไหนให้ = ได้ · ไม่มีการห้ามทับ)
+ * กลุ่ม is_super (Admin) = สิทธิ์เต็มทุกเมนู · ไม่มี key ใน perms = ไม่มีสิทธิ์
+ * can(), canView(), canAdd(), canEdit(), canDel(), canApprove(), permScope(), isAdmin(), myRoles()
  */
 (function () {
 
-  window.ROLE_PERMISSIONS = {};
+  window.ROLES = []; // ตาราง roles (realtime.service.js)
 
-  // ── Default Permissions by Role ──
-  function _roleDefaultPerms(role) {
-    var full = { view:true,  add:true,  edit:true,  del:true  };
-    var ro   = { view:true,  add:false, edit:false, del:false };
-    var none = { view:false, add:false, edit:false, del:false };
-    var vadd = { view:true,  add:true,  edit:false, del:false };
+  var SCOPE_RANK = { own:1, dept:2, all:3 };
 
-    if (role === 'pm') return {
-      overview:ro, kanban:full, projects:full, advance:full, expense_form:full, lodging:full,
-      workload:ro, calendar:full, leave:full, timesheet:ro, cost:ro, budget:ro,
-      availability:ro, holiday:ro, admin:none, targets:none, hospital:ro, contract:full,
-      impl_tracker:full, all_issues:ro, helpdesk:{ view:true, add:true, edit:true, del:false }, assist:full, training:full, server_request:full,
-    };
-    if (role === 'viewer') return {
-      overview:ro, kanban:ro, projects:none, advance:full, expense_form:full, lodging:full,
-      workload:ro, calendar:ro, leave:vadd, timesheet:ro, cost:ro, budget:none,
-      availability:ro, holiday:none, admin:none, targets:none, hospital:ro, contract:ro,
-      impl_tracker:ro, all_issues:none, helpdesk:ro, assist:ro, training:none, server_request:ro,
-    };
-    return {
-      overview:ro, kanban:ro, projects:ro, advance:ro, expense_form:ro, lodging:ro,
-      workload:ro, calendar:ro, leave:ro, timesheet:ro, cost:ro, budget:none,
-      availability:ro, holiday:none, admin:none, targets:none, hospital:ro, contract:ro,
-      impl_tracker:ro, all_issues:none, helpdesk:ro, assist:ro, training:none, server_request:ro,
-    };
+  // ── กลุ่มของผู้ใช้ (เรียงตาม sort_order) ──
+  window.rolesOf = function (u) {
+    var ids = (u && u.roles) || [];
+    return (window.ROLES || []).filter(function (r) { return ids.indexOf(r.id) > -1; });
+  };
+  window.myRoles = function () { return window.rolesOf(window.cu); };
+
+  // ── รวมสิทธิ์ของหลายกลุ่ม → { superUser, perms:{ module:{ view, add, edit, del, approve, scope } } }
+  // ขอบเขต (scope) เอาที่กว้างที่สุด · กลุ่มที่ดูได้แต่ไม่ได้ตั้งขอบเขต = ทั้งหมด ──
+  window.permsForRoles = function (roles) {
+    var eff = { superUser:false, perms:{} };
+    (roles || []).forEach(function (r) {
+      if (r.super) eff.superUser = true;
+      Object.keys(r.perms || {}).forEach(function (m) {
+        var src = r.perms[m] || {}, dst = eff.perms[m] || (eff.perms[m] = {});
+        ['view','add','edit','del','approve'].forEach(function (a) { if (src[a] === true) dst[a] = true; });
+        if (src.view === true) {
+          var sc = SCOPE_RANK[src.scope] ? src.scope : 'all';
+          if (!dst.scope || SCOPE_RANK[sc] > SCOPE_RANK[dst.scope]) dst.scope = sc;
+        }
+      });
+    });
+    return eff;
+  };
+
+  // ── สิทธิ์รวมของผู้ใช้ที่ Login — คำนวณใหม่เมื่อผู้ใช้/ตาราง roles เปลี่ยน (realtime แทนที่ทั้ง object/array ทุกครั้ง
+  // จึงเทียบ reference พอ — can() ถูกเรียกหลายร้อยครั้งต่อการวาดหน้าจอ) ──
+  var _eff = null, _effCu = null, _effRoles = null;
+  function _effective() {
+    var cu = window.cu;
+    if (_eff && cu === _effCu && window.ROLES === _effRoles) return _eff;
+    _eff = window.permsForRoles(window.rolesOf(cu)); _effCu = cu; _effRoles = window.ROLES;
+    return _eff;
   }
-  window._roleDefaultPerms = _roleDefaultPerms; // ใช้ซ้ำใน admin.js (renderAdmRoles) กันสำเนาเพี้ยนตามกันไม่ทัน
 
   // ── Core Permission Check ──
   window.can = function (action, module) {
     if (!window.cu) return false;
-    var role = window.cu.role;
-    if (role === 'admin') return true;
-    var rp      = window.ROLE_PERMISSIONS && window.ROLE_PERMISSIONS[role];
-    var modPerm = rp ? rp[module] : null;
-    if (!modPerm) modPerm = _roleDefaultPerms(role)[module] || {};
-    // ── "approve" ยังไม่มีคอลัมน์แยกในตาราง role_permissions เดิม (มีแค่ view/add/edit/del) — Role ที่
-    // ยังไม่เคยถูกตั้งค่านี้ไว้อย่างชัดเจน (undefined ไม่ใช่ false) ให้ยึดตามสิทธิ์ "แก้" (edit) เดิมไปก่อน
-    // กันสิทธิ์อนุมัติหายไปทันทีตอน deploy ครั้งแรกก่อน admin จะเข้ามากำหนดเอง (ดู admin.js renderAdmRoles) ──
-    if (action === 'approve' && modPerm.approve === undefined) return !!modPerm.edit;
-    return !!modPerm[action];
+    var eff = _effective();
+    if (eff.superUser) return true;
+    return !!(eff.perms[module] && eff.perms[module][action]);
   };
 
   // ── Shorthand Checkers ──
@@ -56,9 +60,16 @@
   window.canDel     = function (m) { return window.can('del',     m); };
   window.canApprove = function (m) { return window.can('approve', m); };
 
+  // ── ขอบเขตข้อมูลของ module (PERM_MODULES ที่มี scope:true): 'own' ของตัวเอง · 'dept' ทั้งแผนก · 'all' ทั้งหมด ──
+  window.permScope = function (m) {
+    if (!window.cu) return 'own';
+    var eff = _effective();
+    if (eff.superUser) return 'all';
+    return (eff.perms[m] && eff.perms[m].scope) || 'own';
+  };
+
   // ── Role Helpers ──
-  window.isAdmin = function () { return window.cu && window.cu.role === 'admin'; };
-  window.ce      = function () { return window.cu && (window.cu.role === 'admin' || window.cu.role === 'pm'); };
+  window.isAdmin = function () { return !!window.cu && _effective().superUser; };
   window.cl      = function () { return window.cu !== null; };
 
 })();

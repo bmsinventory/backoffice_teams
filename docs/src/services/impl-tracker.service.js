@@ -9,7 +9,7 @@
   // ── Transform: raw DB row → app object ──
   var transform = {
     IMPL_TEMPLATES: function (d) {
-      return { id:d.id, name:d.template_name||'', description:d.description||'', structure:d.structure||{} };
+      return { id:d.id, name:d.template_name||'', description:d.description||'', ptypeId:d.ptype_id||'', structure:d.structure||{} };
     },
     IMPL_PROJECTS: function (d) {
       // เจ้าของไซต์ (PM) / ผู้ติดตั้ง (ผู้ประสานงาน) อ่านจากโครงการต้นทางเสมอ (projects.site_owner / installer_name — รหัสพนักงาน)
@@ -287,36 +287,6 @@
       }
     }
     if (opCount > 0) await batch.commit();
-  };
-
-  // ── Attachment Upload (Storage bucket: impl-attachments) ──
-  window.imtUploadAttachment = async function (taskId, file) {
-    var sb = window.getDb();
-    var path = window.storageKey(taskId, file.name);
-    var up = await sb.storage.from('impl-attachments').upload(path, file, { contentType: file.type || 'application/octet-stream' });
-    if (up.error) throw up.error;
-    var pub = sb.storage.from('impl-attachments').getPublicUrl(path);
-    var id = window.imtUid('IATT');
-    var uploadedBy = window.meId(); // รหัสผู้ใช้ (users.id)
-    var row = { task_id:taskId, file_name:file.name, file_url:pub.data.publicUrl, file_size:file.size, uploaded_by:uploadedBy };
-    await window.setDoc(window.getDocRef('IMPL_ATTACHMENTS', id), row);
-    window.imtApplyLocal('IMPL_ATTACHMENTS', id, Object.assign({ uploaded_at:new Date().toISOString() }, row));
-    return id;
-  };
-
-  window.imtDeleteAttachment = async function (attId) {
-    var att = window.IMPL_ATTACHMENTS.find(function (a) { return a.id === attId; });
-    if (att && att.fileUrl) {
-      var sb = window.getDb();
-      var marker = '/impl-attachments/';
-      var idx = att.fileUrl.indexOf(marker);
-      if (idx >= 0) {
-        var path = att.fileUrl.slice(idx + marker.length);
-        await sb.storage.from('impl-attachments').remove([path]).catch(function () {});
-      }
-    }
-    window.imtRemoveLocal('IMPL_ATTACHMENTS', attId);
-    await window.deleteDoc(window.getDocRef('IMPL_ATTACHMENTS', attId));
   };
 
   // ── Re-render Router: บอก impl-tracker.js ให้ re-render ตาม tab ที่กำลังเปิดอยู่ ──

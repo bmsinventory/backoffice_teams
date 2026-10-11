@@ -1,14 +1,13 @@
 /**
  * ai.service.js — ตัวเรียก AI กลางของทั้งระบบ (vLLM OpenAI-compatible)
- * ดูวิธีใช้ API: https://vllm-gemma.bmscloud.in.th/docs
- * เซิร์ฟเวอร์ไม่ใช้คีย์ + เปิด CORS ไว้ → เบราว์เซอร์เรียกตรงได้เลย ไม่ต้องผ่าน proxy
+ * เรียกผ่าน backend เท่านั้น: /api/ai/v1/... (nginx ใน frontend container → บริการ AI จริง ดู nginx.conf)
  *
  * ใช้โดย: Helpdesk (วิเคราะห์หมวด/Priority, ร่างข้อความตอบ), Impl Tracker (แนะนำกลุ่มปัญหา/วิธีแก้),
  * ปัญหาทุกโครงการ (สรุปบทวิเคราะห์)
  */
 (function () {
 
-  window.AI_BASE = 'https://vllm-gemma.bmscloud.in.th';
+  window.AI_BASE = '/api/ai';
 
   // เช็ค content-type ก่อน parse กันข้อความ error ดิบ "Unexpected token '<'" หลุดถึงผู้ใช้
   // ถ้าปลายทางตอบกลับมาเป็นหน้า HTML (เช่นหน้า error ของ reverse proxy)
@@ -19,44 +18,91 @@
   }
 
   // ── ชื่อโมเดล — ถามจาก /v1/models ครั้งแรกแล้วจำไว้ (เปลี่ยนโมเดลฝั่งเซิร์ฟเวอร์ได้โดยไม่ต้องแก้โค้ด) ──
+  // เก็บเป็น Promise — หลายจุดเรียกพร้อมกันตอนเปิดหน้า ก็ยิง /v1/models แค่ครั้งเดียว
   var _model = null;
-  window.aiModel = async function () {
+  window.aiModel = function () {
     if (_model) return _model;
-    var res;
-    try { res = await fetch(window.AI_BASE + '/v1/models', { headers: { 'Accept': 'application/json' } }); }
-    catch (e) { throw new Error('เชื่อมต่อระบบ AI ไม่ได้ — ตรวจสอบอินเทอร์เน็ต หรือเซิร์ฟเวอร์ AI อาจปิดอยู่'); }
-    if (!res.ok) throw new Error('เรียก AI ไม่สำเร็จ (HTTP ' + res.status + ')');
-    var d = await aiJsonOrThrow(res);
-    _model = (d.data && d.data[0] && d.data[0].id) || 'gemma4';
+    _model = (async function () {
+      var res;
+      try { res = await fetch(window.AI_BASE + '/v1/models', { headers: { 'Accept': 'application/json' } }); }
+      catch (e) { throw new Error('เชื่อมต่อระบบ AI ไม่ได้ — ตรวจสอบอินเทอร์เน็ต หรือเซิร์ฟเวอร์ AI อาจปิดอยู่'); }
+      if (!res.ok) throw new Error('เรียก AI ไม่สำเร็จ (HTTP ' + res.status + ')');
+      var d = await aiJsonOrThrow(res);
+      return (d.data && d.data[0] && d.data[0].id) || 'gemma4';
+    })();
+    _model.catch(function () { _model = null; }); // ล้มเหลว → ครั้งหน้าถามใหม่
     return _model;
   };
 
+  // ── คิวเรียก AI ของทั้งระบบ: ส่งทีละ 1 คำขอ เว้นระยะขั้นต่ำระหว่างคำขอ — ไม่ยิงซ้อนจนเซิร์ฟเวอร์ตอบ 429 ──
+  var AI_GAP_MS = 500, AI_RETRY = 2, _queue = Promise.resolve(), _lastAt = 0;
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function enqueue(fn) {
+    var run = _queue.then(async function () {
+      var wait = _lastAt + AI_GAP_MS - Date.now();
+      if (wait > 0) await sleep(wait);
+      try { return await fn(); } finally { _lastAt = Date.now(); }
+    });
+    _queue = run.catch(function () {});
+    return run;
+  }
+
+  // ── จำคำตอบที่ถามซ้ำ (opts.cache) 5 นาที — ถามคำถามเดิม/ข้อมูลเดิมไม่ต้องเรียก AI ใหม่ ──
+  var CACHE_MS = 5 * 60 * 1000, CACHE_MAX = 50, _cache = new Map();
+  function cacheGet(k) {
+    var c = _cache.get(k);
+    if (!c) return null;
+    if (Date.now() - c.at > CACHE_MS) { _cache.delete(k); return null; }
+    return c.v;
+  }
+  function cacheSet(k, v) {
+    _cache.set(k, { v: v, at: Date.now() });
+    if (_cache.size > CACHE_MAX) _cache.delete(_cache.keys().next().value);
+  }
+
   // ── ส่งข้อความหา AI คืนข้อความคำตอบ (string) ──
-  // opts: { maxTokens, temperature }
+  // opts: { maxTokens, temperature, cache (จำคำตอบ), isStale (คืน true = ไม่ต้องส่งแล้ว เช่นผู้ใช้ถามเรื่องใหม่ไปแล้ว) }
   window.aiChat = async function (system, user, opts) {
     opts = opts || {};
-    var model = await window.aiModel();
-    var res;
-    try {
-      res = await fetch(window.AI_BASE + '/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: model,
-          temperature: opts.temperature != null ? opts.temperature : 0.2,
-          max_tokens: opts.maxTokens || 600,
-          messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
-        }),
-      });
-    } catch (e) { throw new Error('เชื่อมต่อระบบ AI ไม่ได้ — ตรวจสอบอินเทอร์เน็ต หรือเซิร์ฟเวอร์ AI อาจปิดอยู่'); }
-    if (!res.ok) throw new Error('AI ประมวลผลไม่สำเร็จ (HTTP ' + res.status + ')');
-    var data = await aiJsonOrThrow(res);
-    var content = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
-    if (!content) throw new Error('AI ไม่ได้ตอบกลับมา — ลองใหม่อีกครั้ง');
+    var body = {
+      temperature: opts.temperature != null ? opts.temperature : 0.2,
+      max_tokens: opts.maxTokens || 600,
+      messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
+    };
+    var key = opts.cache ? JSON.stringify(body) : '';
+    var hit = key && cacheGet(key);
+    if (hit) return hit;
+    var out = await enqueue(async function () {
+      if (opts.isStale && opts.isStale()) { var c = new Error('ยกเลิกแล้ว'); c.cancelled = true; throw c; }
+      body.model = await window.aiModel();
+      for (var attempt = 0; ; attempt++) {
+        var res;
+        try {
+          res = await fetch(window.AI_BASE + '/v1/chat/completions', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+          });
+        } catch (e) { throw new Error('เชื่อมต่อระบบ AI ไม่ได้ — ตรวจสอบอินเทอร์เน็ต หรือเซิร์ฟเวอร์ AI อาจปิดอยู่'); }
+        // ถี่เกิน/เซิร์ฟเวอร์ยุ่ง → รอแล้วลองใหม่เอง (ตาม Retry-After ถ้ามี ไม่เกิน 8 วินาที) ก่อนแจ้งผู้ใช้
+        if ((res.status === 429 || res.status === 502 || res.status === 503 || res.status === 504) && attempt < AI_RETRY) {
+          var ra = parseFloat(res.headers.get('retry-after'));
+          await sleep(Math.min(8000, ra > 0 ? ra * 1000 : 1500 * Math.pow(2, attempt)));
+          if (opts.isStale && opts.isStale()) { var c2 = new Error('ยกเลิกแล้ว'); c2.cancelled = true; throw c2; }
+          continue;
+        }
+        if (res.status === 429) throw new Error('เรียก AI ถี่เกินไป — รอสักครู่แล้วลองใหม่');
+        if (!res.ok) throw new Error('AI ประมวลผลไม่สำเร็จ (HTTP ' + res.status + ')');
+        var data = await aiJsonOrThrow(res);
+        var content = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+        if (!content) throw new Error('AI ไม่ได้ตอบกลับมา — ลองใหม่อีกครั้ง');
+        return content;
+      }
+    });
     // โมเดลบางครั้งเขียนลูกศรเป็น LaTeX ($\rightarrow$) ซึ่งหน้าเว็บ/LINE แสดงเป็นข้อความดิบ — แปลงเป็นอักขระปกติ
-    return String(content).trim()
+    out = String(out).trim()
       .replace(/\$\s*\\(?:rightarrow|to|Rightarrow|longrightarrow)\s*\$/g, '→')
       .replace(/\$\s*\\(?:leftarrow|Leftarrow)\s*\$/g, '←');
+    if (key) cacheSet(key, out);
+    return out;
   };
 
   // ซ่อมเฉพาะข้อผิดพลาดที่โมเดลทำบ่อยใน JSON string:

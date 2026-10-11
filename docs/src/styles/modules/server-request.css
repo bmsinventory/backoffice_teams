@@ -408,16 +408,18 @@
 .srv-lg-sep { width: 1px; height: 16px; background: var(--border); }
 .srv-lg-n { min-width: 22px; text-align: center; border-radius: 5px; font-size: 11px; padding: 0 4px; }
 .srv-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; cursor: pointer; flex-shrink: 0; }
-.srv-tl { border: 1px solid var(--border); border-radius: 12px; overflow: auto; max-height: calc(100vh - 290px); background: var(--surface); }
-.srv-tl-row { display: grid; min-width: 1000px; border-bottom: 1px solid var(--border); }
+.srv-tl { --srv-line: rgba(110,115,140,.38); --srv-line2: rgba(110,115,140,.6); border: 1px solid var(--srv-line2); border-radius: 12px; overflow: auto; max-height: calc(100vh - 290px); background: var(--surface); }
+.srv-tl-row { display: grid; min-width: 1000px; border-bottom: 1px solid var(--srv-line); }
+.srv-tl-row.head, .srv-tl-row.req { border-bottom-color: var(--srv-line2); }
 .srv-tl-row:last-child { border-bottom: none; }
 .srv-tl-row.head { position: sticky; top: 0; z-index: 3; background: var(--surface2); }
 .srv-tl-row.head > div, .srv-tl-row.sum > div, .srv-tl-row.req > div { background: var(--surface2); }
 .srv-tl-row:not(.head):not(.sum):not(.req):hover .srv-tl-l { background: var(--surface2); }
-.srv-tl-l { position: sticky; left: 0; z-index: 2; background: var(--surface); border-right: 1px solid var(--border); padding: 5px 10px; display: flex; flex-direction: column; justify-content: center; min-width: 0; font-size: 12.5px; }
+.srv-tl-l { position: sticky; left: 0; z-index: 2; background: var(--surface); border-right: 2px solid var(--srv-line2); padding: 5px 10px; display: flex; flex-direction: column; justify-content: center; min-width: 0; font-size: 12.5px; }
 .srv-tl-row.head .srv-tl-l, .srv-tl-row.sum .srv-tl-l, .srv-tl-row.req .srv-tl-l { font-weight: 700; color: var(--txt2); font-size: 12px; }
 .srv-tl-l small { font-size: 10.5px; color: var(--txt3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.srv-tl-h, .srv-tl-s, .srv-tl-q, .srv-tl-row > .srv-tl-c { border-right: 1px solid var(--border); }
+.srv-tl-h, .srv-tl-s, .srv-tl-q, .srv-tl-row > .srv-tl-c { border-right: 1px solid var(--srv-line); }
+.srv-tl-h.wk, .srv-tl-s.wk, .srv-tl-q.wk, .srv-tl-row > .srv-tl-c.wk { border-left: 2px solid var(--srv-line2); }
 .srv-tl-h { text-align: center; padding: 4px 0; line-height: 1.15; }
 .srv-tl-h b { display: block; font-size: 12px; color: var(--txt2); }
 .srv-tl-h small { font-size: 9.5px; color: var(--txt3); }
@@ -440,6 +442,10 @@
 .srv-tl-c.leave { background: rgba(201,130,12,.55); }
 .srv-tl-c.off { background: repeating-linear-gradient(45deg, var(--surface2), var(--surface2) 3px, var(--surface3) 3px, var(--surface3) 6px); }
 .srv-tl-pr .srv-tl-c { min-height: 0; }
+.srv-tl-pr { min-height: 46px; }
+.srv-tl-pr .srv-tl-l b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.srv-tl-pr .srv-tl-l { line-height: 1.35; }
+.srv-tl-l small.srv-tl-free { color: #0f9d6e; font-weight: 600; }
 .srv-tl-bar { position: relative; z-index: 1; align-self: center; height: 24px; margin: 0 2px; padding: 0 7px; border-radius: 6px; line-height: 24px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 11px; font-weight: 600; color: #fff; background: rgba(124,92,252,.85); box-shadow: 0 2px 6px rgba(0,0,0,.15); cursor: pointer; transition: transform .15s, box-shadow .15s; }
 .srv-tl-bar:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(0,0,0,.25); }
 .srv-tl-bar.leave { background: rgba(201,130,12,.15); border: 2px dashed #c9820c; color: #9a6206; line-height: 20px; }

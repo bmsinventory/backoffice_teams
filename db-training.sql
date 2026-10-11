@@ -171,14 +171,31 @@ create table if not exists trn_survey_responses (
 );
 
 -- ค่าตั้งค่าแบบ key/value ใช้ร่วมกันทั้งระบบอบรมและระบบสอบ (สิทธิ์ใช้หน้าสิทธิ์ของ Backoffice ไม่เก็บที่นี่)
--- (site_notify_tokens, site_name, org_name, cert_*, emailjs_* ...)
--- site_notify_tokens = JSON {รหัสโครงการ: token เฉพาะโครงการ | 'off' = ไม่แจ้งเตือน} · ไม่มี key = ใช้ token กลาง
--- (settings.notify_training_token ตั้งที่ Admin Panel → 🔔 ตั้งค่าการแจ้งเตือน)
+-- (site_name, org_name, cert_*, emailjs_* ...)
+-- Token แจ้งเตือนลงทะเบียน (กลาง + รายโครงการ) อยู่ที่ notify_tokens — หน้าเว็บอ่านไม่ได้ (ดู NOTIFY TOKENS ใน db-schema.sql)
 create table if not exists trn_settings (
   key        text primary key,
   value      text not null default '',
   updated_at timestamptz default now()
 );
+
+-- ย้าย token รายโครงการเดิม (trn_settings.site_notify_tokens = JSON {รหัสโครงการ: token | 'off'} ที่หน้าเว็บอ่านได้)
+-- → notify_tokens key 'site:<รหัส>' แล้วลบทิ้ง · รันซ้ำ = ไม่มีให้ย้าย
+do $$
+declare raw text; j jsonb; k text; v text;
+begin
+  select value into raw from trn_settings where key = 'site_notify_tokens';
+  if raw is null then return; end if;
+  begin j := raw::jsonb; exception when others then j := '{}'::jsonb; end;
+  if jsonb_typeof(j) = 'object' then
+    for k, v in select e.key, btrim(e.value) from jsonb_each_text(j) e loop
+      if coalesce(k, '') <> '' and coalesce(v, '') <> '' then
+        insert into notify_tokens (key, token) values ('site:' || k, v) on conflict (key) do nothing;
+      end if;
+    end loop;
+  end if;
+  delete from trn_settings where key = 'site_notify_tokens';
+end $$;
 
 create index if not exists idx_trn_sessions_site     on trn_sessions(site);
 create index if not exists idx_trn_regs_session      on trn_registrations(session_id);
@@ -366,37 +383,17 @@ grant select (id, quiz_id, question, choices, sort_order, is_active, created_at,
 grant select on trn_quizzes, trn_quiz_attempts, trn_quiz_certs to anon, authenticated;
 grant update (email_status, email_error, emailed_at) on trn_quiz_certs to anon, authenticated;
 
--- ผู้ใช้ Backoffice ที่ Login อยู่ + มีสิทธิ์หน้าอบรม — sig = djb2(id|password) แบบเดียวกับ src/utils/session.util.js
--- สิทธิ์ตรงกับ src/services/bo-auth.service.js: admin = ทุกอย่าง · role อื่นตาม settings.role_permissions[role].training[p_need] (ไม่ตั้ง = เฉพาะ pm)
+-- ผู้ใช้ Backoffice ที่ Login อยู่ + มีสิทธิ์หน้าอบรม — p_sig = token ของ session (src/utils/session.util.js · ตาราง user_sessions ใน db-schema.sql)
+-- สิทธิ์ตรงกับ src/services/bo-auth.service.js: กลุ่ม is_super = ทุกอย่าง · นอกนั้นกลุ่มใดกลุ่มหนึ่งของผู้ใช้ (users.roles) มี perms.training[p_need]
 -- p_need: view = งานของโครงการ (ผลสอบ/ใบประกาศ) · edit = แก้คลังแบบทดสอบกลาง
 drop function if exists trn_staff_ok(text, text);
 create or replace function trn_staff_ok(p_uid text, p_sig text, p_need text default 'view') returns boolean
 language plpgsql stable security definer set search_path = public as $$
 declare
-  u    users;
-  s    text;
-  h    bigint := 5381;
-  b36  text := '';
-  v    text;
-  i    int;
+  u users := _bo_session_user(p_sig);
 begin
-  if coalesce(p_uid, '') = '' or coalesce(p_sig, '') = '' then return false; end if;
-  select * into u from users where coalesce(nullif(user_id, ''), id) = p_uid limit 1;
-  if not found or u.is_active is false then return false; end if;
-  s := p_uid || '|' || coalesce(u.password, '');
-  for i in 1 .. length(s) loop
-    h := (h * 33 + ascii(substr(s, i, 1))) % 4294967296;
-  end loop;
-  loop
-    b36 := substr('0123456789abcdefghijklmnopqrstuvwxyz', (h % 36)::int + 1, 1) || b36;
-    h := h / 36;
-    exit when h = 0;
-  end loop;
-  if b36 <> p_sig then return false; end if;
-  if u.role = 'admin' then return true; end if;
-  select to_jsonb(r) -> u.role -> 'training' ->> p_need into v from settings r where r.id = 'role_permissions';
-  if v is null then return u.role = 'pm'; end if;
-  return v = 'true';
+  if u.id is null or _bo_uid(u) <> coalesce(p_uid, '') then return false; end if;
+  return _bo_user_can(u, 'training', array[p_need]);
 end $$;
 revoke execute on function trn_staff_ok(text, text, text) from public, anon, authenticated;
 
@@ -705,3 +702,14 @@ grant execute on function trn_category_usage()       to anon, authenticated;
 grant execute on function trn_quiz_usage()           to anon, authenticated;
 
 notify pgrst, 'reload schema';
+
+
+-- ################################################################
+-- ▼▼▼ ส่วนที่ต้องรัน (อัปเดตล่าสุด) — ไม่ต้องรันทั้งไฟล์ ▼▼▼
+-- ทุกครั้งที่ไฟล์นี้มีการแก้ จะคัดลอกเฉพาะส่วนที่เปลี่ยนมาไว้ตรงนี้ เป็นบล็อกแยกตามเวลา
+--   → รันเฉพาะบล็อกที่ยังไม่เคยรัน (เรียงจากเก่าไปใหม่) · รันเสร็จแจ้ง Claude ให้ลบบล็อกนั้นออก
+-- โค้ดด้านบนเป็นฉบับเต็ม (ใช้ตั้ง DB ใหม่) — ทุกบล็อกรันซ้ำได้ ไม่ทับข้อมูล
+-- ลำดับ: ถ้า db-schema.sql มีส่วนรอรันด้วย → รันของ db-schema.sql ก่อน แล้วค่อยรันของไฟล์นี้
+-- ################################################################
+
+-- (ไม่มีส่วนที่รอรัน — ตรวจล่าสุด 2026-10-11)

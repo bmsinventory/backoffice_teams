@@ -11,24 +11,153 @@
 .ftk-header-pbar span  { font-size: 11.5px; font-weight: 700; flex-shrink: 0; }
 
 /* ── Filter Bar ── */
+/* แถวเดียว: สถานะ segmented ชิดซ้าย · ค้นหายืดเต็มช่องกลาง · ตัวกรอง pill ชิดขวา — จอแคบตัดลงบรรทัดใหม่เอง */
 .ftk-filterbar {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   padding: 12px 24px; border-bottom: 1px solid var(--border);
 }
-.ftk-hidedone-chk {
-  display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--txt2);
-  white-space: nowrap; cursor: pointer;
+
+/* ── สถานะแบบ segmented: จำนวนเป็น badge · ปุ่มที่เลือกอยู่ย้อมสีตามสถานะ (--c) ── */
+.ftk-seg { display: flex; flex-shrink: 0; gap: 2px; padding: 3px; height: 38px; box-sizing: border-box; border-radius: 10px; background: var(--surface2); border: 1px solid var(--border); }
+.ftk-seg-btn {
+  --c: var(--violet);
+  display: inline-flex; align-items: center; gap: 6px; padding: 0 6px 0 10px; border: 0; border-radius: 7px; background: none;
+  font: inherit; font-size: 12.5px; color: var(--txt2); cursor: pointer; white-space: nowrap; transition: background .15s, color .15s;
+}
+.ftk-seg-btn i { width: 7px; height: 7px; border-radius: 50%; background: var(--c); flex-shrink: 0; }
+.ftk-seg-btn b {
+  min-width: 20px; padding: 1px 6px; border-radius: 999px; box-sizing: border-box; text-align: center;
+  font-size: 11px; font-weight: 700; color: var(--txt2); background: var(--border); font-variant-numeric: tabular-nums;
+}
+.ftk-seg-btn:hover { color: var(--txt); background: color-mix(in srgb, var(--txt) 5%, transparent); }
+.ftk-seg-btn.on { background: var(--surface); color: var(--txt); font-weight: 600; box-shadow: 0 1px 3px rgba(20,22,40,.14); }
+.ftk-seg-btn.on b { color: #fff; background: var(--c); }
+
+/* ── ค้นหา: ยืดเต็มพื้นที่ที่เหลือ · มีคำค้น = ขอบสี + ปุ่ม × ── */
+.ftk-search {
+  display: flex; align-items: center; gap: 8px; flex: 1 1 220px; min-width: 200px; height: 38px; padding: 0 6px 0 12px; box-sizing: border-box;
+  border: 1.5px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--txt3);
+  cursor: text; transition: border-color .2s, box-shadow .2s;
+}
+.ftk-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; font: inherit; font-size: 13px; color: var(--txt); }
+.ftk-search input::placeholder { color: var(--txt3); }
+.ftk-search:hover { border-color: color-mix(in srgb, var(--violet) 35%, var(--border)); }
+.ftk-search:focus-within, .ftk-search.on { border-color: var(--violet); color: var(--violet); }
+.ftk-search:focus-within { box-shadow: 0 0 0 3px rgba(124,92,252,.12); }
+.ftk-search-x, .ftk-pill-x {
+  display: grid; place-items: center; flex-shrink: 0; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%;
+  background: none; font-size: 16px; line-height: 1; color: var(--txt3); cursor: pointer;
+}
+.ftk-search-x:hover { background: var(--surface2); color: var(--txt); }
+
+/* ── ตัวกรอง pill แยกกัน: ยังไม่กรอง = ขอบเส้นประ + ลูกศร · กรองอยู่ = พื้นสีม่วงอ่อน + ปุ่ม × ── */
+.ftk-pills { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ftk-pill {
+  position: relative; display: flex; align-items: center; height: 34px; box-sizing: border-box;
+  border: 1.5px dashed var(--border); border-radius: 999px; background: var(--surface);
+  transition: border-color .15s, background .15s;
+}
+.ftk-pill label { display: flex; align-items: center; gap: 6px; height: 100%; padding: 0 28px 0 13px; font-size: 12.5px; color: var(--txt2); cursor: pointer; white-space: nowrap; }
+.ftk-pill:not(.on) label::after {
+  content: ''; position: absolute; right: 12px; top: 50%; width: 6px; height: 6px; margin-top: -5px;
+  border: solid var(--txt3); border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); pointer-events: none;
+}
+.ftk-pill select {
+  /* กว้างตามค่าที่เลือกอยู่ (ไม่ใช่ตามตัวเลือกที่ยาวที่สุด) — ไม่งั้น pill กว้างจนดันแถวตกบรรทัด */
+  field-sizing: content; width: auto; min-width: 0; max-width: 160px; text-overflow: ellipsis;
+  appearance: none; border: 0; outline: 0; background: none; padding: 0;
+  font: inherit; font-weight: 600; color: var(--txt); cursor: pointer;
+}
+.ftk-pill select option { font-weight: 400; color: var(--txt); background: var(--surface); }
+.ftk-pill:hover { border-color: var(--txt3); }
+.ftk-pill:focus-within { border-color: var(--violet); }
+.ftk-pill.on { border-style: solid; border-color: color-mix(in srgb, var(--violet) 45%, transparent); background: color-mix(in srgb, var(--violet) 10%, var(--surface)); }
+.ftk-pill.on label { padding-right: 2px; color: color-mix(in srgb, var(--violet) 70%, var(--txt2)); }
+.ftk-pill.on select { color: var(--violet); }
+.ftk-pill-x { margin-right: 5px; color: var(--violet); }
+.ftk-pill-x:hover { background: color-mix(in srgb, var(--violet) 18%, transparent); }
+.ftk-clear { border: 0; background: none; padding: 0 6px; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--txt2); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.ftk-clear:hover { color: var(--red, #ef4444); }
+
+/* ── แถบ "เลือก n รายการ" — โผล่เฉพาะตอนติ๊กเลือกแถว ── */
+.ftk-bulkbar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin: 10px 24px 0; padding: 8px 12px; border-radius: 10px;
+  background: color-mix(in srgb, var(--violet) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--violet) 35%, transparent);
+  font-size: 12.5px;
+}
+.ftk-bulkbar[hidden] { display: none; }
+/* ── ตั้งวันที่รับ/วันที่เสร็จให้รายการที่เลือก — ใช้ input date โปร่งใสทับ (เหมือนในแถว) หน้าตาเป็นปุ่ม ── */
+.ftk-bulk-date .ftk-date-display {
+  border-color: var(--border); background: var(--surface); color: var(--txt2); padding: 5px 10px; font-size: 12px;
 }
 
 .ftk-scroll { padding: 16px 24px; overflow-y: auto; flex: 1; }
 
-/* ── Group (คลัง) ── */
-.ftk-group      { margin-bottom: 18px; }
-.ftk-group-head {
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  padding: 10px 4px; font-size: 13.5px; font-weight: 700;
+/* ── แถบความครบ "แบบฟอร์มตามสัญญา n/N" (สีส้ม = ตามสัญญา, ครบแล้วเป็นสีเขียว) — รายการที่ขาดเป็นชิปเล็ก ── */
+.ftk-cbar {
+  margin: 12px 24px 0; padding: 10px 14px; border-radius: 10px; font-size: 12.5px;
+  background: color-mix(in srgb, #f59e0b 8%, var(--surface)); border: 1px solid color-mix(in srgb, #f59e0b 35%, transparent);
 }
-.ftk-group-icon { flex-shrink: 0; }
+.ftk-cbar.done { padding: 6px 14px; background: color-mix(in srgb, #06d6a0 8%, var(--surface)); border-color: color-mix(in srgb, #06d6a0 35%, transparent); }
+.ftk-cbar-head { display: flex; align-items: center; gap: 8px 10px; flex-wrap: wrap; }
+.ftk-cbar-msg { font-size: 13.5px; display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.ftk-cbar-msg b { color: #b45309; }
+.ftk-cbar-sub { color: var(--txt3); }
+.ftk-cbar-toggle { border: 0; background: none; padding: 4px 6px; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--violet); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.ftk-cbar-ok { color: #059669; font-weight: 700; }
+.ftk-cbar-line { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.ftk-cbar-lbl { color: var(--txt3); font-weight: 600; margin-right: 2px; }
+.ftk-cbar-chip { padding: 2px 9px; border-radius: 99px; background: var(--surface); border: 1px solid var(--border); color: var(--txt2); font-size: 11.5px; }
+.ftk-cbar-add { display: inline-flex; gap: 6px; align-items: center; margin-left: auto; }
+/* ── คอลัมน์ประเภท: ป้ายสีสั้น (ตั้งต้น / สัญญา ข้อ n / ใหม่) หน้าชื่อแบบฟอร์ม ── */
+.ftk-table td.ftk-type-cell { width: 1%; white-space: nowrap; padding-right: 2px; }
+.ftk-type-cell .ftk-type-pill { min-width: 76px; text-align: center; font-size: 11.5px; padding: 4px 8px; }
+/* ── สถานะ + ปุ่มขั้นถัดไป ── */
+.ftk-st { display: flex; align-items: center; gap: 6px; }
+.ftk-next {
+  flex-shrink: 0; height: 28px; padding: 0 10px; border-radius: 7px; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap;
+  border: 1.5px solid var(--violet); background: var(--surface); color: var(--violet);
+}
+.ftk-next:hover { background: color-mix(in srgb, var(--violet) 10%, var(--surface)); }
+.ftk-next.to-done, .ftk-btn-done { border: 0; background: #059669; color: #fff; }
+.ftk-next.to-done:hover, .ftk-btn-done:hover { background: #047857; }
+/* ── มอบหมายผู้จัดทำทั้งคลัง (หัวคลัง) ── */
+.ftk-group-owner { flex-shrink: 0; max-width: 200px; font-weight: 400; }
+/* ── แถบ "เลิกทำ" ลอยล่างกลางจอ 8 วินาที หลังเปลี่ยนสถานะ/ผู้จัดทำ/เพิ่มใบที่ขาด ── */
+.ftk-undo {
+  position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 9000;
+  display: flex; align-items: center; gap: 14px; max-width: calc(100vw - 32px); padding: 8px 8px 8px 16px; border-radius: 12px;
+  background: #1a1d2e; color: #fff; font-size: 13px; box-shadow: 0 8px 24px rgba(0,0,0,.25);
+}
+.ftk-undo[hidden] { display: none; }
+.ftk-undo button { flex-shrink: 0; height: 32px; padding: 0 12px; border: 0; border-radius: 8px; background: #33394f; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+.ftk-undo button:hover { background: #454c66; }
+@media (max-width: 640px) {
+  .ftk-cbar { margin: 10px 16px 0; }
+  .ftk-cbar-add { margin-left: 0; }
+}
+
+/* ── Group (คลัง) ── */
+.ftk-group      { margin-bottom: 14px; }
+.ftk-group.ftk-collapsed { margin-bottom: 4px; }
+.ftk-group-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 4px; font-size: 13.5px; font-weight: 700;
+}
+.ftk-group-toggle {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 32px; height: 32px; border: none; border-radius: 8px; background: transparent; color: var(--txt2); cursor: pointer;
+}
+.ftk-group-toggle:hover { background: var(--surface2); }
+.ftk-group-toggle svg { transition: transform .15s; transform: rotate(90deg); }
+.ftk-collapsed .ftk-group-toggle svg { transform: rotate(0deg); }
+.ftk-group-pbar { width: 120px; flex-shrink: 0; }
+.ftk-group-pct  { font-size: 12px; font-weight: 700; flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px; }
+/* ── ปุ่มลบ (คลัง/แถว) จาง ๆ จนกว่าจะชี้ — กันกดพลาด และตารางดูโล่งขึ้น; จอสัมผัสโชว์ปกติ ── */
+.ftk-del { opacity: 0; transition: opacity .12s; }
+.ftk-group-head:hover .ftk-del, .ftk-table tr:hover .ftk-del, .ftk-del:focus-visible { opacity: 1; }
+@media (hover: none) { .ftk-del { opacity: .7; } }
 .ftk-group-name-input {
   flex: 1; min-width: 0; border: 1px solid transparent; background: transparent;
   padding: 4px 8px; border-radius: 6px; font-size: 13.5px; font-family: inherit; font-weight: 700; color: var(--txt);
@@ -47,6 +176,34 @@
 .ftk-table td    { padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: middle; }
 .ftk-table tr:last-child td { border-bottom: none; }
 .ftk-table th.ftk-no, .ftk-table td.ftk-no { width: 1%; padding-right: 4px; text-align: center; color: var(--txt3); font-size: 12px; white-space: nowrap; }
+.ftk-table tbody tr:not(.ftk-quickadd):not(.ftk-empty-row):hover { background: var(--surface2); }
+.ftk-table tr.ftk-row-sel, .ftk-table tr.ftk-row-sel:hover { background: color-mix(in srgb, var(--violet) 9%, var(--surface)); }
+.ftk-empty-row td { text-align: center; color: var(--txt3); padding: 14px; }
+/* ── ช่อง "#": โชว์ลำดับ ชี้/เลือกแล้วกลายเป็น checkbox (เลือกหลายรายการ) ── */
+.ftk-chk { width: 16px; height: 16px; cursor: pointer; accent-color: var(--violet); margin: 0; }
+.ftk-chk-wrap { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; cursor: pointer; }
+.ftk-chk-wrap .ftk-chk { position: absolute; opacity: 0; }
+.ftk-table tr:hover .ftk-chk-wrap .ftk-chk, .ftk-row-sel .ftk-chk-wrap .ftk-chk, .ftk-chk-wrap .ftk-chk:focus-visible { opacity: 1; }
+.ftk-table tr:hover .ftk-chk-wrap span, .ftk-row-sel .ftk-chk-wrap span { visibility: hidden; }
+/* ── บรรทัดรองใต้ชื่อ: ประเภท (pill เล็ก) + "+ ชื่อตามสัญญา" ── */
+.ftk-sub { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 0 8px 2px; }
+.ftk-type-pill { font-size: 11px; padding: 2px 8px; border-radius: 99px; }
+.ftk-add-contract {
+  border: none; background: transparent; padding: 2px 4px; font: inherit; font-size: 11px; color: var(--txt3); cursor: pointer;
+  opacity: 0; transition: opacity .12s;
+}
+.ftk-add-contract:hover { color: var(--violet); text-decoration: underline; }
+.ftk-table tr:hover .ftk-add-contract, .ftk-add-contract:focus-visible { opacity: 1; }
+@media (hover: none) { .ftk-add-contract { opacity: 1; } }
+/* ── ระหว่าง AI จับคู่ชื่อตามสัญญา (หลังเปลี่ยนประเภทเป็นตามสัญญา) ── */
+.ftk-ai-mapping { font-size: 11px; color: var(--violet); animation: ftkAiPulse 1.2s ease-in-out infinite; }
+@keyframes ftkAiPulse { 50% { opacity: .45; } }
+.ftk-owner-none { color: var(--txt3); font-style: italic; }
+/* ── วันที่รับ / วันที่เสร็จ ในคอลัมน์เดียว ── */
+.ftk-dates { display: flex; align-items: center; gap: 2px; white-space: nowrap; }
+.ftk-dates-arrow { color: var(--txt3); font-size: 12px; }
+.ftk-dates .ftk-date, .ftk-dates .ftk-date-display { padding: 4px 6px; }
+.ftk-date-display.empty { color: var(--txt3); }
 /* ── ชื่อแบบฟอร์ม: textarea แถวเดียวที่ขยายสูงอัตโนมัติ (JS resize ใน form-tracker.js) แทน input เดิม
    ที่ตัดข้อความยาว ๆ ทิ้งเงียบ ๆ — resize:none/overflow:hidden กันผู้ใช้ลากขยายเองหรือเห็น scrollbar ── */
 .ftk-name-input {
@@ -55,6 +212,40 @@
   white-space: normal; overflow-wrap: break-word; line-height: 1.4; resize: none; overflow: hidden;
 }
 .ftk-name-input:hover, .ftk-name-input:focus { border-color: var(--border); background: var(--surface2); outline: none; }
+/* ── ชื่อตามสัญญา: บรรทัดรองใต้ชื่อแบบฟอร์ม (ตัวเล็ก/สีจาง) ── */
+.ftk-contract-input { font-size: 11.5px; color: var(--txt3); padding-top: 2px; padding-bottom: 2px; }
+.ftk-contract-input:not(:placeholder-shown) { color: var(--txt2); }
+
+/* ── ใบส่งมอบแบบฟอร์ม (m-ftk-handover) — กว้างกว่า .modal.md ปกติ ให้ช่องผู้ลงนามไม่อึดอัด ── */
+#m-ftk-handover .modal.md { max-width: min(920px, 94vw); }
+.fho-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+.fho-check { display: flex; align-items: center; gap: 8px; font-size: 12.5px; margin: 2px 0 10px; cursor: pointer; }
+.fho-count { font-size: 12.5px; background: var(--surface2); border-radius: 10px; padding: 10px 12px; margin-bottom: 14px; line-height: 1.6; }
+.fho-warn  { color: var(--amber); }
+/* ผู้ลงนาม: การ์ดแยกสีตามฝั่ง (ซ้าย BMS = indigo · ขวา สถานพยาบาล = teal) */
+.fho-sec { display: flex; align-items: center; gap: 10px; font-size: 12px; font-weight: 700; color: var(--txt2); margin: 4px 0 10px; }
+.fho-sec::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.fho-signs { gap: 14px; }
+.fho-sign  { --sc: var(--indigo); border: 1px solid color-mix(in srgb, var(--sc) 28%, var(--border)); border-top: 3px solid var(--sc); border-radius: 12px; background: var(--surface); }
+.fho-sign-r { --sc: var(--teal); }
+.fho-sign-hd { position: relative; border-radius: 9px 9px 0 0; display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: color-mix(in srgb, var(--sc) 8%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--sc) 18%, transparent); }
+.fho-sign-hd b { display: block; font-size: 13.5px; color: var(--txt); }
+.fho-sign-hd small { display: block; font-size: 11px; color: var(--txt3); }
+.fho-side { flex: none; font-size: 11px; font-weight: 700; color: #fff; background: var(--sc); border-radius: 999px; padding: 3px 10px; }
+.fho-sign-bd { padding: 12px 14px 2px; }
+/* ป้ายกับช่องกรอกอยู่แถวเดียวกัน (ป้ายซ้าย · ช่องขวา) */
+.fho-sign-bd .f-group { display: grid; grid-template-columns: 88px minmax(0, 1fr); align-items: center; column-gap: 10px; }
+.fho-sign-bd .f-label { margin: 0; }
+.fho-owner { margin-left: auto; flex: none; white-space: nowrap; border: 1px dashed color-mix(in srgb, var(--indigo) 45%, transparent); background: color-mix(in srgb, var(--indigo) 6%, transparent); color: var(--indigo); border-radius: 999px; padding: 3px 10px; font-size: 11.5px; font-weight: 500; font-family: inherit; cursor: pointer; }
+.fho-owner:hover { background: color-mix(in srgb, var(--indigo) 12%, transparent); }
+.fho-sign-r .fho-owner { --indigo: var(--teal); color: color-mix(in srgb, var(--teal) 70%, var(--txt)); }
+.fho-pick { position: absolute; top: calc(100% + 4px); right: 10px; z-index: 30; width: min(320px, 90%); max-height: 260px; overflow-y: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 10px 28px rgba(0,0,0,.16); padding: 4px; }
+.fho-pick button { display: block; width: 100%; text-align: left; border: 0; background: transparent; border-radius: 8px; padding: 7px 10px; font-family: inherit; cursor: pointer; color: var(--txt); }
+.fho-pick button:hover { background: color-mix(in srgb, var(--teal) 10%, transparent); }
+.fho-pick b { display: block; font-size: 13px; font-weight: 600; }
+.fho-pick b span { font-weight: 400; color: var(--txt3); }
+.fho-pick small { display: block; font-size: 11.5px; color: var(--txt3); }
+@media (max-width: 640px) { .fho-grid2 { grid-template-columns: 1fr; gap: 10px; } }
 /* ── dropdown ประเภท/สถานะ/ผู้จัดทำ: width:auto ให้กว้างตามข้อความที่เลือกจริง (สั้น/ยาวต่างกันตามตัวเลือก)
    ไม่ยืดเต็มคอลัมน์เหมือนเดิม — min-width กันเหลือแคบเกินจนกดยาก ── */
 .ftk-sel {
@@ -99,93 +290,164 @@
 .ftk-empty-sub   { font-size: 12px; color: var(--txt3); }
 
 /* ── Template Modal (m-ftk-template): รายชื่อเอกสารมาตรฐาน — จัดการ (ลบ) หรือติ๊กเลือกดึงมาใช้ ── */
-.ftk-tpl-list { display: flex; flex-direction: column; gap: 2px; }
-.ftk-tpl-row {
-  display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  padding: 7px 8px; border-radius: 8px; font-size: 12.5px;
+/* กว้างกว่า .modal.md ปกติ — ชื่อเอกสารยาวอยู่บรรทัดเดียวได้ ไม่ตัดหลายบรรทัด */
+#m-ftk-template .modal.md { max-width: min(960px, 94vw); }
+#m-ftk-template .m-body { max-height: 70vh !important; }
+/* แถบบน (แถบสลับ/ค้นหา/เพิ่ม/หัวคอลัมน์) ติดหัวตอนเลื่อน — margin ติดลบชดเชย padding ของ .m-body (18px 20px) */
+.ftk-tpl-toolbar {
+  position: sticky; top: -18px; z-index: 2; background: var(--surface);
+  margin: -18px -20px 0; padding: 14px 20px 0;
 }
+/* แถบสลับ 2 แถบ (แบบฟอร์มมาตรฐาน / แบบฟอร์มตามสัญญา) — เส้นใต้สีบอกแถบที่เปิดอยู่ */
+.ftk-tpl-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+.ftk-tpl-tab {
+  border: none; background: none; cursor: pointer; font: inherit; font-size: 13px; font-weight: 600; color: var(--txt3);
+  padding: 8px 14px 10px; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color .15s, border-color .15s;
+}
+.ftk-tpl-tab:hover { color: var(--txt); }
+.ftk-tpl-tab.on { color: #06a6a0; border-bottom-color: #06a6a0; }
+.ftk-tpl-cnt { font-size: 11px; font-weight: 700; background: var(--surface2); color: var(--txt3); border-radius: 10px; padding: 1px 7px; margin-left: 4px; }
+.ftk-tpl-tab.on .ftk-tpl-cnt { background: rgba(6,166,160,.12); color: #06a6a0; }
+.ftk-tpl-tools { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+.ftk-tpl-tools .f-input { flex: 1; min-width: 0; }
+.ftk-tpl-nomatch { text-align: center; color: var(--txt3); font-size: 12.5px; padding: 24px 0 12px; }
+.ftk-tpl-head {
+  display: flex; align-items: center; gap: 10px; padding: 6px 10px;
+  font-size: 11px; font-weight: 700; color: var(--txt3); text-transform: uppercase; letter-spacing: .3px;
+  border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+}
+.ftk-tpl-head-name { flex: 1; }
+.ftk-tpl-text { flex: 1; min-width: 0; word-break: break-word; font-weight: 500; }
+.ftk-tpl-head-del { flex: 0 0 28px; }
+.ftk-tpl-list { display: flex; flex-direction: column; }
+.ftk-tpl-list[hidden], .ftk-tpl-add[hidden], .ftk-tpl-head[hidden] { display: none; }
+/* ช่องเพิ่มชื่อเอกสาร (แถวเดียวกับช่องค้นหา) */
+.ftk-tpl-add { display: flex; gap: 8px; flex: 1; min-width: 0; }
+.ftk-tpl-add .f-input { flex: 1; min-width: 0; border-style: dashed; }
+/* แถบตามสัญญา: ชื่อตามสัญญาสีส้มอ่อน แยกจากชื่อเอกสารให้เห็นชัด */
+.ftk-tpl-cname, .ftk-tpl-ctext { color: #b45309; }
+.ftk-tpl-cname::placeholder { color: var(--txt3); opacity: .7; font-weight: 400; }
+/* แถบ "ตามสัญญา" ใช้สีส้ม (ตรงกับ pill ประเภท form_contract) แยกจากแถบมาตรฐานสี teal */
+.ftk-tpl-tab.on[data-kind="contract"] { color: #f59e0b; border-bottom-color: #f59e0b; }
+.ftk-tpl-tab.on[data-kind="contract"] .ftk-tpl-cnt { background: rgba(245,158,11,.12); color: #f59e0b; }
+.ftk-tpl-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px; font-size: 13px; line-height: 1.45; border-bottom: 1px solid var(--border);
+}
+.ftk-tpl-row:nth-child(even) { background: color-mix(in srgb, var(--surface2) 45%, transparent); }
 .ftk-tpl-row:hover { background: var(--surface2); }
 .ftk-tpl-row-dim { opacity: .55; }
 .ftk-tpl-row-dim small { color: var(--txt3); font-weight: 600; }
-.ftk-tpl-chklbl { display: flex; align-items: center; gap: 8px; cursor: pointer; flex: 1; min-width: 0; }
+.ftk-tpl-no {
+  flex: 0 0 24px; text-align: center; font-size: 11px; font-weight: 700; color: var(--txt3);
+  font-variant-numeric: tabular-nums;
+}
+.ftk-tpl-chklbl { display: flex; align-items: center; gap: 8px; cursor: pointer; flex: 1; min-width: 0; font-weight: 500; }
 .ftk-tpl-chklbl input[type="checkbox"] { flex-shrink: 0; width: 15px; height: 15px; cursor: pointer; }
 .ftk-tpl-chklbl span { word-break: break-word; }
-
-/* ================================================================
-   PRINT SUMMARY / IMAGE (.ftk-print-page → .ftkp-*): สรุป "บันทึกเป็นรูปภาพ" — ออกแบบเป็นเอกสารแนวตั้ง
-   สัดส่วน A4 (form-tracker.js ตั้งความกว้าง clone ไว้ 794px = A4 @96dpi ตอนจับภาพ) เป็นภาพส่งต่อทางไลน์/
-   อีเมล ไม่ใช่กระดาษพิมพ์จริง จึงออกแบบให้มีสีสัน/การ์ด/เงาได้เต็มที่ (ไม่ใช้ชุด .ppc-* ขาวดำของ impl-tracker)
-   โทนสีอ้างอิงจากตัวแปรแบรนด์ของแอป (--violet #7c5cfc / --indigo #4361ee / --teal #06d6a0) แบบ hardcode
-   เป็น hex ตรง ๆ เพราะ html2canvas บางเวอร์ชันอ่านค่า CSS custom property จาก element ที่ clone แล้วนอกจอ
-   ไม่แน่นอน ── ไล่จากบนลงล่าง: แถบหัวไล่สี → hero % + stat mini-tile 3 ใบ → กราฟแท่งแยกสถานะ/ประเภท
-   (เต็มความกว้าง เรียงต่อกันในแนวตั้ง) → การ์ดรายละเอียดต่อคลัง (คอลัมน์เดียว อ่านง่ายกว่าบนหน้าแคบ) → ท้ายเอกสาร
-   ================================================================ */
-.ftkp-doc { background: #ffffff; font-family: 'Plus Jakarta Sans','Noto Sans Thai',sans-serif; color: #1a1d2e; }
-
-.ftkp-header      { background: linear-gradient(135deg,#7c5cfc,#4361ee); padding: 32px 36px 28px; color: #fff; }
-.ftkp-header-eyebrow { font-size: 12.5px; font-weight: 700; letter-spacing: .4px; opacity: .85; margin-bottom: 8px; }
-.ftkp-header-title   { font-size: 26px; font-weight: 800; line-height: 1.3; margin-bottom: 8px; }
-.ftkp-header-sub     { font-size: 12.5px; opacity: .92; line-height: 1.6; }
-
-.ftkp-body { padding: 28px 36px 8px; }
-
-/* ── Hero: % รวมตัวใหญ่ + progress bar ในการ์ดไล่สีอ่อน + stat mini-tile 3 ใบ ── */
-.ftkp-hero {
-  background: linear-gradient(135deg,#f2effe,#eafaf5); border: 1px solid #e4e7ed; border-radius: 18px;
-  padding: 22px 24px; margin-bottom: 20px;
+/* ช่องแก้ชื่อเอกสาร: ดูเหมือนข้อความปกติ เห็นกรอบเมื่อชี้/โฟกัส */
+.ftk-tpl-name {
+  flex: 1; min-width: 0; resize: none; overflow: hidden; display: block;
+  border: 1px solid transparent; background: transparent; color: var(--txt); border-radius: 7px;
+  padding: 5px 8px; margin: -5px 0; font: inherit; font-weight: 500; line-height: 1.45;
+  transition: border-color .15s, background .15s;
 }
-.ftkp-hero-pct-row  { display: flex; align-items: baseline; gap: 12px; margin-bottom: 10px; }
-.ftkp-hero-pct      { font-size: 44px; font-weight: 800; color: #7c5cfc; line-height: 1; }
-.ftkp-hero-pct-lbl  { font-size: 13px; font-weight: 700; color: #5a6075; }
-.ftkp-hero-bar-track { height: 14px; background: rgba(255,255,255,.7); border-radius: 8px; overflow: hidden; }
-.ftkp-hero-bar-fill  { height: 100%; border-radius: 8px; background: linear-gradient(90deg,#7c5cfc,#4361ee); }
-
-.ftkp-stats     { display: flex; gap: 12px; margin-top: 18px; }
-.ftkp-stat      { flex: 1; display: flex; align-items: center; gap: 10px; background: #fff; border: 1px solid #e4e7ed; border-radius: 12px; padding: 12px 14px; }
-.ftkp-stat-icon { width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
-.ftkp-stat b    { display: block; font-size: 19px; font-weight: 800; line-height: 1.1; }
-.ftkp-stat span { display: block; font-size: 10.5px; color: #5a6075; font-weight: 600; margin-top: 2px; }
-
-/* ── กราฟแท่ง: แยกตามสถานะ / แยกตามประเภท — เต็มความกว้าง เรียงต่อกันในแนวตั้ง ── */
-.ftkp-panel       { background: #f8f9fb; border: 1px solid #e4e7ed; border-radius: 16px; padding: 18px 20px; margin-bottom: 16px; }
-.ftkp-panel-title { font-size: 13.5px; font-weight: 800; margin-bottom: 14px; }
-.ftkp-bar-row      { margin-bottom: 12px; }
-.ftkp-bar-row:last-child { margin-bottom: 0; }
-.ftkp-bar-row-top  { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-size: 12px; }
-.ftkp-bar-dot      { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
-.ftkp-bar-label    { font-weight: 700; flex: 1; min-width: 0; }
-.ftkp-bar-val      { font-weight: 800; flex-shrink: 0; }
-.ftkp-bar-track    { height: 10px; background: #e4e7ed; border-radius: 6px; overflow: hidden; }
-.ftkp-bar-fill     { height: 100%; border-radius: 6px; }
-
-/* ── รายละเอียดต่อคลัง: การ์ดคอลัมน์เดียว เรียงจากบนลงล่าง — สีขอบซ้าย/ตัวเลข % อ้างอิงความคืบหน้าคลังนั้น ── */
-.ftkp-detail-title { font-size: 14px; font-weight: 800; margin: 4px 0 12px; }
-.ftkp-group         { background: #fff; border: 1px solid #e4e7ed; border-radius: 14px; margin-bottom: 14px; overflow: hidden; }
-.ftkp-group-head     { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px; border-left: 5px solid #9ba3b8; background: #f8f9fb; }
-.ftkp-group-name     { font-size: 13px; font-weight: 800; }
-.ftkp-group-pct      { font-size: 12px; font-weight: 800; flex-shrink: 0; }
-.ftkp-item-row       { display: flex; align-items: center; gap: 10px; padding: 9px 16px; border-top: 1px solid #f0f1f4; font-size: 11.5px; }
-.ftkp-item-dot       { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.ftkp-item-name      { flex: 1; min-width: 0; font-weight: 600; }
-.ftkp-item-name.done { color: #5a6075; font-weight: 500; }
-.ftkp-item-meta      { flex-shrink: 0; color: #9ba3b8; font-size: 10.5px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ftkp-item-date      { flex-shrink: 0; font-weight: 700; color: #06d6a0; font-size: 10.5px; white-space: nowrap; }
-
-.ftkp-footer { text-align: center; font-size: 10.5px; color: #9ba3b8; padding: 18px 20px 26px; }
+.ftk-tpl-name:hover { border-color: var(--border); background: var(--surface); }
+.ftk-tpl-name:focus { outline: none; border-color: #06a6a0; background: var(--surface); box-shadow: 0 0 0 3px rgba(6,166,160,.12); }
+.ftk-tpl-del {
+  flex: 0 0 28px; height: 28px; border: none; background: none; border-radius: 7px; cursor: pointer;
+  font-size: 13px; opacity: .35; transition: opacity .15s, background .15s;
+}
+.ftk-tpl-row:hover .ftk-tpl-del { opacity: .8; }
+.ftk-tpl-del:hover { opacity: 1 !important; background: rgba(239,71,111,.12); }
+.ftk-tpl-empty { text-align: center; color: var(--txt3); font-size: 12.5px; padding: 28px 20px; }
+.ftk-tpl-empty[hidden], .ftk-tpl-sec[hidden], .ftk-tpl-bulk[hidden] { display: none; }
+/* แยกตามประเภทโครงการ: รายการประเภทด้านซ้าย (โหมดจัดการ) + เนื้อหาด้านขวา — โหมดดึงมาใช้ไม่มีแถบซ้าย */
+.ftk-tpl-layout { display: flex; gap: 18px; align-items: flex-start; }
+.ftk-tpl-main { flex: 1; min-width: 0; }
+.ftk-tpl-layout:not(.pick) .ftk-tpl-toolbar { margin-left: 0; padding-left: 0; }
+.ftk-tpl-side {
+  flex: 0 0 180px; position: sticky; top: 0; display: flex; flex-direction: column; gap: 2px;
+  padding-right: 14px; border-right: 1px solid var(--border);
+}
+.ftk-tpl-side-title { font-size: 11px; font-weight: 700; color: var(--txt3); letter-spacing: .3px; padding: 4px 10px 8px; }
+.ftk-tpl-side-item {
+  display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+  border: none; background: none; cursor: pointer; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--txt2, var(--txt));
+  padding: 7px 10px; border-radius: 8px; transition: background .15s;
+}
+.ftk-tpl-side-item:hover { background: var(--surface2); }
+.ftk-tpl-side-item.on { background: color-mix(in srgb, var(--pt) 14%, transparent); color: var(--txt); }
+.ftk-tpl-side-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ftk-tpl-side-item .ftk-tpl-cnt { margin-left: 0; }
+.ftk-tpl-dot { flex: 0 0 9px; width: 9px; height: 9px; border-radius: 50%; background: var(--pt); }
+.ftk-tpl-dot.all { background: conic-gradient(#06a6a0, #f59e0b, #ef476f, #7c5cff, #06a6a0); }
+/* หัวกลุ่มประเภทในรายการ */
+.ftk-tpl-sec-head {
+  display: flex; align-items: center; gap: 8px; padding: 10px 10px 6px;
+  font-size: 12px; font-weight: 700; color: var(--txt); border-bottom: 2px solid color-mix(in srgb, var(--pt) 40%, transparent);
+}
+.ftk-tpl-sec-head .ftk-tpl-cnt { margin-left: 0; }
+.ftk-tpl-secchk { width: 15px; height: 15px; margin: 0 4px 0 4px; cursor: pointer; flex-shrink: 0; }
+/* เลือกประเภทในแถว (ย้ายประเภท) */
+.ftk-tpl-pt, .ftk-tpl-head-pt { flex: 0 0 150px; width: 150px; }
+.ftk-tpl-pt {
+  font: inherit; font-size: 12px; color: var(--txt2, var(--txt)); background: transparent; cursor: pointer;
+  border: 1px solid transparent; border-radius: 7px; padding: 4px 6px;
+}
+.ftk-tpl-pt:hover, .ftk-tpl-pt:focus { border-color: var(--border); background: var(--surface); outline: none; }
+/* เลขลำดับ ↔ ช่องติ๊ก (ชี้ที่แถว หรือกำลังเลือกอยู่ = เห็นช่องติ๊ก) */
+.ftk-tpl-no-chk { cursor: pointer; }
+.ftk-tpl-no-chk input { display: none; width: 15px; height: 15px; margin: 0; cursor: pointer; }
+.ftk-tpl-row:hover .ftk-tpl-no-chk input, .ftk-tpl-selecting .ftk-tpl-no-chk input, .ftk-tpl-no-chk input:checked { display: inline-block; }
+.ftk-tpl-row:hover .ftk-tpl-no-chk span, .ftk-tpl-selecting .ftk-tpl-no-chk span { display: none; }
+/* แถบเลือกหลายรายการ → ย้ายประเภท */
+.ftk-tpl-bulk {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;
+  padding: 8px 12px; border-radius: 9px; font-size: 12.5px;
+  background: rgba(6,166,160,.08); border: 1px solid rgba(6,166,160,.25);
+}
+.ftk-tpl-bulk .t-sel { min-width: 180px; }
+/* โหมดดึงมาใช้: บอกประเภทที่กรองอยู่ */
+.ftk-tpl-scope { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 12.5px; color: var(--txt3); margin: -4px 0 10px; }
+.ftk-tpl-scope > span { flex: 1; min-width: 0; }
+.ftk-tpl-showall { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-weight: 600; color: var(--txt); white-space: nowrap; }
+@media (max-width: 640px) {
+  .ftk-tpl-toolbar { top: -16px; margin: -16px -16px 0; padding: 12px 16px 0; }
+  .ftk-tpl-head { display: none; }
+  .ftk-tpl-tools, .ftk-tpl-add { flex-direction: column; align-items: stretch; }
+  .ftk-tpl-row { flex-wrap: wrap; }
+  /* แถบตามสัญญา: ชื่อเอกสารบรรทัดแรก ชื่อตามสัญญาขึ้นบรรทัดใหม่ย่อหน้าตรงกัน */
+  .ftk-tpl-list[data-kind="contract"] .ftk-tpl-row > :nth-child(2) { flex: 1 1 calc(100% - 72px); }
+  .ftk-tpl-list[data-kind="contract"] .ftk-tpl-row > :nth-child(3) { flex: 1 1 calc(100% - 72px); margin-left: 34px; }
+  /* ประเภทโครงการ: แถบซ้ายกลายเป็นแถบเลื่อนแนวนอนด้านบน · ช่องประเภทในแถวขึ้นบรรทัดใหม่ */
+  .ftk-tpl-layout { flex-direction: column; gap: 10px; }
+  .ftk-tpl-side { position: static; flex: none; width: 100%; flex-direction: row; overflow-x: auto; padding: 0 0 8px; border-right: none; border-bottom: 1px solid var(--border); }
+  .ftk-tpl-side-title { display: none; }
+  .ftk-tpl-side-item { width: auto; flex-shrink: 0; }
+  .ftk-tpl-side-name { overflow: visible; }
+  .ftk-tpl-pt { flex: 1 1 calc(100% - 72px); margin-left: 34px; }
+}
 
 /* ================================================================
    RESPONSIVE — Mobile-first: ตาราง .ftk-table แปลงเป็นการ์ดต่อแถวใต้ 768px
-   (ตาราง 9 คอลัมน์ scroll ทางขวาบนจอเล็กใช้งานยาก) — เก็บโครงสร้าง <table>/<td> เดิมไว้ทั้งหมด ใช้
+   (ตารางหลายคอลัมน์ scroll ทางขวาบนจอเล็กใช้งานยาก) — เก็บโครงสร้าง <table>/<td> เดิมไว้ทั้งหมด ใช้
    data-label ที่ผูกไว้ในแต่ละ td (ดู form-tracker.js) แสดงแทนหัวตารางที่ซ่อนไป การ์ดจัดด้วย
-   grid-template-areas ตามตำแหน่ง td จริง (ชื่อ → ประเภท/สถานะ คู่กัน → ผู้จัดทำ/วันที่รับเอกสาร คู่กัน →
-   วันที่ดำเนินการ → หมายเหตุ) ให้กระชับกว่าเดิมที่ไล่ label+value ทีละแถวยาว ๆ 8 ช่อง ปุ่มลบย้ายไปลอย
-   มุมขวาบนของการ์ดแทนการกินพื้นที่เต็มแถวแยกต่างหาก
+   grid-template-areas ตามตำแหน่ง td จริง (ชื่อ+ประเภท → สถานะ/ผู้จัดทำ คู่กัน → วันที่ → หมายเหตุ)
+   ปุ่มลบลอยมุมขวาบนของการ์ดแทนการกินพื้นที่เต็มแถวแยกต่างหาก
    ================================================================ */
 @media (max-width: 768px) {
   .ftk-btn-desktop { display: none !important; }
   .ftk-filterbar { padding: 8px 12px; }
+  .ftk-filterbar { gap: 8px; }
+  .ftk-search, .ftk-pills, .ftk-seg { flex: 1 1 100%; min-width: 0; }
+  .ftk-pills { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .ftk-pill { flex-shrink: 0; }
+  .ftk-seg { overflow-x: auto; }
+  .ftk-seg-btn { flex: 1 0 auto; justify-content: center; }
+  .ftk-bulkbar { margin: 8px 12px 0; }
   .ftk-scroll { padding: 12px 14px; }
-  .ftk-group-head { flex-wrap: wrap; }
+  .ftk-group-pbar { display: none; }
 
   .ftk-table                          { display: block; }
   .ftk-table thead                    { display: none; }
@@ -193,7 +455,7 @@
   .ftk-table tr {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    grid-template-areas: "name name" "type status" "owner recv" "done done" "note note";
+    grid-template-areas: "type type" "name name" "status owner" "dates dates" "note note";
     gap: 5px 10px;
     position: relative;
     background: var(--surface); border: 1.5px solid var(--border); border-radius: 12px;
@@ -201,32 +463,38 @@
   }
   .ftk-table td                       { display: block; padding: 0; border: none; min-width: 0; }
   .ftk-table td::before               { content: attr(data-label); display: block; font-size: 9px; font-weight: 700; color: var(--txt3); text-transform: uppercase; letter-spacing: .3px; margin-bottom: 1px; }
-  /* "ลำดับ" ไม่ต้องโชว์ซ้ำบนการ์ด — ลำดับการวางการ์ดจากบนลงล่างสื่อความหมายอยู่แล้ว */
+  /* "ลำดับ"/checkbox ไม่ต้องโชว์บนการ์ด — ลำดับการวางการ์ดจากบนลงล่างสื่อความหมายอยู่แล้ว */
   .ftk-table td.ftk-no                { display: none; }
   /* "แบบฟอร์ม" ทำหน้าที่เป็นหัวการ์ด — เต็มความกว้าง ตัวหนา ไม่ต้องมี label ซ้ำ */
-  .ftk-table td:nth-child(2)          { grid-area: name; padding-bottom: 6px; border-bottom: 1px solid var(--border); margin-bottom: 1px; }
-  .ftk-table td:nth-child(2)::before  { display: none; }
-  .ftk-table td:nth-child(2) .ftk-name-input { font-size: 13.5px; font-weight: 700; padding: 0; }
-  /* ประเภท/สถานะ คู่กันแถวเดียว, ผู้จัดทำ/วันที่รับเอกสาร คู่กันอีกแถว — ลดจำนวนแถวจาก 6 label เหลือ 3 */
-  .ftk-table td:nth-child(3)          { grid-area: type; }
+  /* ป้ายประเภทอยู่บนสุดของการ์ด ไม่ต้องมี label ซ้ำ */
+  .ftk-table td.ftk-type-cell         { grid-area: type; width: auto; }
+  .ftk-table td.ftk-type-cell::before { display: none; }
+  .ftk-table td:nth-child(3)          { grid-area: name; padding-bottom: 6px; border-bottom: 1px solid var(--border); margin-bottom: 1px; }
+  .ftk-table td:nth-child(3)::before  { display: none; }
+  .ftk-table td:nth-child(3) .ftk-name-input:not(.ftk-contract-input) { font-size: 13.5px; font-weight: 700; padding: 0; }
+  .ftk-table .ftk-sub                 { padding: 4px 0 0; }
   .ftk-table td:nth-child(4)          { grid-area: status; }
   .ftk-table td:nth-child(5)          { grid-area: owner; }
-  .ftk-table td:nth-child(6)          { grid-area: recv; }
-  .ftk-table td:nth-child(7)          { grid-area: done; }
+  .ftk-table td:nth-child(6)          { grid-area: dates; }
+  .ftk-table .ftk-st                  { flex-wrap: wrap; }
+  .ftk-group-owner                    { max-width: 140px; }
   /* "หมายเหตุ" กว้างเต็มการ์ด และซ่อนไปเลยถ้าไม่มีข้อความ (ไม่เปลืองพื้นที่โชว์ "—" เปล่า ๆ ) */
   .ftk-table td.ftk-note-cell         { grid-area: note; }
   .ftk-table td.ftk-note-cell:has(.ftk-note[value=""]) { display: none; }
   /* ปุ่ม "ลบ" ลอยมุมขวาบนของการ์ดแทนแถวแยก — ไม่กินพื้นที่แนวตั้งเพิ่ม */
-  .ftk-table td:last-child            { position: absolute; top: 8px; right: 6px; grid-area: unset; }
-  .ftk-table td:last-child::before    { display: none; }
-  .ftk-table .ftk-sel,
-  .ftk-table .ftk-note,
-  .ftk-table .ftk-date-picker         { width: 100%; }
-  .ftk-table .ftk-sel                 { font-size: 11.5px; padding: 5px 6px; }
-  .ftk-table .ftk-date-display        { font-size: 11px; padding: 5px 6px; }
+  .ftk-table td.ftk-del-cell          { position: absolute; top: 8px; right: 6px; grid-area: unset; }
+  .ftk-table td.ftk-del-cell::before  { display: none; }
+  .ftk-table .ftk-sel:not(.ftk-type-pill),
+  .ftk-table .ftk-note                { width: 100%; }
+  .ftk-table .ftk-sel:not(.ftk-type-pill) { font-size: 11.5px; padding: 5px 6px; }
+  .ftk-table .ftk-date-display        { font-size: 11px; }
   .ftk-table .ftk-note                { font-size: 12px; padding: 5px 6px; }
   .ftk-table .ftk-date                { font-size: 11px; }
-  /* แถว "+ พิมพ์ชื่อแบบฟอร์มแล้วกด Enter..." ไม่ใช่การ์ดข้อมูล — คืนกลับเป็นแถวเรียบ ๆ ปกติ */
-  .ftk-table tr.ftk-quickadd          { display: flex; flex-direction: column; gap: 8px; background: transparent; border: none; padding: 8px 0 0; }
-  .ftk-table tr.ftk-quickadd td       { display: block; padding: 0; }
+  /* แถว "+ พิมพ์ชื่อแบบฟอร์มแล้วกด Enter..." / แถวว่าง ไม่ใช่การ์ดข้อมูล — คืนกลับเป็นแถวเรียบ ๆ ปกติ */
+  .ftk-table tr.ftk-quickadd,
+  .ftk-table tr.ftk-empty-row         { display: flex; flex-direction: column; gap: 8px; background: transparent; border: none; padding: 8px 0 0; }
+  .ftk-table tr.ftk-quickadd td,
+  .ftk-table tr.ftk-empty-row td      { display: block; padding: 0; }
+  .ftk-table tr.ftk-quickadd td::before,
+  .ftk-table tr.ftk-empty-row td::before { display: none; }
 }

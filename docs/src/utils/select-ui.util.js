@@ -5,7 +5,8 @@
  *   - ค่าจริงยังอยู่ที่ <select> เดิม (โค้ดเดิมอ่าน/ตั้ง .value, innerHTML, onchange ได้เหมือนเดิม) — เลือกแล้วยิง input + change
  *   - รองรับ optgroup · option disabled/hidden · ช่องค้นหาเมื่อมีตัวเลือกเกิน 8 รายการ · คีย์บอร์ด (↑ ↓ Enter Esc)
  *   - ข้าม: select[multiple], size > 1, disabled, [data-native]
- * สไตล์: src/styles/components/select-ui.css · โหลดโดย src/utils/training-page.util.js ทุกส่วนของ /training/
+ *   - กดที่ <label> ที่ครอบ <select> (เช่นป้าย "คลัง" ของ pill ตัวกรอง) ก็เปิดแผงด้วย · แผงจัดตำแหน่งตามกรอบ [data-sui-anchor] ที่ครอบอยู่ (ถ้ามี)
+ * สไตล์: src/styles/components/select-ui.css · โหลดในแอปหลัก (index.html + main.css) และ src/utils/training-page.util.js ทุกส่วนของ /training/
  */
 (function () {
   var MOBILE = window.matchMedia('(max-width:640px)');
@@ -35,9 +36,18 @@
     arr[active].scrollIntoView({ block: 'nearest' });
   }
 
+  // <select> ที่ถูกกด: ตัวมันเอง หรือ <select> ใน <label> ที่ถูกกด
+  function selectAt(t) {
+    if (!t || !t.closest) return null;
+    var sel = t.closest('select');
+    if (sel) return sel;
+    var lb = t.closest('label');
+    return lb && !t.closest('input,textarea,button,a') ? lb.querySelector('select') : null;
+  }
+
   function place() {
     if (!cur || !panel || root.classList.contains('sheet')) return;
-    var r = cur.getBoundingClientRect(), vw = window.innerWidth, vh = window.innerHeight;
+    var r = (cur.closest('[data-sui-anchor]') || cur).getBoundingClientRect(), vw = window.innerWidth, vh = window.innerHeight;
     if (r.bottom < 0 || r.top > vh) { close(); return; }
     var w = Math.min(Math.max(r.width, 240), vw - 16);
     var below = vh - r.bottom - 10, above = r.top - 10;
@@ -59,7 +69,7 @@
       n++;
       var on = o.selected;
       return '<button type="button" class="sui-opt' + (on ? ' on' : '') + (o.disabled ? ' off' : '') + '" data-i="' + o.index + '" aria-selected="' + on + '"' + (o.disabled ? ' disabled' : '') + '>'
-        + '<span>' + esc(o.textContent) + '</span></button>';
+        + '<span>' + esc(o.textContent) + '</span>' + (on ? '<i class="ti ti-check" aria-hidden="true"></i>' : '') + '</button>';
     };
     [].forEach.call(sel.children, function (c) {
       if (c.tagName === 'OPTGROUP') {
@@ -74,7 +84,8 @@
       + (sheet ? '<div class="sui-grab"></div><div class="sui-title"><span>' + esc(titleOf(sel)) + '</span><button type="button" class="sui-x" aria-label="ปิด"><i class="ti ti-x"></i></button></div>' : '')
       + (n > 8 ? '<div class="sui-search"><i class="ti ti-search"></i><input type="text" placeholder="ค้นหา..." autocomplete="off"></div>' : '')
       + '<div class="sui-list">' + (html || '<div class="sui-empty">ไม่มีตัวเลือก</div>') + '</div></div>';
-    document.body.appendChild(root);
+    // โหมดเต็มจอ (Fullscreen API) แสดงเฉพาะสิ่งที่อยู่ใน element ที่เต็มจอ — ต้องวางแผงไว้ในนั้น ไม่งั้นมองไม่เห็น
+    (document.fullscreenElement || document.body).appendChild(root);
     panel = root.querySelector('.sui-panel');
     list = root.querySelector('.sui-list');
     search = root.querySelector('.sui-search input');
@@ -124,7 +135,7 @@
   // ── เปิดแผงแทน popup ของระบบ ──
   // เมาส์: กันที่ mousedown (popup ของระบบเปิดตอนนี้)
   document.addEventListener('mousedown', function (e) {
-    var sel = e.target.closest && e.target.closest('select');
+    var sel = selectAt(e.target);
     if (root && !e.target.closest('.sui') && sel !== cur) close();
     if (e.button !== 0 || !eligible(sel)) return;
     e.preventDefault();
@@ -134,7 +145,7 @@
   // จอสัมผัส: แตะแล้วยกนิ้ว (ไม่ได้ลาก) → ยกเลิก click/focus ของระบบที่จะเปิดตัวเลือกเดิม แล้วเปิดแผงของเรา
   document.addEventListener('touchstart', function (e) {
     var t = e.touches[0];
-    touchStart = { x: t.clientX, y: t.clientY, sel: e.target.closest && e.target.closest('select') };
+    touchStart = { x: t.clientX, y: t.clientY, sel: selectAt(e.target) };
     if (root && !e.target.closest('.sui') && touchStart.sel !== cur) close();
   }, { capture: true, passive: true });
   document.addEventListener('touchend', function (e) {
@@ -165,4 +176,6 @@
   window.addEventListener('scroll', function (e) { if (root && !(e.target.closest && e.target.closest('.sui'))) place(); }, true);
   // ย่อขยายหน้าต่าง: แผงลอยปิด · แผ่นล่างของมือถือคงไว้ (คีย์บอร์ดเด้งตอนพิมพ์ค้นหาก็ resize)
   window.addEventListener('resize', function () { if (root && !root.classList.contains('sheet')) close(); });
+  // เข้า/ออกเต็มจอระหว่างเปิดแผง — แผงอยู่ผิดที่แล้ว ปิดทิ้ง
+  document.addEventListener('fullscreenchange', function () { close(); });
 })();

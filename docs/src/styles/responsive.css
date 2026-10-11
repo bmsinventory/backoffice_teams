@@ -8,7 +8,6 @@
 @supports (padding: max(0px)) {
   #topbar    { padding-left: max(24px, env(safe-area-inset-left)); padding-right: max(24px, env(safe-area-inset-right)); }
   #bottom-nav { padding-bottom: max(8px, env(safe-area-inset-bottom)); }
-  .lform     { padding-bottom: max(40px, env(safe-area-inset-bottom)); }
 }
 
 /* ════ TABLET: 769px – 1024px ════ */
@@ -17,11 +16,6 @@
   #wrap       { padding-bottom: 0; }
 
   /* Login */
-  .lhero { flex: 0 0 48%; padding: 32px 28px; }
-  .lhero-t1 { font-size: 28px; }
-  .lhero-t3 { display: none; }
-  .lform  { flex: 0 0 52%; }
-  .lcard  { padding: 36px 30px; }
 
   /* Slim sidebar on tablet */
   #sidebar { width: 64px; min-width: 64px; }
@@ -37,7 +31,6 @@
   div[id="stat-row"],
   div[style*="grid-template-columns:repeat(4,1fr)"] { grid-template-columns: repeat(2,1fr) !important; }
   div[style*="1fr 1fr 280px"] { grid-template-columns: 1fr 1fr !important; }
-  .ov-row-3 { grid-template-columns: 1fr 1fr !important; }
 
   .f-input { min-height: 42px; }
   .toolbar { flex-wrap: wrap; }
@@ -66,7 +59,7 @@
 
   /* ── Horizontal scroll prevention ── */
   body, #wrap, #main, #content { max-width: 100vw; overflow-x: hidden; }
-  #kb-board, .tl-container, .dtable-inner, .af-tabs, .adv-stepper, .lmock { overflow-x: auto; }
+  #kb-board, .tl-container, .dtable-inner, .af-tabs, .adv-stepper { overflow-x: auto; }
 
   /* ── Calendar: hide add-project button on smartphone ── */
 
@@ -131,7 +124,6 @@
   .pku-x-btn { min-height: 0 !important; width: 20px !important; height: 20px !important; padding: 0 !important; font-size: 11px !important; display: inline-flex !important; align-items: center; justify-content: center; border-radius: 50% !important; }
   .nav-btn { padding: 12px 10px !important; min-height: 44px; }
   .f-input, .t-sel, .t-search input, select, .ms-filter .ms-btn { min-height: 44px; }
-  .lf-inp { min-height: 48px; font-size: 14px !important; } /* เดิม 16px กัน iOS auto-zoom แต่ใหญ่กว่า .lf-lbl (13px) จนดูไม่เข้าชุด — ลดให้เท่า desktop แทน (ดูเหตุผลเดียวกับ .f-input ด้านบน) */
   td { min-height: 44px; }
 
   /* ── Toolbar ── */
@@ -152,11 +144,6 @@
   #content select, .modal select { max-width: 100%; }
   .toolbar > div { min-width: 0; max-width: 100%; }
 
-  /* ── แท็บมุมมอง รพ. (รายชื่อ/สรุปข้อมูลการติดต่อ/วิเคราะห์/Dashboard) เดิมถูกบีบจนตัวหนังสือ
-     ตัดทีละพยางค์เป็นแนวตั้ง → แถวเดียวเลื่อนซ้ายขวา ── */
-  .hsp-vtabs { overflow-x: auto; scrollbar-width: none; padding: 0 8px !important; flex-shrink: 0; }
-  .hsp-vtabs::-webkit-scrollbar { display: none; }
-  .hsp-vtabs > button { flex-shrink: 0; white-space: nowrap; padding: 10px 12px !important; }
   .toolbar .btn { padding: 8px 10px; font-size: 12px; }
 
   /* ── Stat Row ── */
@@ -170,10 +157,8 @@
 
   /* ── Overview ── */
   div[style*="1fr 1fr 280px"] { grid-template-columns: 1fr !important; }
-  /* minmax(0,1fr) ไม่ใช่ 1fr — 1fr เฉย ๆ = minmax(auto,1fr) การ์ดที่มีข้อความยาว/ตาราง (Budget Distribution,
-     Critical Timeline, Project Health …) ยืดคอลัมน์เป็น ~650px แล้วถูกตัดขอบขวาหาย */
-  .ov-row { grid-template-columns: minmax(0, 1fr) !important; padding: 0 12px 12px !important; gap: 12px !important; }
-  .ov-row > *, .ov-card { min-width: 0; }
+  /* การ์ดที่มีข้อความยาว/ตาราง ไม่ให้ดันคอลัมน์กริดจนล้นจอ */
+  .ov-card { min-width: 0; }
   #annual-target-wrap { padding: 0 12px 12px !important; }
   #ov-ai-wrap { padding: 12px 12px 0 !important; }
 
@@ -305,9 +290,6 @@
   .kb-card  { cursor: default; }
 
   /* ── Login ── */
-  .lhero { display: none; }
-  .lform { flex: 1; min-height: 100dvh; background: #fff; padding: 28px 20px; }
-  .lcard { box-shadow: none; border: none; background: transparent; padding: 32px 0 0; }
 
   /* ── Timeline / Workload ── */
   .tl-left { width: 130px !important; min-width: 130px !important; }
@@ -330,11 +312,6 @@
      ให้แต่ละแผงกว้างเต็มโมดัล และลด max-height ลงกันสองแผงรวมกันยาวเกินจอ ── */
   .pku-grid { grid-template-columns: 1fr !important; }
   .pku-grid #pku-avail, .pku-grid #mem-list { max-height: 220px !important; }
-
-  /* ── บันทึกงาน: ผู้เข้าร่วม (ที่เลือก | รายชื่อกว้างตายตัว 200px) ชิดกันบนจอแคบ ช่องที่เลือกเหลือ ~20px
-     ข้อความเรียงเป็นแนวตั้ง → สแตก รายชื่อขึ้นก่อน ช่องที่เลือกอยู่ล่าง ── */
-  .wl-pt-row { flex-direction: column-reverse; }
-  .wl-pt-row > .wl-pt-pick { width: 100% !important; }
 
   /* ── Advance Stepper ── */
   .adv-stepper { overflow-x: auto; gap: 0; padding-bottom: 4px; }
@@ -371,7 +348,6 @@
   .m-foot { gap: 6px !important; }
   .m-foot .btn { font-size: 12.5px; }
   table.m-card-table td::before { font-size: 10px; }
-  .lcard { padding: 28px 0 0 !important; }
 }
 
 /* ════ VERY SMALL: ≤ 375px ════ */
@@ -383,7 +359,6 @@
   .bottom-nav-icon  { font-size: 20px; }
   #bottom-nav { height: calc(52px + env(safe-area-inset-bottom, 0px)); }
   #wrap       { padding-bottom: calc(52px + env(safe-area-inset-bottom, 0px)); }
-  .lcard { padding: 24px 0 0; }
 
   /* Timeline even narrower */
   .tl-left { width: 96px !important; min-width: 96px !important; }

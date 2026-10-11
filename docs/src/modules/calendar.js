@@ -132,17 +132,8 @@ window.renderCalendar=function(){
       if(deptFilt&&(s.dept||'')!==deptFilt)return false;
       return true;
     }).map(s=>({id:s.id,name:s.name,sub:s.dept||'ไม่ระบุแผนก',type:'staff',obj:s}));
-    // Sort by dept → earliest project start date
-    // หาวันเริ่มงานแรกสุดต่อคนในรอบเดียว (เดิม ทุกคน × ทุกโครงการ × ทุก visit)
-    var _mnBy=new Map();var _mnSet=function(sid,v){var c=_mnBy.get(sid);if(!c||v<c)_mnBy.set(sid,v);};
-    (window.PROJECTS||[]).forEach(function(p){
-      if(p.status==='cancelled')return;
-      if(p.visits&&p.visits.length>0){p.visits.forEach(function(v){_calVisitMembers(v).forEach(function(x){if(x.vm.s)_mnSet(x.sid,x.vm.s);});});}
-      else{(p.members&&p.members.length>0?p.members:p.team.map(function(id){return{sid:id,s:p.start};})).forEach(function(m){if(m.s)_mnSet(m.sid,m.s);});}
-    });
-    var _eSt={};
-    window.STAFF.forEach(function(s){_eSt[s.id]=_mnBy.get(s.id)||'9999-99';});
-    baseRows.sort(function(a,b){var da=a.obj.dept||'zzz',db=b.obj.dept||'zzz';if(da!==db)return da.localeCompare(db,'th');return(_eSt[a.id]||'9999-99').localeCompare(_eSt[b.id]||'9999-99');});
+    // เรียง แผนก → ระดับตำแหน่ง → ชื่อ
+    baseRows.sort(function(a,b){return window.sortStaffByDeptRank(a.obj,b.obj);});
     // Filter to staff with events in range if "แสดงเฉพาะคนที่มีงาน" is checked
     var _onlyCb=document.getElementById('cal-only-active');
     if(_onlyCb&&_onlyCb.checked&&tCols.length>0){
@@ -231,7 +222,7 @@ window.renderCalendar=function(){
         p.visits.forEach((v,vi)=>{
           if(!v.start||!v.end)return;
           let ms=pd(v.start),me=pd(v.end);me.setHours(23,59,59);
-          let team=v.team&&v.team.length>0?window._vtMembers(v.team,v.start,v.end).map(m=>{let st=_stIdx.get(m.sid);return st?(st.nickname||st.name.split(' ')[0]):'';}).filter(Boolean):[];
+          let team=v.team&&v.team.length>0?window.sortByStaffRank(window._vtMembers(v.team,v.start,v.end)).map(m=>{let st=_stIdx.get(m.sid);return st?(st.nickname||st.name.split(' ')[0]):'';}).filter(Boolean):[];
           let label=(team.length>0?team.join(', '):'ยังไม่มีทีม')+` (รอบ${v.no||vi+1})`;
           let idxs=getColIndices(ms,me,tCols);
           let vColor={'planned':gS(p.stage).color,'ongoing':'#7c5cfc','done':'#06d6a0'}[v.status]||gS(p.stage).color;
@@ -245,7 +236,7 @@ window.renderCalendar=function(){
           let ms=new Date(Math.min(...validMems.map(mb=>pd(mb.s).getTime())));
           let me=new Date(Math.max(...validMems.map(mb=>{let d=pd(mb.e);d.setHours(23,59,59);return d.getTime();})));
           let idxs=getColIndices(ms,me,tCols);
-          let staffNames=[...new Set(validMems.map(mb=>{let st=_stIdx.get(mb.sid);return st?st.nickname:'';}).filter(n=>n))];
+          let staffNames=[...new Set(window.sortByStaffRank(validMems).map(mb=>{let st=_stIdx.get(mb.sid);return st?st.nickname:'';}).filter(n=>n))];
           if(idxs)rawEvents.push({sIdx:idxs.sIdx,eIdx:idxs.eIdx,text:staffNames.join(', ')||'ยังไม่มีทีมงาน',color:gS(p.stage).color,p:p});
         } else if(p.start&&p.end){
           let idxs=getColIndices(pd(p.start),new Date(pd(p.end).setHours(23,59,59)),tCols);
@@ -260,7 +251,7 @@ window.renderCalendar=function(){
         p.visits.forEach((v,vi)=>{
           if(!v.start||!v.end)return;
           let ms=pd(v.start),me=pd(v.end);me.setHours(23,59,59);
-          let team=v.team&&v.team.length>0?window._vtMembers(v.team,v.start,v.end).map(m=>{let st=_stIdx.get(m.sid);return st?(st.nickname||st.name.split(' ')[0]):'';}).filter(Boolean):[];
+          let team=v.team&&v.team.length>0?window.sortByStaffRank(window._vtMembers(v.team,v.start,v.end)).map(m=>{let st=_stIdx.get(m.sid);return st?(st.nickname||st.name.split(' ')[0]):'';}).filter(Boolean):[];
           let label=`${team.join(', ')||'ไม่มีทีม'} (${p.name} รอบ${v.no||vi+1})`;
           let idxs=getColIndices(ms,me,tCols);
           if(idxs)rawEvents.push({sIdx:idxs.sIdx,eIdx:idxs.eIdx,text:label,color:_pColor(p),p:p});
@@ -272,7 +263,7 @@ window.renderCalendar=function(){
         if(!isNaN(me.getTime()))me.setHours(23,59,59);
         if(validMems.length>0){ms=new Date(Math.min(...validMems.map(mb=>pd(mb.s).getTime())));me=new Date(Math.max(...validMems.map(mb=>{let d=pd(mb.e);d.setHours(23,59,59);return d.getTime();})));}
         if(!isNaN(ms.getTime())&&!isNaN(me.getTime())){
-          let staffNames=[...new Set(validMems.map(mb=>{let st=_stIdx.get(mb.sid);return st?st.nickname:'';}).filter(n=>n))];
+          let staffNames=[...new Set(window.sortByStaffRank(validMems).map(mb=>{let st=_stIdx.get(mb.sid);return st?st.nickname:'';}).filter(n=>n))];
           let idxs=getColIndices(ms,me,tCols);
           if(idxs)rawEvents.push({sIdx:idxs.sIdx,eIdx:idxs.eIdx,text:`${staffNames.join(', ')||'ไม่มีทีม'} (${p.name})`,color:_pColor(p),p:p});
         }

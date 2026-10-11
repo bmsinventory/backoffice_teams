@@ -35,7 +35,37 @@
   line-height: 1.45;
 }
 
+/* หัวกลุ่มตามประเภทโครงการ */
+#proj-rows tr.proj-grp-head,
+#proj-rows tr.proj-grp-head:hover td { background: var(--surface2); cursor: default; }
+#proj-rows tr.proj-grp-head td { padding: 10px 16px; border-bottom: 1px solid var(--border); }
+.proj-grp-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--txt);
+  font-size: 14px;
+  font-weight: 700;
+}
+.proj-grp-bar { width: 4px; height: 18px; border-radius: 2px; flex: 0 0 auto; }
+.proj-grp-cnt {
+  padding: 1px 9px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--txt2);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* ระยะสัญญา: แถบเวลาที่ผ่านไป + เหลือ/เลย N วัน */
+.proj-period { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; max-width: 130px; }
+.proj-period-bar { display: block; height: 4px; border-radius: 999px; background: var(--border); overflow: hidden; }
+.proj-period-bar > span { display: block; height: 100%; border-radius: 999px; }
+
 @media (max-width: 768px) {
+  table.m-card-table tr.proj-grp-head { display: block; background: none; border: 0; box-shadow: none; padding: 8px 2px 0; }
+  table.m-card-table tr.proj-grp-head td { display: block; padding: 0; border: 0; margin: 0; background: none; }
   .proj-title-line { align-items: center; }
   .proj-row-index { min-width: 26px; height: 22px; font-size: 10.5px; }
   .proj-row-title { font-size: 13.5px; font-weight: 700; }

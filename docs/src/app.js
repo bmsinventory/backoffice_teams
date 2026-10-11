@@ -18,26 +18,31 @@
  */
 (function () {
 
+  // ── อวาตาร์ผู้ใช้ใน sidebar: มีรูปในคลังรูปแนะนำทีม (window.STAFF_FIGS, staff.id) → ใช้รูป · ไม่มี → ตัวอักษรแรก ──
+  window.setUserAvatar = function () {
+    var cu = window.cu, uAv = document.getElementById('u-av');
+    if (!cu || !uAv) return;
+    var topRole = window.myRoles()[0]; // กลุ่มลำดับแรก (sort_order) — ใช้สีอวาตาร์
+    var grad = topRole ? 'linear-gradient(135deg,' + topRole.color + ',#4cc9f0)' : 'linear-gradient(135deg,#7c5cfc,#ff6b6b)';
+    var fig = cu.staffId && (window.STAFF_FIGS || {})[cu.staffId];
+    uAv.textContent = (cu.name || cu.username || '?').charAt(0).toUpperCase();
+    uAv.classList.toggle('has-fig', !!fig);
+    uAv.style.setProperty('--av-ring', topRole ? topRole.color : '#7c5cfc');
+    window.LoginFace && window.LoginFace.save(cu, fig); // จำรูปไว้ทักทายที่หน้า Login (เฉพาะบัญชีที่ติ๊กจดจำ)
+    uAv.style.background = fig ? 'url("' + String(fig.url).replace(/"/g, '%22') + '"), ' + grad : grad;
+  };
+
   // ── Setup User Session (sidebar UI, permissions, element visibility) ──
   window.setupUser = function () {
     var cu = window.cu;
     if (!cu) return;
 
     // Update avatar & name in sidebar (IDs match index.html: u-av, u-name, u-role)
-    var uAv   = document.getElementById('u-av');
     var uName = document.getElementById('u-name');
     var uRole = document.getElementById('u-role');
-    var roleColors = {
-      admin:  'linear-gradient(135deg,#ff6b6b,#ffa62b)',
-      pm:     'linear-gradient(135deg,#7c5cfc,#4cc9f0)',
-      viewer: 'linear-gradient(135deg,#06d6a0,#4cc9f0)',
-    };
-    if (uAv) {
-      uAv.textContent = (cu.name || cu.username || '?').charAt(0).toUpperCase();
-      uAv.style.background = roleColors[cu.role] || 'linear-gradient(135deg,#7c5cfc,#ff6b6b)';
-    }
+    window.setUserAvatar();
     if (uName) uName.textContent = cu.name || cu.username || '';
-    if (uRole) uRole.textContent = window.roleLabel ? window.roleLabel(cu.role) : (cu.role || '');
+    if (uRole) uRole.textContent = window.userRoleLabel(cu);
     window.showWhatsNew();
 
     // Show/hide role-based CSS class elements
@@ -46,8 +51,10 @@
     document.querySelectorAll('.admin-only').forEach(function (el) {
       el.style.display = (isAdm || canAdm) ? '' : 'none';
     });
-    document.querySelectorAll('.ce-only').forEach(function (el) {
-      el.style.display = (window.ce && window.ce()) ? '' : 'none';
+    // data-perm="action:module" — แสดงเมื่อมีสิทธิ์นั้น (เช่น data-perm="add:projects")
+    document.querySelectorAll('[data-perm]').forEach(function (el) {
+      var p = el.getAttribute('data-perm').split(':');
+      el.style.display = window.can(p[0], p[1]) ? '' : 'none';
     });
     document.querySelectorAll('.cl-only').forEach(function (el) {
       el.style.display = (window.cl && window.cl()) ? '' : 'none';
@@ -65,7 +72,7 @@
       'overview','kanban','projects','advance','lodging',
       'workload','availability','calendar','leave','timesheet',
       'cost','budget','targets','hospital','contract','worklog','holiday',
-      'impl_tracker','all_issues','helpdesk','assist','training','server_request',
+      'impl_tracker','all_issues','helpdesk','assist','training','server_request','team_showcase','team_map',
     ];
     navModules.forEach(function (m) {
       var btn = document.querySelector('.nav-btn[onclick*="\'' + m + '\'"]');
@@ -77,6 +84,8 @@
       if (m === 'budget' && window.canView && window.canView('cost')) canSee = true;
       // ปุ่ม ภาระงานทีม รวมแท็บทีมว่าง (availability) ไว้ด้วย
       if (m === 'workload' && window.canView && window.canView('availability')) canSee = true;
+      // ปุ่ม ผู้ช่วยทีม รวมแท็บตรวจไฟล์ข้อมูลพื้นฐาน (datacheck) ไว้ด้วย
+      if (m === 'assist' && window.canView && window.canView('datacheck')) canSee = true;
       // ปุ่ม จัดการวันหยุด (หมวดระบบ) — เฉพาะผู้เพิ่ม/แก้วันหยุดได้ · ทีมดูรายการวันหยุดจากปุ่มในปฏิทินทีม
       if (m === 'holiday') canSee = isAdm || !!(window.canAdd && window.canAdd('holiday')) || !!(window.canEdit && window.canEdit('holiday'));
       btn.style.display = canSee ? '' : 'none';
@@ -213,6 +222,7 @@
       'view-expense-form': 'renderExpenseForm',
       'view-lodging':      'renderLodging',
       'view-workload':     'renderWorkload',
+      'view-team-map':     'renderTeamMap',
       'view-calendar':     'renderCalendar',
       'view-leave':        'renderLeave',
       'view-timesheet':    'renderTimesheet',
@@ -251,8 +261,7 @@
     var m = document.createElement('div');
     m.id = 'user-menu';
     m.innerHTML = '<div class="um-head"><b>' + window.esc(cu.name || cu.username || '') + '</b><span>'
-      + window.esc(window.roleLabel ? window.roleLabel(cu.role) : (cu.role || '')) + '</span></div>'
-      + '<button type="button" data-act="manual">📖 คู่มือการใช้งาน</button>'
+      + window.esc(window.userRoleLabel(cu)) + '</span></div>'
       + '<button type="button" data-act="pw">🔒 เปลี่ยนรหัสผ่าน</button>'
       + '<button type="button" data-act="tour">🧭 แนะนำการใช้งาน</button>'
       + '<button type="button" data-act="out" class="danger">🚪 ออกจากระบบ</button>';
@@ -265,8 +274,7 @@
       if (!act) return;
       _closeUserMenu();
       window.closeMobSidebar && window.closeMobSidebar();
-      if (act === 'manual') window.open('manual.html', '_blank');
-      else if (act === 'pw') window.openChangePassword && window.openChangePassword();
+      if (act === 'pw') window.openChangePassword && window.openChangePassword();
       else if (act === 'tour') window.startTour && window.startTour();
       else window.doLogout && window.doLogout();
     });
@@ -286,7 +294,7 @@
   // force = เปิดดูเองจากการคลิกเลขเวอร์ชัน (แสดงเวอร์ชันล่าสุดแม้รับทราบแล้ว)
   window.showWhatsNew = function (force) {
     var log = window.CHANGELOG || [];
-    if (!window.cu || !log.length) return;
+    if (!log.length || (!window.cu && !force)) return; // ก่อนเข้าสู่ระบบเปิดได้เฉพาะกดเอง (ปุ่มมีอะไรใหม่ หน้าล็อกอิน)
     if (!force && (_whatsNewShown || _getVerAck() === window.APP_VERSION)) return;
     var ack = force ? null : _getVerAck();
     var seen = log.findIndex(function (v) { return v.version === ack; });
@@ -316,13 +324,74 @@
     (function waitLoader() {
       if (document.querySelector('#sys-loader.on')) return setTimeout(waitLoader, 300);
       window.openM('m-whats-new');
+      // เปิดมาแล้วเริ่มอ่านให้ฟังทันที ไม่ต้องกดเอง
+      if (!_wnSpeaking) window.toggleWhatsNewSpeech();
     })();
   };
 
   window.ackWhatsNew = function () {
-    try { localStorage.setItem(_verAckKey(), window.APP_VERSION); } catch (e) {}
+    if (window.cu) try { localStorage.setItem(_verAckKey(), window.APP_VERSION); } catch (e) {}
     window.closeM('m-whats-new');
   };
+
+  // ── AI อ่านให้ฟัง: เสียง AI ภาษาไทย (src/services/tts.service.js → backend /api/tts) ──
+  // เปิด popup แล้วเริ่มอ่านเอง: กล่าวทักทาย → บทนำ → หัวข้อทุกรายการ (ข้อละ 1 ท่อน) + ไฮไลต์รายการที่กำลังอ่าน
+  var _wnSpeaking = false, _wnState = 'off';
+  function _wnSpeechUi(state) { // 'off' | 'load' | 'wait' | 'on'
+    _wnState = state;
+    _wnSpeaking = state !== 'off';
+    var b = document.getElementById('wn-speak');
+    if (b) {
+      b.classList.toggle('on', _wnSpeaking);
+      b.querySelector('.wn-speak-ic').textContent = state === 'load' ? '⏳' : state === 'wait' ? '👆' : _wnSpeaking ? '⏹' : '🔊';
+      b.querySelector('.wn-speak-lbl').textContent = state === 'load' ? 'กำลังเตรียมเสียง…'
+        : state === 'wait' ? 'แตะที่ใดก็ได้เพื่อฟัง' : _wnSpeaking ? 'หยุดอ่าน' : 'AI อ่านให้ฟัง';
+    }
+    if (!_wnSpeaking) document.querySelectorAll('#wn-body .wn-reading').forEach(function (el) { el.classList.remove('wn-reading'); });
+  }
+  function _stopWhatsNewSpeech() {
+    if (!_wnSpeaking) return;
+    window.TTS.stop();
+    _wnSpeechUi('off');
+  }
+  window.toggleWhatsNewSpeech = function () {
+    if (_wnState === 'wait') return; // กดปุ่ม "แตะเพื่อฟัง" = การแตะที่ปลดล็อกเสียงแล้ว ไม่ใช่สั่งหยุด
+    if (_wnSpeaking) return _stopWhatsNewSpeech();
+    var items = Array.prototype.slice.call(document.querySelectorAll('#wn-body .wn-item'));
+    // คิวคำพูด: ทักทาย → บทนำ → "ข้อ N <หัวข้อ>" ครบทุกรายการ
+    var h = new Date().getHours();
+    var name = (window.cu && (window.cu.name || window.cu.username)) || '';
+    var queue = [
+      { text: 'สวัสดี' + (h >= 5 && h < 12 ? 'ตอนเช้า' : h >= 12 && h < 17 ? 'ตอนบ่าย' : h >= 17 && h < 21 ? 'ตอนเย็น' : '') + 'ค่ะ' + (name ? ' คุณ' + name : '') },
+      { text: 'ระบบอัปเดตเป็นเวอร์ชัน ' + window.APP_VERSION + ' แล้วนะคะ มีอะไรใหม่ทั้งหมด ' + items.length + ' ข้อ มาดูกันเลยค่ะ' },
+    ];
+    items.forEach(function (el, i) {
+      queue.push({ text: 'ข้อ ' + (i + 1) + ' ' + el.querySelector('.wn-title').textContent, data: el });
+    });
+    _wnSpeechUi('load');
+    window.TTS.play(queue, {
+      onWait: function () { if (_wnSpeaking) _wnSpeechUi('wait'); },
+      onPart: function (part) {
+        if (!_wnSpeaking) return;
+        _wnSpeechUi('on');
+        var el = part.data;
+        document.querySelectorAll('#wn-body .wn-reading').forEach(function (x) { if (x !== el) x.classList.remove('wn-reading'); });
+        if (el && !el.classList.contains('wn-reading')) {
+          el.classList.add('wn-reading');
+          el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      },
+      onEnd: function () { _wnSpeechUi('off'); },
+      onError: function (err) { _wnSpeechUi('off'); window.showToast(err.message, 'error'); },
+    });
+  };
+
+  // ปิด popup ด้วยวิธีใดก็ตาม (ปุ่ม/Esc/คลิกนอกกรอบ) → หยุดอ่าน
+  document.addEventListener('DOMContentLoaded', function () {
+    var m = document.getElementById('m-whats-new');
+    if (m) new MutationObserver(function () { if (!m.classList.contains('on')) _stopWhatsNewSpeech(); })
+      .observe(m, { attributes: true, attributeFilter: ['class'] });
+  });
 
   // ── New Version Available Banner ──
   // Shown instead of a silent forced reload, so an in-progress form isn't wiped out.
@@ -378,12 +447,9 @@
     if (window.Chart) window.Chart.defaults.animation.duration = 250;
 
     var remUser = window.StorageService && window.StorageService.getRememberedUser();
-    var remPass = window.StorageService && window.StorageService.getRememberedPassword();
     var uEl  = document.getElementById('lu');
-    var pEl  = document.getElementById('lp');
     var remEl = document.getElementById('l-rem');
     if (remUser && uEl) { uEl.value = remUser; if (remEl) remEl.checked = true; }
-    if (remPass && pEl) { pEl.value = remPass; }
 
     // Enter key on username/password inputs → login
     ['lu', 'lp'].forEach(function (id) {

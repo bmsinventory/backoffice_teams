@@ -727,20 +727,13 @@
       <div class="card-header" style="justify-content:flex-start;gap:14px;flex-wrap:wrap;row-gap:8px;">
         <div class="card-title"><i class="ti ti-shield-check"></i>ตรวจสอบสิทธิ์ผู้ใช้งาน (Login Verify)</div>
         <div id="lv-summary" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
-        <button class="btn btn-ghost btn-sm" onclick="loadLoginVerify()" style="margin-left:auto;"><i class="ti ti-refresh"></i>รีโหลด</button>
+        <button class="btn btn-ghost btn-sm" id="lv-cancel-btn" onclick="cancelLoginVerifyEdits()" style="margin-left:auto;display:none;" title="ทิ้งสถานะ/หมายเหตุที่แก้แต่ยังไม่บันทึก กลับไปใช้ข้อมูลล่าสุด"></button>
       </div>
       <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
         <div style="position:relative;flex:1;min-width:200px;">
           <i class="ti ti-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:15px;pointer-events:none;"></i>
           <input class="form-control" id="lv-search" placeholder="ค้นหาชื่อ หรือ หน่วยงาน..." oninput="renderLoginVerify()" style="padding-left:32px;">
         </div>
-        <select class="form-control" id="lv-status-filter" style="width:180px;" onchange="renderLoginVerify()">
-          <option value="">-- ทุกสถานะ --</option>
-          <option value="has_login">มี Login</option>
-          <option value="no_login">ไม่มี Login</option>
-          <option value="disabled">ปิดใช้งาน</option>
-          <option value="pending">ยังไม่ระบุสถานะ</option>
-        </select>
         <button class="btn btn-primary" id="lv-save-btn" onclick="saveLoginVerifyAll()"><i class="ti ti-device-floppy"></i>บันทึกสถานะ</button>
       </div>
       <div class="table-wrap table-cards">
@@ -750,7 +743,7 @@
               <th style="width:40px;">#</th>
               <th>ชื่อ-นามสกุล</th>
               <th>ตำแหน่ง/หน่วยงาน</th>
-              <th style="width:190px;">สถานะ Login</th>
+              <th style="width:140px;">สถานะ Login</th>
               <th>หมายเหตุ (Login)</th>
             </tr>
           </thead>
@@ -2159,7 +2152,7 @@
         <div class="step-num">2</div>
         <div class="step-body">
           <div class="step-title">กรอก Username และ Password</div>
-          <div class="step-desc">ใช้ account ที่ผู้ดูแลระบบสร้างให้ — ติ๊ก <strong>"จดจำการเข้าสู่ระบบ"</strong> เพื่อให้เบราว์เซอร์นี้จำ Username/Password ไว้ ไม่ต้องกรอกใหม่ครั้งหน้า</div>
+          <div class="step-desc">ใช้ account ที่ผู้ดูแลระบบสร้างให้ — ติ๊ก <strong>"จดจำการเข้าสู่ระบบ"</strong> เพื่อค้างการเข้าระบบไว้บนเบราว์เซอร์นี้ 30 วัน ไม่ต้องกรอกใหม่ · ใส่รหัสผิด 10 ครั้งติดกัน บัญชีถูกล็อก 15 นาที</div>
         </div>
       </div>
       <div class="step">
@@ -2253,7 +2246,7 @@
         <tr><td>🎤 <strong>วิทยากร</strong></td><td>Dropdown ในฟอร์มเพิ่มรอบอบรม</td></tr>
         <tr><td>📍 <strong>สถานที่</strong></td><td>Dropdown ในฟอร์มเพิ่มรอบอบรม</td></tr>
         <tr><td>🏢 <strong>แผนก</strong></td><td>Dropdown ในฟอร์มลงทะเบียน และ Walk-in</td></tr>
-        <tr><td>🪪 <strong>คำนำหน้าชื่อ</strong></td><td>Dropdown ในฟอร์มลงทะเบียน</td></tr>
+        <tr><td>📛 <strong>คำนำหน้าชื่อ</strong></td><td>Dropdown ในฟอร์มลงทะเบียน</td></tr>
       </tbody>
     </table>
 
@@ -2344,7 +2337,7 @@
     </div>
 
     <h3>ตั้งค่าโครงการ</h3>
-    <p>เมนูซ้าย › ตั้งค่า › <strong>⚙️ ตั้งค่าโครงการ</strong> — บังคับกรอกอีเมล, แจ้งเตือนเมื่อมีคนลงทะเบียน (ค่าเริ่มต้น = ใช้ Token กลางที่ตั้งใน Backoffice › Admin Panel › 🔔 ตั้งค่าการแจ้งเตือน · เลือก "ใช้ Token เฉพาะโครงการนี้" เพื่อแยกกลุ่ม หรือ "ไม่แจ้งเตือน" ได้ · กด "ทดสอบ" ก่อนบันทึกได้) และ <strong>ปิดอบรม</strong> (เฉพาะ Admin หรือผู้มีสิทธิ์ "ลบ" — ข้อมูลเดิมไม่ถูกลบ)</p>
+    <p>เมนูซ้าย › ตั้งค่า › <strong>⚙️ ตั้งค่าโครงการ</strong> — บังคับกรอกอีเมล, แจ้งเตือนเมื่อมีคนลงทะเบียน (ค่าเริ่มต้น = ใช้ Token กลางที่ตั้งใน Backoffice › Admin Panel › 🔔 ตั้งค่าการแจ้งเตือน · เลือก "ใช้ Token เฉพาะโครงการนี้" เพื่อแยกกลุ่ม หรือ "ไม่แจ้งเตือน" ได้ · กด "ทดสอบ" ก่อนบันทึกได้ · Token เก็บที่เซิร์ฟเวอร์เท่านั้น บันทึกแล้วเห็นแค่ 4 ตัวท้าย — จะเปลี่ยนให้วาง Token ใหม่แล้วบันทึก) และ <strong>ปิดอบรม</strong> (เฉพาะ Admin หรือผู้มีสิทธิ์ "ลบ" — ข้อมูลเดิมไม่ถูกลบ)</p>
   </section>
 
   <!-- ═══ ADMIN USERS ═══ -->

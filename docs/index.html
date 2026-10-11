@@ -22,7 +22,7 @@
 <!-- มี session ค้าง (Refresh) → ตั้ง class ก่อนวาดหน้าแรก: ซ่อนหน้าล็อกอิน แสดงตัวโหลดทันที (ไม่วาบหน้าล็อกอิน)
      auth.service.js _restoreSession เอา class ออกเมื่อเข้าแอปได้/ไม่ได้ · key เดียวกับ src/utils/session.util.js -->
 <script>try{if(sessionStorage.getItem('_bms_sess')||localStorage.getItem('_bms_sess'))document.documentElement.classList.add('boot-sess');}catch(e){}</script>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+Thai:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css">
 <!-- defer: ดาวน์โหลดคู่ขนาน ไม่บล็อกการวาดหน้า · ใช้ภายในฟังก์ชันหลังเปิดหน้าเท่านั้น (รันก่อน DOMContentLoaded)
      Excel (xlsx) / สร้างรูป (html2canvas) โหลดเมื่อจะใช้ — src/utils/lib-loader.util.js -->
@@ -40,137 +40,132 @@
 <div class="overlay" id="sys-loader" style="z-index:9999;background:rgba(26,29,46,.8)">
   <div class="loader-box">
     <span class="pulse ok"></span>
-    <span id="sys-loader-text">กำลังเตรียมระบบ...</span>
+    <span id="sys-loader-text">กำลังเตรียมระบบ</span>
   </div>
 </div>
 
-<!-- ── LOGIN ── -->
+<!-- ── LOGIN ── (สไตล์: src/styles/modules/login.css · ข้อมูลประกอบหน้า: initLoginPage ใน auth.service.js) -->
 <div id="login" style="display:flex">
+  <!-- วิดีโอพื้นหลัง (สร้างเอง วน 12 วินาที) — หยุดเล่นอัตโนมัติเมื่อเข้าระบบแล้ว -->
+  <div class="lg-bg"><video id="login-bg" autoplay muted loop playsinline disablepictureinpicture preload="auto" poster="video/login-bg.jpg" aria-hidden="true"><source src="video/login-bg.mp4" type="video/mp4"></video></div>
+  <div class="lg-spot"></div><div class="lg-grain"></div>
 
-  <!-- LEFT: Hero -->
-  <div class="lhero">
-    <div class="lhero-content">
-      <div class="lhero-badge">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        Secure Access
-      </div>
-      <h1 class="lhero-t1">BMS Backoffice<br>Workspace</h1>
-      <p class="lhero-t2">ระบบปฏิบัติงานกลางสำหรับการบริหารจัดการงานภายในองค์กร</p>
-      <p class="lhero-t3">บริหารโครงการ ติดตามงาน ประสานงานระหว่างทีม จัดการเอกสาร และวิเคราะห์ผลการดำเนินงานผ่านศูนย์กลางข้อมูลเดียว</p>
-      <!-- Dashboard illustration -->
-      <div class="lmock">
-        <div class="lmock-top">
-          <div style="display:flex;gap:5px">
-            <div style="width:8px;height:8px;border-radius:50%;background:#ef4444"></div>
-            <div style="width:8px;height:8px;border-radius:50%;background:#f59e0b"></div>
-            <div style="width:8px;height:8px;border-radius:50%;background:#22c55e"></div>
-          </div>
-          <div class="lmock-titlebar"></div>
-          <div class="lmock-avatar"></div>
-        </div>
-        <div class="lmock-body">
-          <div class="lmock-sb">
-            <div class="lmock-logo-mini"></div>
-            <div class="lmock-menu on"></div>
-            <div class="lmock-menu"></div>
-            <div class="lmock-menu"></div>
-            <div class="lmock-menu"></div>
-            <div class="lmock-menu"></div>
-          </div>
-          <div class="lmock-main">
-            <div class="lmock-kpi-row">
-              <div class="lmock-kpi" style="--kc:#60a5fa">
-                <div class="lmock-kpi-ic"></div>
-                <div><div class="lmock-kpi-n"></div><div class="lmock-kpi-l"></div></div>
-                <div class="lmock-kpi-trend up"></div>
-              </div>
-              <div class="lmock-kpi" style="--kc:#34d399">
-                <div class="lmock-kpi-ic"></div>
-                <div><div class="lmock-kpi-n"></div><div class="lmock-kpi-l"></div></div>
-                <div class="lmock-kpi-trend up"></div>
-              </div>
-              <div class="lmock-kpi" style="--kc:#f472b6">
-                <div class="lmock-kpi-ic"></div>
-                <div><div class="lmock-kpi-n"></div><div class="lmock-kpi-l"></div></div>
-                <div class="lmock-kpi-trend"></div>
-              </div>
-            </div>
-            <div class="lmock-chart-area">
-              <div class="lmock-chart-title"></div>
-              <div class="lmock-bars">
-                <div class="lmock-bar" style="--bh:40%"></div>
-                <div class="lmock-bar" style="--bh:65%"></div>
-                <div class="lmock-bar" style="--bh:50%"></div>
-                <div class="lmock-bar" style="--bh:80%"></div>
-                <div class="lmock-bar" style="--bh:55%"></div>
-                <div class="lmock-bar hi" style="--bh:90%"></div>
-                <div class="lmock-bar" style="--bh:70%"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+  <header class="lg-head">
+    <div class="lg-brand lg-rv" style="--d:.05s"><img src="img/BMS_T.png" alt="BMS"><div><b>Backoffice</b><small>BMS Workspace</small></div></div>
+    <div class="lg-hright lg-rv" style="--d:.15s">
+      <div class="lg-clock" aria-live="off"><span class="emo-ic" aria-hidden="true">🕐</span><b id="lg-time"></b><span id="lg-date"></span></div>
+      <!-- มีอะไรใหม่ — เปิด popup รายการปรับแก้เวอร์ชันล่าสุด (src/app.js showWhatsNew) · จุดแดง = เวอร์ชันนี้ยังไม่เคยเปิดดูบนเครื่องนี้ (auth.service.js initLoginPage) -->
+      <button type="button" class="lg-ghost" id="lg-wn" onclick="window.openLoginWhatsNew()" title="ดูว่ามีอะไรใหม่ในเวอร์ชันล่าสุด"><span class="lg-wn-ic" aria-hidden="true">📢</span><span class="lbl">มีอะไรใหม่</span><i class="lg-new" hidden>NEW</i></button>
+      <a class="lg-ghost" href="manual.html" target="_blank" rel="noopener" title="คู่มือการใช้งาน"><span class="lg-wn-ic lg-man-ic" aria-hidden="true">📖</span><span class="lbl">คู่มือ</span></a>
     </div>
-  </div>
+  </header>
 
-  <!-- RIGHT: Login Card -->
-  <div class="lform">
-    <div class="lcard">
-      <div class="lcard-head">
-        <div class="lcard-logo"><img src="img/BMS_T.png" alt="BMS Logo"></div>
-        <h2 class="lcard-t1">BMS Backoffice Workspace</h2>
-        <p class="lcard-t2">กรุณาเข้าสู่ระบบเพื่อเริ่มต้นใช้งาน</p>
+  <main class="lg-main">
+    <section class="lg-lead">
+      <div class="lg-status lg-rv" style="--d:.25s"><i></i>ระบบพร้อมใช้งาน<em id="lg-ver"></em></div>
+      <h1 class="lg-h1 lg-rv" style="--d:.35s"><span>บริหารทุกงานของทีม</span><br><span class="lg-grad">ในที่เดียว</span></h1>
+      <p class="lg-sub lg-rv" style="--d:.5s">BMS Backoffice Workspace รวมโครงการ ทีมงาน ต้นทุน และศูนย์ช่วยเหลือไว้บนแพลตฟอร์มเดียว ข้อมูลอัปเดตแบบเรียลไทม์ ตัดสินใจได้ทันที</p>
+      <!-- วิดีโอแนะนำระบบ — ดูได้ก่อนเข้าสู่ระบบ (window.openIntroVideo ใน auth.service.js · ไฟล์ video/showcase.mp4) -->
+      <button type="button" class="lg-vcta lg-rv" style="--d:.62s" onclick="window.openIntroVideo()">
+        <span class="lg-thumb"><span class="lg-play"><svg width="15" height="15" viewBox="0 0 24 24" fill="#fff"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></span></span>
+        <span><b>ดูวิดีโอแนะนำระบบ</b><small><i>1:32</i>พาชมทุกเมนู · มีเสียงบรรยาย</small></span>
+      </button>
+      <!-- ตัวเลขโมดูล/หมวดงาน นับจาก window.PERM_MODULES (routes.config.js) -->
+      <div class="lg-stats lg-rv" style="--d:.75s">
+        <div class="lg-stat"><b id="lg-n-mod">25</b><span>โมดูลการทำงาน</span></div>
+        <div class="lg-stat"><b id="lg-n-grp">6</b><span>หมวดงานครบทั้งทีม</span></div>
+        <div class="lg-stat"><b>Realtime</b><span>ข้อมูลซิงก์ทันที</span></div>
+        <div class="lg-stat"><b>PWA</b><span>ใช้ได้ทุกอุปกรณ์</span></div>
+      </div>
+    </section>
+
+    <div class="lg-card lg-rv" style="--d:.45s">
+      <!-- ตัวการ์ตูนเจ้าของเครื่องแอบอยู่หลังขอบซ้ายการ์ด (เฉพาะเครื่องที่ติ๊กจดจำ) · src/modules/login-face.js -->
+      <div class="lg-peek" id="lg-peek" aria-hidden="true"><div class="lg-peek-clip"><img id="lg-peek-img" alt="" draggable="false"></div><div class="lg-bubble" id="lg-bubble"></div></div>
+      <div class="lg-chead"><img src="img/BMS_T.png" alt=""><div><small>Secure Sign-in</small><b>BMS Backoffice Workspace</b></div></div>
+      <!-- คำทักทายเปลี่ยนตามช่วงเวลา (initLoginPage) -->
+      <div class="lg-greet-row">
+        <div><h2 id="lg-greet">สวัสดี</h2><p class="lg-hint" id="lg-hint">เข้าสู่ระบบเพื่อเริ่มงานของทีมวันนี้</p></div>
+        <!-- ท้องฟ้าตามเวลา: ดวงอาทิตย์ 06–18 น. / ดวงจันทร์ 18–06 น. เคลื่อนตามเส้นโค้ง (updateLoginSky ใน auth.service.js) -->
+        <div class="lg-sky" id="lg-sky" aria-hidden="true">
+          <svg viewBox="0 0 120 64">
+            <defs><mask id="lg-moon-cut"><rect x="-12" y="-12" width="24" height="24" fill="#fff"/><circle cx="4.2" cy="-2.2" r="7" fill="#000"/></mask></defs>
+            <g class="lg-stars"><circle cx="18" cy="14" r=".9"/><circle cx="38" cy="8" r=".7"/><circle cx="84" cy="10" r=".9"/><circle cx="102" cy="20" r=".7"/><circle cx="60" cy="16" r=".6"/><circle cx="28" cy="30" r=".6"/><circle cx="94" cy="34" r=".6"/></g>
+            <path class="lg-arc" d="M20 54 A40 40 0 0 1 100 54"/>
+            <line class="lg-horizon" x1="4" y1="54" x2="116" y2="54"/>
+            <g id="lg-orb">
+              <g class="lg-sun"><circle class="lg-sun-glow" r="13"/><g class="lg-rays"><path d="M0-11.5v-3M0 11.5v3M-11.5 0h-3M11.5 0h3M-8.1-8.1l-2.1-2.1M8.1 8.1l2.1 2.1M-8.1 8.1l-2.1 2.1M8.1-8.1l2.1-2.1"/></g><circle class="lg-sun-core" r="7"/></g>
+              <g class="lg-moon"><circle class="lg-moon-glow" r="14"/><circle class="lg-moon-core" r="8.5" mask="url(#lg-moon-cut)"/></g>
+            </g>
+            <rect class="lg-ground" x="0" y="54" width="120" height="10"/>
+          </svg>
+        </div>
       </div>
 
       <div class="login-err" id="lerr">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span class="emo-ic" aria-hidden="true">⚠️</span>
         <span id="lerr-msg">ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง</span>
       </div>
       <div class="login-info" id="linfo"></div>
 
-      <div class="lf-grp">
-        <label class="lf-lbl">Username / Email</label>
-        <div class="lf-wrap">
-          <svg class="lf-ico" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-          <input id="lu" class="lf-inp" type="text" placeholder="กรอก Username" autocomplete="off">
+      <div class="lg-fld">
+        <label for="lu">ชื่อผู้ใช้ หรือ อีเมล</label>
+        <div class="lg-inp">
+          <span class="emo-ic" aria-hidden="true">👤</span>
+          <input id="lu" type="text" placeholder="กรอก Username" autocomplete="username">
         </div>
       </div>
-      <div class="lf-grp">
-        <label class="lf-lbl">รหัสผ่าน</label>
-        <div class="lf-wrap">
-          <svg class="lf-ico" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          <input id="lp" class="lf-inp" type="password" placeholder="กรอกรหัสผ่าน" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')">
-          <button class="lf-eye" type="button" onclick="window.toggleLoginPw()" tabindex="-1">
-            <svg id="eye-show" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-            <svg id="eye-hide" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+      <!-- รหัสเดาง่าย / รหัสตั้งต้น 123456 จาก Admin (pw-policy.util.js) → ตั้งรหัสใหม่ตรงนี้ก่อนเข้าระบบ (_startPwFix ใน auth.service.js)
+           ใช้ช่อง #lp เดิมเป็นช่องรหัสใหม่ (ห้ามซ่อน/ลบ — Chrome จะนับเป็นล็อกอินสำเร็จด้วยรหัสเก่าแล้วเด้งเตือนรหัสรั่ว)
+           ช่องยืนยัน #lnp2 เป็น type=text + จุดปิดตัวอักษร → Chrome ไม่นับเป็นช่องรหัสผ่าน · คำอธิบายเด้งเป็น popup (#pw-weak) -->
+      <div class="lg-fld">
+        <label for="lp" id="lp-label">รหัสผ่าน</label>
+        <div class="lg-inp">
+          <span class="emo-ic" aria-hidden="true">🔒</span>
+          <input id="lp" type="password" placeholder="กรอกรหัสผ่าน" autocomplete="current-password">
+          <button class="lg-eye" type="button" onclick="window.toggleLoginPw()" tabindex="-1" aria-label="แสดง/ซ่อนรหัสผ่าน">
+            <span id="eye-show" class="emo-ic" aria-hidden="true">👁️</span>
+            <span id="eye-hide" class="emo-ic" aria-hidden="true" style="display:none">🙈</span>
           </button>
         </div>
       </div>
-
-      <div class="lf-opt">
-        <label class="lf-chk">
-          <input type="checkbox" id="l-rem">
-          <span class="lf-chk-box"></span>
-          <span>จดจำการเข้าสู่ระบบ</span>
-        </label>
-        <a href="#" class="lf-forgot" onclick="window.openForgotPassword();return false">ลืมรหัสผ่าน?</a>
+      <div class="lg-fld lg-pwfix-only">
+        <label for="lnp2">ยืนยันรหัสผ่านใหม่</label>
+        <div class="lg-inp">
+          <span class="emo-ic" aria-hidden="true">🔐</span>
+          <input id="lnp2" type="text" class="lg-mask" placeholder="พิมพ์รหัสผ่านใหม่อีกครั้ง" autocomplete="off" data-form-type="other" spellcheck="false">
+        </div>
       </div>
 
-      <button class="lbtn" id="login-btn">
-        <span id="lbtn-txt">เข้าสู่ระบบ</span>
-        <span id="lbtn-spin" style="display:none;align-items:center;gap:6px">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="l-spin"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
-          กำลังเข้าสู่ระบบ...
+      <div class="lg-opt">
+        <label class="lg-chk"><input type="checkbox" id="l-rem">จดจำการเข้าสู่ระบบ</label>
+        <a href="#" class="lg-forgot" onclick="window.openForgotPassword();return false">ลืมรหัสผ่าน?</a>
+      </div>
+
+      <button class="lg-btn" id="login-btn">
+        <span id="lbtn-txt">เข้าสู่ระบบ <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+        <span id="lbtn-spin" style="display:none">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="l-spin" style="vertical-align:-2px;margin-right:6px"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>กำลังเข้าสู่ระบบ...
         </span>
       </button>
 
-      <p class="lcard-foot">© 2026 Backoffice System · All rights reserved</p>
+      <div class="lg-pwfix-only">
+        <button class="lg-btn" id="lpwfix-btn" type="button" onclick="window.savePwFix()">บันทึกรหัสใหม่และเข้าสู่ระบบ</button>
+        <a href="#" class="lg-pwfix-back" onclick="window.cancelPwFix();return false">ยกเลิก กลับไปหน้าเข้าสู่ระบบ</a>
+      </div>
+
+      <p class="lg-trust"><span class="emo-ic" aria-hidden="true">🛡️</span>เชื่อมต่อแบบเข้ารหัส · สิทธิ์ตามกลุ่มผู้ใช้</p>
       <p class="lcard-ios-tip" id="ios-tip" style="display:none">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v13M5 9l7-7 7 7"/><path d="M3 17h18v4H3z"/></svg>
+        <span class="emo-ic" aria-hidden="true">📤</span>
         ติดตั้งแอปบน iPhone: กด <strong>Share</strong> แล้วเลือก <strong>Add to Home Screen</strong>
       </p>
     </div>
-  </div>
+  </main>
+
+  <footer class="lg-foot lg-rv" style="--d:.9s">
+    <span class="lg-copy">© 2026 BMS Backoffice Workspace</span>
+    <div class="lg-marq"><div id="lg-marq"></div></div>
+  </footer>
 </div>
 
 <!-- ── APP ── -->
@@ -219,8 +214,14 @@
         <i class="ti ti-wallet ni" aria-hidden="true"></i><span class="nl">งบประมาณ &amp; ค่าใช้จ่าย</span>
       </div>
       <div class="sb-sec">ทีม</div>
+      <div class="nav-btn" onclick="window.goView('team_showcase',this)">
+        <i class="ti ti-friends ni" aria-hidden="true"></i><span class="nl">แนะนำทีม</span>
+      </div>
       <div class="nav-btn" onclick="window.goView('workload',this)">
         <i class="ti ti-chart-arrows-vertical ni" aria-hidden="true"></i><span class="nl">ภาระงานทีม</span>
+      </div>
+      <div class="nav-btn" onclick="window.goView('team_map',this)">
+        <i class="ti ti-map-2 ni" aria-hidden="true"></i><span class="nl">แผนที่ทีม</span>
       </div>
       <div class="nav-btn" onclick="window.goView('calendar',this)">
         <i class="ti ti-calendar-event ni" aria-hidden="true"></i><span class="nl">ปฏิทินทีม</span>
@@ -317,7 +318,6 @@
       <button id="mob-menu-btn" class="btn btn-ghost btn-sm" onclick="window.toggleMobSidebar()" style="display:none;" aria-label="เมนู"><i class="ti ti-menu-2" aria-hidden="true"></i></button>
       <div class="tp-title" id="tp-title"><i class="ti ti-chart-bar tp-title-icon" aria-hidden="true"></i><span class="tp-title-label">Overview</span></div>
       <div id="tp-actions"></div>
-      <button class="btn btn-ghost btn-sm" id="btn-ask-ai" onclick="window.askAiOpen()" title="ถาม AI — ค้นข้อมูลด้วยภาษาคน (Ctrl+K)"><i class="ti ti-sparkles" aria-hidden="true"></i><span class="btn-lbl">ถาม AI</span></button>
       <button class="btn btn-ghost btn-sm admin-only" id="btn-import-top" style="display:none" onclick="window.openImportModal()" title="นำเข้าข้อมูล"><i class="ti ti-file-import" aria-hidden="true"></i><span class="btn-lbl">นำเข้า</span></button>
       <button id="dm-toggle" onclick="window.toggleDarkMode()" title="Dark/Light Mode" aria-label="สลับธีม"><i class="ti ti-moon" aria-hidden="true"></i></button>
       <button id="noti-bell" onclick="window.toggleNotiMenu(event)" title="ไม่มีการแจ้งเตือน" aria-label="การแจ้งเตือน"><i class="ti ti-bell" aria-hidden="true"></i><span id="noti-count" style="display:none">0</span></button>
@@ -333,89 +333,133 @@
             <select class="t-sel" id="ov-yr" onchange="window.renderOverview()"><option value="">ทุกปี พ.ศ.</option></select>
             <div class="ms-filter" id="ov-grp"></div>
             <div class="ms-filter" id="ov-type"></div>
+            <div class="ovd-seg" role="group" aria-label="รูปแบบกราฟ"><button type="button" id="ov-m3d" onclick="window.ovDash.setMode(true)">3D</button><button type="button" id="ov-m2d" onclick="window.ovDash.setMode(false)">2D</button></div>
             <button class="btn btn-pri btn-sm m-icon-btn" id="ov-ai-btn" onclick="window.ovAiDaily()" title="ให้ AI สรุปสิ่งที่ต้องทำวันนี้/สัปดาห์นี้ จากทุกโมดูล"><i class="ti ti-sparkles" aria-hidden="true"></i>AI สรุปประจำวัน</button>
           </div>
         </div>
         <div id="ov-ai-wrap" style="padding:14px 24px 0;display:none;"></div>
-        <!-- KPI cards -->
-        <div id="stat-row" style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;padding:16px 24px;"></div>
-        <!-- Annual Target Tracker -->
+        <!-- ── พยากรณ์ (เลื่อนเวลา) · วาดโดย src/modules/overview-dash.js ── -->
+        <div class="ovd-pad">
+          <div class="ov-card ovd-fc">
+            <div class="ovd-fc-top">
+              <div class="ovd-fc-when"><span class="ovd-eyebrow">มุมมอง ณ เดือน</span><b id="ovd-fc-month">—</b><span class="ovd-chip" id="ovd-fc-kind"></span></div>
+              <div class="ovd-ctrls">
+                <div class="ovd-seg" id="ovd-fc-scen" role="group" aria-label="สถานการณ์พยากรณ์">
+                  <button type="button" data-s="low">ระวัง</button><button type="button" data-s="base">คาดการณ์</button><button type="button" data-s="push">เร่งปิดงาน</button>
+                </div>
+                <button type="button" class="btn btn-ghost btn-sm" id="ovd-fc-play" aria-pressed="false"><i class="ti ti-player-play" aria-hidden="true"></i><span>เล่นไทม์ไลน์</span></button>
+              </div>
+            </div>
+            <p class="ovd-fc-head" id="ovd-fc-head"></p>
+            <div class="ovd-fc-key" aria-label="วิธีอ่านกราฟ">
+              <span><svg width="26" height="8" aria-hidden="true"><line x1="0" y1="4" x2="26" y2="4" stroke="var(--teal)" stroke-width="4"/></svg>ยอดปิดที่เกิดขึ้นจริง</span>
+              <span><svg width="26" height="8" aria-hidden="true"><line x1="0" y1="4" x2="26" y2="4" stroke="var(--teal)" stroke-width="4" stroke-dasharray="7 4"/></svg>พยากรณ์</span>
+              <span><svg width="26" height="10" aria-hidden="true"><rect width="26" height="10" rx="2" fill="var(--teal)" opacity=".22"/></svg>ช่วงที่เป็นไปได้</span>
+              <span><svg width="26" height="8" aria-hidden="true"><line x1="0" y1="4" x2="26" y2="4" stroke="var(--violet)" stroke-width="2.5" stroke-dasharray="6 4"/></svg>เป้าหมายสะสม</span>
+              <span><svg width="10" height="14" aria-hidden="true"><line x1="5" y1="0" x2="5" y2="14" stroke="var(--coral)" stroke-width="3"/></svg>ส่วนที่ขาดเป้า</span>
+              <span><svg width="26" height="8" aria-hidden="true"><line x1="0" y1="4" x2="26" y2="4" stroke="var(--txt3)" stroke-width="1.5" stroke-dasharray="2 3"/></svg>สถานการณ์อื่น</span>
+            </div>
+            <div class="ovd-fc-body">
+              <div class="ovd-fc-chart"><div class="ovd-chart" id="ovd-c-fc" style="height:360px"></div></div>
+              <div class="ovd-fc-side"><div class="ovd-fk" id="ovd-fc-kpis"></div><div class="ovd-fins" id="ovd-fc-ins"></div></div>
+            </div>
+            <div class="ovd-fc-slider"><input type="range" id="ovd-fc-range" min="0" max="17" step="1" value="0" aria-label="เลือกเดือน"><div class="ovd-fc-ticks" id="ovd-fc-ticks"></div></div>
+            <p class="ovd-note" id="ovd-fc-note"></p>
+          </div>
+        </div>
+        <!-- ── สถานะวันนี้ (KPI) ── -->
+        <div class="ovd-sh ovd-pad"><h2>สถานะวันนี้</h2><span id="ovd-today"></span></div>
+        <div id="ovd-kpis" class="ovd-kpis ovd-pad"></div>
+        <!-- ── การเงิน & เป้าหมาย ── -->
+        <div class="ovd-sh ovd-pad"><h2>การเงิน &amp; เป้าหมาย</h2><span>เป้าหมาย → ออกโครงการ → ปิดโครงการ · กดที่กราฟเพื่อดูรายละเอียด</span></div>
+        <div class="ovd-grid ovd-pad">
+          <div class="ov-card ovd-c8">
+            <div class="ov-card-title"><i class="ti ti-target-arrow" aria-hidden="true"></i>เป้าหมายเทียบผลงาน<span class="calc-tip" tabindex="0" data-html2canvas-ignore data-calc="ตามตารางเป้าหมายประจำปีด้านล่าง (รวมกลุ่ม/แยกประเภท)&#10;ม่วง = เป้าหมาย · น้ำเงิน = ยอดโครงการทั้งหมด (ออกโครงการ) · เขียว = ยอดปิดโครงการแล้ว">i</span></div>
+            <div class="ovd-chart" id="ovd-c-target" style="height:290px"></div>
+          </div>
+          <div class="ov-card ovd-c4">
+            <div class="ov-card-title"><i class="ti ti-chart-donut" aria-hidden="true"></i>สัดส่วนมูลค่าตามประเภท<span class="calc-tip" tabindex="0" data-html2canvas-ignore data-calc="ผลรวมมูลค่าโครงการ แยกตามประเภทโครงการ (ตามตัวกรองด้านบน)">i</span></div>
+            <div class="ovd-chart ovd-donut" id="ovd-c-share" style="height:200px"></div>
+            <div class="ovd-dl" id="ovd-lg-share"></div>
+          </div>
+        </div>
         <div style="padding:0 24px 16px;" id="annual-target-wrap"></div>
-        <!-- Row 1: Workload trend + Resource ring -->
-        <div class="ov-row" style="display:grid;grid-template-columns:1fr 340px;gap:16px;padding:0 24px 16px;">
-          <div class="ov-card">
-            <div class="ov-card-title"><i class="ti ti-chart-line" aria-hidden="true"></i>Monthly Workload Trend<span class="calc-tip" tabindex="0" data-html2canvas-ignore data-calc="จำนวนโครงการที่ดำเนินอยู่ในแต่ละเดือน แยกตามประเภท&#10;นับโครงการที่ช่วง วันเริ่ม–วันสิ้นสุด คาบเกี่ยวกับเดือนนั้น (ต้องมีทั้งวันเริ่มและวันสิ้นสุด)">i</span></div>
-            <div style="height:220px;position:relative"><canvas id="chart-workload-trend"></canvas></div>
+        <div class="ovd-grid ovd-pad">
+          <div class="ov-card ovd-c8">
+            <div class="ov-card-title"><i class="ti ti-chart-arrows-vertical" aria-hidden="true"></i>ยอดปิดโครงการรายเดือน<span class="calc-tip" tabindex="0" data-html2canvas-ignore data-calc="แท่งทึบ = มูลค่าโครงการที่ปิดแล้ว นับตามเดือนของวันสิ้นสุดโครงการ&#10;แท่งจาง = คาดว่าจะปิด (ตามสถานการณ์ที่เลือกในส่วนพยากรณ์)&#10;เส้นน้ำเงิน = ยอดสะสม · เส้นประม่วง = เป้าหมายสะสมตามเวลา">i</span></div>
+            <div class="ovd-chart" id="ovd-c-rev" style="height:280px"></div>
           </div>
-          <div class="ov-card">
-            <div class="ov-card-title"><i class="ti ti-users-group" aria-hidden="true"></i>Resource Status<span class="calc-tip" tabindex="0" data-html2canvas-ignore data-calc="นับพนักงานที่ใช้งานอยู่ ตามจำนวนโครงการ (ยังไม่ยกเลิก/ไม่เสร็จสิ้น) ที่มีชื่ออยู่ในทีม&#10;Overload = มากกว่า 3 โครงการ · Active = 1–3 โครงการ · Available = ไม่มีโครงการ">i</span></div>
-            <div style="height:160px;position:relative"><canvas id="chart-resource"></canvas></div>
-            <div id="ov-resource-legend" style="display:flex;justify-content:center;gap:14px;margin-top:10px;font-size:11px;"></div>
-          </div>
-        </div>
-        <!-- Row 2: Budget distribution + Critical timeline -->
-        <div class="ov-row" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:0 24px 16px;">
-          <div class="ov-card">
-            <div class="ov-card-title"><i class="ti ti-chart-donut" aria-hidden="true"></i>Budget Distribution (งบตามประเภท)<span class="calc-tip" tabindex="0" data-html2canvas-ignore data-calc="ผลรวมมูลค่าโครงการ แยกตามประเภทโครงการ (ตามตัวกรองด้านบน)">i</span></div>
-            <div style="height:200px;position:relative"><canvas id="chart-budget-bar"></canvas></div>
-          </div>
-          <div class="ov-card" style="display:flex;flex-direction:column;">
-            <div class="ov-card-title" style="display:flex;justify-content:space-between;align-items:center;">
-              <span class="icon-label"><i class="ti ti-clock-exclamation" aria-hidden="true"></i>Critical Timeline (Ending Soon)<span class="calc-tip" tabindex="0" data-html2canvas-ignore data-calc="โครงการที่ยังไม่เสร็จ และวันสิ้นสุดเหลือ ≤ 30 วัน (รวมที่เลยกำหนด) เรียงจากใกล้สิ้นสุดที่สุด&#10;ตัวเลขวัน = วันสิ้นสุด − วันนี้">i</span></span>
-              <span id="ov-crit-count" style="font-size:10px;background:var(--coral)18;color:var(--coral);padding:2px 8px;border-radius:10px;font-weight:700;"></span>
-            </div>
-            <div id="ov-critical" style="flex:1;overflow-y:auto;max-height:220px;"></div>
+          <div class="ov-card ovd-c4 ovd-col">
+            <div class="ov-card-title" style="color:var(--coral);"><i class="ti ti-credit-card" aria-hidden="true"></i>Financial Alerts (Adv.)<span class="calc-tip" tabindex="0" data-html2canvas-ignore data-calc="กราฟ = จำนวนใบเบิกล่วงหน้า (Adv.) ที่ยังไม่เคลียร์ แยกตามสถานะ · เลยกำหนด = เบิกแล้ว/รอเคลียร์ และเลยวันครบกำหนดเคลียร์&#10;รายการ = 8 ใบแรกเรียงตามวันครบกำหนดเคลียร์">i</span></div>
+            <div class="ovd-chart" id="ovd-c-adv" style="height:170px"></div>
+            <div id="ov-adv-alerts" style="flex:1;overflow-y:auto;max-height:190px;"></div>
           </div>
         </div>
-        <!-- Row 3: Health + Stage + Advance alerts -->
-        <div class="ov-row ov-row-3" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;padding:0 24px 16px;">
-          <div class="ov-card">
-            <div class="ov-card-title"><i class="ti ti-heart-rate-monitor" aria-hidden="true"></i>Project Health<span class="calc-tip" tabindex="0" data-html2canvas-ignore data-calc="เสร็จ = คืบหน้า 100% / ปิดโครงการ / เสร็จสิ้น&#10;ล่าช้า = เลยวันสิ้นสุดแล้ว&#10;เสี่ยง = เหลือ ≤ 15 วัน และคืบหน้า &lt; 80%&#10;ปกติ = นอกเหนือจากนี้ (รวมโครงการที่ไม่มีวันสิ้นสุด)">i</span></div>
-            <div style="height:180px;position:relative"><canvas id="chart-health"></canvas></div>
+        <!-- ── พอร์ตโครงการ ── -->
+        <div class="ovd-sh ovd-pad"><h2>พอร์ตโครงการ</h2><span id="ovd-port-sub"></span></div>
+        <div class="ovd-grid ovd-pad">
+          <div class="ov-card ovd-c7">
+            <div class="ov-card-title"><i class="ti ti-chart-bar" aria-hidden="true"></i>โครงการตาม Stage<span class="calc-tip" tabindex="0" data-html2canvas-ignore data-calc="จำนวนโครงการในแต่ละขั้นตอน (ตามตัวกรองด้านบน)">i</span></div>
+            <div class="ovd-chart" id="ovd-c-stage" style="height:260px"></div>
           </div>
-          <div class="ov-card">
-            <div class="ov-card-title"><i class="ti ti-chart-pie" aria-hidden="true"></i>Stage Distribution<span class="calc-tip" tabindex="0" data-html2canvas-ignore data-calc="จำนวนโครงการในแต่ละขั้นตอน (ตามตัวกรองด้านบน)">i</span></div>
-            <div style="height:180px;position:relative"><canvas id="chart-stage"></canvas></div>
-          </div>
-          <div class="ov-card" style="display:flex;flex-direction:column;">
-            <div class="ov-card-title" style="color:var(--coral);"><i class="ti ti-credit-card" aria-hidden="true"></i>Financial Alerts<span class="calc-tip" tabindex="0" data-html2canvas-ignore data-calc="ใบเบิกล่วงหน้า (Adv.) ของโครงการที่ผ่านตัวกรอง ที่ยังไม่เคลียร์ เรียงตามวันครบกำหนดเคลียร์ (แสดง 8 รายการแรก)&#10;เกินกำหนด = วันครบกำหนดเคลียร์ผ่านไปแล้ว">i</span></div>
-            <div id="ov-adv-alerts" style="flex:1;overflow-y:auto;max-height:200px;"></div>
+          <div class="ov-card ovd-c5">
+            <div class="ov-card-title"><i class="ti ti-heart-rate-monitor" aria-hidden="true"></i>สุขภาพโครงการที่ยังเปิด<span class="calc-tip" tabindex="0" data-html2canvas-ignore data-calc="ล่าช้า = เลยวันสิ้นสุดแล้ว&#10;เสี่ยง = คืบหน้าช้ากว่าแผนตั้งแต่ 25% (แผน = สัดส่วนวันที่ผ่านไปของโครงการ) หรือถึงวันสุดท้ายแล้วคืบหน้า &lt; 80%&#10;ปกติ = นอกเหนือจากนี้ (รวมโครงการที่ไม่มีวันสิ้นสุด)&#10;ไม่นับโครงการที่เสร็จแล้ว (คืบหน้า 100% / ปิดโครงการ / เสร็จสิ้น)">i</span></div>
+            <div class="ovd-chart ovd-donut" id="ovd-c-health" style="height:180px"></div>
+            <div class="ovd-dl" id="ovd-lg-health"></div>
           </div>
         </div>
-        <!-- Row 4: Project table summary -->
-        <div style="padding:0 24px 28px;">
-          <div class="ov-card" style="padding:0;overflow:hidden;">
-            <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-              <span class="icon-label" style="font-size:12px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.7px;"><i class="ti ti-list-details" aria-hidden="true"></i>รายการโครงการทั้งหมด</span>
-              <div class="t-search" style="margin-left:auto"><input id="ov-tbl-q" placeholder="ค้นหาโครงการ..." oninput="window.renderOvTable()"></div>
-              <select class="t-sel" id="ov-tbl-yr" onchange="window.renderOvTable()"><option value="">ทุกปี</option></select>
-              <div class="ms-filter" id="ov-tbl-type"></div>
-              <select class="t-sel" id="ov-tbl-stg" onchange="window.renderOvTable()"><option value="">ทุก Stage</option></select>
-              <select class="t-sel" id="ov-tbl-sort" onchange="window.renderOvTable()">
-                <option value="end_asc">⏰ วันสิ้นสุด ใกล้ก่อน</option>
-                <option value="start_desc">📅 วันเริ่ม ใหม่ก่อน</option>
-                <option value="progress_asc">📊 คืบหน้า น้อยก่อน</option>
-                <option value="name_asc">🔤 ชื่อ ก→ฮ</option>
-              </select>
-              <button class="btn btn-ghost btn-sm" onclick="window.exportOvExcel()" title="Export ตารางโครงการเป็น Excel" style="white-space:nowrap;"><i class="ti ti-file-spreadsheet" aria-hidden="true"></i>Export Excel</button>
+        <!-- ── ทรัพยากรบุคคล ── -->
+        <div class="ovd-sh ovd-pad"><h2>ทรัพยากรบุคคล</h2><span id="ovd-res-sub"></span></div>
+        <div class="ovd-grid ovd-pad">
+          <div class="ov-card ovd-c8">
+            <div class="ov-card-title"><i class="ti ti-chart-line" aria-hidden="true"></i>ภาระงานรายเดือน<span class="calc-tip" tabindex="0" data-html2canvas-ignore data-calc="จำนวนโครงการที่ดำเนินอยู่ในแต่ละเดือน แยกตามประเภท&#10;นับโครงการที่ช่วง วันเริ่ม–วันสิ้นสุด คาบเกี่ยวกับเดือนนั้น (ต้องมีทั้งวันเริ่มและวันสิ้นสุด)">i</span></div>
+            <div class="ovd-chart" id="ovd-c-work" style="height:280px"></div>
+          </div>
+          <div class="ov-card ovd-c4">
+            <div class="ov-card-title"><i class="ti ti-users-group" aria-hidden="true"></i>สถานะทีมงาน<span class="calc-tip" tabindex="0" data-html2canvas-ignore data-calc="นับพนักงานที่ใช้งานอยู่ ตามจำนวนโครงการ (ไม่ยกเลิก) ที่มีชื่ออยู่ในทีม และช่วงวันเริ่ม–วันสิ้นสุดคาบเกี่ยวกับเดือนปัจจุบัน (ตรงกับรูปคนในภาระงานรายบุคคล)&#10;เกินกำลัง = มากกว่า 3 โครงการ · ปกติ = 1–3 โครงการ · ว่าง = ไม่มีโครงการ">i</span></div>
+            <div class="ovd-chart ovd-donut" id="ovd-c-res" style="height:190px"></div>
+            <div class="ovd-dl" id="ov-resource-legend"></div>
+          </div>
+          <div class="ov-card ovd-c12">
+            <div class="ovd-card-h">
+              <div class="ov-card-title" style="margin:0"><i class="ti ti-users" aria-hidden="true"></i>ภาระงานรายบุคคล<span class="calc-tip" tabindex="0" data-html2canvas-ignore data-calc="จำนวนโครงการ (ไม่ยกเลิก) ที่มีชื่อพนักงานอยู่ในทีม และช่วงวันเริ่ม–วันสิ้นสุดคาบเกี่ยวกับเดือนนั้น&#10;รูปคน: สีเติมจากเท้าขึ้นไปตามจำนวนโครงการ (เต็มตัว = 5) · เขียว ว่าง · ฟ้า ปกติ · ส้ม เต็มมือ · แดง เกินกำลัง (4+)">i</span></div>
+              <div class="ovd-ctrls">
+                <select class="ovd-dept" id="ovd-dept" aria-label="เลือกแผนก"><option value="">ทุกแผนก</option></select>
+                <div class="ovd-seg" role="group" aria-label="มุมมองภาระงาน"><button type="button" id="ovd-v-people">รูปคน</button><button type="button" id="ovd-v-matrix">ทั้งปี (คน × เดือน)</button></div>
+                <button type="button" class="btn btn-ghost btn-sm" id="ovd-rot" hidden><i class="ti ti-rotate-360" aria-hidden="true"></i><span>หยุดหมุน</span></button>
+              </div>
             </div>
-            <div style="overflow-x:auto;">
-              <table class="t-table" style="min-width:820px;">
-                <thead><tr>
-                  <th style="width:44px;text-align:center">#</th>
-                  <th style="width:220px">โครงการ</th>
-                  <th>ประเภท / กลุ่ม</th>
-                  <th>Stage</th>
-                  <th>วันเริ่ม</th>
-                  <th>วันสิ้นสุด</th>
-                  <th>ทีมงาน</th>
-                  <th style="width:120px">ความคืบหน้า</th>
-                  <th style="text-align:right">งบ (฿)</th>
-                </tr></thead>
-                <tbody id="ov-tbl-rows"></tbody>
-              </table>
+            <div id="ovd-people-view">
+              <div class="ovd-mseg" id="ovd-people-month" role="group" aria-label="เลือกเดือน"></div>
+              <div class="ovd-psum" id="ovd-people-sum"></div>
+              <div class="ovd-people" id="ovd-people"></div>
             </div>
-            <div id="ov-tbl-pager" style="padding:12px 20px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap;"></div>
+            <div class="ovd-chart" id="ovd-c-heat" style="height:440px" hidden></div>
+          </div>
+        </div>
+        <!-- ── บริการ & ความเสี่ยง ── -->
+        <div class="ovd-sh ovd-pad"><h2>บริการ &amp; ความเสี่ยง</h2><span>Helpdesk, Adv., ที่พัก, งานติดตั้ง, การลา</span></div>
+        <div class="ovd-grid ovd-pad">
+          <div class="ov-card ovd-c5" id="ovd-hd-card">
+            <div class="ov-card-title"><i class="ti ti-headset" aria-hidden="true"></i>Helpdesk ที่ยังเปิด<span class="calc-tip" tabindex="0" data-html2canvas-ignore data-calc="Ticket ที่สถานะยังเปิดอยู่ แยกตามความเร่งด่วน&#10;เกิน SLA = เลยกำหนดแก้ไข (resolution due) แล้ว หรือระบบบันทึกว่าเกิน SLA">i</span></div>
+            <div class="ovd-sub" id="ovd-hd-sub"></div>
+            <div class="ovd-chart" id="ovd-c-hd" style="height:250px"></div>
+          </div>
+          <div class="ov-card ovd-c7">
+            <div class="ov-card-title"><i class="ti ti-alert-triangle" aria-hidden="true"></i>ศูนย์รวมสิ่งที่ต้องจัดการ<span class="calc-tip" tabindex="0" data-html2canvas-ignore data-calc="เรียงตามความรุนแรง · กดแต่ละแถวเพื่อดูรายการ/ไปยังเมนูนั้น">i</span></div>
+            <div class="ovd-acts" id="ovd-acts"></div>
+          </div>
+        </div>
+        <!-- ── โครงการที่ต้องจับตา (ใช้ตัวกรองด้านบนของหน้า) ── -->
+        <div class="ovd-sh ovd-pad"><h2>โครงการที่ต้องจับตา</h2><span>ตามตัวกรองด้านบน · กดแถวเพื่อเปิดโครงการ</span></div>
+        <div class="ovd-pad" style="padding-bottom:28px;">
+          <div class="ov-card ovd-watch">
+            <div class="ovd-card-h">
+              <div class="ovd-seg ovd-tabs" id="ovd-watch-tabs" role="group" aria-label="เลือกรายการ"></div>
+              <span class="calc-tip" tabindex="0" data-html2canvas-ignore data-calc="ต้องจับตา = ล่าช้า (เลยวันสิ้นสุด) + เสี่ยง (ช้ากว่าแผนตั้งแต่ 25% หรือถึงวันสุดท้ายแล้วคืบหน้า &lt; 80%) เรียงจากเลยกำหนดนานสุด&#10;รอปิดโครงการ = คืบหน้า 100% / เสร็จสิ้น / เลยวันสิ้นสุด แต่ยังไม่อยู่ขั้นตอนปิดโครงการ เรียงมูลค่ามากก่อน (มูลค่าที่ยังไม่รับรู้)&#10;ใกล้ครบกำหนด = ยังไม่เสร็จ และวันสิ้นสุดเหลือ ≤ 30 วัน (รวมที่เลยกำหนด)&#10;แสดงสูงสุด 10 โครงการต่อแท็บ จัดกลุ่มตามประเภทโครงการ">i</span>
+            </div>
+            <div id="ovd-watch"></div>
+            <div class="ovd-watch-foot"><span id="ovd-watch-more"></span><button type="button" class="btn btn-ghost btn-sm" onclick="window.goView('projects')">ดูทั้งหมดในเมนูโครงการ ›</button></div>
           </div>
         </div>
       </div>
@@ -428,7 +472,7 @@
           <div class="ms-filter" id="kb-grp"></div>
           <div style="flex:1"></div>
           <button class="btn btn-pri btn-sm" onclick="window.kbAiAdvSummary()" title="สรุปไซต์ในคอลัมน์ วางแผนงาน/จัดทำ Adv. ที่ต้องขออนุมัติ Adv. เป็นข้อความส่ง LINE"><i class="ti ti-sparkles" aria-hidden="true"></i>AI สรุปขออนุมัติ Adv.</button>
-          <button class="btn btn-sm ce-only" style="background:var(--violet)15;color:var(--violet);border:1px solid var(--violet)30;font-weight:700;" onclick="window.runAutoStage(false)"><i class="ti ti-bolt" aria-hidden="true"></i>อัปเดต Stage อัตโนมัติ</button>
+          <button class="btn btn-sm" data-perm="edit:projects" style="background:var(--violet)15;color:var(--violet);border:1px solid var(--violet)30;font-weight:700;" onclick="window.runAutoStage(false)"><i class="ti ti-bolt" aria-hidden="true"></i>อัปเดต Stage อัตโนมัติ</button>
         </div>
         <div id="kb-board"></div>
       </div>
@@ -453,7 +497,7 @@
           </select>
           <div style="flex:1"></div>
           <button class="btn btn-xls btn-sm" onclick="window.exportProjects()" title="Export Excel"><i class="ti ti-file-spreadsheet" aria-hidden="true"></i>Excel</button>
-          <button class="btn btn-pri btn-sm ce-only" id="btn-add-proj" onclick="window.openProjModal(null)"><i class="ti ti-plus" aria-hidden="true"></i>เพิ่มโครงการ</button>
+          <button class="btn btn-pri btn-sm" data-perm="add:projects" id="btn-add-proj" onclick="window.openProjModal(null)"><i class="ti ti-plus" aria-hidden="true"></i>เพิ่มโครงการ</button>
         </div>
         <div class="dtable-wrap">
           <div class="dtable-inner">
@@ -546,7 +590,7 @@
               <button class="mnav-btn" onclick="window.wlNav(1)">›</button>
             </div>
             <button class="btn btn-pri btn-sm" onclick="window.wlAiAnalyze()" title="ให้ AI วิเคราะห์ภาระงานทีมเดือนนี้ และแนะนำการวางคนให้โครงการที่ยังขาดคน"><i class="ti ti-sparkles" aria-hidden="true"></i>AI วิเคราะห์ภาระงาน</button>
-            <button class="btn btn-pri btn-sm ce-only" onclick="window.openWlNotifyReport()" title="สรุปตารางงานที่ยังไม่เริ่ม แยกรายคน สำหรับคัดลอก/บันทึกภาพส่ง LINE"><i class="ti ti-send" aria-hidden="true"></i>สรุปแจ้งงาน</button>
+            <button class="btn btn-pri btn-sm" data-perm="edit:projects" onclick="window.openWlNotifyReport()" title="สรุปตารางงานที่ยังไม่เริ่ม แยกรายคน สำหรับคัดลอก/บันทึกภาพส่ง LINE"><i class="ti ti-send" aria-hidden="true"></i>สรุปแจ้งงาน</button>
           </div>
         </div>
         <div id="wl-stats" style="flex-shrink:0;background:var(--surface);border-bottom:2px solid var(--border);"></div>
@@ -786,59 +830,60 @@
 
       <!-- HOSPITAL LIST -->
       <div class="view" id="view-hospital" style="overflow-y:auto;">
-        <div class="toolbar" style="position:sticky;top:0;z-index:10;background:var(--surface);">
-          <div class="t-search"><input id="hsp-q" placeholder="ค้นหาจากรหัส / ชื่อ รพ. / อำเภอ..." oninput="window._hspPage=1;window.renderHospital();if(window._hspViewMode==='analysis')window.renderHspAnalysis&&window.renderHspAnalysis();if(window._hspViewMode==='summary')window.renderHspSummary&&window.renderHspSummary();"></div>
-          <select class="t-sel" id="hsp-prov" onchange="window._hspProvChanged()"><option value="">ทุกจังหวัด</option></select>
-          <select class="t-sel" id="hsp-dist" onchange="window._hspDistChanged()"><option value="">ทุกอำเภอ</option></select>
-          <select class="t-sel" id="hsp-type" onchange="window._hspPage=1;window.renderHospital();if(window._hspViewMode==='analysis')window.renderHspAnalysis&&window.renderHspAnalysis();if(window._hspViewMode==='summary')window.renderHspSummary&&window.renderHspSummary();">
-            <option value="">ทุกระดับ</option>
-            <option value="A">A – ระดับสูงสุด (500+ เตียง)</option>
-            <option value="S">S – ศูนย์/ทั่วไปใหญ่ (300–499 เตียง)</option>
-            <option value="M1">M1 – ทั่วไปกลาง (150–299 เตียง)</option>
-            <option value="M2">M2 – ทั่วไปเล็ก (90–149 เตียง)</option>
-            <option value="F1">F1 – ชุมชนใหญ่ (60–89 เตียง)</option>
-            <option value="F2">F2 – ชุมชนกลาง (30–59 เตียง)</option>
-            <option value="F3">F3 – ชุมชนเล็ก (&lt;30 เตียง)</option>
-            <option value="P">P – เอกชน</option>
-            <option value="other">อื่นๆ</option>
-          </select>
-          <span id="hsp-count" style="color:var(--txt-muted);font-size:12px;white-space:nowrap;align-self:center;"></span>
-          <div style="flex:1"></div>
-          <!-- multi-checkbox dropdown (list view) -->
-          <div id="hsp-prod-multi-wrap" style="display:none;position:relative;z-index:30;"></div>
-          <!-- single select (analysis view — whitespace filter) -->
-          <select class="t-sel" id="hsp-product-filter" onchange="window._hspAnalysisPage=1;window._hspAnalysisLastFilter='';window.renderHspAnalysis&&window.renderHspAnalysis();" style="display:none;">
-            <option value="">ทุก Product</option>
-          </select>
-          <select class="t-sel" id="hsp-prod-usage-filter" onchange="window._hspAnalysisPage=1;window._hspAnalysisLastFilter='';window._hspPage=1;if(window._hspViewMode==='analysis'){window.renderHspAnalysis&&window.renderHspAnalysis();}else{window.renderHospital&&window.renderHospital();}" style="display:none;">
-            <option value="">🏥 ทั้งหมด</option>
-            <option value="has">✅ ใช้งาน Products</option>
-            <option value="none">⬜ ยังไม่ได้ใช้ Products</option>
-          </select>
-          <button class="btn btn-ghost btn-sm admin-only" style="display:none" onclick="window.openHspApiSettings()" title="ตั้งค่าการเชื่อมต่อ MOPH API"><i class="ti ti-settings" aria-hidden="true"></i>MOPH API</button>
-          <button class="btn btn-ghost btn-sm admin-only" style="display:none" onclick="window.openHspAutoEnrich()" title="เติมข้อมูลที่ไม่ครบถ้วนจาก MOPH API อัตโนมัติ"><i class="ti ti-refresh" aria-hidden="true"></i>เติมข้อมูล API</button>
-
-          <button class="btn btn-xls btn-sm" onclick="window.exportHospitals()" title="Export Excel"><i class="ti ti-file-spreadsheet" aria-hidden="true"></i>Excel</button>
-          <button class="btn btn-pri btn-sm admin-only" style="display:none" onclick="window.openHospitalModal(null)"><i class="ti ti-plus" aria-hidden="true"></i>เพิ่ม รพ.</button>
-        </div>
-        <!-- View toggle tabs -->
-        <div class="hsp-vtabs" style="display:flex;gap:0;border-bottom:2px solid var(--border);padding:0 24px;background:var(--surface);">
-          <button id="hsp-vtab-list" onclick="window.goHspView('list')"
-            style="padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;cursor:pointer;color:var(--violet);border-bottom:2px solid var(--violet);margin-bottom:-2px;transition:all .15s;">
-            <i class="ti ti-list-details" aria-hidden="true"></i> รายชื่อ รพ.
-          </button>
-          <button id="hsp-vtab-summary" onclick="window.goHspView('summary')"
-            style="padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;cursor:pointer;color:var(--txt-muted);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s;">
-            <i class="ti ti-address-book" aria-hidden="true"></i> สรุปข้อมูลการติดต่อ
-          </button>
-          <button id="hsp-vtab-analysis" onclick="window.goHspView('analysis')"
-            style="padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;cursor:pointer;color:var(--txt-muted);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s;">
-            <i class="ti ti-chart-bar" aria-hidden="true"></i> วิเคราะห์ Product
-          </button>
-          <button id="hsp-vtab-dashboard" onclick="window.goHspView('dashboard')"
-            style="padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;cursor:pointer;color:var(--txt-muted);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s;">
-            <i class="ti ti-map-2" aria-hidden="true"></i> Dashboard
-          </button>
+        <div class="hsp-head">
+          <!-- แถวบน: มุมมอง (ซ้าย) · คำสั่ง (ขวา) -->
+          <div class="hsp-head-row">
+            <div class="adv-seg hsp-vtabs" role="tablist">
+              <span id="hsp-vtab-list" class="adv-subtab on" onclick="window.goHspView('list')"><i class="ti ti-list-details" aria-hidden="true"></i> รายชื่อ รพ.</span>
+              <span id="hsp-vtab-summary" class="adv-subtab" onclick="window.goHspView('summary')"><i class="ti ti-address-book" aria-hidden="true"></i> สรุปข้อมูลการติดต่อ</span>
+              <span id="hsp-vtab-analysis" class="adv-subtab" onclick="window.goHspView('analysis')"><i class="ti ti-chart-bar" aria-hidden="true"></i> วิเคราะห์ Product</span>
+              <span id="hsp-vtab-dashboard" class="adv-subtab" onclick="window.goHspView('dashboard')"><i class="ti ti-map-2" aria-hidden="true"></i> Dashboard</span>
+            </div>
+            <div class="hsp-head-actions">
+              <span id="hsp-count" class="hsp-count"></span>
+              <div class="hsp-tools admin-only" style="display:none">
+                <button class="btn btn-ghost btn-sm" onclick="window._hspToggleTools(event)" title="เครื่องมือผู้ดูแล"><i class="ti ti-tool" aria-hidden="true"></i>เครื่องมือ <span style="font-size:10px;">▾</span></button>
+                <div id="hsp-tools-menu" class="hsp-tools-menu" style="display:none">
+                  <button onclick="window._hspCloseTools();window.openHspApiSettings()"><i class="ti ti-settings" aria-hidden="true"></i>ตั้งค่า MOPH API</button>
+                  <button onclick="window._hspCloseTools();window.openHspAutoEnrich()"><i class="ti ti-refresh" aria-hidden="true"></i>เติมข้อมูลจาก API</button>
+                  <button onclick="window._hspCloseTools();window.openHspGeoFill()"><i class="ti ti-map-pin" aria-hidden="true"></i>เติมพิกัด รพ.</button>
+                </div>
+              </div>
+              <button class="btn btn-xls btn-sm" onclick="window.exportHospitals()" title="Export Excel"><i class="ti ti-file-spreadsheet" aria-hidden="true"></i>Excel</button>
+              <button class="btn btn-pri btn-sm admin-only" style="display:none" onclick="window.openHospitalModal(null)"><i class="ti ti-plus" aria-hidden="true"></i>เพิ่ม รพ.</button>
+            </div>
+          </div>
+          <!-- แถวล่าง: ตัวกรอง -->
+          <div class="hsp-filters">
+            <div class="t-search"><input id="hsp-q" placeholder="ค้นหารหัส / ชื่อ รพ. / อำเภอ..." oninput="window._hspFilterChanged()"></div>
+            <select class="t-sel" id="hsp-prov" onchange="window._hspProvChanged()"><option value="">ทุกจังหวัด</option></select>
+            <select class="t-sel" id="hsp-dist" onchange="window._hspDistChanged()"><option value="">ทุกอำเภอ</option></select>
+            <select class="t-sel" id="hsp-type" onchange="window._hspFilterChanged()" title="ระดับโรงพยาบาล">
+              <option value="">ทุกระดับ</option>
+              <option value="A">A – ระดับสูงสุด (500+ เตียง)</option>
+              <option value="S">S – ศูนย์/ทั่วไปใหญ่ (300–499 เตียง)</option>
+              <option value="M1">M1 – ทั่วไปกลาง (150–299 เตียง)</option>
+              <option value="M2">M2 – ทั่วไปเล็ก (90–149 เตียง)</option>
+              <option value="F1">F1 – ชุมชนใหญ่ (60–89 เตียง)</option>
+              <option value="F2">F2 – ชุมชนกลาง (30–59 เตียง)</option>
+              <option value="F3">F3 – ชุมชนเล็ก (&lt;30 เตียง)</option>
+              <option value="P">P – เอกชน</option>
+              <option value="other">อื่นๆ</option>
+            </select>
+            <select class="t-sel" id="hsp-geo-filter" onchange="window._hspPage=1;window.renderHospital();" title="กรองตามพิกัดบนแผนที่">
+              <option value="">ทุกสถานะพิกัด</option>
+              <option value="has">📍 มีพิกัดแล้ว</option>
+              <option value="none">⚪ ยังไม่มีพิกัด</option>
+            </select>
+            <!-- multi-checkbox dropdown (list/analysis view) -->
+            <div id="hsp-prod-multi-wrap" style="display:none;position:relative;z-index:30;"></div>
+            <select class="t-sel" id="hsp-prod-usage-filter" onchange="window._hspAnalysisPage=1;window._hspAnalysisLastFilter='';window._hspPage=1;if(window._hspViewMode==='analysis'){window.renderHspAnalysis&&window.renderHspAnalysis();}else{window.renderHospital&&window.renderHospital();}" style="display:none;" title="การใช้งาน Product">
+              <option value="">🏥 ทุกการใช้ Product</option>
+              <option value="has">✅ ใช้งาน Products</option>
+              <option value="none">⬜ ยังไม่ได้ใช้ Products</option>
+            </select>
+            <button id="hsp-clear-filters" class="hsp-clear" onclick="window._hspClearFilters()" style="display:none;" title="ล้างตัวกรองทั้งหมด"><i class="ti ti-x" aria-hidden="true"></i>ล้างตัวกรอง</button>
+          </div>
         </div>
         <div id="hsp-import-progress" style="text-align:center;padding:6px 24px;font-size:12px;color:var(--primary);display:block;min-height:0;"></div>
         <!-- Dashboard view -->
@@ -960,7 +1005,7 @@
           </select>
           <div style="flex:1"></div>
           <button class="btn btn-xls btn-sm" onclick="window.exportContracts()" title="Export Excel"><i class="ti ti-file-spreadsheet" aria-hidden="true"></i>Excel</button>
-          <button class="btn btn-pri btn-sm ce-only" onclick="window.openContractModal(null)"><i class="ti ti-plus" aria-hidden="true"></i>เพิ่มสัญญา</button>
+          <button class="btn btn-pri btn-sm" data-perm="add:contract" onclick="window.openContractModal(null)"><i class="ti ti-plus" aria-hidden="true"></i>เพิ่มสัญญา</button>
         </div>
         <div id="ct-summary-bar"></div>
         <div id="ct-rows" style="padding:12px 24px 32px;"></div>
@@ -974,6 +1019,13 @@
 
       <!-- ผู้ช่วยทีม — แชทถามข้อความ/โค้ดที่ทีมเก็บไว้ (ซ้าย) + คลังคำตอบ (ขวา) · src/modules/assist.js renderAssist -->
       <div class="view" id="view-assist"></div>
+      <!-- ผู้ช่วยทีม › ตรวจไฟล์ข้อมูลพื้นฐาน (Excel/CSV) — ซ้ำ/อักขระพิเศษ/ชื่อคล้าย + AI · src/modules/datacheck.js renderDatacheck -->
+      <div class="view" id="view-datacheck"></div>
+
+      <!-- แนะนำทีม — ตัวการ์ตูน 3D ของสมาชิกหมุนสลับ + คลังรูปทีม · src/modules/team-showcase.js renderTeamShowcase -->
+      <div class="view" id="view-team-showcase"></div>
+      <!-- แผนที่ทีม 3 มิติ — src/modules/team-map.js renderTeamMap -->
+      <div class="view" id="view-team-map" tabindex="-1"></div>
 
       <!-- ขอใช้งานทีม Server — คำขอจากฟอร์ม public server-request.html → อนุมัติ → จัดคน/สร้างโครงการ · src/modules/server-request.js -->
       <div class="view" id="view-server-request"></div>
@@ -1046,11 +1098,14 @@
   <div class="modal wn-modal" role="dialog" aria-labelledby="wn-ver">
     <div class="wn-hero">
       <div class="wn-hero-ic">🚀</div>
-      <div>
+      <div class="wn-hero-txt">
         <div class="wn-kicker">ระบบอัปเดตแล้ว · มีอะไรใหม่</div>
         <div class="wn-ver" id="wn-ver"></div>
         <div class="wn-sub" id="wn-sub"></div>
       </div>
+      <button class="wn-speak" id="wn-speak" type="button" onclick="window.toggleWhatsNewSpeech()" title="ให้ AI อ่านรายการทั้งหมดให้ฟัง">
+        <span class="wn-speak-ic">🔊</span><span class="wn-speak-lbl">AI อ่านให้ฟัง</span>
+      </button>
     </div>
     <div class="wn-body" id="wn-body"></div>
     <div class="wn-foot">
@@ -1392,7 +1447,7 @@
 
 <!-- WORK LOG MODAL -->
 <div class="overlay" id="m-worklog">
-  <div class="modal lg">
+  <div class="modal xl">
     <div class="m-head">
       <div class="m-icon" style="background:rgba(255,166,43,.12)">📝</div>
       <div class="m-title" id="m-worklog-title">เพิ่มบันทึกงาน</div>
@@ -1401,6 +1456,7 @@
     <div class="m-body" id="m-worklog-body" style="max-height:70vh;overflow-y:auto;padding:0;"></div>
     <div class="m-foot">
       <button id="m-worklog-del" class="btn btn-ghost" style="display:none;color:var(--coral);" onclick="window.deleteWorkLog()">🗑 ลบ</button>
+      <label id="m-worklog-keep" class="wlf-check wlf-keep" style="display:none;"><input type="checkbox" id="wlf-keep" onchange="window._wlKeepToggle(this.checked)">บันทึกแล้วเพิ่มงานถัดไปต่อ</label>
       <div style="flex:1;"></div>
       <button class="btn btn-ghost" onclick="window.closeM('m-worklog')">ยกเลิก</button>
       <button class="btn btn-pri" onclick="window.saveWorkLog()">💾 บันทึก</button>
@@ -1468,34 +1524,56 @@
   </div>
 </div>
 
-<!-- CHANGE PASSWORD -->
+<!-- CHANGE PASSWORD (สไตล์: .cpw-* ใน src/styles/modules/admin.css · ตรรกะ: admin.js) -->
 <div class="overlay" id="m-change-pw">
-  <div class="modal md" style="max-width:400px">
-    <div class="m-head">
-      <div class="m-icon" style="background:rgba(67,97,238,.12)">🔒</div>
-      <div class="m-title">เปลี่ยนรหัสผ่าน</div>
-      <button class="m-x" onclick="window.closeM('m-change-pw')">✕</button>
+  <div class="modal cpw-modal">
+    <button class="m-x cpw-x" onclick="window.closeM('m-change-pw')" title="ปิด">✕</button>
+    <div class="cpw-hero">
+      <div class="cpw-badge"><i class="ti ti-shield-lock"></i></div>
+      <div class="cpw-title">เปลี่ยนรหัสผ่าน</div>
+      <div class="cpw-sub">เครื่องอื่นที่เข้าสู่ระบบค้างไว้จะต้องเข้าใหม่ · เครื่องนี้ใช้งานต่อได้</div>
     </div>
-    <div class="m-body">
-      <div class="f-grid">
-        <div class="f-group">
-          <label class="f-label">รหัสผ่านปัจจุบัน *</label>
-          <input type="text" class="f-input" id="cpw-old" autocomplete="off" data-form-type="other" style="-webkit-text-security:disc;font-family:monospace;">
+    <div class="m-body cpw-body">
+      <div class="cpw-field">
+        <label class="cpw-label" for="cpw-old">รหัสผ่านปัจจุบัน</label>
+        <div class="cpw-wrap">
+          <i class="ti ti-lock cpw-ico"></i>
+          <input type="text" class="cpw-input" id="cpw-old" placeholder="กรอกรหัสผ่านที่ใช้อยู่" autocomplete="off" data-form-type="other" spellcheck="false">
+          <button type="button" class="cpw-eye" tabindex="-1" onclick="window.cpwToggle(this)" title="แสดง/ซ่อนรหัสผ่าน"><i class="ti ti-eye"></i></button>
         </div>
-        <div class="f-group">
-          <label class="f-label">รหัสผ่านใหม่ *</label>
-          <input type="text" class="f-input" id="cpw-new" autocomplete="off" data-form-type="other" style="-webkit-text-security:disc;font-family:monospace;">
-        </div>
-        <div class="f-group">
-          <label class="f-label">ยืนยันรหัสผ่านใหม่ *</label>
-          <input type="text" class="f-input" id="cpw-confirm" autocomplete="off" data-form-type="other" style="-webkit-text-security:disc;font-family:monospace;">
-        </div>
-        <div id="cpw-err" style="display:none;color:var(--coral);font-size:12px;padding:4px 0;font-weight:600;"></div>
       </div>
+      <div class="cpw-field">
+        <label class="cpw-label" for="cpw-new">รหัสผ่านใหม่</label>
+        <div class="cpw-wrap">
+          <i class="ti ti-key cpw-ico"></i>
+          <input type="text" class="cpw-input" id="cpw-new" placeholder="อย่างน้อย 4 ตัวอักษร" autocomplete="off" data-form-type="other" spellcheck="false">
+          <button type="button" class="cpw-eye" tabindex="-1" onclick="window.cpwToggle(this)" title="แสดง/ซ่อนรหัสผ่าน"><i class="ti ti-eye"></i></button>
+        </div>
+        <div class="cpw-strength">
+          <div class="cpw-meter" id="cpw-meter" data-lv="0"><span></span><span></span><span></span><span></span></div>
+          <div class="cpw-meter-txt" id="cpw-meter-txt">ความแข็งแรง</div>
+        </div>
+      </div>
+      <div class="cpw-field">
+        <label class="cpw-label" for="cpw-confirm">ยืนยันรหัสผ่านใหม่</label>
+        <div class="cpw-wrap">
+          <i class="ti ti-lock-check cpw-ico"></i>
+          <input type="text" class="cpw-input" id="cpw-confirm" placeholder="พิมพ์รหัสผ่านใหม่อีกครั้ง" autocomplete="off" data-form-type="other" spellcheck="false">
+          <button type="button" class="cpw-eye" tabindex="-1" onclick="window.cpwToggle(this)" title="แสดง/ซ่อนรหัสผ่าน"><i class="ti ti-eye"></i></button>
+        </div>
+        <div class="cpw-match" id="cpw-match"></div>
+      </div>
+      <ul class="cpw-rules" id="cpw-rules">
+        <li data-r="len">4 ตัวขึ้นไป</li>
+        <li data-r="diff">ไม่ซ้ำรหัสเดิม</li>
+        <li data-r="safe">ไม่ใช่รหัสเดาง่าย (1234, 0000)</li>
+        <li data-r="mix">ผสมอักษร ตัวเลข อักขระพิเศษ</li>
+      </ul>
+      <div id="cpw-err" class="cpw-err" style="display:none;"></div>
     </div>
-    <div class="m-foot">
+    <div class="m-foot cpw-foot">
       <button class="btn btn-ghost" onclick="window.closeM('m-change-pw')">ยกเลิก</button>
-      <button class="btn btn-pri" onclick="window.saveChangePassword()">🔒 บันทึก</button>
+      <button class="btn btn-pri" id="cpw-save" onclick="window.saveChangePassword()"><i class="ti ti-device-floppy"></i> บันทึกรหัสผ่านใหม่</button>
     </div>
   </div>
 </div>
@@ -1674,7 +1752,7 @@
         </div>
         <div id="ct-txn-list" style="display:flex;flex-direction:column;gap:6px;min-height:60px;max-height:320px;overflow-y:auto;"></div>
         <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
-          <button class="btn btn-ghost btn-sm ce-only" style="font-size:12px;width:100%;justify-content:center;" onclick="window._ctAddTxn()">＋ เพิ่ม Transaction</button>
+          <button class="btn btn-ghost btn-sm" data-perm="edit:contract" style="font-size:12px;width:100%;justify-content:center;" onclick="window._ctAddTxn()">＋ เพิ่ม Transaction</button>
         </div>
       </div>
     </div>
@@ -1740,7 +1818,7 @@
 
 <!-- USER MODAL -->
 <div class="overlay" id="m-user">
-  <div class="modal md" style="max-width:480px">
+  <div class="modal md" style="max-width:560px">
     <div class="m-head">
       <div class="m-icon" style="background:rgba(67,97,238,.12)" id="m-user-icon">🔑</div>
       <div class="m-title" id="m-user-title">เพิ่มบัญชีผู้ใช้</div>
@@ -1748,34 +1826,37 @@
       <button class="m-x" onclick="window.closeM('m-user')">✕</button>
     </div>
     <div class="m-body">
+      <div class="auf-sec">ข้อมูลบัญชี</div>
       <div class="f-grid">
         <div class="f-group">
           <label class="f-label">Username *</label>
-          <input class="f-input" id="auf-u" placeholder="username" autocomplete="off">
+          <input class="f-input" id="auf-u" placeholder="username" autocomplete="off" oninput="window._aufStaffSuggest()">
         </div>
         <div class="f-group">
           <label class="f-label">รหัสผ่าน</label>
           <input type="text" class="f-input" id="auf-p" placeholder="กำหนดรหัสผ่าน..." autocomplete="off" data-form-type="other" style="-webkit-text-security:disc;font-family:monospace;" onfocus="this.style.webkitTextSecurity='disc'" onpaste="event.preventDefault();this.value+=event.clipboardData.getData('text')">
+          <!-- รหัสตั้งต้น 123456 → ผู้ใช้ถูกบังคับตั้งรหัสใหม่ตอนเข้าระบบครั้งแรก (pw-policy.util.js · admin.js admUserForm) -->
+          <div style="display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap">
+            <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('auf-p').value=window.PwPolicy.DEFAULT">🔄 รีเซ็ตเป็น 123456</button>
+            <span style="font-size:11.5px;color:var(--txt3)">ผู้ใช้จะถูกบังคับตั้งรหัสใหม่ตอนเข้าระบบครั้งแรก</span>
+          </div>
         </div>
         <div class="f-group">
           <label class="f-label">ชื่อที่แสดง *</label>
-          <input class="f-input" id="auf-n" placeholder="ชื่อผู้ใช้">
+          <input class="f-input" id="auf-n" placeholder="ชื่อผู้ใช้" oninput="window._aufStaffSuggest()">
         </div>
         <div class="f-group">
-          <label class="f-label">Role</label>
-          <select class="f-input" id="auf-r">
-            <option value="admin">🔴 Admin</option>
-            <option value="pm">🟡 DM/PM</option>
-            <option value="viewer" selected>🟢 Viewer</option>
-          </select>
-        </div>
-        <div class="f-group">
-          <label class="f-label">ผูกกับพนักงาน <span style="font-size:10px;color:var(--txt3);">(Viewer จะเห็นเฉพาะวันลาของตนเอง)</span></label>
+          <label class="f-label">ผูกกับพนักงาน</label>
           <select class="f-input" id="auf-staff">
             <option value="">-- ไม่ผูก --</option>
           </select>
         </div>
+        <div class="auf-ai" id="auf-staff-ai" style="grid-column:1/-1"></div>
+        <div class="auf-hint" style="grid-column:1/-1">ระบบจับคู่พนักงานให้อัตโนมัติจากชื่อที่แสดง/Username (เปลี่ยนเองได้) · ผูกกับพนักงาน ใช้กับขอบเขตสิทธิ์ "ของตัวเอง/ทั้งแผนก" เช่น การลางาน</div>
       </div>
+      <div class="auf-sec">กลุ่มสิทธิ์ <span>เลือกได้หลายกลุ่ม — ได้สิทธิ์รวมของทุกกลุ่ม</span></div>
+      <div class="auf-roles" id="auf-roles"></div>
+      <div class="auf-roles-sum" id="auf-roles-sum"></div>
     </div>
     <div class="m-foot">
       <button class="btn btn-ghost" onclick="window.closeM('m-user')">ยกเลิก</button>
@@ -1820,7 +1901,7 @@
   </div>
 </div>
 
-<!-- FORM TRACKER — Template ชื่อเอกสารมาตรฐาน (ใช้ร่วมกันทุกโครงการ) -->
+<!-- FORM TRACKER — Template ชื่อเอกสาร (แยกตามประเภทโครงการ / ใช้ร่วม) -->
 <div class="overlay" id="m-ftk-template">
   <div class="modal md">
     <div class="m-head">
@@ -1832,6 +1913,23 @@
     <div class="m-foot">
       <button class="btn btn-ghost" onclick="window.closeM('m-ftk-template')">ปิด</button>
       <button class="btn btn-pri" id="m-ftk-template-import" onclick="window.ftkImportFromTemplate()">📥 นำเข้ารายการที่เลือก</button>
+    </div>
+  </div>
+</div>
+
+<!-- FORM TRACKER — ใบส่งมอบแบบฟอร์ม (สร้างจากรายการแบบฟอร์มของโครงการ) -->
+<div class="overlay" id="m-ftk-handover">
+  <div class="modal md">
+    <div class="m-head">
+      <div class="m-icon" style="background:rgba(124,92,252,.12)">📄</div>
+      <div class="m-title">ใบส่งมอบแบบฟอร์ม</div>
+      <button class="m-x" onclick="window.closeM('m-ftk-handover')">✕</button>
+    </div>
+    <div class="m-body" id="m-ftk-handover-body" style="max-height:80vh;overflow-y:auto;"></div>
+    <div class="m-foot">
+      <button class="btn btn-ghost" onclick="window.closeM('m-ftk-handover')">ปิด</button>
+      <button class="btn btn-xls" onclick="window.ftkHandoverExcel()">📥 Excel</button>
+      <button class="btn btn-pri" onclick="window.ftkHandoverPrint()">🖨️ พิมพ์ / PDF</button>
     </div>
   </div>
 </div>
@@ -1852,10 +1950,11 @@
 </div>
 
 <div class="overlay" id="m-imt-task">
-  <div class="modal xl" style="max-width:900px;">
+  <div class="modal xl" style="max-width:1100px;">
     <div class="m-head">
       <div class="m-icon" style="background:rgba(6,214,160,.12)">📌</div>
       <div class="m-title" id="m-imt-task-title">รายละเอียดงาน</div>
+      <div class="imt-td-head" id="m-imt-task-headx"></div>
       <button class="m-x" onclick="window.closeM('m-imt-task')">✕</button>
     </div>
     <div class="m-body" id="m-imt-task-body"></div>
@@ -1915,7 +2014,7 @@
 </div>
 
 <div class="overlay" id="m-imt-template">
-  <div class="modal xl" style="max-width:820px;">
+  <div class="modal xl imt-tplb-modal">
     <div class="m-head">
       <div class="m-icon" style="background:rgba(124,92,252,.12)">📐</div>
       <div class="m-title" id="m-imt-template-title">สร้าง Template</div>
@@ -1923,7 +2022,9 @@
     </div>
     <div class="m-body" id="m-imt-template-body"></div>
     <div class="m-foot" id="m-imt-template-foot">
+      <div class="imt-tplb-foot-sum"><span id="imt-tpl-foot-sum"></span><span class="imt-tplb-saved" id="imt-tplb-saved"></span></div>
       <button class="btn btn-ghost" onclick="window.closeM('m-imt-template')">ยกเลิก</button>
+      <button class="btn btn-ghost" id="imt-tpl-save-create" onclick="window.saveImtTemplate(true)">บันทึก แล้วสร้างโครงการ</button>
       <button class="btn btn-pri" onclick="window.saveImtTemplate()">💾 บันทึก Template</button>
     </div>
   </div>
@@ -2151,6 +2252,23 @@
   </div>
 </div>
 
+<!-- HOSPITAL GEO-FILL MODAL — เติมพิกัดจากข้อมูล สธ. (data/moph-hospitals.json) -->
+<div class="overlay" id="m-hsp-geo">
+  <div class="modal xl" style="max-width:860px;display:flex;flex-direction:column;max-height:90vh;">
+    <div class="m-head" style="flex-shrink:0;">
+      <div class="m-icon" style="background:rgba(67,97,238,.12)">📍</div>
+      <div class="m-title">เติมพิกัดโรงพยาบาลจากข้อมูลกระทรวงสาธารณสุข</div>
+      <button class="m-x" onclick="window.closeM('m-hsp-geo')">✕</button>
+    </div>
+    <div id="m-hsp-geo-body" style="flex:1;overflow-y:auto;min-height:0;"></div>
+    <div class="m-foot" id="m-hsp-geo-foot" style="flex-shrink:0;gap:10px;flex-wrap:wrap;">
+      <div style="flex:1;font-size:12px;color:var(--txt-muted);" id="m-hsp-geo-foot-note"></div>
+      <button class="btn btn-ghost" onclick="window.closeM('m-hsp-geo')">ยกเลิก</button>
+      <button class="btn btn-teal" id="m-hsp-geo-confirm-btn" onclick="window.confirmHspGeoFill()" disabled>📍 บันทึกพิกัด</button>
+    </div>
+  </div>
+</div>
+
 <!-- HOSPITAL DETAIL MODAL -->
 <div class="overlay" id="m-hsp-detail">
   <div class="modal lg" style="height:min(700px,90vh);display:flex;flex-direction:column;width:min(760px,96vw);">
@@ -2352,6 +2470,15 @@
           <label class="f-label">ที่อยู่</label>
           <input class="f-input" id="m-hsp-address" placeholder="ที่อยู่โรงพยาบาล">
         </div>
+        <div class="f-group" style="grid-column:1/-1;">
+          <label class="f-label">พิกัด (ละติจูด, ลองจิจูด)</label>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <input class="f-input" id="m-hsp-geo" style="flex:1;min-width:200px;" placeholder="เช่น 13.6723, 100.5087 หรือวางลิงก์ Google Maps" oninput="window._hspGeoInput()">
+            <button type="button" class="btn btn-ghost btn-sm" onclick="window._hspGeoFindForm()" title="ค้นพิกัดจากข้อมูลกระทรวงสาธารณสุข ด้วยชื่อ + จังหวัด"><i class="ti ti-search" aria-hidden="true"></i>ค้นจาก สธ.</button>
+            <a class="btn btn-ghost btn-sm" id="m-hsp-geo-open" href="#" target="_blank" rel="noopener" style="display:none;" title="เปิดดูตำแหน่งใน Google Maps"><i class="ti ti-map-pin" aria-hidden="true"></i>ดูแผนที่</a>
+          </div>
+          <div id="m-hsp-geo-hint" style="font-size:11px;min-height:16px;margin-top:3px;padding-left:2px;color:var(--txt-muted);"></div>
+        </div>
         <div class="f-group">
           <label class="f-label">โทรศัพท์</label>
           <input class="f-input" id="m-hsp-tel" placeholder="0x-xxxx-xxxx">
@@ -2518,15 +2645,18 @@
 <script src="src/utils/number.util.js"></script>
 <script src="src/utils/string.util.js"></script>
 <script src="src/utils/staff-combo.util.js"></script>
+<script src="src/utils/select-ui.util.js"></script>
 <script src="src/utils/lib-loader.util.js"></script>
 <script src="src/utils/permission.util.js"></script>
 <script src="src/utils/project-team.util.js"></script>
 <script src="src/utils/hospital-match.util.js"></script>
 <script src="src/utils/labor.util.js"></script>
+<script src="src/utils/team-stage.util.js"></script>
 <script src="src/modules/ms-select.js"></script>
 
 <!-- 3. Services Layer (ต้องโหลดหลัง utils) -->
 <script src="src/utils/session.util.js"></script>
+<script src="src/utils/pw-policy.util.js"></script>
 <script src="src/services/storage.service.js"></script>
 <script src="src/services/db.service.js"></script>
 <script src="src/services/realtime.service.js"></script>
@@ -2538,6 +2668,7 @@
 <script src="src/services/site-notice-form.service.js"></script>
 <script src="src/services/ai.service.js"></script>
 <script src="src/services/ai-knowledge.js"></script>
+<script src="src/services/tts.service.js"></script>
 <script src="src/services/helpdesk.service.js"></script>
 <script src="src/services/push.service.js"></script>
 
@@ -2546,6 +2677,7 @@
 
 <!-- ══ Feature Modules (unchanged — ยังใช้ window.* globals เหมือนเดิม) ══ -->
 <script type="module" src="src/modules/overview.js"></script>
+<script type="module" src="src/modules/overview-dash.js"></script>
 <script type="module" src="src/modules/kanban.js"></script>
 <script type="module" src="src/modules/projects.js"></script>
 <script type="module" src="src/modules/advance.js"></script>
@@ -2568,16 +2700,21 @@
 <script type="module" src="src/modules/form-tracker.js"></script>
 <script type="module" src="src/modules/impl-tracker.js"></script>
 <script src="src/modules/print-documents.js"></script>
+<script src="src/modules/form-handover.js"></script>
 <script type="module" src="src/modules/helpdesk.js"></script>
 <script src="src/modules/all-issues.js"></script>
 <script src="src/modules/ask-ai.js"></script>
 <script src="src/modules/schedule-email.js"></script>
 <script src="src/modules/assist.js"></script>
+<script src="src/modules/datacheck.js"></script>
+<script src="src/modules/team-showcase.js"></script>
+<script src="src/modules/team-map.js"></script>
 <script src="src/modules/server-request.js"></script>
 <script src="src/modules/training.js"></script>
 <script src="src/modules/budget.js"></script>
 <script src="src/modules/export.js"></script>
 <script src="src/modules/tour.js"></script>
+<script src="src/modules/login-face.js"></script>
 
 <!-- 5. App Entry Point (โหลดสุดท้าย หลัง feature modules ทั้งหมด) -->
 <script src="src/app.js"></script>

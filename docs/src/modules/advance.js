@@ -367,7 +367,7 @@ window.advInitLaborTable = function(pid, workStart, workEnd, isBorder, existingI
   if(!tbody) return;
   tbody.innerHTML = '';
   var proj = window.PROJECTS.find(function(p){return p.id===pid;});
-  var mems = proj ? (proj.members&&proj.members.length ? proj.members : (proj.team||[]).map(function(sid){return{sid:sid};})) : [];
+  var mems = proj ? window.sortByStaffRank(proj.members&&proj.members.length ? proj.members : (proj.team||[]).map(function(sid){return{sid:sid};})) : [];
   var visits = proj && Array.isArray(proj.visits)
     ? proj.visits.filter(function(v){ return v.start && v.end && v.team && v.team.length; })
     : [];
@@ -400,7 +400,7 @@ window.advInitLaborTable = function(pid, workStart, workEnd, isBorder, existingI
     // มี visits → 1 แถวต่อคนต่อช่วง
     visits.forEach(function(v){
       var visitLabel = v.no ? 'ช่วงที่ '+v.no : '';
-      window._vtMembers(v.team, v.start, v.end).forEach(function(mem){
+      window.sortByStaffRank(window._vtMembers(v.team, v.start, v.end)).forEach(function(mem){
         if(!mem.sid) return;
         var info = window.countLaborDaysInfo(mem.sid, mem.s, mem.e);
         // holidayDays เริ่มที่ 0 — user กรอกเองว่าทำงานวันหยุดกี่วัน

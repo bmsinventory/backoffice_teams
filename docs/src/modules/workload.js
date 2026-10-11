@@ -261,9 +261,7 @@ window.renderWorkload = function() {
     if (r.s.dept && grouped[r.s.dept]) grouped[r.s.dept].push(r);
     else noDept.push(r);
   });
-  var sortFn = function(a, b) { return b.busyDays - a.busyDays; };
-  deptOrder.forEach(function(d) { grouped[d].sort(sortFn); });
-  noDept.sort(sortFn);
+  // ในแต่ละแผนกคงลำดับตำแหน่งจาก STAFF (เรียงไว้แล้ว)
 
   var allSections = [];
   deptOrder.forEach(function(d) { if (grouped[d] && grouped[d].length) allSections.push({ label: d, list: grouped[d] }); });
@@ -464,12 +462,12 @@ window.openWlNotifyReport = function() {
 
   var rows = Object.keys(byStaff).map(function(sid) { return byStaff[sid]; }).filter(function(r) { return r.projs.length > 0; });
   rows.forEach(function(r) { r.projs.sort(function(a, b) { return pd(a.periods[0].s) - pd(b.periods[0].s); }); });
-  rows.sort(function(a, b) { return pd(a.projs[0].periods[0].s) - pd(b.projs[0].periods[0].s); });
+  // rows คงลำดับตำแหน่งจาก STAFF
 
   var teamRows = Object.keys(teamMap).map(function(pid) {
     var t = teamMap[pid];
     var entries = Object.keys(t.entries).map(function(k) { return t.entries[k]; });
-    entries.forEach(function(en) { en.staff.sort(function(a, b) { return a.name.localeCompare(b.name, 'th'); }); });
+    entries.forEach(function(en) { en.staff.sort(window.sortStaffByRank); });
     entries.sort(function(a, b) { return pd(a.s) - pd(b.s); });
     return { p: t.p, entries: entries };
   }).filter(function(t) { return t.entries.length > 0; });

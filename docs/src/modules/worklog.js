@@ -3,8 +3,10 @@
 'use strict';
 
 var _wlEditId = null;
+var _wlSaving = false;
 
-const WL_CATS = [
+// หมวดงานเริ่มต้น — ผู้มีสิทธิ์แก้ไขบันทึกงานตั้งค่าเพิ่ม/แก้/ซ่อนได้ (เก็บที่ settings.worklog_categories)
+const WL_CATS_DEFAULT = [
   {id:'meeting',   emoji:'🗣️', label:'ประชุม'},
   {id:'doc',       emoji:'📄', label:'เอกสาร/รายงาน'},
   {id:'support',   emoji:'🛠️', label:'สนับสนุน'},
@@ -15,7 +17,20 @@ const WL_CATS = [
   {id:'internal',  emoji:'🏢', label:'งานภายใน'},
   {id:'other',     emoji:'📌', label:'อื่นๆ'},
 ];
+// รายการเดียวกันตลอด (แก้ในที่) — calendar.js อ่าน window.WL_CATS · หมวดที่ซ่อน (hidden) ยังใช้แสดงบันทึกเก่า
+const WL_CATS = [];
 window.WL_CATS = WL_CATS;
+
+window.wlApplyCats = function(list){
+  var src = Array.isArray(list) && list.length ? list : WL_CATS_DEFAULT;
+  WL_CATS.length = 0;
+  src.forEach(function(c){
+    if(c && c.id && c.label) WL_CATS.push({id:String(c.id), emoji:c.emoji||'📌', label:String(c.label), hidden:!!c.hidden});
+  });
+  var ed = document.getElementById('wlf-cat-edit');
+  if(document.getElementById('wlf-cats') && !(ed && ed.style.display!=='none')) _renderCatChips();
+};
+window.wlApplyCats(window.WL_CATS_CFG);
 
 const WL_LOCS = [
   {id:'local',     emoji:'🏢', label:'ในพื้นที่'},
@@ -50,24 +65,50 @@ function _curStaffId(){
   return u ? u.staffId||'' : '';
 }
 
-function _ptTag(sid, name, s, e){
-  return '<div class="wl-ptag" data-sid="'+sid+'" data-s="'+s+'" data-e="'+e+'" style="display:flex;align-items:center;gap:5px;padding:5px 7px;border-radius:7px;background:var(--bg);border:1px solid var(--border);margin-bottom:4px;">'
-    +'<span style="font-size:11px;font-weight:600;color:var(--txt);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+window.esc(name)+'</span>'
-    +'<input type="date" class="wl-mem-s f-input" value="'+s+'" oninput="this.closest(\'.wl-ptag\').setAttribute(\'data-s\',this.value)" style="flex:1;padding:2px 4px;font-size:9px;height:22px;min-width:0;" title="วันเริ่ม">'
-    +'<span style="font-size:9px;color:var(--txt-muted);">→</span>'
-    +'<input type="date" class="wl-mem-e f-input" value="'+e+'" oninput="this.closest(\'.wl-ptag\').setAttribute(\'data-e\',this.value)" style="flex:1;padding:2px 4px;font-size:9px;height:22px;min-width:0;" title="วันสิ้นสุด">'
-    +'<button type="button" onclick="this.closest(\'.wl-ptag\').remove();window._wlUpdatePtCnt()" style="background:none;border:none;color:var(--txt-muted);cursor:pointer;font-size:13px;padding:0 2px;flex-shrink:0;line-height:1;">✕</button>'
+function _ptAv(sid, nm){
+  var i = (window.STAFF||[]).findIndex(function(x){ return x.id===sid; });
+  return '<span class="wlf-av" style="background:'+window.avC(Math.max(0,i))+'">'+window.esc((nm||'?').charAt(0))+'</span>';
+}
+
+// แถวผู้เข้าร่วมที่เลือก — ช่องวันที่รายคนแสดงเฉพาะงานหลายวัน · custom = แก้วันเองแล้ว (ไม่ตามวันของงาน)
+function _ptRow(sid, s, e, custom){
+  var st = (window.STAFF||[]).find(function(x){ return x.id===sid; });
+  var nm = st ? st.name : sid;
+  return '<div class="wl-prow'+(custom?' custom':'')+'" data-sid="'+sid+'">'
+    +'<div class="wl-prow-hd">'
+      +_ptAv(sid, st ? (st.nickname||st.name) : sid)
+      +'<span class="wl-prow-nm">'+window.esc(nm)+(st&&st.nickname?' <span>('+window.esc(st.nickname)+')</span>':'')+'</span>'
+      +'<button type="button" class="wl-prow-x" onclick="window._wlRemovePt(this)" aria-label="เอาออก" title="เอาออก">✕</button>'
+    +'</div>'
+    +'<div class="wl-prow-dates">'
+      +window.beDateField('', s, {inputCls:'wl-mem-s', onchange:'window._wlPtDateSet(this)'})
+      +window.beDateField('', e, {inputCls:'wl-mem-e', onchange:'window._wlPtDateSet(this)'})
+    +'</div>'
   +'</div>';
 }
 
-function _dateSectionHtml(type, wl, today){
-  if(type==='daily'){
-    return '<label class="f-label">วันที่</label>'
-      +'<input type="date" class="f-input" id="wlf-date" value="'+(wl&&wl.date?wl.date:today)+'">';
-  }
-  return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'
-    +'<div><label class="f-label">วันที่เริ่ม</label><input type="date" class="f-input" id="wlf-start" value="'+(wl&&wl.startDate?wl.startDate:today)+'" onchange="window._wlAutoEndDate()"></div>'
-    +'<div><label class="f-label">วันที่สิ้นสุด</label><input type="date" class="f-input" id="wlf-end" value="'+(wl&&wl.endDate?wl.endDate:today)+'"></div>'
+// จำค่า "บันทึกแล้วเพิ่มงานถัดไปต่อ" ไว้ในเครื่อง
+function _keepGet(){ try { return localStorage.getItem('wl_keep_open')==='1'; } catch(e){ return false; } }
+window._wlKeepToggle = function(on){ try { localStorage.setItem('wl_keep_open', on?'1':'0'); } catch(e){} };
+
+// งานล่าสุดของฉัน (ชื่อไม่ซ้ำ) — แตะครั้งเดียวเติมชื่อ/หมวด/สถานที่
+var _wlRecents = [];
+function _recentsHtml(){
+  var myUid = window.cu ? window.cu.id : '';
+  var seen = {};
+  _wlRecents = (window.WORK_LOGS||[]).filter(function(w){ return w.uid===myUid && w.title; })
+    .sort(function(a,b){
+      var ka = a.createdAt||a.date||a.startDate||'', kb = b.createdAt||b.date||b.startDate||'';
+      return ka<kb ? 1 : ka>kb ? -1 : 0;
+    })
+    .filter(function(w){ var k = w.title.trim(); if(seen[k]) return false; seen[k]=1; return true; })
+    .slice(0,5);
+  if(!_wlRecents.length) return '';
+  return '<div class="wlf-recents"><span>ล่าสุด:</span>'
+    +_wlRecents.map(function(w,i){
+      var c = _cat(w.category);
+      return '<button type="button" class="wlf-recent" onclick="window._wlUseRecent('+i+')" title="'+window.esc(w.title)+' · '+window.esc(c.label)+'">'+window.esc(c.emoji)+' '+window.esc(w.title)+'</button>';
+    }).join('')
     +'</div>';
 }
 
@@ -119,7 +160,7 @@ window.renderWorkLog = function(){
       var loc  = _loc(wl.locationType);
       var isCreator = wl.uid === myUid;
 
-      var ptNames = (wl.participants||[]).map(function(p){
+      var ptNames = window.sortByStaffRank(wl.participants||[]).map(function(p){
         var st = staffById.get(p.sid);
         return st ? (st.nickname||st.name.split(' ')[0]) : '';
       }).filter(Boolean);
@@ -135,10 +176,10 @@ window.renderWorkLog = function(){
         +'style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:8px;cursor:pointer;transition:background .12s;" '
         +'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'var(--surface)\'">'
         +'<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:6px;">'
-          +'<span style="font-size:22px;line-height:1;flex-shrink:0;">'+cat.emoji+'</span>'
+          +'<span style="font-size:22px;line-height:1;flex-shrink:0;">'+window.esc(cat.emoji)+'</span>'
           +'<div style="flex:1;min-width:0;">'
             +'<div style="font-size:13px;font-weight:700;color:var(--txt);line-height:1.3;">'+window.esc(wl.title)+'</div>'
-            +'<div style="font-size:10px;color:var(--txt-muted);margin-top:2px;">'+cat.label+' · '+_wlDateLabel(wl)+'</div>'
+            +'<div style="font-size:10px;color:var(--txt-muted);margin-top:2px;">'+window.esc(cat.label)+' · '+_wlDateLabel(wl)+'</div>'
           +'</div>'
           +locBadge
         +'</div>'
@@ -161,175 +202,601 @@ window.openWorkLogModal = function(id){
   document.getElementById('m-worklog-title').textContent = wl ? 'แก้ไขบันทึกงาน' : 'เพิ่มบันทึกงาน';
 
   var today   = window.todayStr();
-  var type    = wl ? wl.type    : 'daily';
+  var multi   = wl ? wl.type==='period' : false;
+  var dFrom   = wl ? ((multi ? wl.startDate : wl.date) || today) : today;
+  var dTo     = wl && multi ? (wl.endDate || dFrom) : dFrom;
+  var catId   = wl ? (wl.category||'other') : 'meeting';
   var locType = wl ? (wl.locationType||'local') : 'local';
-  var parts   = wl ? (wl.participants||[]) : [];
-
-  var catOpts = WL_CATS.map(function(c){
-    var sel = (wl&&wl.category===c.id)||(!wl&&c.id==='meeting') ? ' selected' : '';
-    return '<option value="'+c.id+'"'+sel+'>'+c.emoji+' '+c.label+'</option>';
-  }).join('');
+  var parts   = wl ? window.sortByStaffRank(wl.participants||[]) : [];
 
   var ptHtml = parts.map(function(p){
-    var st = (window.STAFF||[]).find(function(s){ return s.id===p.sid; });
-    return _ptTag(p.sid, st?(st.nickname||st.name):p.sid, p.s||'', p.e||'');
+    var s = p.s||dFrom, e = p.e||(multi?dTo:s);
+    return _ptRow(p.sid, s, e, multi && !(s===dFrom && e===dTo));
   }).join('');
+  var picked = parts.map(function(p){ return p.sid; });
 
-  // Flat staff list (no dept grouping)
-  var activeStaff = (window.STAFF||[]).filter(function(s){ return s.active!==false; })
-    .sort(function(a,b){ return (a.nickname||a.name).localeCompare(b.nickname||b.name,'th'); });
-
-  var staffListHtml = activeStaff.map(function(s){
-    var nm = s.nickname||s.name;
-    return '<div class="wl-staff-item" data-sid="'+s.id+'" data-nm="'+window.esc(nm.toLowerCase())+'" '
-      +'onclick="window._wlAddPt(\''+s.id+'\')" '
-      +'style="padding:6px 10px;cursor:pointer;border-radius:6px;font-size:12px;color:var(--txt);transition:background .1s;display:flex;align-items:center;gap:6px;" '
-      +'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">'
-      +'<span style="width:22px;height:22px;border-radius:50%;background:'+window.avC((window.STAFF||[]).findIndex(function(x){return x.id===s.id;}))+';color:#fff;font-size:9px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">'+nm.charAt(0)+'</span>'
-      +window.esc(nm)
-      +(s.dept?'<span style="font-size:9px;color:var(--txt-muted);margin-left:2px;flex-shrink:0;">·'+window.esc(s.dept)+'</span>':'')
+  // รายชื่อทั้งหมด แบ่งกลุ่มตามแผนก → ระดับตำแหน่ง
+  var staffListHtml = '', curDept = null;
+  (window.STAFF||[]).filter(function(s){ return s.active!==false; }).sort(window.sortStaffByDeptRank).forEach(function(s){
+    var dept = s.dept||'ไม่ระบุแผนก';
+    if(dept!==curDept){ staffListHtml += '<div class="wl-pk-dept">👥 '+window.esc(dept)+'</div>'; curDept = dept; }
+    staffListHtml += '<div class="wl-pk-item'+(picked.indexOf(s.id)>=0?' on':'')+'" data-sid="'+s.id+'" data-q="'+window.esc((s.name+' '+(s.nickname||'')+' '+(s.dept||'')).toLowerCase())+'" onclick="window._wlTogglePt(this.getAttribute(\'data-sid\'))">'
+      +_ptAv(s.id, s.nickname||s.name)
+      +'<div class="wl-pk-txt"><div class="wl-pk-nm">'+window.esc(s.name)+(s.nickname?' <span>('+window.esc(s.nickname)+')</span>':'')+'</div>'
+        +(s.role?'<div class="wl-pk-role">'+window.esc(s.role)+'</div>':'')
+      +'</div>'
+      +'<span class="wl-pk-mark" aria-hidden="true"></span>'
     +'</div>';
-  }).join('');
+  });
 
-  var html = '<div style="padding:20px;">'
-    // Type toggle
-    +'<div style="margin-bottom:16px;">'
-      +'<label class="f-label">ประเภทงาน</label>'
-      +'<div style="display:flex;gap:8px;margin-top:6px;">'
-        +'<button type="button" id="wlt-daily" onclick="window._wlTypeToggle(\'daily\')" class="btn '+(type==='daily'?'btn-pri':'btn-ghost')+'" style="font-size:12px;padding:5px 16px;">📅 รายวัน</button>'
-        +'<button type="button" id="wlt-period" onclick="window._wlTypeToggle(\'period\')" class="btn '+(type==='period'?'btn-pri':'btn-ghost')+'" style="font-size:12px;padding:5px 16px;">📆 ช่วงเวลา</button>'
+  var html = '<div class="wlf">'
+    // ซ้าย: รายละเอียดงาน
+    +'<div class="wlf-main">'
+    // ชื่องาน + งานล่าสุด
+    +'<div>'
+      +'<div class="wlf-lbl-row"><label class="f-label" for="wlf-title">ชื่องาน / หัวข้อ *</label>'
+        +'<button type="button" class="wlf-link wlf-ai" id="wlf-ai-fill" onclick="window._wlAiFill()" title="พิมพ์เป็นประโยค เช่น “13-15 ต.ค. ลงพื้นที่ติดตั้ง รพ.ขอนแก่น กับเอี้ยม เต้ย” แล้วกด Enter หรือกดปุ่มนี้ · Ctrl+Enter = บันทึกทันทีไม่ผ่าน AI">✨ AI กรอกให้</button>'
+      +'</div>'
+      +'<input type="text" class="f-input wlf-title" id="wlf-title" autocomplete="off" placeholder="'+(wl ? 'ชื่องาน · Enter = บันทึก' : 'พิมพ์งานเป็นประโยค แล้วกด Enter ให้ AI กรอกให้ · Enter อีกครั้ง = บันทึก')+'" value="'+window.esc(wl?wl.title||'':'')+'" oninput="window._wlTitleInput()" onkeydown="window._wlTitleKey(event)">'
+      +'<div id="wlf-ai-note" class="wlf-ai-note" style="display:none;"></div>'
+      +(wl ? '' : '<div id="wlf-recents-wrap">'+_recentsHtml()+'</div>')
+    +'</div>'
+    // วันที่ | สถานที่
+    +'<div class="wlf-row2">'
+      +'<div>'
+        +'<label class="f-label">วันที่</label>'
+        +'<div class="wlf-dates">'
+          +'<input type="date" class="f-input" id="wlf-date" value="'+dFrom+'" onchange="window._wlAutoEndDate()" aria-label="วันที่เริ่ม">'
+          +'<span id="wlf-end-wrap"'+(multi?'':' style="display:none;"')+'><span>ถึง</span>'
+            +'<input type="date" class="f-input" id="wlf-end" value="'+dTo+'" onchange="window._wlAutoEndDate()" aria-label="วันที่สิ้นสุด">'
+          +'</span>'
+          +'<label class="wlf-check"><input type="checkbox" id="wlf-multi"'+(multi?' checked':'')+' onchange="window._wlMultiToggle(this.checked)">หลายวัน</label>'
+        +'</div>'
+      +'</div>'
+      +'<div>'
+        +'<label class="f-label">สถานที่</label>'
+        +'<div class="wlf-seg" role="radiogroup" aria-label="สถานที่">'
+          +WL_LOCS.map(function(l){
+            var on = locType===l.id;
+            return '<button type="button" role="radio" aria-checked="'+on+'" class="wl-loc-btn'+(on?' on':'')+'" data-lid="'+l.id+'" onclick="window._wlLocToggle(\''+l.id+'\')">'+l.emoji+' '+l.label+'</button>';
+          }).join('')
+        +'</div>'
+        +'<div id="wl-dest-wrap"'+(locType==='local'?' style="display:none;"':'')+'>'
+          +'<input type="text" class="f-input" id="wlf-dest" placeholder="ปลายทาง เช่น เชียงใหม่, โตเกียว ญี่ปุ่น" value="'+window.esc(wl?wl.destination||'':'')+'" aria-label="ปลายทาง">'
+        +'</div>'
       +'</div>'
     +'</div>'
-    // Date section
-    +'<div id="wl-date-section" style="margin-bottom:16px;">'+_dateSectionHtml(type, wl, today)+'</div>'
-    // Category
-    +'<div style="margin-bottom:16px;">'
-      +'<label class="f-label">หมวดงาน *</label>'
-      +'<select class="f-input" id="wlf-cat">'+catOpts+'</select>'
-    +'</div>'
-    // Location
-    +'<div style="margin-bottom:16px;">'
-      +'<label class="f-label">สถานที่</label>'
-      +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">'
-        +WL_LOCS.map(function(l){
-          return '<button type="button" class="wl-loc-btn btn '+(locType===l.id?'btn-pri':'btn-ghost')+'" data-lid="'+l.id+'" onclick="window._wlLocToggle(\''+l.id+'\')" style="font-size:12px;padding:5px 14px;">'+l.emoji+' '+l.label+'</button>';
-        }).join('')
+    // หมวดงาน
+    +'<div>'
+      +'<div class="wlf-lbl-row"><label class="f-label">หมวดงาน *</label>'
+        +(_canCfgCats() ? '<button type="button" class="wlf-link" id="wlf-cat-cfg" onclick="window._wlCatEdit(true)">⚙ ตั้งค่าหมวด</button>' : '')
       +'</div>'
+      +'<input type="hidden" id="wlf-cat" value="'+window.esc(catId)+'">'
+      +'<div class="wlf-cats" id="wlf-cats"></div>'
+      +'<div id="wlf-cat-edit" class="wlf-ce" style="display:none;"></div>'
     +'</div>'
-    // Destination
-    +'<div id="wl-dest-wrap" style="margin-bottom:16px;'+(locType==='local'?'display:none;':'')+'">'
-      +'<label class="f-label">ปลายทาง</label>'
-      +'<input type="text" class="f-input" id="wlf-dest" placeholder="เช่น เชียงใหม่, โตเกียว ญี่ปุ่น" value="'+window.esc(wl?wl.destination||'':'')+'">'
+    // รายละเอียด
+    +'<div>'
+      +'<div class="wlf-lbl-row"><label class="f-label" for="wlf-detail">รายละเอียด</label>'
+        +'<button type="button" class="wlf-link wlf-ai" id="wlf-ai-detail" onclick="window._wlAiDetail()" title="จดสั้น ๆ เป็นข้อ ๆ แล้วให้ AI เรียบเรียงเป็นข้อความทางการ">✨ เรียบเรียง</button>'
+      +'</div>'
+      +'<textarea class="f-input" id="wlf-detail" rows="2" placeholder="ไม่บังคับ" oninput="if(event.isTrusted)window._wlDetailEdited()">'+window.esc(wl?wl.detail||'':'')+'</textarea>'
     +'</div>'
-    // Title
-    +'<div style="margin-bottom:16px;">'
-      +'<label class="f-label">ชื่องาน / หัวข้อ *</label>'
-      +'<input type="text" class="f-input" id="wlf-title" placeholder="ระบุชื่องาน..." value="'+window.esc(wl?wl.title||'':'')+'">'
     +'</div>'
-    // Detail
-    +'<div style="margin-bottom:16px;">'
-      +'<label class="f-label">รายละเอียด</label>'
-      +'<textarea class="f-input" id="wlf-detail" rows="2" placeholder="รายละเอียดเพิ่มเติม...">'+window.esc(wl?wl.detail||'':'')+'</textarea>'
-    +'</div>'
-    // Participants
-    +'<div id="wl-pt-section">'
-      +'<label class="f-label" style="margin-bottom:8px;">ผู้เข้าร่วม '
-        +'<span id="wl-pt-cnt" style="color:var(--violet);font-weight:400;">'+(parts.length?'('+parts.length+')':'')+'</span>'
-      +'</label>'
-      +'<div class="wl-pt-row" style="display:flex;gap:12px;">'
-        // Selected list
-        +'<div style="flex:1;min-width:0;">'
-          +'<div id="wl-pt-selected" style="border:1px solid var(--border);border-radius:8px;min-height:64px;padding:6px;">'
-            +(ptHtml||'<div style="color:var(--txt-muted);font-size:11px;padding:10px;text-align:center;">กดเลือกจากรายชื่อพนักงาน</div>')
-          +'</div>'
-        +'</div>'
-        // Staff flat picker
-        +'<div class="wl-pt-pick" style="width:200px;flex-shrink:0;">'
-          +'<input type="text" class="f-input" placeholder="🔍 ค้นหา..." style="font-size:11px;padding:4px 8px;height:28px;margin-bottom:6px;" oninput="window._wlStaffFilter(this.value)">'
-          +'<div id="wl-staff-list" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:4px;">'
-            +staffListHtml
-          +'</div>'
-        +'</div>'
+    // ขวา: ผู้เข้าร่วม — บน: ที่เลือกแล้ว · ล่าง: ค้นหา + รายชื่อทั้งหมด
+    +'<div id="wl-pt-section" class="wlf-side'+(multi?' multi':'')+'">'
+      +'<div class="wlf-lbl-row"><label class="f-label" for="wl-pt-q">ผู้เข้าร่วม <span id="wl-pt-cnt">'+(parts.length?'('+parts.length+')':'')+'</span></label><span class="wlf-pt-hint">ไม่เลือก = บันทึกของตนเอง</span></div>'
+      +'<div id="wl-pt-selected" class="wl-pk-sel">'+ptHtml+'</div>'
+      +'<div class="wl-pk-col">'
+        +'<div class="wl-pk-search"><input type="text" id="wl-pt-q" autocomplete="off" placeholder="🔍 ค้นหาชื่อ / ชื่อเล่น / แผนก..." oninput="window._wlStaffFilter(this.value)" onkeydown="window._wlPtKey(event)"></div>'
+        +'<div id="wl-pt-sug" class="wlf-recents wl-pt-sug"></div>'
+        +'<div id="wl-staff-list" class="wl-pk-body">'+staffListHtml+'<div class="wl-pk-empty" style="display:none;">ไม่พบรายชื่อ</div></div>'
       +'</div>'
     +'</div>'
   +'</div>';
 
   document.getElementById('m-worklog-body').innerHTML = html;
+  _renderCatChips();
+  _wlAiSeq++;
+  _wlCatTouched = !!wl; // แก้บันทึกเดิม = ไม่เดาหมวดทับ
+  _wlAiOrig = null; _wlDetailOrig = null; _wlAiDone = null;
+  _wlRenderPtSug();
   var delBtn = document.getElementById('m-worklog-del');
   var myUid2 = window.cu ? window.cu.id : '';
   var isCreator = wl && (wl.uid === myUid2);
   // Delete button: visible only for creator or users with canDel permission
   if(delBtn) delBtn.style.display = (wl && (isCreator || window.canDel('worklog'))) ? '' : 'none';
+  // "บันทึกแล้วเพิ่มงานถัดไปต่อ" มีเฉพาะตอนเพิ่มใหม่
+  var keepWrap = document.getElementById('m-worklog-keep');
+  if(keepWrap) keepWrap.style.display = wl ? 'none' : '';
+  var keepCb = document.getElementById('wlf-keep');
+  if(keepCb) keepCb.checked = _keepGet();
   window.openM('m-worklog');
+  setTimeout(function(){ var t = document.getElementById('wlf-title'); if(t) t.focus(); }, 60);
 };
 
 // ── TOGGLE HELPERS ──
-window._wlTypeToggle = function(t){
-  var today = window.todayStr();
-  document.getElementById('wl-date-section').innerHTML = _dateSectionHtml(t, null, today);
-  ['daily','period'].forEach(function(x){
-    var b = document.getElementById('wlt-'+x);
-    if(b){ b.className='btn '+(t===x?'btn-pri':'btn-ghost'); b.style.fontSize='12px'; b.style.padding='5px 16px'; }
+window._wlMultiToggle = function(on){
+  var w = document.getElementById('wlf-end-wrap');
+  var f = document.getElementById('wlf-date'), e = document.getElementById('wlf-end');
+  if(w) w.style.display = on ? '' : 'none';
+  if(on && f && e && (!e.value || e.value < f.value)) e.value = f.value;
+  var sec = document.getElementById('wl-pt-section');
+  if(sec) sec.classList.toggle('multi', on);
+  _wlPtSyncDates();
+};
+
+// ── หมวดงาน: ปุ่มเลือก + ตั้งค่า ──
+function _canCfgCats(){ return !!((window.canEdit && window.canEdit('worklog')) || (window.isAdmin && window.isAdmin())); }
+
+function _renderCatChips(){
+  var box = document.getElementById('wlf-cats');
+  if(!box) return;
+  var h = document.getElementById('wlf-cat');
+  var cur = h ? h.value : '';
+  // หมวดที่ซ่อนแล้วยังแสดงถ้าเป็นหมวดของบันทึกที่กำลังแก้
+  var list = WL_CATS.filter(function(c){ return !c.hidden || c.id===cur; });
+  if(h && !list.some(function(c){ return c.id===cur; }) && list.length){ cur = list[0].id; h.value = cur; }
+  box.innerHTML = list.map(function(c){
+    var on = c.id===cur;
+    return '<button type="button" class="wlf-chip wlf-cat'+(on?' on':'')+'" data-cid="'+window.esc(c.id)+'" aria-pressed="'+on+'" onclick="window._wlCatPick(this.getAttribute(\'data-cid\'))">'+window.esc(c.emoji+' '+c.label)+'</button>';
+  }).join('');
+}
+
+function _catEditRow(c){
+  return '<div class="wlf-ce-row" data-id="'+window.esc(c?c.id:'')+'">'
+    +'<input type="text" class="f-input wlf-ce-emo" maxlength="4" value="'+window.esc(c?c.emoji:'📌')+'" aria-label="ไอคอน">'
+    +'<input type="text" class="f-input wlf-ce-lbl" value="'+window.esc(c?c.label:'')+'" placeholder="ชื่อหมวด" aria-label="ชื่อหมวด">'
+    +'<button type="button" class="wlf-ce-ico" title="เลื่อนขึ้น" aria-label="เลื่อนขึ้น" onclick="var r=this.parentNode;if(r.previousElementSibling)r.parentNode.insertBefore(r,r.previousElementSibling);">↑</button>'
+    +'<button type="button" class="wlf-ce-ico" title="ซ่อนหมวดนี้" aria-label="ลบหมวด" onclick="this.parentNode.remove()">✕</button>'
+  +'</div>';
+}
+
+window._wlCatEdit = function(on){
+  var ed = document.getElementById('wlf-cat-edit'), box = document.getElementById('wlf-cats');
+  var cfg = document.getElementById('wlf-cat-cfg');
+  if(!ed || !box) return;
+  if(on){
+    ed.innerHTML = '<div id="wlf-ce-rows">'+WL_CATS.filter(function(c){ return !c.hidden; }).map(_catEditRow).join('')+'</div>'
+      +'<div class="wlf-ce-foot">'
+        +'<button type="button" class="wlf-link" onclick="var w=document.getElementById(\'wlf-ce-rows\');w.insertAdjacentHTML(\'beforeend\',window._wlCatRowHtml());w.lastElementChild.querySelector(\'.wlf-ce-lbl\').focus();">+ เพิ่มหมวด</button>'
+        +'<span class="wlf-ce-note">ลบหมวด = ซ่อนจากตัวเลือก บันทึกเดิมยังแสดงชื่อหมวดเดิม</span>'
+        +'<button type="button" class="btn btn-ghost btn-sm" onclick="window._wlCatEdit(false)">ยกเลิก</button>'
+        +'<button type="button" class="btn btn-pri btn-sm" onclick="window._wlCatSave()">บันทึกหมวด</button>'
+      +'</div>';
+  } else {
+    ed.innerHTML = '';
+    _renderCatChips();
+  }
+  ed.style.display = on ? '' : 'none';
+  box.style.display = on ? 'none' : '';
+  if(cfg) cfg.style.display = on ? 'none' : '';
+};
+window._wlCatRowHtml = function(){ return _catEditRow(null); };
+
+window._wlCatSave = async function(){
+  if(!_canCfgCats()){ window.showAlert&&window.showAlert('คุณไม่มีสิทธิ์ตั้งค่าหมวดงาน','warn'); return; }
+  var list = [], seen = {}, dup = '';
+  document.querySelectorAll('#wlf-ce-rows .wlf-ce-row').forEach(function(r){
+    var label = r.querySelector('.wlf-ce-lbl').value.trim();
+    if(!label) return; // ชื่อว่าง = ไม่เอา (หมวดเดิมจะถูกซ่อน)
+    if(seen[label]) dup = label;
+    seen[label] = 1;
+    list.push({ id: r.getAttribute('data-id') || ('c_'+window.uid()), emoji: r.querySelector('.wlf-ce-emo').value.trim()||'📌', label: label });
+  });
+  if(dup){ window.showAlert&&window.showAlert('ชื่อหมวดซ้ำ: '+dup,'error'); return; }
+  if(!list.length){ window.showAlert&&window.showAlert('ต้องมีอย่างน้อย 1 หมวด','error'); return; }
+  // หมวดที่เอาออก → เก็บไว้แบบซ่อน (บันทึกเก่ายังอ้างรหัสนี้อยู่)
+  WL_CATS.forEach(function(c){
+    if(!list.some(function(x){ return x.id===c.id; })) list.push({ id:c.id, emoji:c.emoji, label:c.label, hidden:true });
+  });
+  try {
+    await window.setDoc(window.getDocRef('SETTINGS','app'), { worklog_categories: list }, { merge:true });
+    window.wlApplyCats(list);
+    window._wlCatEdit(false);
+    window.renderWorkLog && window.renderWorkLog();
+    window.showAlert&&window.showAlert('บันทึกหมวดงานแล้ว','success');
+  } catch(err){
+    window.showAlert&&window.showAlert('เกิดข้อผิดพลาด: '+err.message,'error');
+  }
+};
+
+// auto = ระบบ/AI เลือกให้ (ป้าย "แนะนำ") · ผู้ใช้กดเอง = หยุดเดาหมวดให้
+window._wlCatPick = function(cid, auto){
+  if(!auto) _wlCatTouched = true;
+  var h = document.getElementById('wlf-cat');
+  if(h) h.value = cid;
+  document.querySelectorAll('.wlf-cat').forEach(function(b){
+    var on = b.getAttribute('data-cid')===cid;
+    b.classList.toggle('on', on); b.setAttribute('aria-pressed', on);
+    b.classList.toggle('sug', on && !!auto);
   });
 };
 
 window._wlLocToggle = function(lid){
   document.querySelectorAll('.wl-loc-btn').forEach(function(b){
-    b.className = 'wl-loc-btn btn '+(b.getAttribute('data-lid')===lid?'btn-pri':'btn-ghost');
-    b.style.fontSize='12px'; b.style.padding='5px 14px';
+    var on = b.getAttribute('data-lid')===lid;
+    b.classList.toggle('on', on); b.setAttribute('aria-checked', on);
   });
   var dw = document.getElementById('wl-dest-wrap');
   if(dw) dw.style.display = lid==='local' ? 'none' : '';
 };
 
-window._wlAutoEndDate = function(){
-  var s = document.getElementById('wlf-start');
-  var e = document.getElementById('wlf-end');
-  if(s && e && (!e.value || e.value < s.value)) e.value = s.value;
-  // Sync participant tags that have no date yet
-  document.querySelectorAll('#wl-pt-selected .wl-ptag').forEach(function(tag){
-    var ms = tag.querySelector('.wl-mem-s');
-    var me = tag.querySelector('.wl-mem-e');
-    if(ms && !ms.value && s) { ms.value = s.value; tag.setAttribute('data-s', s.value); }
-    if(me && !me.value && e) { me.value = e.value; tag.setAttribute('data-e', e.value); }
-  });
+window._wlUseRecent = function(i){
+  var w = _wlRecents[i];
+  if(!w) return;
+  var t = document.getElementById('wlf-title');
+  if(t){ t.value = w.title; t.focus(); }
+  _wlAiDone = w.title.trim(); // ครบแล้ว Enter = บันทึกเลย
+  window._wlCatPick(w.category||'other');
+  window._wlLocToggle(w.locationType||'local');
+  var dest = document.getElementById('wlf-dest');
+  if(dest) dest.value = w.destination||'';
 };
 
-// ── PARTICIPANT PICKER ──
-window._wlAddPt = function(sid){
+window._wlAutoEndDate = function(){
+  var s = document.getElementById('wlf-date');
+  var e = document.getElementById('wlf-end');
+  if(s && e && (!e.value || e.value < s.value)) e.value = s.value;
+  _wlPtSyncDates();
+};
+
+// ── PARTICIPANT PICKER — ล่าง: รายชื่อทั้งหมด (แตะเพื่อเพิ่ม/เอาออก) · บน: ผู้เข้าร่วมที่เลือก ──
+function _wlRange(){
+  var s = (document.getElementById('wlf-date')||{}).value||'';
+  var multi = !!(document.getElementById('wlf-multi')||{}).checked;
+  return { s:s, e: multi ? ((document.getElementById('wlf-end')||{}).value||s) : s };
+}
+
+// แถวที่ยังไม่ได้แก้วันเอง → ตามวันของงาน
+function _wlPtSyncDates(){
+  var r = _wlRange();
+  document.querySelectorAll('#wl-pt-selected .wl-prow:not(.custom)').forEach(function(row){
+    var a = row.querySelector('.wl-mem-s'), b = row.querySelector('.wl-mem-e');
+    a.value = r.s; b.value = r.e; window.beDateSync(a); window.beDateSync(b);
+  });
+}
+
+function _wlPtMark(sid, on){
+  var it = document.querySelector('#wl-staff-list .wl-pk-item[data-sid="'+sid+'"]');
+  if(it) it.classList.toggle('on', on);
+}
+
+window._wlTogglePt = function(sid){
   var sel = document.getElementById('wl-pt-selected');
   if(!sel) return;
-  if(sel.querySelector('.wl-ptag[data-sid="'+sid+'"]')) return;
-
-  var st   = (window.STAFF||[]).find(function(s){ return s.id===sid; });
-  var name = st ? (st.nickname||st.name) : sid;
-
-  // Inherit dates from current date fields
-  var s = '', e = '';
-  var ds = document.getElementById('wlf-start') || document.getElementById('wlf-date');
-  var de = document.getElementById('wlf-end')   || document.getElementById('wlf-date');
-  if(ds) s = ds.value||'';
-  if(de) e = de.value||'';
-
-  var placeholder = sel.querySelector('div:not(.wl-ptag)');
-  if(placeholder) placeholder.remove();
-  var div = document.createElement('div');
-  div.innerHTML = _ptTag(sid, name, s, e);
-  sel.appendChild(div.firstElementChild);
+  var row = sel.querySelector('.wl-prow[data-sid="'+sid+'"]');
+  if(row) row.remove();
+  else {
+    var r = _wlRange();
+    var tmp = document.createElement('div'); tmp.innerHTML = _ptRow(sid, r.s, r.e, false);
+    var nr = tmp.firstElementChild;
+    window.insertByStaffRank(sel, nr); // แทรกตามลำดับตำแหน่ง
+    nr.scrollIntoView({block:'nearest'});
+  }
+  _wlPtMark(sid, !row);
   window._wlUpdatePtCnt();
 };
 
+window._wlRemovePt = function(btn){
+  var row = btn.closest('.wl-prow');
+  _wlPtMark(row.getAttribute('data-sid'), false);
+  row.remove();
+  window._wlUpdatePtCnt();
+};
+
+window._wlPtDateSet = function(inp){
+  var row = inp.closest('.wl-prow');
+  var a = row.querySelector('.wl-mem-s'), b = row.querySelector('.wl-mem-e');
+  if(a.value && b.value && b.value < a.value){ b.value = a.value; window.beDateSync(b); }
+  row.classList.add('custom');
+};
+
+// Enter = เพิ่มคนแรกที่ค้นเจอ · Esc = ล้างคำค้น
+window._wlPtKey = function(ev){
+  if(ev.isComposing) return;
+  if(ev.key==='Escape' && ev.target.value){ ev.stopPropagation(); ev.target.value = ''; window._wlStaffFilter(''); return; }
+  if(ev.key!=='Enter') return;
+  ev.preventDefault();
+  if(!ev.target.value.trim()) return;
+  var first = Array.prototype.find.call(document.querySelectorAll('#wl-staff-list .wl-pk-item:not(.on)'), function(it){ return it.style.display!=='none'; });
+  if(!first) return;
+  window._wlTogglePt(first.getAttribute('data-sid'));
+  ev.target.value = ''; window._wlStaffFilter('');
+};
+
 window._wlUpdatePtCnt = function(){
-  var n  = (document.querySelectorAll('#wl-pt-selected .wl-ptag')||[]).length;
+  var n  = document.querySelectorAll('#wl-pt-selected .wl-prow').length;
   var el = document.getElementById('wl-pt-cnt');
   if(el) el.textContent = n ? '('+n+')' : '';
+  _wlRenderPtSug();
 };
 
 window._wlStaffFilter = function(q){
-  var ql = (q||'').toLowerCase();
-  document.querySelectorAll('.wl-staff-item').forEach(function(item){
-    item.style.display = (!ql || item.getAttribute('data-nm').includes(ql)) ? '' : 'none';
+  var ql = (q||'').trim().toLowerCase();
+  var hdr = null, hdrHas = false, any = false;
+  Array.prototype.forEach.call((document.getElementById('wl-staff-list')||{children:[]}).children, function(el){
+    if(el.classList.contains('wl-pk-dept')){
+      if(hdr) hdr.style.display = hdrHas ? '' : 'none';
+      hdr = el; hdrHas = false;
+    } else if(el.classList.contains('wl-pk-item')){
+      var show = !ql || el.getAttribute('data-q').includes(ql);
+      el.style.display = show ? '' : 'none';
+      if(show){ hdrHas = true; any = true; }
+    }
   });
+  if(hdr) hdr.style.display = hdrHas ? '' : 'none';
+  var emp = document.querySelector('#wl-staff-list .wl-pk-empty');
+  if(emp) emp.style.display = any ? 'none' : '';
+};
+
+// ── ตัวช่วยกรอก ──
+// ไม่เรียก AI: เดาหมวดจากชื่องาน · แนะนำผู้เข้าร่วมจากประวัติ
+// เรียก AI: แยกประโยคเป็นช่องต่าง ๆ (✨ AI กรอกให้) · เรียบเรียงรายละเอียด (✨ เรียบเรียง)
+var _wlAiSeq = 0;          // เปิดหน้าต่างใหม่ = ทิ้งคำตอบ AI ที่ค้างอยู่
+var _wlCatTouched = false; // ผู้ใช้เลือกหมวดเองแล้ว → ไม่เดาทับ
+var _wlTitleTimer = null;
+var _wlAiOrig = null;      // ข้อความในช่องชื่องานก่อน AI แยก (ปุ่มคืนข้อความเดิม)
+var _wlAiDone = null;      // ชื่องานที่ AI กรอกแล้ว/ไม่ต้องผ่าน AI → กด Enter = บันทึก
+var _wlDetailOrig = null;  // รายละเอียดก่อน AI เรียบเรียง (ปุ่มย้อนกลับ)
+var WL_THDAY = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
+
+function _wlVisCats(){ return WL_CATS.filter(function(c){ return !c.hidden; }); }
+function _wlPicked(){
+  var m = {};
+  document.querySelectorAll('#wl-pt-selected .wl-prow').forEach(function(r){ m[r.getAttribute('data-sid')] = 1; });
+  return m;
+}
+
+// เพิ่มใหม่: Enter ครั้งแรก = ให้ AI กรอกจากประโยค · Enter อีกครั้ง (ข้อความไม่เปลี่ยน) = บันทึก
+// Ctrl/⌘+Enter = บันทึกทันทีไม่ผ่าน AI · แก้บันทึกเดิม: Enter = บันทึก
+window._wlTitleKey = function(ev){
+  if(ev.key!=='Enter' || ev.isComposing) return;
+  ev.preventDefault();
+  var v = ev.target.value.trim();
+  if(ev.ctrlKey || ev.metaKey || _wlEditId || !v || v===_wlAiDone) window.saveWorkLog();
+  else window._wlAiFill();
+};
+
+window._wlTitleInput = function(){
+  clearTimeout(_wlTitleTimer);
+  _wlTitleTimer = setTimeout(function(){ _wlGuessCat(); _wlRenderPtSug(); }, 250);
+};
+
+// เดาหมวด: งานเก่าที่ชื่อคล้ายที่สุด (ของตัวเองได้คะแนนเพิ่ม) → ไม่มี ค่อยดูว่าชื่อหมวดอยู่ในชื่องานไหม
+function _wlGuessCat(){
+  if(_wlCatTouched) return;
+  var t = ((document.getElementById('wlf-title')||{}).value||'').trim();
+  if(t.length < 3) return;
+  var vis = _wlVisCats(), ok = {};
+  vis.forEach(function(c){ ok[c.id] = 1; });
+  var myUid = window.cu ? window.cu.id : '', cid = '', best = 0;
+  (window.WORK_LOGS||[]).forEach(function(w){
+    if(!w.title || !ok[w.category]) return;
+    var s = window.aiTextSim(t, w.title) + (w.uid===myUid ? 0.05 : 0);
+    if(s > best){ best = s; cid = w.category; }
+  });
+  if(best < 0.55) cid = '';
+  if(!cid){
+    var tl = t.toLowerCase();
+    vis.some(function(c){
+      return c.label.split('/').some(function(p){
+        p = p.trim().toLowerCase();
+        if(p.length >= 3 && tl.indexOf(p) >= 0){ cid = c.id; return true; }
+        return false;
+      });
+    });
+  }
+  if(cid) window._wlCatPick(cid, true);
+}
+
+// แนะนำผู้เข้าร่วม: คนที่อยู่ในงานชื่อ/ปลายทางคล้ายกัน + คนที่ไปงานกับฉันบ่อยใน 180 วันล่าสุด
+function _wlPtSuggest(){
+  var mySid = _curStaffId(), myUid = window.cu ? window.cu.id : '';
+  var t = ((document.getElementById('wlf-title')||{}).value||'').trim();
+  var picked = _wlPicked(), score = {};
+  var cut = new Date(); cut.setDate(cut.getDate()-180); cut = window.ymd(cut);
+  (window.WORK_LOGS||[]).forEach(function(w){
+    var pts = (w.participants||[]).map(function(p){ return p.sid; });
+    if(!pts.length) return;
+    var wgt = 0;
+    if(t.length >= 3){
+      var sim = window.aiTextSim(t, (w.title||'')+' '+(w.destination||''));
+      if(sim >= 0.35) wgt += sim*3;
+    }
+    var d = w.date || w.startDate || '';
+    if(d >= cut && (w.uid===myUid || pts.indexOf(mySid) >= 0)) wgt += 0.3;
+    if(!wgt) return;
+    pts.forEach(function(sid){ if(sid!==mySid && !picked[sid]) score[sid] = (score[sid]||0) + wgt; });
+  });
+  var byId = {};
+  (window.STAFF||[]).forEach(function(s){ if(s.active!==false && !byId[s.id]) byId[s.id] = s; });
+  return Object.keys(score).filter(function(sid){ return byId[sid]; })
+    .sort(function(a,b){ return score[b]-score[a]; })
+    .slice(0,6).map(function(sid){ return byId[sid]; });
+}
+
+function _wlRenderPtSug(){
+  var box = document.getElementById('wl-pt-sug');
+  if(!box) return;
+  var list = _wlPtSuggest();
+  box.style.display = list.length ? '' : 'none';
+  box.innerHTML = list.length ? '<span>แนะนำ:</span>'+list.map(function(s){
+    return '<button type="button" class="wlf-recent" data-sid="'+window.esc(s.id)+'" onclick="window._wlTogglePt(this.getAttribute(\'data-sid\'))" title="'+window.esc(s.name)+'">+ '+window.esc(s.nickname||s.name.split(' ')[0])+'</button>';
+  }).join('') : '';
+}
+
+// จับคู่ชื่อที่ AI อ่านได้กับพนักงาน — ตรงชื่อเล่น/ชื่อจริงก่อน แล้วค่อยขึ้นต้นด้วย · เจอหลายคนเท่ากัน = ไม่เดา
+// ไม่สนวรรณยุกต์/การันต์ (ฟลุ๊ค = ฟลุ้ค)
+function _wlNormName(s){
+  return String(s||'').toLowerCase().replace(/^(นางสาว|น\.ส\.|นาย|นาง|คุณ|พี่|น้อง)\s*/,'').replace(/[\s่-์]+/g,'');
+}
+function _wlMatchStaff(name){
+  var n = _wlNormName(name);
+  if(!n) return null;
+  var act = (window.STAFF||[]).filter(function(s){ return s.active!==false; });
+  var tests = [
+    function(s){ return _wlNormName(s.nickname)===n; },
+    function(s){ return _wlNormName(s.name.split(' ')[0])===n || _wlNormName(s.name)===n; },
+    function(s){ return (s.nickname && _wlNormName(s.nickname).indexOf(n)===0) || _wlNormName(s.name).indexOf(n)===0; },
+  ];
+  for(var i=0; i<tests.length; i++){
+    var hit = act.filter(tests[i]);
+    if(hit.length===1) return hit[0];
+    if(hit.length>1) return null;
+  }
+  return null;
+}
+
+function _wlAiNote(html, warn){
+  var el = document.getElementById('wlf-ai-note');
+  if(!el) return;
+  el.innerHTML = html;
+  el.style.display = html ? '' : 'none';
+  el.classList.toggle('warn', !!warn);
+}
+
+function _wlFixDate(v){
+  var m = String(v||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(!m) return '';
+  var y = +m[1]; if(y > 2400) y -= 543; // ปี พ.ศ.
+  var d = y+'-'+m[2]+'-'+m[3];
+  return isNaN(new Date(d)) ? '' : d;
+}
+
+// ✨ AI กรอกให้ — พิมพ์ประโยคเดียวในช่องชื่องาน แล้วแยกเป็นชื่องาน วันที่ หมวด สถานที่ ผู้เข้าร่วม รายละเอียด
+window._wlAiFill = async function(){
+  var t = document.getElementById('wlf-title'), btn = document.getElementById('wlf-ai-fill');
+  if(!t || !btn || btn.disabled) return;
+  var text = t.value.trim();
+  if(!text){
+    window.showAlert&&window.showAlert('พิมพ์งานเป็นประโยคในช่องชื่องานก่อน เช่น “13-15 ต.ค. ลงพื้นที่ติดตั้ง รพ.ขอนแก่น กับเอี้ยม เต้ย”','warn');
+    t.focus(); return;
+  }
+  var seq = _wlAiSeq;
+  var today = window.todayStr(), base = window.pd(today), cal = [];
+  for(var i=-7; i<=21; i++){
+    var d = new Date(base); d.setDate(d.getDate()+i);
+    cal.push(window.ymd(d)+' วัน'+WL_THDAY[d.getDay()]+(i===0?' (วันนี้)':''));
+  }
+  var cats = _wlVisCats().map(function(c){ return '- '+c.id+': '+c.label; }).join('\n');
+  var sys = 'คุณแปลงข้อความบันทึกงานภาษาไทยเป็น JSON ตอบเป็น JSON อย่างเดียว ไม่มีคำอธิบาย\n'
+    +'รูปแบบ: {"title":"","category":"","location":"local","destination":"","start":"YYYY-MM-DD","end":"YYYY-MM-DD","detail":"","people":[]}\n'
+    +'กติกา:\n'
+    +'- title: ชื่องานสั้น กระชับ ไม่ใส่วันที่และชื่อคน\n'
+    +'- category: id จากรายการหมวดเท่านั้น เลือกที่ตรงที่สุด\n'
+    +'- location: local = ในพื้นที่/ที่ออฟฟิศ/ออนไลน์ · upcountry = ต่างจังหวัด · overseas = ต่างประเทศ\n'
+    +'- destination: จังหวัด/สถานที่/ประเทศปลายทาง ถ้าไม่ได้ระบุ = ""\n'
+    +'- start, end: ปี ค.ศ. ดูวันจากปฏิทินที่ให้ (พรุ่งนี้, จันทร์หน้า, 13-15 ต.ค.) · ไม่ระบุวัน = วันนี้ · งานวันเดียว end = start\n'
+    +'- people: ชื่อหรือชื่อเล่นของคนที่ร่วมงานตามที่เขียนไว้ ไม่รวมผู้เขียน (ผม/ฉัน/หนู) · ไม่มี = []\n'
+    +'- detail: ข้อมูลอื่นที่ไม่อยู่ในช่องข้างบน ไม่มี = ""\n'
+    +'ห้ามแต่งข้อมูลที่ไม่มีในข้อความ';
+  var usr = 'ปฏิทิน:\n'+cal.join('\n')+'\n\nหมวดงาน:\n'+cats+'\n\nข้อความ: '+text;
+
+  btn.disabled = true; btn.textContent = '⏳ AI กำลังอ่าน...';
+  try {
+    var r = await window.aiChatJson(sys, usr, { maxTokens:400, temperature:0, isStale:function(){ return seq!==_wlAiSeq; } });
+    if(seq!==_wlAiSeq) return;
+    var got = [];
+    _wlAiOrig = text;
+    if(r.title && String(r.title).trim()) t.value = String(r.title).trim();
+
+    var s = _wlFixDate(r.start) || today, e = _wlFixDate(r.end) || s;
+    if(e < s) e = s;
+    var multi = e > s;
+    document.getElementById('wlf-date').value = s;
+    var endEl = document.getElementById('wlf-end');
+    if(endEl) endEl.value = e;
+    var mc = document.getElementById('wlf-multi');
+    if(mc) mc.checked = multi;
+    window._wlMultiToggle(multi);
+    got.push(multi ? 'วันที่ '+window.fd(s)+' – '+window.fd(e) : 'วันที่ '+window.fd(s));
+
+    if(_wlVisCats().some(function(c){ return c.id===r.category; })){
+      window._wlCatPick(r.category, true);
+      _wlCatTouched = true;
+      got.push('หมวด');
+    }
+    var loc = WL_LOCS.some(function(l){ return l.id===r.location; }) ? r.location : 'local';
+    window._wlLocToggle(loc);
+    var dest = document.getElementById('wlf-dest');
+    if(dest && loc!=='local' && r.destination) dest.value = String(r.destination).trim();
+    got.push('สถานที่');
+
+    var det = document.getElementById('wlf-detail');
+    if(det && !det.value.trim() && r.detail && String(r.detail).trim()){ det.value = String(r.detail).trim(); got.push('รายละเอียด'); }
+
+    var mySid = _curStaffId(), added = 0, miss = [], picked = _wlPicked();
+    (Array.isArray(r.people) ? r.people : []).forEach(function(nm){
+      var st = _wlMatchStaff(nm);
+      if(!st){ if(String(nm||'').trim()) miss.push(String(nm).trim()); return; }
+      if(st.id===mySid || picked[st.id]) return;
+      window._wlTogglePt(st.id); picked[st.id] = 1; added++;
+    });
+    if(added) got.push('ผู้เข้าร่วม '+added+' คน');
+
+    _wlAiNote('🤖 AI เติมให้แล้ว: '+window.esc(got.join(' · '))+' — ตรวจแล้วกด Enter อีกครั้งเพื่อบันทึก'
+      +(miss.length ? '<br>⚠ ไม่พบชื่อ: '+window.esc(miss.join(', '))+' — เลือกจากรายชื่อทางขวาเอง' : '')
+      +' <button type="button" class="wlf-link" onclick="window._wlAiUndo()">↩ คืนข้อความเดิม</button>', miss.length > 0);
+    _wlAiDone = t.value.trim();
+    t.focus();
+  } catch(err){
+    if(err && err.cancelled) return;
+    if(seq!==_wlAiSeq) return;
+    _wlAiDone = text; // AI ใช้ไม่ได้ → Enter ถัดไปบันทึกตามที่พิมพ์ ไม่ติดวนเรียก AI
+    window.showAlert&&window.showAlert(err.message+' — กด Enter อีกครั้งเพื่อบันทึกตามที่พิมพ์','error');
+  } finally {
+    if(seq===_wlAiSeq){ btn.disabled = false; btn.textContent = '✨ AI กรอกให้'; }
+  }
+};
+
+window._wlAiUndo = function(){
+  var t = document.getElementById('wlf-title');
+  if(t && _wlAiOrig!=null){ t.value = _wlAiOrig; t.focus(); }
+  _wlAiDone = _wlAiOrig; // เลือกใช้ข้อความเดิม → Enter = บันทึก ไม่ส่ง AI ซ้ำ
+  _wlAiOrig = null;
+  _wlAiNote('');
+};
+
+// ✨ เรียบเรียง — จดสั้น ๆ แล้วให้ AI เขียนเป็นข้อความทางการ · กดอีกครั้ง (↩ ย้อนกลับ) = คืนข้อความเดิม
+window._wlAiDetail = async function(){
+  var d = document.getElementById('wlf-detail'), btn = document.getElementById('wlf-ai-detail');
+  if(!d || !btn || btn.disabled) return;
+  if(_wlDetailOrig!=null){ d.value = _wlDetailOrig; window._wlDetailEdited(); d.focus(); return; }
+  var text = d.value.trim();
+  if(!text){ window.showAlert&&window.showAlert('จดรายละเอียดคร่าว ๆ ก่อน แล้วกด ✨ เรียบเรียง','warn'); d.focus(); return; }
+  var seq = _wlAiSeq;
+  var title = ((document.getElementById('wlf-title')||{}).value||'').trim();
+  var cat = _cat((document.getElementById('wlf-cat')||{}).value).label;
+  var sys = 'เรียบเรียงบันทึกรายละเอียดงานให้เป็นภาษาไทยทางการ กระชับ อ่านง่าย\n'
+    +'- หลายเรื่อง ให้เขียนเป็นข้อ บรรทัดละข้อ ขึ้นต้นด้วย "- "\n'
+    +'- คงข้อเท็จจริง ตัวเลข ชื่อคน ชื่อหน่วยงาน ชื่อระบบตามเดิม ห้ามเพิ่มข้อมูลที่ไม่มี\n'
+    +'- ตอบเฉพาะเนื้อหาส่วนบันทึกที่เรียบเรียงแล้ว ไม่ต้องใส่ชื่องาน/หมวด ไม่มีคำนำ ไม่ใช้ markdown';
+  btn.disabled = true; btn.textContent = '⏳ กำลังเรียบเรียง...';
+  try {
+    var out = await window.aiChat(sys, 'ชื่องาน: '+(title||'-')+'\nหมวด: '+cat+'\nบันทึก:\n'+text,
+      { maxTokens:600, temperature:0.2, isStale:function(){ return seq!==_wlAiSeq; } });
+    if(seq!==_wlAiSeq) return;
+    out = out.replace(/```[a-z]*\n?|```/gi,'').replace(/\*\*(.+?)\*\*/g,'$1')
+      .replace(/^\s*(ชื่องาน|หมวด|บันทึก)\s*:.*$/gm,'').trim(); // บางครั้งทวนหัวข้อที่ส่งไปกลับมาด้วย
+    if(!out) throw new Error('AI ไม่ได้ตอบกลับมา — ลองใหม่อีกครั้ง');
+    _wlDetailOrig = d.value;
+    d.value = out;
+    d.rows = Math.min(8, Math.max(2, out.split('\n').length + 1));
+  } catch(err){
+    if(err && err.cancelled) return;
+    if(seq===_wlAiSeq) window.showAlert&&window.showAlert(err.message,'error');
+  } finally {
+    if(seq===_wlAiSeq){ btn.disabled = false; btn.textContent = _wlDetailOrig!=null ? '↩ ย้อนกลับ' : '✨ เรียบเรียง'; }
+  }
+};
+
+// ผู้ใช้แก้รายละเอียดเอง → ปุ่มกลับเป็น ✨ เรียบเรียง
+window._wlDetailEdited = function(){
+  if(_wlDetailOrig==null) return;
+  _wlDetailOrig = null;
+  var btn = document.getElementById('wlf-ai-detail');
+  if(btn && !btn.disabled) btn.textContent = '✨ เรียบเรียง';
 };
 
 // ── SAVE ──
@@ -347,24 +814,33 @@ window.saveWorkLog = async function(){
   var title   = titleEl ? titleEl.value.trim() : '';
   if(!title){ window.showAlert&&window.showAlert('กรุณาระบุชื่องาน','error'); return; }
 
-  var type  = document.querySelector('.btn-pri[id^="wlt-"]');
-  var locBtn= document.querySelector('.wl-loc-btn.btn-pri');
+  var locBtn= document.querySelector('.wl-loc-btn.on');
 
-  var typeVal  = type  ? type.id.replace('wlt-','') : 'daily';
+  var typeVal  = (document.getElementById('wlf-multi')||{}).checked ? 'period' : 'daily';
   var locVal   = locBtn ? locBtn.getAttribute('data-lid') : 'local';
 
   var dateVal  = (document.getElementById('wlf-date')||{}).value||'';
-  var startVal = (document.getElementById('wlf-start')||{}).value||'';
+  var startVal = dateVal;
   var endVal   = (document.getElementById('wlf-end')||{}).value||'';
+  if(!dateVal){ window.showAlert&&window.showAlert('กรุณาระบุวันที่','error'); return; }
+  if(typeVal==='period' && (!endVal || endVal < startVal)) endVal = startVal;
   var totalDays= 1;
   if(typeVal==='period' && startVal && endVal){
     totalDays = Math.max(1, Math.round((new Date(endVal)-new Date(startVal))/86400000)+1);
   }
 
   var participants = [];
-  document.querySelectorAll('#wl-pt-selected .wl-ptag').forEach(function(tag){
-    var sid = tag.getAttribute('data-sid');
-    if(sid) participants.push({sid:sid, s:tag.getAttribute('data-s')||'', e:tag.getAttribute('data-e')||''});
+  document.querySelectorAll('#wl-pt-selected .wl-prow').forEach(function(r){
+    var sid = r.getAttribute('data-sid');
+    if(!sid) return;
+    // งานวันเดียว = ใช้วันของงาน · งานหลายวัน = ช่วงวันรายคน (ว่าง = ช่วงของงาน)
+    var ps = startVal, pe = typeVal==='period' ? endVal : startVal;
+    if(typeVal==='period'){
+      ps = r.querySelector('.wl-mem-s').value || startVal;
+      pe = r.querySelector('.wl-mem-e').value || endVal;
+      if(pe < ps) pe = ps;
+    }
+    participants.push({sid:sid, s:ps, e:pe});
   });
 
   var myStaffId = _curStaffId();
@@ -388,16 +864,31 @@ window.saveWorkLog = async function(){
   };
   if(!_wlEditId) data.created_at = new Date().toISOString();
 
+  if(_wlSaving) return;
+  _wlSaving = true;
   try {
     var docId = _wlEditId||window.uid();
     var ref = window.getDocRef('WORK_LOGS', docId);
     await window.setDoc(ref, data, {merge:true});
     window._applyLocalDoc('WORK_LOGS', docId, Object.assign({id:docId}, data));
     window.renderWorkLog&&window.renderWorkLog();
-    window.closeM('m-worklog');
-    window.showAlert&&window.showAlert('บันทึกเรียบร้อย','success');
+    var keep = !_wlEditId && (document.getElementById('wlf-keep')||{}).checked;
+    if(keep){
+      // เพิ่มงานถัดไปต่อ: ล้างชื่อ/รายละเอียด คงวันที่ หมวด สถานที่ ผู้เข้าร่วมไว้
+      titleEl.value = '';
+      var det = document.getElementById('wlf-detail'); if(det) det.value = '';
+      window._wlDetailEdited(); _wlAiOrig = null; _wlAiDone = null; _wlAiNote('');
+      var rw = document.getElementById('wlf-recents-wrap'); if(rw) rw.innerHTML = _recentsHtml();
+      titleEl.focus();
+      window.showAlert&&window.showAlert('บันทึก “'+title+'” แล้ว — พิมพ์งานถัดไปได้เลย','success');
+    } else {
+      window.closeM('m-worklog');
+      window.showAlert&&window.showAlert('บันทึกเรียบร้อย','success');
+    }
   } catch(err){
     window.showAlert&&window.showAlert('เกิดข้อผิดพลาด: '+err.message,'error');
+  } finally {
+    _wlSaving = false;
   }
 };
 

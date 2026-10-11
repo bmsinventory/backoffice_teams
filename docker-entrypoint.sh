@@ -22,11 +22,11 @@ envsubst '${SUPABASE_URL} ${SUPABASE_ANON_KEY}' \
 NS=$(awk '/^nameserver/ { print $2; exit }' /etc/resolv.conf)
 echo "resolver ${NS:-1.1.1.1} valid=300s ipv6=off;" > /etc/nginx/conf.d/00-resolver.conf
 
-# ── ตัวส่ง Web Push (push-worker/index.js) รันเบื้องหลังคู่ nginx · ดับเองก็ start ใหม่ ──
+# ── ตัวส่ง Web Push + แจ้งเตือน BMS Notify (push-worker/index.js · /api/notify → 127.0.0.1:8790) รันเบื้องหลังคู่ nginx · ดับเองก็ start ใหม่ ──
 if [ -f /opt/push-worker/worker.secret ] && command -v node >/dev/null 2>&1; then
   ( while true; do node /opt/push-worker/index.js; sleep 10; done ) &
 else
-  echo "[entrypoint] Web Push: ไม่มี worker.secret ใน image — ไม่ส่งการแจ้งเตือนตอนปิดแอป"
+  echo "[entrypoint] ไม่มี worker.secret ใน image — ไม่ส่ง Web Push และแจ้งเตือน BMS Notify (กลุ่ม Line)"
 fi
 
 exec "$@"

@@ -17,6 +17,71 @@
 .adm-card:hover .adm-card-actions { opacity: 1; }
 
 
+/* ── กลุ่มสิทธิ์ (renderAdmRoles ใน admin.js): รายชื่อกลุ่มซ้าย · ตัวแก้ไขขวา ── */
+.rl-wrap { display: flex; gap: 18px; align-items: flex-start; max-width: 1080px; }
+.rl-list { width: 230px; flex-shrink: 0; display: flex; flex-direction: column; gap: 6px; position: sticky; top: 0; }
+.rl-item { display: flex; align-items: center; gap: 9px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); cursor: pointer; font-size: 13px; transition: border-color .15s, background .15s; }
+.rl-item:hover { border-color: var(--border2); }
+.rl-item.on { border-color: var(--rc); background: color-mix(in srgb, var(--rc) 9%, var(--surface)); box-shadow: inset 3px 0 0 var(--rc); }
+.rl-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--rc); flex-shrink: 0; }
+.rl-name { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rl-badge { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 6px; background: color-mix(in srgb, var(--rc) 18%, transparent); color: var(--rc); }
+.rl-cnt { font-size: 11px; color: var(--txt3); white-space: nowrap; }
+.rl-edit { flex: 1; min-width: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; }
+.rl-empty { color: var(--txt3); text-align: center; padding: 48px 12px; }
+.rl-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.rl-color { width: 40px; height: 38px; padding: 2px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); cursor: pointer; flex-shrink: 0; }
+.rl-name-in { flex: 1; font-size: 15px !important; font-weight: 700; }
+.rl-meta { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.rl-meta label { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--txt3); }
+.rl-meta label:first-child { flex: 1; min-width: 200px; }
+.rl-meta label:last-child input { width: 90px; }
+.rl-super { padding: 14px 16px; border-radius: 10px; background: rgba(255,107,107,.08); border: 1px solid rgba(255,107,107,.25); font-size: 13px; color: var(--txt2); }
+.rl-tbl-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; }
+.rl-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.rl-tbl th { padding: 9px 6px; font-size: 11px; color: var(--txt3); background: var(--surface2); border-bottom: 1px solid var(--border); white-space: nowrap; }
+.rl-tbl th.rl-mod { text-align: left; padding-left: 14px; }
+.rl-tbl th.rl-act { cursor: pointer; user-select: none; }
+.rl-tbl th.rl-act:hover { color: var(--violet); }
+.rl-tbl td { text-align: center; padding: 5px 6px; border-bottom: 1px solid var(--border); }
+.rl-tbl td.rl-mod { text-align: left; padding: 7px 14px; white-space: nowrap; cursor: pointer; }
+.rl-tbl td.rl-mod:hover { color: var(--violet); }
+.rl-tbl td.rl-na { color: var(--border2); }
+.rl-tbl tr.rl-grp td { text-align: left; padding: 7px 14px; font-size: 11px; font-weight: 700; letter-spacing: .4px; color: var(--txt3); background: var(--bg); cursor: pointer; user-select: none; }
+.rl-tbl tr.rl-grp td:hover { color: var(--violet); }
+.rl-tbl .perm-cb { width: 16px; height: 16px; accent-color: var(--violet); cursor: pointer; }
+.rl-scope { padding: 4px 6px !important; font-size: 12px !important; min-width: 110px; }
+.rl-hint { font-size: 11.5px; color: var(--txt3); margin-top: 8px; line-height: 1.6; }
+.rl-sec { font-size: 12px; font-weight: 700; margin: 16px 0 8px; }
+.usr-grp td { padding: 8px 14px !important; background: color-mix(in srgb, var(--rc) 8%, var(--surface2)) !important; font-size: 12px; font-weight: 700; color: var(--rc); box-shadow: inset 3px 0 0 var(--rc); }
+.usr-grp .rl-dot { display: inline-block; margin-right: 8px; vertical-align: middle; }
+.usr-grp .rl-cnt { margin-left: 8px; font-weight: 500; }
+.rl-members { display: flex; flex-wrap: wrap; gap: 6px; }
+.rl-mem { font-size: 12px; padding: 3px 10px; border-radius: 20px; background: var(--surface2); border: 1px solid var(--border); }
+.rl-none { font-size: 12px; color: var(--txt3); }
+.rl-foot { display: flex; gap: 8px; align-items: center; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+
+/* ฟอร์มผู้ใช้: 2 ส่วน (ข้อมูลบัญชี / กลุ่มสิทธิ์) · ติ๊กกลุ่มได้หลายกลุ่ม + สรุปเมนูที่จะเห็น */
+.auf-sec { display: flex; align-items: baseline; gap: 8px; font-size: 12px; font-weight: 700; color: var(--txt2); text-transform: uppercase; letter-spacing: .3px; margin: 0 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.auf-sec span { font-size: 10.5px; font-weight: 400; color: var(--txt3); text-transform: none; letter-spacing: 0; }
+.auf-sec:not(:first-child) { margin-top: 18px; }
+.auf-hint { font-size: 11px; color: var(--txt3); margin-top: -4px; }
+.auf-ai { font-size: 12px; color: var(--violet); margin-top: -6px; line-height: 1.9; }
+.auf-ai:empty { display: none; }
+.auf-ai-chip { font: inherit; font-size: 11.5px; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--violet); background: transparent; color: var(--violet); cursor: pointer; }
+.auf-ai-chip:hover { background: var(--violet); color: #fff; }
+.auf-roles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.auf-role { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border: 1px solid var(--border); border-left: 3px solid var(--rc); border-radius: 10px; font-size: 12.5px; cursor: pointer; user-select: none; transition: background .15s, border-color .15s; }
+.auf-role:hover { background: var(--surface2); }
+.auf-role input { accent-color: var(--rc); width: 15px; height: 15px; margin: 0; flex-shrink: 0; }
+.auf-role:has(input:checked) { border-color: var(--rc); background: color-mix(in srgb, var(--rc) 12%, transparent); font-weight: 600; }
+.auf-roles-sum { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: var(--surface2); border: 1px solid var(--border); font-size: 12px; color: var(--txt2); }
+.auf-roles-sum.warn { color: #b45309; background: rgba(245,158,11,.1); border-color: rgba(245,158,11,.35); }
+.auf-sum-h { font-size: 11.5px; color: var(--txt3); margin-bottom: 8px; }
+.auf-sum-h b { color: var(--txt); }
+.auf-sum-list { display: flex; flex-wrap: wrap; gap: 5px; max-height: 120px; overflow-y: auto; }
+.auf-sum-list span { font-size: 11px; padding: 2px 8px; border-radius: 6px; background: var(--surface); border: 1px solid var(--border); color: var(--txt2); white-space: nowrap; }
+
 /* ── จอสัมผัส: ปุ่ม ✏️/🗑 บนการ์ด (กลุ่ม/ประเภท/Stage) เดิมโผล่เฉพาะตอนเอาเมาส์ชี้ (hover) —
    บนมือถือ/แท็บเล็ตไม่มี hover จึงมองไม่เห็นปุ่มเลย แก้/ลบไม่ได้ → แสดงตลอดเมื่อไม่มี hover ── */
 @media (hover: none), (max-width: 768px) {
@@ -29,7 +94,9 @@
   .imt-trn.adm-page { min-height: 0; }
   .adm-main-head { padding: 10px 14px; min-height: 0; }
   .adm-head-title { font-size: 15px; }
+  .adm-head-actions { flex-wrap: wrap; }
   .adm-head-actions .btn { padding: 7px 12px; font-size: 12px; }
+  .adm-head-actions .t-sel { font-size: 12px; max-width: 160px; }
   .adm-main-body { padding: 14px; }
   .adm-card { padding: 12px; gap: 10px; }
 
@@ -38,10 +105,12 @@
   .adm-staff-contact { order: 3; width: 100%; padding-left: 50px; gap: 12px !important; flex-wrap: wrap; flex-shrink: 1 !important; }
   .adm-staff-contact span { max-width: 100% !important; }
 
-  /* สิทธิ์การใช้งาน: คอลัมน์ Admin เต็มทุกช่องเสมอ (ไม่ต้องตั้งค่า) → ซ่อน · ตรึงชื่อ Module ไว้ซ้ายตอนเลื่อน ·
+  /* กลุ่มสิทธิ์: รายชื่อกลุ่มเรียงบนตัวแก้ไข (เลื่อนแนวนอนได้) · ตรึงชื่อเมนูไว้ซ้ายตอนเลื่อนตาราง ·
      checkbox ใหญ่ขึ้นให้แตะง่าย */
-  .adm-perm-tbl { min-width: 0 !important; }
-  .adm-perm-tbl .adm-perm-admin { display: none; }
+  .rl-wrap { flex-direction: column; gap: 12px; }
+  .rl-list { width: 100%; position: static; flex-direction: row; overflow-x: auto; padding-bottom: 2px; }
+  .rl-item { flex-shrink: 0; }
+  .rl-edit { width: 100%; padding: 12px; }
   .adm-perm-tbl .adm-perm-mod { position: sticky; left: 0; z-index: 1; background: var(--surface); white-space: normal !important; min-width: 110px; max-width: 130px; padding: 8px 10px !important; font-size: 12px !important; box-shadow: 1px 0 0 var(--border); }
   .adm-perm-tbl thead .adm-perm-mod { background: var(--surface2); }
   .adm-perm-tbl .perm-cb { width: 22px !important; height: 22px !important; }
@@ -51,4 +120,164 @@
   .hdopt-row .hdopt-id { display: none; }
   .hdopt-row { gap: 8px !important; }
   .hdopt-row .hdopt-pri { width: 120px !important; }
+}
+
+/* ================================================================
+   เปลี่ยนรหัสผ่าน (#m-change-pw) — หัวการ์ดไล่สี + ช่องรหัสมีไอคอน/ปุ่มตา
+   + แถบความแข็งแรง + เช็กลิสต์เงื่อนไข (ตรรกะ: cpwRefresh ใน admin.js)
+================================================================ */
+.cpw-modal { max-width: 420px; position: relative; overflow: hidden; }
+.cpw-x { position: absolute; top: 12px; right: 12px; z-index: 2; color: var(--txt2); background: color-mix(in srgb, var(--surface) 70%, transparent); }
+.cpw-hero {
+  padding: 20px 24px 14px; text-align: center; flex-shrink: 0;
+  background:
+    radial-gradient(120% 90% at 0% 0%, rgba(124,92,252,.16), transparent 60%),
+    radial-gradient(120% 90% at 100% 0%, rgba(255,107,107,.12), transparent 60%);
+  border-bottom: 1px solid var(--border);
+}
+.cpw-badge {
+  width: 48px; height: 48px; margin: 0 auto 8px; border-radius: 15px;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, var(--violet), var(--coral));
+  box-shadow: 0 10px 24px rgba(124,92,252,.35), inset 0 1px 0 rgba(255,255,255,.25);
+  color: #fff; font-size: 24px;
+}
+.cpw-badge .ti { color: #fff; }
+.cpw-title { font-size: 18px; font-weight: 800; color: var(--txt); }
+.cpw-sub   { font-size: 12px; color: var(--txt2); margin-top: 4px; line-height: 1.5; }
+
+.cpw-body  { padding: 14px 24px 12px; }
+.cpw-field { margin-bottom: 10px; }
+.cpw-label { display: block; font-size: 12px; font-weight: 700; color: var(--txt2); margin-bottom: 5px; }
+
+.cpw-wrap { position: relative; display: flex; align-items: center; }
+.cpw-ico  { position: absolute; left: 13px; font-size: 18px; color: var(--txt3); pointer-events: none; transition: color .2s; }
+.cpw-input {
+  width: 100%; height: 40px; padding: 0 42px 0 40px;
+  background: var(--surface2); border: 1.5px solid var(--border); border-radius: 12px;
+  color: var(--txt); font-family: var(--mono); font-size: 14px; letter-spacing: .5px;
+  outline: none; transition: border-color .2s, box-shadow .2s, background .2s;
+  -webkit-text-security: disc;
+}
+.cpw-input.show { -webkit-text-security: none; }
+.cpw-input::placeholder { font-family: 'Plus Jakarta Sans', 'Noto Sans Thai', sans-serif; letter-spacing: 0; font-size: 13px; color: var(--txt3); }
+.cpw-input:hover { border-color: var(--border2); }
+.cpw-input:focus { border-color: var(--violet); background: var(--surface); box-shadow: 0 0 0 4px rgba(124,92,252,.14); }
+.cpw-wrap:focus-within .cpw-ico { color: var(--violet); }
+.cpw-eye {
+  position: absolute; right: 6px; width: 34px; height: 34px; border: none; border-radius: 9px;
+  background: transparent; color: var(--txt3); cursor: pointer; font-size: 18px;
+  display: flex; align-items: center; justify-content: center; transition: all .18s;
+}
+.cpw-eye:hover { background: var(--surface3); color: var(--violet); }
+
+/* แถบความแข็งแรง 4 ขั้น */
+.cpw-strength { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+.cpw-meter { flex: 1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.cpw-meter span { height: 4px; border-radius: 99px; background: var(--surface3); transition: background .25s; }
+.cpw-meter[data-lv="1"] span:nth-child(-n+1) { background: var(--coral); }
+.cpw-meter[data-lv="2"] span:nth-child(-n+2) { background: var(--amber); }
+.cpw-meter[data-lv="3"] span:nth-child(-n+3) { background: var(--sky); }
+.cpw-meter[data-lv="4"] span:nth-child(-n+4) { background: var(--teal); }
+.cpw-meter-txt { font-size: 11px; color: var(--txt3); font-weight: 600; white-space: nowrap; min-width: 62px; text-align: right; }
+.cpw-meter[data-lv="1"] + .cpw-meter-txt { color: var(--coral); }
+.cpw-meter[data-lv="2"] + .cpw-meter-txt { color: #d97706; }
+.cpw-meter[data-lv="3"] + .cpw-meter-txt { color: #0284c7; }
+.cpw-meter[data-lv="4"] + .cpw-meter-txt { color: #059669; }
+
+.cpw-match { font-size: 12px; font-weight: 600; margin-top: 5px; display: flex; align-items: center; gap: 4px; }
+.cpw-match:empty { display: none; }
+.cpw-match.ok  { color: #059669; }
+.cpw-match.bad { color: var(--coral); }
+
+/* เช็กลิสต์เงื่อนไข — ชิปแถวเดียว · วงกลมวาดด้วย CSS (ไอคอน .ti ถูกแปลงเป็นอีโมจิ ✅ ตลอด ใช้บอกสถานะไม่ได้) */
+.cpw-rules { list-style: none; margin: 2px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.cpw-rules li {
+  display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px 3px 6px; border-radius: 99px;
+  background: var(--surface2); border: 1px solid var(--border);
+  font-size: 11.5px; color: var(--txt3); transition: all .2s;
+}
+.cpw-rules li::before {
+  content: ''; width: 12px; height: 12px; border-radius: 50%; box-sizing: border-box;
+  border: 1.5px solid var(--border2); transition: all .2s;
+}
+.cpw-rules li.ok { color: #059669; background: rgba(5,150,105,.08); border-color: rgba(5,150,105,.3); }
+.cpw-rules li.ok::before {
+  border-color: #059669; background: #059669 url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'><path d='M3 6.2l2 2 4-4.4' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/></svg>") center/100% no-repeat;
+}
+
+.cpw-err {
+  margin-top: 10px; padding: 8px 12px; border-radius: 10px; align-items: center; gap: 8px;
+  background: rgba(255,107,107,.1); border: 1px solid rgba(255,107,107,.3);
+  color: var(--coral); font-size: 12.5px; font-weight: 600; animation: cpwShake .35s;
+}
+.cpw-err .ti { font-size: 16px; flex-shrink: 0; }
+@keyframes cpwShake { 0%,100% { transform: none; } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+
+.cpw-foot { padding: 12px 24px; }
+.cpw-foot .btn { height: 40px; padding: 0 18px; display: inline-flex; align-items: center; gap: 6px; }
+.cpw-foot .btn-pri { flex: 1; justify-content: center; }
+.cpw-foot .btn:disabled { opacity: .6; cursor: progress; }
+
+@media (max-width: 480px) {
+  .cpw-hero { padding: 22px 18px 14px; }
+  .cpw-body { padding: 16px 18px 12px; }
+  .cpw-foot { padding: 12px 18px; }
+}
+
+/* ── ตั้งค่าการแจ้งเตือน (notify.js) — รายการช่องทางซ้าย + รายละเอียดขวา (กะทัดรัด) ── */
+.ntf-wrap { max-width: 980px; padding: 0 0 16px; display: flex; flex-direction: column; gap: 10px; }
+.ntf-top { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 12px; color: var(--txt3); }
+.ntf-top-sub { margin-right: auto; }
+.ntf-sum { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--txt2); }
+.ntf-sum b { color: var(--txt); }
+.ntf-bar { width: 80px; height: 5px; border-radius: 99px; background: var(--surface3); overflow: hidden; }
+.ntf-bar > div { height: 100%; border-radius: 99px; background: var(--violet); transition: width .3s; }
+.ntf-body { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; }
+.ntf-list { flex: 1 1 240px; max-width: 280px; min-width: 0; display: flex; flex-direction: column; gap: 2px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 6px; }
+.ntf-item { display: flex; align-items: center; gap: 9px; width: 100%; min-height: 40px; padding: 6px 8px; border-radius: 8px; border: none; background: transparent; font: inherit; text-align: left; cursor: pointer; color: var(--txt); transition: background .15s; }
+.ntf-item:hover { background: var(--surface2); }
+.ntf-item.is-sel { background: color-mix(in srgb, var(--violet) 10%, transparent); }
+.ntf-item.is-sel .ntf-item-name { color: var(--violet); }
+.ntf-item-ic { flex: none; width: 22px; text-align: center; font-size: 15px; }
+.ntf-item-txt { flex: 1 1 auto; min-width: 0; }
+.ntf-item-name { display: block; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ntf-item-short { display: none; }
+.ntf-pill { flex: none; width: 8px; height: 8px; border-radius: 50%; font-size: 0; }
+.ntf-pill.is-on { background: var(--teal); }
+.ntf-pill.is-off { background: var(--amber); }
+.ntf-detail { flex: 999 1 420px; min-width: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+.ntf-d-head { display: flex; align-items: flex-start; gap: 10px; }
+.ntf-d-ic { flex: none; font-size: 18px; line-height: 1.3; }
+.ntf-d-title { font-size: 14px; font-weight: 700; color: var(--txt); }
+.ntf-d-desc { font-size: 12px; line-height: 1.5; color: var(--txt3); margin-top: 2px; }
+.ntf-ok { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, var(--teal) 8%, transparent); }
+.ntf-ok-ic { flex: none; font-weight: 800; color: var(--teal); }
+.ntf-ok-txt { flex: 1 1 180px; font-size: 12px; color: var(--txt2); display: flex; flex-wrap: wrap; gap: 0 6px; }
+.ntf-ok-txt b { color: var(--teal); }
+.ntf-ok-txt code { font-family: ui-monospace, Consolas, monospace; font-weight: 700; color: var(--txt); }
+.ntf-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.ntf-btn { height: 32px; padding: 0 12px; border-radius: 8px; font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--txt); }
+.ntf-btn:hover { border-color: var(--violet); }
+.ntf-btn.primary { background: var(--violet); border-color: var(--violet); color: #fff; }
+.ntf-btn.primary:hover { filter: brightness(1.08); }
+.ntf-btn.danger { height: 28px; color: var(--coral); background: transparent; border-color: transparent; padding: 0 6px; }
+.ntf-btn.danger:hover { border-color: color-mix(in srgb, var(--coral) 40%, transparent); }
+.ntf-btn.danger-fill { background: var(--coral); border-color: var(--coral); color: #fff; }
+.ntf-form { display: flex; flex-direction: column; gap: 6px; }
+.ntf-form .f-label { margin: 0; }
+.ntf-input { flex: 1 1 220px; min-width: 0; height: 32px; font-family: monospace; font-size: 12px; }
+.ntf-warn { font-size: 12px; font-weight: 600; color: var(--amber); }
+.ntf-hint { font-size: 11px; color: var(--txt3); }
+.ntf-msg { font-size: 12px; font-weight: 600; display: none; margin-top: -6px; }
+.ntf-msg.is-show { display: block; }
+.ntf-sec { font-size: 11px; font-weight: 700; color: var(--txt3); margin-bottom: 4px; }
+.ntf-events { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.ntf-events li { display: flex; align-items: flex-start; gap: 6px; font-size: 12px; line-height: 1.5; color: var(--txt2); }
+.ntf-events li > span { flex: none; width: 16px; text-align: center; }
+.ntf-danger { border-top: 1px solid var(--border); padding-top: 8px; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; font-size: 11.5px; color: var(--txt3); }
+.ntf-danger > span { margin-right: auto; }
+@media (max-width: 640px) {
+  .ntf-list { max-width: none; flex-direction: row; flex-wrap: wrap; }
+  .ntf-item { width: auto; flex: 1 1 45%; }
 }

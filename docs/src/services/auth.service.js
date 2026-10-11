@@ -22,41 +22,156 @@
     if (spin) spin.style.display = 'none';
   }
 
-  // ── Perform Login ──
-  function doLoginNow(username, password) {
+  // ── Perform Login — ฐานข้อมูลตรวจรหัสผ่าน (bo_login) ได้ token ของ session กลับมา (src/utils/session.util.js)
+  // เบราว์เซอร์ไม่มีรหัสผ่านของใครเลย · ผิด 10 ครั้งติด = ล็อก 15 นาที ──
+  async function doLoginNow(username, password) {
     var errEl    = document.getElementById('lerr');
     var errMsg   = document.getElementById('lerr-msg');
     var infoEl   = document.getElementById('linfo');
-    var searchList = window.USERS || [];
-    var usr = searchList.find(function (x) {
-      return x.username === username && x.password === password && x.active !== false;
-    });
-
-    if (!usr) {
-      if (errMsg) errMsg.textContent = 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง';
+    var showErr = function (msg) {
+      if (errMsg) errMsg.textContent = msg;
       if (errEl)  errEl.style.display = 'flex';
       if (infoEl) infoEl.style.display = 'none';
       _loginBtnReset();
+    };
+    var remEl = document.getElementById('l-rem');
+    var remember = !!(remEl && remEl.checked);
+
+    var r;
+    try { r = await window.BmsSession.login(window.getDb(), username, password, remember); }
+    catch (e) { console.error('[auth] login', e); showErr('ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาลองใหม่'); return; }
+    var usr = r.uid && (window.USERS || []).find(function (x) { return x.id === r.uid && x.active !== false; });
+    if (r.error === 'locked') { showErr('ใส่รหัสผ่านผิดหลายครั้ง บัญชีถูกล็อกชั่วคราว ลองใหม่ในอีก ' + (r.minutes || 15) + ' นาที'); return; }
+    if (!usr) {
+      if (r.uid) window.BmsSession.logout(window.getDb());
+      showErr('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง');
+      window.LoginFace && window.LoginFace.react('error'); // ตัวการ์ตูนส่ายหัว (src/modules/login-face.js)
       return;
     }
 
-    // Remember me — จำทั้ง username และ password (base64 เบา ๆ ใน StorageService) เมื่อติ๊กไว้
-    var remEl = document.getElementById('l-rem');
-    var remember = !!(remEl && remEl.checked);
-    if (remember) {
-      window.StorageService.setRememberedUser(usr.username);
-      window.StorageService.setRememberedPassword(password);
-    } else {
-      window.StorageService.clearRememberedUser();
-      window.StorageService.clearRememberedPassword();
+    // รหัสเดาง่าย / รหัสตั้งต้นจาก Admin 123456 (src/utils/pw-policy.util.js) → ยังไม่เข้าแอป ตั้งรหัสใหม่บนการ์ด Login ก่อน
+    // (ไม่ส่งรหัสเดาง่ายให้ตัวจัดการรหัสผ่านของเบราว์เซอร์ → Chrome ไม่เด้งเตือน "รหัสผ่านรั่วไหล")
+    if (window.PwPolicy.weak(password, usr.username)) { _startPwFix(usr, username, password, remember); return; }
+    window.PwPolicy.unflag();
+    _finishLogin(usr, username, password, remember);
+  }
+
+  function _finishLogin(usr, username, password, remember) {
+    // Remember me — จำแค่ชื่อผู้ใช้ (รหัสผ่านให้ตัวจัดการรหัสผ่านของเบราว์เซอร์จำ) · session อยู่ต่อแม้ปิดเบราว์เซอร์
+    if (remember) window.StorageService.setRememberedUser(usr.username);
+    else { window.StorageService.clearRememberedUser(); window.LoginFace && window.LoginFace.forget(); } // ไม่จดจำ = ไม่เก็บชื่อ/รูปไว้ในเครื่อง
+    // ช่อง Login ไม่ได้อยู่ใน <form> เบราว์เซอร์จึงไม่ถามบันทึกรหัสเอง → ส่งให้ตัวจัดการรหัสผ่านของเบราว์เซอร์ (Chrome/Edge — ผู้ใช้กดยืนยันเอง)
+    if (remember && window.PasswordCredential && navigator.credentials) {
+      try { navigator.credentials.store(new window.PasswordCredential({ id: username, password: password, name: usr.name || username })).catch(function () {}); } catch (e) {}
     }
-    // เก็บ session ไว้ — กด Refresh แล้วไม่ต้องล็อกอินใหม่ (ดู _restoreSession)
-    window.StorageService.setSession({ uid: usr.id, sig: _sessSig(usr) }, remember);
+    window.LoginFace && window.LoginFace.splash(usr); // หน้าทักทายตัวการ์ตูน ระหว่างแอปโหลดด้านหลัง
     _enterApp(usr, false);
   }
 
-  // ── ลายเซ็น session (ตัวจริง src/utils/session.util.js — ใช้ร่วมกับระบบอบรม/ระบบสอบ) ──
-  function _sessSig(u) { return window.BmsSession.sig(u); }
+  // ── รหัสเดาง่าย: บังคับตั้งรหัสใหม่บนการ์ด Login (.is-pwfix) ก่อนเข้าแอป ──
+  // session ที่เพิ่งได้ใช้เปลี่ยนรหัส (bo_change_password) · ปิดแท็บ/Refresh ระหว่างนี้ = ถูกออกจากระบบ (flag — _restoreSession)
+  // ช่อง #lp เดิมล้างค่าแล้วใช้เป็นช่องรหัสใหม่ — ห้ามซ่อน/ลบ: Chrome จะนับว่าล็อกอินสำเร็จด้วยรหัสเก่าแล้วเด้งเตือนรหัสรั่ว
+  // ผู้ใช้พิมพ์รหัสใหม่ทับในช่องเดิม → ตอนเข้าแอป Chrome เห็นแค่ชื่อผู้ใช้ + รหัสใหม่
+  var _pwFix = null;
+  function _setLp(label, ph, ac) {
+    var lp = document.getElementById('lp');
+    document.getElementById('lp-label').textContent = label;
+    lp.placeholder = ph; lp.setAttribute('autocomplete', ac);
+    lp.type = 'password';
+    var es = document.getElementById('eye-show'), eh = document.getElementById('eye-hide');
+    if (es) es.style.display = ''; if (eh) eh.style.display = 'none';
+    return lp;
+  }
+  function _startPwFix(usr, username, oldPw, remember) {
+    _pwFix = { usr: usr, username: username, oldPw: oldPw, remember: remember };
+    window.PwPolicy.flag(usr.id);
+    var lp = _setLp('รหัสผ่านใหม่', 'อย่างน้อย 4 ตัว ห้ามเลขเรียง/ตัวซ้ำ', 'new-password');
+    lp.value = '';
+    document.getElementById('lu').readOnly = true;
+    document.getElementById('lnp2').value = '';
+    _pwFixMsg('');
+    _loginBtnReset();
+    document.querySelector('.lg-card').classList.add('is-pwfix');
+    _weakPopup(usr);
+  }
+  // แจ้งเหตุผลเป็น popup (ไม่กินพื้นที่การ์ด) · ตัวการ์ตูนของผู้ใช้เกาะขอบบนขวา (LoginFace.figOf) ให้ดูเป็นมิตร ไม่น่าตกใจ
+  // ช่อง #lp ยังอยู่ด้านหลังตามเดิม · ปิดแล้วโฟกัสช่องรหัสใหม่
+  function _weakPopup(usr) {
+    var fg = window.LoginFace ? window.LoginFace.figOf(usr) : null;
+    var m = document.createElement('div');
+    m.id = 'pw-weak';
+    m.innerHTML = '<div class="pww-wrap">'
+      + (fg ? '<div class="pww-fig" aria-hidden="true"><img src="' + window.esc(fg.url) + '" alt=""></div>' : '')
+      + '<div class="pwf-box" role="alertdialog" aria-modal="true" aria-labelledby="pww-title">'
+      + '<div class="pwf-head"><b id="pww-title">กรุณาตั้งรหัสผ่านใหม่</b></div>'
+      + '<p class="pwf-p">รหัสที่ใช้อยู่เดาง่ายเกินไป (เช่น 1234, 123456) หรือเป็นรหัสตั้งต้นที่ Admin ให้มา ผู้อื่นอาจเข้าบัญชีคุณได้<br>ตั้งรหัสใหม่ก่อนเข้าสู่ระบบ</p>'
+      + '<div class="pwf-foot"><button type="button" class="btn btn-pri" id="pww-ok">ตั้งรหัสใหม่</button></div></div></div>';
+    document.body.appendChild(m);
+    var close = function () {
+      if (!m.parentNode) return;
+      m.remove();
+      document.removeEventListener('keydown', onKey, true);
+      document.getElementById('lp').focus();
+    };
+    var onKey = function (e) { if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); close(); } };
+    document.addEventListener('keydown', onKey, true);
+    m.addEventListener('click', function (e) { if (e.target === m) close(); });
+    document.getElementById('pww-ok').onclick = close;
+    setTimeout(function () { var b = document.getElementById('pww-ok'); if (b) b.focus(); }, 50);
+  }
+  function _pwFixMsg(msg) {
+    var errEl = document.getElementById('lerr'), errMsg = document.getElementById('lerr-msg'), infoEl = document.getElementById('linfo');
+    if (errMsg) errMsg.textContent = msg;
+    if (errEl) errEl.style.display = msg ? 'flex' : 'none';
+    if (infoEl) infoEl.style.display = 'none';
+  }
+  // สำเร็จ: ไม่ล้างค่า #lp (Chrome อ่านรหัสใหม่ตอนหน้า Login หายไป — doLogout ล้างให้ภายหลัง)
+  function _pwFixEnd() {
+    _pwFix = null;
+    document.querySelector('.lg-card').classList.remove('is-pwfix');
+    document.getElementById('lu').readOnly = false;
+    document.getElementById('lnp2').value = '';
+    _setLp('รหัสผ่าน', 'กรอกรหัสผ่าน', 'current-password');
+    var b = document.getElementById('lpwfix-btn'); if (b) b.disabled = false;
+  }
+  window.savePwFix = async function () {
+    var f = _pwFix, btn = document.getElementById('lpwfix-btn');
+    if (!f || btn.disabled) return;
+    var np = document.getElementById('lp').value, np2 = document.getElementById('lnp2').value;
+    if (!np || !np2) return _pwFixMsg('กรุณากรอกรหัสผ่านใหม่และยืนยันให้ครบ');
+    if (np !== np2) return _pwFixMsg('รหัสผ่านใหม่ทั้งสองช่องไม่ตรงกัน');
+    if (np.length < 4) return _pwFixMsg('รหัสผ่านต้องมีอย่างน้อย 4 ตัวอักษร');
+    if (np === f.oldPw) return _pwFixMsg('รหัสผ่านใหม่ต้องไม่ซ้ำกับรหัสเดิม');
+    if (window.PwPolicy.weak(np, f.usr.username)) return _pwFixMsg('รหัสผ่านนี้เดาง่ายเกินไป (เช่น เลขเรียง 1234, ตัวซ้ำ 0000, ชื่อผู้ใช้) กรุณาตั้งรหัสอื่น');
+    btn.disabled = true;
+    _pwFixMsg('');
+    try {
+      var res = await window.getDb().rpc('bo_change_password', { p_token: window.BmsSession.token(), p_old: f.oldPw, p_new: np });
+      if (res.error) throw res.error;
+      var d = res.data || {};
+      if (!d.ok) {
+        btn.disabled = false;
+        if (d.error === 'short') return _pwFixMsg('รหัสผ่านต้องมีอย่างน้อย 4 ตัวอักษร');
+        window.cancelPwFix();
+        return _pwFixMsg('หมดเวลาการเข้าสู่ระบบ กรุณาเข้าสู่ระบบใหม่');
+      }
+    } catch (e) { btn.disabled = false; return _pwFixMsg('บันทึกไม่สำเร็จ: ' + (e.message || e)); }
+    window.PwPolicy.unflag();
+    _pwFixEnd();
+    _finishLogin(f.usr, f.username, np, f.remember);
+    window.showAlert && window.showAlert('ตั้งรหัสผ่านใหม่เรียบร้อย', 'success');
+  };
+  // ยกเลิก = ปิด session ที่เพิ่งได้ กลับไปหน้าเข้าสู่ระบบ (เข้ามาใหม่ด้วยรหัสเดิมก็ยังต้องเปลี่ยน)
+  window.cancelPwFix = function () {
+    window.BmsSession.logout(window.getDb());
+    _pwFixEnd();
+    _pwFixMsg('');
+    var lp = document.getElementById('lp'); lp.value = ''; lp.focus();
+  };
+  document.addEventListener('DOMContentLoaded', function () {
+    var el = document.getElementById('lnp2');
+    if (el) el.addEventListener('keydown', function (e) { if (e.key === 'Enter') window.savePwFix(); });
+  });
 
   // ── เข้าสู่หน้าแอป (หลังตรวจรหัสผ่าน หรือกู้ session หลัง Refresh) ──
   // restore = true → กลับไปหน้าที่เปิดค้างไว้ก่อน Refresh (#ชื่อหน้า ใน URL) แทนหน้าเริ่มต้นตามสิทธิ์
@@ -118,6 +233,7 @@
 
   // ── Public Login Function ──
   window.doLogin = function () {
+    if (_pwFix) return window.savePwFix(); // Enter ในช่อง #lp ระหว่างตั้งรหัสใหม่
     var u    = (document.getElementById('lu') || {}).value || '';
     var p    = (document.getElementById('lp') || {}).value || '';
     var errEl  = document.getElementById('lerr');
@@ -187,13 +303,12 @@
       if (!name) { setMsg('กรอกชื่อผู้ใช้ก่อน', 'err'); return; }
       btn.disabled = true;
       try {
-        for (var i = 0; i < 30 && !window.isDbLoaded; i++) await new Promise(function (r) { setTimeout(r, 500); });
-        var u = (window.USERS || []).find(function (x) { return x.username === name && x.active !== false; });
-        if (u) await window.updateDoc(window.getDocRef('USERS', u.id), { pw_reset_requested_at: new Date().toISOString() });
+        // bo_request_pw_reset (db-schema.sql) — หน้าเว็บเขียนตาราง users ตรงไม่ได้แล้ว (เขียนได้เฉพาะ Admin)
+        var res = await window.getDb().rpc('bo_request_pw_reset', { p_username: name });
+        if (res.error) throw res.error;
         // ตอบเหมือนกันทุกกรณี — ไม่บอกว่ามีชื่อผู้ใช้นี้ในระบบหรือไม่
         setMsg('ส่งคำขอแล้ว ถ้ามีบัญชีนี้ในระบบ Admin จะตั้งรหัสผ่านใหม่ให้ แล้วแจ้งกลับ', 'ok');
       } catch (e) {
-        // ส่วนใหญ่ = ยังไม่ได้รัน SQL เพิ่มคอลัมน์ users.pw_reset_requested_at (ดู db-schema.sql)
         console.warn('[forgot-password] บันทึกคำขอไม่สำเร็จ:', (e && (e.message || e.details)) || e);
         setMsg('ส่งคำขอไม่สำเร็จ กรุณาติดต่อ Admin โดยตรง', 'err');
         btn.disabled = false;
@@ -201,11 +316,97 @@
     };
   };
 
+  // ── วิดีโอแนะนำระบบ — เปิดได้จากหน้า Login โดยไม่ต้องเข้าสู่ระบบ (ไฟล์ video/showcase.mp4 โหลดเมื่อกดเท่านั้น) ──
+  function _closeIntroVideo() { var m = document.getElementById('intro-video'); if (m) m.remove(); }
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') _closeIntroVideo(); });
+  window.openIntroVideo = function () {
+    _closeIntroVideo();
+    var m = document.createElement('div');
+    m.id = 'intro-video';
+    m.innerHTML = '<div class="ivid-box" role="dialog" aria-modal="true" aria-labelledby="ivid-title">'
+      + '<div class="ivid-head"><div><b id="ivid-title">วิดีโอแนะนำ BMS Backoffice Workspace</b><span>1 นาที 32 วินาที · พร้อมเสียงบรรยาย</span></div><button type="button" class="ivid-x" aria-label="ปิด">✕</button></div>'
+      + '<video src="video/showcase.mp4?v=4" poster="video/showcase-poster.jpg" controls autoplay playsinline preload="auto"></video></div>';
+    document.body.appendChild(m);
+    m.querySelector('.ivid-x').onclick = _closeIntroVideo;
+    m.addEventListener('click', function (e) { if (e.target === m) _closeIntroVideo(); }); // กดพื้นหลังนอกวิดีโอ = ปิด
+  };
+
+  // ── หน้า Login: คำทักทายตามช่วงเวลา + นาฬิกา, ตัวเลขโมดูล/หมวดงาน, เลขเวอร์ชัน, แถบรายชื่อโมดูล, แสงตามเมาส์
+  // วิดีโอพื้นหลังเล่นเฉพาะตอนหน้า Login แสดงอยู่ (เข้าระบบแล้ว #login ถูกซ่อน → หยุด ไม่กินเครื่อง) ──
+  // ท้องฟ้าข้างคำทักทาย: ขึ้น 06:00 ตก 18:00 (ใกล้เคียงทั้งปีในไทย) · ดวงอาทิตย์/ดวงจันทร์เดินตามเส้นโค้ง ซ้าย→ขวา
+  // สีท้องฟ้า: dawn 05–07 · day 07–17 · dusk 17–19 · night
+  function updateLoginSky(d) {
+    var sky = document.getElementById('lg-sky'), orb = document.getElementById('lg-orb');
+    if (!sky || !orb) return;
+    var min = d.getHours() * 60 + d.getMinutes(), isDay = min >= 360 && min < 1080;
+    var p = ((isDay ? min - 360 : (min - 1080 + 1440) % 1440)) / 720; // 0 = เพิ่งขึ้น · 1 = กำลังตก
+    var a = Math.PI * (1 - p), x = 60 + 40 * Math.cos(a), y = 54 - 40 * Math.sin(a);
+    orb.setAttribute('transform', 'translate(' + x.toFixed(1) + ' ' + y.toFixed(1) + ')');
+    var h = d.getHours();
+    sky.className = 'lg-sky ' + (isDay ? 'is-day' : 'is-night') + ' ' + (h >= 5 && h < 7 ? 'dawn' : h >= 7 && h < 17 ? 'day' : h >= 17 && h < 19 ? 'dusk' : 'night');
+    var left = Math.round((1 - p) * 720), txt = (left >= 60 ? Math.floor(left / 60) + ' ชม. ' : '') + (left % 60) + ' นาที';
+    sky.title = 'อีก ' + txt + (isDay ? ' พระอาทิตย์ตก' : ' พระอาทิตย์ขึ้น');
+  }
+
+  function initLoginPage() {
+    var login = document.getElementById('login');
+    if (!login) return;
+    var mods = window.PERM_MODULES || [];
+    var setText = function (id, v) { var el = document.getElementById(id); if (el) el.textContent = v; };
+    if (mods.length) {
+      setText('lg-n-mod', mods.length);
+      setText('lg-n-grp', mods.map(function (m) { return m.g; }).filter(function (g, i, a) { return a.indexOf(g) === i; }).length);
+      var chips = mods.filter(function (m) { return m.id !== 'admin'; })
+        .map(function (m) { return '<span>' + window.esc(m.label.replace(/^.*› /, '')) + '</span>'; }).join('');
+      var mq = document.getElementById('lg-marq');
+      if (mq) mq.innerHTML = chips + chips; // 2 ชุดต่อกัน → เลื่อนวนต่อเนื่อง (-50%)
+    }
+    setText('lg-ver', window.APP_VERSION || '');
+    // ปุ่มมีอะไรใหม่: เรืองแสง + ป้าย NEW จนกว่าจะเปิดดูเวอร์ชันนี้บนเครื่องนี้
+    var WN_KEY = '_bms_wn_login';
+    var wnBtn = document.getElementById('lg-wn');
+    var setWnOn = function (on) {
+      if (!wnBtn) return;
+      wnBtn.classList.toggle('lg-wn-on', on);
+      wnBtn.querySelector('.lg-new').hidden = !on;
+    };
+    try { setWnOn(localStorage.getItem(WN_KEY) !== window.APP_VERSION); } catch (e) {}
+    window.openLoginWhatsNew = function () {
+      try { localStorage.setItem(WN_KEY, window.APP_VERSION); } catch (e) {}
+      setWnOn(false);
+      window.showWhatsNew(true);
+    };
+
+    // คำทักทาย: 05–11 เช้า · 12–16 บ่าย · 17–04 เย็น · อัปเดตทุกต้นนาที
+    (function tick() {
+      if (login.style.display !== 'none') {
+        var d = new Date(), h = d.getHours();
+        if (window.LoginFace) window.LoginFace.render(); // คำทักทาย + ชื่อเจ้าของเครื่อง (login-face.js)
+        else setText('lg-greet', 'สวัสดีตอน' + (h >= 5 && h < 12 ? 'เช้า' : h >= 12 && h < 17 ? 'บ่าย' : 'เย็น'));
+        updateLoginSky(d);
+        setText('lg-time', d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.');
+        setText('lg-date', d.toLocaleDateString('th-TH', { weekday: 'long' }) + 'ที่ ' + d.toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' }));
+      }
+      setTimeout(tick, (60 - new Date().getSeconds()) * 1000);
+    })();
+
+    login.addEventListener('pointermove', function (e) {
+      login.style.setProperty('--mx', e.clientX + 'px');
+      login.style.setProperty('--my', e.clientY + 'px');
+    });
+
+    var bg = document.getElementById('login-bg');
+    if (bg) new MutationObserver(function () {
+      if (login.style.display === 'none') bg.pause(); else bg.play().catch(function () {});
+    }).observe(login, { attributes: true, attributeFilter: ['style'] });
+  }
+  document.addEventListener('DOMContentLoaded', initLoginPage);
+
   // ── Logout ──
   window.doLogout = function () {
     window.disableWebPush && window.disableWebPush(true);
     window.cu = null;
-    window.StorageService.clearSession();
+    window.BmsSession.logout(window.getDb()); // ปิด session ที่ฐานข้อมูลด้วย (token เดิมใช้ต่อไม่ได้)
     window.clearDataCache && window.clearDataCache(); // ข้อมูลที่เก็บไว้ในเครื่อง (db.service.js) — ไม่ทิ้งไว้ให้คนถัดไป
     window.resetTraining && window.resetTraining();
     if (window._loginRetryInterval) { clearInterval(window._loginRetryInterval); window._loginRetryInterval = null; }
@@ -223,9 +424,8 @@
     if (errEl) errEl.style.display = 'none';
     if (infoEl) infoEl.style.display = 'none';
     var remUser = window.StorageService.getRememberedUser();
-    var remPass = window.StorageService.getRememberedPassword();
     if (remUser && uEl) uEl.value = remUser;
-    if (remPass && pEl) pEl.value = remPass;
+    window.LoginFace && window.LoginFace.render();
   };
 
   // ── Toggle login password show/hide ──
@@ -247,8 +447,9 @@
     });
   });
 
-  // ── กู้ session หลัง Refresh: ซ่อนหน้าล็อกอินทันที (ไม่ให้วาบ) รอข้อมูลผู้ใช้โหลด แล้วตรวจว่ายังใช้ได้
-  // (บัญชียังเปิดอยู่ + รหัสผ่านไม่เปลี่ยน) → เข้าแอปต่อหน้าเดิม · ไม่ผ่าน/โหลดไม่ทัน → ลบ session กลับหน้าล็อกอิน ──
+  // ── กู้ session หลัง Refresh: ซ่อนหน้าล็อกอินทันที (ไม่ให้วาบ) ถามฐานข้อมูลว่า session ยังใช้ได้ไหม
+  // (ยังไม่หมดอายุ + บัญชียังเปิด + ไม่ได้เปลี่ยนรหัส/ออกจากระบบ · session แบบเดิมแลกเป็น token ให้เอง — session.util.js)
+  // คู่กับรอข้อมูลผู้ใช้โหลด → เข้าแอปต่อหน้าเดิม · ไม่ผ่าน/โหลดไม่ทัน → ลบ session กลับหน้าล็อกอิน ──
   function _restoreSession() {
     var root = document.documentElement;
     var sess = window.StorageService.getSession();
@@ -256,14 +457,20 @@
     var loginEl = document.getElementById('login');
     if (loginEl) loginEl.style.display = 'none';
     window.showLoader && window.showLoader('กำลังโหลดข้อมูล...');
+    var uid = null, checked = false;
+    window.BmsSession.resolve(window.getDb()).then(function (id) { uid = id; }, function (e) {
+      console.warn('[auth] ตรวจ session ไม่สำเร็จ', e);
+    }).then(function () { checked = true; });
     var tries = 0;
     var t = setInterval(function () {
       tries++;
-      if (!window.isDbLoaded && tries < 300) return; // รอสูงสุด ~30 วินาที
+      if ((!window.isDbLoaded || !checked) && tries < 300) return; // รอสูงสุด ~30 วินาที
       clearInterval(t);
       var list = window.USERS || [];
-      var usr = window.isDbLoaded && list.find(function (x) { return x.id === sess.uid && x.active !== false; });
-      if (usr && _sessSig(usr) === sess.sig) {
+      var usr = uid && window.isDbLoaded && list.find(function (x) { return x.id === uid && x.active !== false; });
+      // ปิดแท็บ/Refresh ระหว่างบังคับตั้งรหัสใหม่ (รหัสเดาง่าย — _startPwFix) → ไม่ให้เข้า ต้องล็อกอินแล้วเปลี่ยนรหัสก่อน
+      if (usr && window.PwPolicy.flagged(usr.id)) { window.BmsSession.logout(window.getDb()); usr = null; }
+      if (usr) {
         window.hideLoader && window.hideLoader();
         _enterApp(usr, true);
         root.classList.remove('boot-sess');
@@ -276,6 +483,18 @@
     }, 100);
   }
   document.addEventListener('DOMContentLoaded', _restoreSession);
+
+  // ── ตรวจ session ทุกชั่วโมงขณะใช้งาน (ต่ออายุให้ด้วย) — ถูกปิดไปแล้ว (Admin ตั้งรหัสใหม่/ปิดบัญชี/เปลี่ยนรหัสจากเครื่องอื่น)
+  // → ออกจากระบบ · ติดต่อฐานข้อมูลไม่ได้ = ไม่ทำอะไร (ลองใหม่รอบหน้า) ──
+  setInterval(function () {
+    if (!window.cu) return;
+    window.BmsSession.resolve(window.getDb()).then(function (id) {
+      if (window.cu && !id) {
+        window.doLogout();
+        window.showAlert && window.showAlert('หมดเวลาการเข้าสู่ระบบ กรุณาเข้าสู่ระบบใหม่', 'warn');
+      }
+    }, function () {});
+  }, 3600 * 1000);
 
   // ── Initialize: start realtime (รอให้ service ที่โหลดทีหลังพร้อมก่อน) ──
   document.addEventListener('DOMContentLoaded', function () {

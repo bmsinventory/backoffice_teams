@@ -17,23 +17,10 @@
       try { localStorage.removeItem('_bms_rem'); } catch {}
     },
 
-    // ── Remembered Password (เฉพาะตอนติ๊ก "จดจำการเข้าสู่ระบบ") — เข้ารหัสเบา ๆ ด้วย base64 กันสายตา
-    // เผลอเห็นตรง ๆ ใน localStorage เท่านั้น ไม่ใช่การเข้ารหัสจริง (เปิด devtools อ่านได้เหมือนเดิม) —
-    // encodeURIComponent ก่อน btoa กันรหัสผ่านที่มีอักษรไทย/Unicode ทำให้ btoa error ──
-    getRememberedPassword: function () {
-      try { var raw = localStorage.getItem('_bms_rem_p'); return raw ? decodeURIComponent(atob(raw)) : null; } catch { return null; }
-    },
-    setRememberedPassword: function (password) {
-      try { localStorage.setItem('_bms_rem_p', btoa(encodeURIComponent(password))); } catch {}
-    },
-    clearRememberedPassword: function () {
-      try { localStorage.removeItem('_bms_rem_p'); } catch {}
-    },
-
     // ── Login Session — กด Refresh แล้วยังอยู่ในระบบ (ออกเมื่อกด "ออกจากระบบ" เท่านั้น)
     // ไม่ติ๊ก "จดจำ" → sessionStorage (อยู่รอด Refresh · ปิดแท็บ/เบราว์เซอร์แล้วต้องล็อกอินใหม่)
-    // ติ๊ก "จดจำ" → localStorage (อยู่ต่อแม้ปิดเบราว์เซอร์) · เก็บแค่ { uid, sig } — sig คำนวณจากรหัสผ่าน
-    // เปลี่ยนรหัสผ่าน/ปิดบัญชีแล้ว session เดิมใช้ไม่ได้ทันที (ตรวจตอนกู้คืนใน auth.service) ──
+    // ติ๊ก "จดจำ" → localStorage (อยู่ต่อแม้ปิดเบราว์เซอร์) · เก็บแค่ { uid, tok } — tok = token จากฐานข้อมูล ไม่เก็บรหัสผ่าน
+    // เปลี่ยนรหัสผ่าน/ปิดบัญชีแล้ว session เดิมใช้ไม่ได้ทันที (ฐานข้อมูลตรวจตอนกู้คืนใน auth.service) ──
     // ตัวจริงอยู่ที่ src/utils/session.util.js (ใช้ร่วมกับระบบอบรม/ระบบสอบ) — ที่นี่คงชื่อเดิมให้โค้ดเดิมเรียกได้
     getSession:   function () { return window.BmsSession.get(); },
     setSession:   function (sess, persist) { window.BmsSession.set(sess, persist); },

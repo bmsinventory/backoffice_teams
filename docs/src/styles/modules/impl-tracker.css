@@ -356,9 +356,95 @@
 .imt-ck-name      { font-size: 12.5px; font-weight: 600; color: var(--txt); line-height: 1.4; }
 .imt-ck-name.done { text-decoration: line-through; color: var(--txt3); }
 
-/* ── Task Status Select (Task Detail modal) — dropdown เดียวแทน pill 7 ปุ่มเดิม เปลี่ยนสีตามสถานะที่เลือก ── */
-.imt-status-select { font-weight: 700; cursor: pointer; transition: all .15s; }
-.imt-status-select:disabled { cursor: default; opacity: .8; }
+/* ── Task Detail modal (V1.008) — 2 คอลัมน์: ซ้าย = เนื้องาน/เช็คลิสต์ · ขวา = คุณสมบัติงาน (กดครั้งเดียวจบ) ── */
+#m-imt-task-body { padding: 0; }
+.imt-td { display: grid; grid-template-columns: minmax(0, 1fr) 330px; min-height: 100%; }
+.imt-td-main { padding: 18px 22px; min-width: 0; }
+.imt-td-side { padding: 18px 20px; background: var(--surface2, var(--bg)); border-left: 1px solid var(--border); display: flex; flex-direction: column; gap: 18px; }
+.imt-td-side .f-label { margin-bottom: 8px; }
+.imt-td-hint { font-size: 11px; color: var(--txt2); margin-top: 6px; line-height: 1.45; }
+.imt-td-block { border-top: 1px solid var(--border); margin-top: 18px; padding-top: 16px; }
+#imt-t-ck-wrap { margin-top: 6px; }
+
+.imt-td-head { display: flex; align-items: center; gap: 6px; }
+.imt-td-saved { font-size: 11.5px; color: #0b7a5e; background: rgba(6,214,160,.13); padding: 4px 10px; border-radius: 999px; white-space: nowrap; margin-right: 4px; }
+[data-theme="dark"] .imt-td-saved { color: var(--teal); }
+.imt-td-nav { width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--txt2); font-size: 18px; line-height: 1; cursor: pointer; }
+.imt-td-nav:hover:not(:disabled) { border-color: var(--violet); color: var(--violet); }
+.imt-td-nav:disabled { opacity: .35; cursor: default; }
+.imt-td-pos { font-size: 11px; color: var(--txt3); min-width: 34px; text-align: center; }
+
+/* สถานะ: 4 หลักเป็นปุ่มใหญ่ 2×2 + 3 สถานะพิเศษเป็นปุ่มเล็ก — สีจาก IMPL_STATUS ผ่าน --c */
+.imt-td-st-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.imt-td-st-more { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.imt-td-st { display: flex; align-items: center; gap: 7px; min-height: 38px; padding: 6px 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--txt); font: inherit; font-size: 12.5px; text-align: left; cursor: pointer; transition: all .15s; }
+.imt-td-st i { width: 8px; height: 8px; border-radius: 50%; background: var(--c); flex-shrink: 0; }
+.imt-td-st:hover:not(:disabled) { border-color: var(--c); }
+.imt-td-st.on { border: 1.5px solid var(--c); background: color-mix(in srgb, var(--c) 14%, var(--surface)); font-weight: 700; }
+.imt-td-st.sm { min-height: 30px; padding: 3px 11px; border-radius: 999px; font-size: 11.5px; background: transparent; }
+.imt-td-st.sm.on { background: var(--c); border-color: var(--c); color: #fff; }
+.imt-td-st:disabled { cursor: default; opacity: .75; }
+
+/* ความสำคัญ: segmented control */
+.imt-td-seg { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); background: var(--border); padding: 3px; border-radius: 11px; }
+.imt-td-seg button { min-height: 34px; border: none; border-radius: 8px; background: transparent; color: var(--txt2); font: inherit; font-size: 12.5px; cursor: pointer; }
+.imt-td-seg button.on { background: var(--surface); color: var(--txt); font-weight: 700; box-shadow: 0 1px 3px rgba(0,0,0,.12), inset 0 -2px 0 var(--c); }
+.imt-td-seg button:disabled { cursor: default; }
+
+/* ปุ่มลัด (ผู้รับผิดชอบ / วันกำหนดเสร็จ) */
+.imt-td-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.imt-td-chip { min-height: 30px; padding: 3px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--txt); font: inherit; font-size: 12px; cursor: pointer; transition: all .15s; }
+.imt-td-chip:hover { border-color: var(--violet); color: var(--violet); }
+.imt-td-chip.me { border-style: dashed; border-color: var(--violet); color: var(--violet); }
+.imt-td-chip.on { background: var(--violet); border-color: var(--violet); color: #fff; }
+.imt-td-dates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.imt-td-dates label { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--txt2); }
+
+/* เช็คลิสต์ */
+.imt-td-ck-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.imt-td-ck-count { font-size: 12px; color: var(--txt2); }
+.imt-td-ck-pct { font-size: 12px; color: #0b7a5e; min-width: 36px; text-align: right; }
+[data-theme="dark"] .imt-td-ck-pct { color: var(--teal); }
+.imt-td-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 8px; }
+.imt-ck-seg { display: inline-flex; background: var(--border); padding: 3px; border-radius: 10px; gap: 2px; }
+.imt-ck-seg button { min-height: 30px; padding: 2px 12px; border: none; border-radius: 7px; background: transparent; color: var(--txt2); font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.imt-ck-seg button b { font-weight: 700; margin-left: 2px; }
+.imt-ck-seg button.on { background: var(--surface); color: var(--txt); font-weight: 700; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.imt-ck-tip { font-size: 11px; color: var(--txt3); margin: 0 2px 8px; }
+.imt-ck-tip kbd { display: inline-block; padding: 0 5px; border: 1px solid var(--border2); border-bottom-width: 2px; border-radius: 4px; font: inherit; font-size: 10.5px; color: var(--txt2); background: var(--surface); }
+.imt-td-ck-list { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+/* แถวกะทัดรัด — ทั้งแถวคือพื้นที่คลิกติ๊ก · ลำดับข้อช่วยไม่หลงในรายการยาว · ปุ่มลบโผล่ตอนชี้ (จอสัมผัสเห็นตลอด) */
+.imt-td-ck-list .imt-ck-row { padding: 0 6px 0 0; align-items: stretch; gap: 0; transition: background .12s; }
+.imt-td-ck-list .imt-ck-row:hover { background: var(--surface2, var(--bg)); }
+.imt-td-ck-list .imt-ck-row.is-done { background: rgba(6,214,160,.05); }
+.imt-td-ck-lbl { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; min-height: 42px; padding: 6px 4px 6px 12px; cursor: pointer; user-select: none; }
+.imt-td-ck-list .imt-ck-row input[type=checkbox] { width: 20px; height: 20px; margin: 0; }
+.imt-ck-no { font-size: 11px; color: var(--txt3); min-width: 18px; text-align: right; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.imt-td-ck-lbl .imt-ck-name { flex: 1; min-width: 0; font-size: 13px; }
+.imt-ck-meta { font-size: 10.5px; color: var(--txt3); white-space: nowrap; flex-shrink: 0; }
+.imt-ck-x { align-self: center; }
+.imt-ck-empty { padding: 14px 12px; font-size: 12.5px; color: var(--txt2); text-align: center; }
+@media (hover: hover) {
+  .imt-td-ck-list .imt-ck-x { opacity: 0; transition: opacity .12s; }
+  .imt-td-ck-list .imt-ck-row:hover .imt-ck-x, .imt-td-ck-list .imt-ck-x:focus-visible { opacity: 1; }
+}
+.imt-td-ck-add { display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: var(--surface2, var(--bg)); }
+.imt-td-ck-add > span { color: var(--violet); font-weight: 700; }
+.imt-td-ck-add input { flex: 1; border: none; background: transparent; font: inherit; font-size: 12.5px; color: var(--txt); padding: 6px 0; outline: none; }
+.imt-td-banner { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(6,214,160,.12); color: var(--txt); font-size: 13px; }
+.imt-td-banner > span { flex: 1; }
+
+.imt-td-ck-add kbd { display: inline-block; padding: 0 5px; border: 1px solid var(--border2); border-bottom-width: 2px; border-radius: 4px; font: inherit; font-size: 10.5px; color: var(--txt2); background: var(--surface); }
+#m-imt-task-foot { align-items: center; }
+
+@media (max-width: 820px) {
+  .imt-td { grid-template-columns: minmax(0, 1fr); }
+  .imt-td-side { border-left: none; border-top: 1px solid var(--border); order: -1; }
+  .imt-td-main { padding: 16px; }
+  .imt-td-pos, .imt-td-ck-add kbd, .imt-ck-tip { display: none; }
+  .imt-ck-meta { display: none; }
+  .imt-td-saved { font-size: 10.5px; padding: 3px 8px; }
+}
 
 /* ── Comments / Activity Timeline ── */
 .imt-comment   { padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 12.5px; color: var(--txt); line-height: 1.5; }
@@ -639,6 +725,164 @@
 .imt-tpl-ckrow .f-input { padding: 6px 10px; font-size: 11.5px; }
 .imt-tpl-ckadd  { margin-top: 2px; }
 
+/* ── Template Builder 2 ฝั่ง: ซ้าย = ข้อมูล + ตัวช่วยลดงานซ้ำ (Task ที่ใช้บ่อย / เริ่มเร็วขึ้น / คีย์ลัด) · ขวา = โครงสร้าง ── */
+.imt-tplb-modal { max-width: 1180px; height: 90vh; }
+.m-body.imt-tplb { padding: 0; display: grid; grid-template-columns: 300px minmax(0, 1fr); overflow: hidden; min-height: 0; }
+.imt-tplb-side { overflow-y: auto; padding: 18px; border-right: 1px solid var(--border); background: var(--surface2); display: flex; flex-direction: column; gap: 14px; }
+.imt-tplb-side .f-group { margin-bottom: 0; }
+.imt-tplb-hint { font-size: 11px; color: var(--txt3); line-height: 1.6; }
+.imt-tplb-hint b { color: var(--violet); }
+.imt-tplb-hint code, .imt-tplb-text code { background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; }
+.imt-tplb-opt { font-weight: 400; color: var(--txt3); }
+.imt-tplb-types { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
+.imt-tplb-type { padding: 5px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--txt2); font: inherit; font-size: 12px; cursor: pointer; }
+.imt-tplb-type:hover { border-color: var(--violet); color: var(--violet); }
+.imt-tplb-type.on { background: var(--violet); border-color: var(--violet); color: #fff; font-weight: 600; }
+.imt-tplb-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); background: var(--surface); border: 1px solid var(--border); border-radius: var(--r2); padding: 10px 4px; text-align: center; }
+.imt-tplb-stats > div { display: flex; flex-direction: column; gap: 2px; }
+.imt-tplb-stats > div + div { border-left: 1px solid var(--border); }
+.imt-tplb-stats b { font-size: 19px; color: var(--txt); }
+.imt-tplb-stats span { font-size: 11px; color: var(--txt3); }
+.imt-tplb-block { display: flex; flex-direction: column; gap: 6px; }
+.imt-tplb-bt { font-size: 12px; font-weight: 700; color: var(--txt); }
+.imt-tplb-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.imt-tplb-chip { padding: 5px 10px; border-radius: 999px; border: 1px dashed var(--border2); background: var(--surface); color: var(--txt2); font: inherit; font-size: 12px; cursor: pointer; }
+.imt-tplb-chip:hover { border-color: var(--violet); border-style: solid; color: var(--violet); }
+.imt-tplb-keys { margin-top: auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r2); padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; font-size: 11.5px; color: var(--txt2); }
+.imt-tplb-keys > div:not(.imt-tplb-bt) { display: flex; justify-content: space-between; align-items: center; }
+.imt-tplb-keys kbd { font-family: var(--mono); font-size: 10.5px; background: var(--surface2); border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; }
+
+.imt-tplb-main { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.imt-tplb-head { display: flex; align-items: center; gap: 12px; padding: 14px 20px 10px; flex-wrap: wrap; }
+.imt-tplb-title { flex: 1; font-size: 12px; font-weight: 800; letter-spacing: .04em; color: var(--txt2); text-transform: uppercase; }
+.imt-tplb-seg { display: inline-flex; gap: 2px; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 3px; }
+.imt-tplb-seg button { border: 0; background: transparent; color: var(--txt2); font: inherit; font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 8px; cursor: pointer; }
+.imt-tplb-seg button.on { background: var(--surface); color: var(--txt); box-shadow: var(--sh-sm); }
+.imt-tplb-restore { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 20px 10px; padding: 8px 12px; border-radius: var(--r2); background: rgba(245,166,35,.12); border: 1px solid rgba(245,166,35,.35); font-size: 12px; color: var(--txt); }
+.imt-tplb-restore span { flex: 1; min-width: 180px; }
+.imt-tplb-list { flex: 1; min-height: 0; overflow-y: auto; padding: 2px 20px 20px; }
+.imt-tplb-modal .imt-tplphase { background: var(--surface); cursor: default; transition: border-color .15s, box-shadow .15s; }
+.imt-tplb-modal .imt-tplphase.on { border-color: var(--violet); box-shadow: 0 0 0 3px rgba(124,92,252,.12); }
+.imt-tplb-modal .imt-tplphase.col { padding-top: 8px; padding-bottom: 8px; }
+.imt-tplph-head { display: flex; align-items: center; gap: 6px; }
+.imt-tplph-name { flex: 1; min-width: 0; font-weight: 700; }
+.imt-tplph-meta { font-size: 11px; color: var(--txt3); white-space: nowrap; }
+.imt-tplph-body { margin-top: 10px; padding-left: 22px; }
+.imt-tplb-ib { width: 30px; height: 30px; flex-shrink: 0; border: 0; border-radius: 8px; background: transparent; color: var(--txt3); font: inherit; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.imt-tplb-ib:hover { background: var(--surface2); color: var(--txt); }
+.imt-tplb-ib.del:hover { background: rgba(255,107,107,.1); color: var(--coral); }
+.imt-tplb-ckbtn { flex-shrink: 0; min-width: 112px; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--txt3); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.imt-tplb-ckbtn:hover { border-color: var(--violet); color: var(--violet); }
+.imt-tplb-ckbtn.has { border-color: rgba(124,92,252,.35); background: rgba(124,92,252,.08); color: var(--violet); }
+.imt-tplb-addrow { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.imt-tplb-plus { width: 15px; flex-shrink: 0; text-align: center; color: var(--violet); font-weight: 800; padding: 0 2px; }
+.imt-tplb-add.f-input { flex: 1; border-style: dashed; background: transparent; }
+.imt-tplb-add.f-input:focus { border-style: solid; background: var(--surface); }
+.imt-tplb-addphase { width: 100%; height: 46px; border-radius: var(--r); border: 1.5px dashed var(--border2); background: transparent; color: var(--violet); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.imt-tplb-addphase:hover { background: rgba(124,92,252,.06); border-color: var(--violet); }
+.imt-tpltask.flash > .m-row { animation: imtTplFlash .9s ease; border-radius: var(--r); }
+@keyframes imtTplFlash { from { background: rgba(124,92,252,.18); } to { background: transparent; } }
+
+.imt-tplb-text { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; padding: 0 20px 20px; }
+.imt-tplb-tcol { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+/* ── หน้าต่างเพิ่ม Task: สลับ ทีละงาน / วางเป็นข้อความ (หลายงาน) ── */
+.imt-td-modebar { display: flex; justify-content: flex-end; margin-bottom: 12px; }
+.imt-td-bulk-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.imt-td-bulk-grid .imt-tplb-preview { max-height: 46vh; }
+#imt-t-bulk { min-height: 320px; max-height: 46vh; resize: vertical; font-family: var(--mono), var(--font); font-size: 13px; line-height: 1.75; tab-size: 4; }
+.imt-td-bulk-tag { font-size: 10.5px; font-weight: 700; border-radius: 999px; padding: 2px 8px; background: var(--surface2); color: var(--txt3); white-space: nowrap; }
+.imt-td-bulk-tag.new { background: rgba(124,92,252,.12); color: var(--violet); }
+.imt-td-bulk-tag.warn { background: rgba(255,107,107,.12); color: var(--coral); }
+@media (max-width: 860px) {
+  .imt-td-bulk-grid { grid-template-columns: 1fr; }
+  #imt-t-bulk { min-height: 200px; }
+}
+#imt-tplb-textarea { flex: 1; min-height: 280px; resize: none; font-family: var(--mono), var(--font); font-size: 13px; line-height: 1.75; tab-size: 4; }
+.imt-tplb-prevhead { display: flex; justify-content: space-between; font-size: 12px; color: var(--txt3); }
+.imt-tplb-prevhead b { color: var(--txt); }
+.imt-tplb-preview { flex: 1; min-height: 200px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--r2); padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; }
+.imt-tplb-pv-name { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 4px; }
+.imt-tplb-pv-tk { display: flex; gap: 8px; margin-left: 12px; font-size: 12.5px; color: var(--txt); }
+.imt-tplb-pv-tk span { flex: 1; }
+.imt-tplb-pv-tk em { font-style: normal; color: var(--txt3); white-space: nowrap; }
+.imt-tplb-pv-ck { margin-left: 30px; font-size: 11.5px; color: var(--txt3); }
+
+.imt-tplb-foot-sum { margin-right: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font-size: 12px; color: var(--txt3); }
+.imt-tplb-saved { color: var(--teal); }
+
+@media (max-width: 860px) {
+  .imt-tplb-modal { height: auto; }
+  .m-body.imt-tplb { display: block; overflow-y: auto; }
+  .imt-tplb-side { border-right: 0; border-bottom: 1px solid var(--border); }
+  .imt-tplb-keys { display: none; }
+  .imt-tplb-list { overflow: visible; padding: 2px 12px 16px; }
+  .imt-tplb-head { padding: 12px; }
+  .imt-tplb-text { grid-template-columns: 1fr; padding: 0 12px 16px; }
+  .imt-tplph-body { padding-left: 0; }
+  .imt-tplph-meta { display: none; }
+  .imt-tplb-ckbtn { min-width: 0; }
+  .imt-tplb-foot-sum { display: none; }
+}
+
+/* ── แท็บ Template: ค้นหา + ชิปกรองประเภทโครงการ + กลุ่มตามประเภท (การ์ดมีแถบสีประเภททางซ้าย) ── */
+.imt-tpl-toolbar { gap: 10px; }
+.imt-tpl-search  { max-width: 300px; }
+.imt-tpl-chips   { display: flex; gap: 6px; flex-wrap: wrap; padding: 12px 24px 0; }
+.imt-tpl-chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px;
+  border: 1.5px solid var(--border); background: var(--surface); color: var(--txt2);
+  font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: all .15s;
+}
+.imt-tpl-chip b { font-size: 11px; padding: 0 7px; border-radius: 999px; background: var(--surface2); color: var(--txt2); }
+.imt-tpl-chip:hover { border-color: var(--border2); color: var(--txt); }
+.imt-tpl-chip.on { border-color: var(--violet); color: var(--violet); box-shadow: var(--sh-sm); }
+.imt-tpl-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+.imt-tpl-empty { padding: 48px 20px; text-align: center; color: var(--txt3); }
+
+.imt-tpl-hint {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 12px 24px 0; padding: 10px 14px;
+  border-radius: var(--r2); background: var(--surface); border: 1.5px dashed var(--violet); font-size: 12.5px; color: var(--txt2);
+}
+.imt-tpl-hint span { flex: 1 1 260px; }
+
+/* กลุ่มตามประเภท: หัวกลุ่มกดพับ/ขยายได้ · กล่องรายการมีแถบสีประเภทด้านซ้าย */
+.imt-tpl-sec { padding: 16px 24px 4px; }
+.imt-tpl-sec-head {
+  display: flex; align-items: center; gap: 10px; width: 100%; margin-bottom: 8px; padding: 0;
+  background: none; border: 0; font: inherit; cursor: pointer; text-align: left;
+}
+.imt-tpl-sec-bar   { width: 4px; height: 18px; border-radius: 2px; flex: 0 0 auto; background: var(--tc); }
+.imt-tpl-sec-name  { font-size: 15px; font-weight: 800; color: var(--tc); }
+.imt-tpl-sec-cnt   { padding: 1px 9px; border-radius: 999px; background: var(--surface2); border: 1px solid var(--border); color: var(--txt2); font-size: 11px; font-weight: 600; }
+.imt-tpl-sec-caret { margin-left: auto; font-size: 10px; color: var(--txt3); }
+.imt-tpl-rows {
+  background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--tc);
+  border-radius: var(--r2); box-shadow: var(--sh-sm); overflow: hidden;
+}
+.imt-tpl-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) 64px 64px auto; align-items: center; gap: 14px;
+  padding: 12px 16px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background .12s;
+}
+.imt-tpl-row:last-child { border-bottom: 0; }
+.imt-tpl-row:hover { background: var(--surface2); }
+.imt-tpl-row-main { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.imt-tpl-row-name { font-size: 14px; font-weight: 700; color: var(--txt); }
+.imt-tpl-row-sub  { font-size: 11.5px; color: var(--txt3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.imt-tpl-phs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+.imt-tpl-ph {
+  display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px 2px 3px; border-radius: 999px;
+  background: var(--surface2); color: var(--txt2); font-size: 11px; white-space: nowrap;
+}
+.imt-tpl-ph i {
+  font-style: normal; width: 16px; height: 16px; border-radius: 50%; background: var(--tc); color: #fff;
+  font-size: 9.5px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center;
+}
+.imt-tpl-row-stat { display: flex; flex-direction: column; align-items: center; font-size: 10.5px; color: var(--txt3); line-height: 1.2; }
+.imt-tpl-row-stat b { font-size: 18px; font-weight: 800; color: var(--txt); }
+.imt-tpl-row-act { display: flex; align-items: center; gap: 6px; }
+.imt-tpl-row-act .btn { padding: 5px 9px; }
+.imt-tpl-del:hover { color: var(--coral); border-color: var(--coral); }
+
 /* ================================================================
    RESPONSIVE — มือถือ / iPad
    (โมดูลนี้ทำงานอิสระ เก็บ responsive override ไว้ในไฟล์เดียวกันเพื่อดูแลง่าย
@@ -704,6 +948,17 @@
 
   /* Project / Task card grids — คอลัมน์เดียวบนจอแคบ */
   .imt-pgrid, .imt-tgrid, .imt-report-phasegrid { grid-template-columns: 1fr; padding: 14px; gap: 10px; }
+  /* Template: ชิปประเภทเลื่อนแนวนอน · ค้นหาเต็มแถว · การ์ดคอลัมน์เดียว */
+  .imt-tpl-chips { flex-wrap: nowrap; overflow-x: auto; padding: 10px 14px 2px; }
+  .imt-tpl-search { max-width: none; flex: 1 1 100%; }
+  .imt-tpl-sec { padding: 14px 14px 2px; }
+  .imt-tpl-hint { margin: 10px 14px 0; }
+  /* แถว Template: ชื่อเต็มแถวบน · Phase/Task + ปุ่มอยู่แถวล่าง */
+  .imt-tpl-row { grid-template-columns: auto auto 1fr; gap: 8px 14px; padding: 12px; }
+  .imt-tpl-row-main { grid-column: 1 / -1; }
+  .imt-tpl-row-stat { flex-direction: row; gap: 4px; align-items: baseline; }
+  .imt-tpl-row-stat b { font-size: 14px; }
+  .imt-tpl-row-act { justify-content: flex-end; min-width: 0; }
 
   /* Report hero — ring มาก่อน สถิติต่อแถวด้านล่าง แทนเรียงข้างกันซึ่งจะแคบเกินไป */
   .imt-report-hero { margin: 12px 12px 14px; padding: 16px 14px; gap: 16px; flex-direction: column; align-items: stretch; }
@@ -810,3 +1065,18 @@
 .ifb-day:hover { border-color: var(--violet); }
 .ifb-day.on { border-color: var(--violet); background: rgba(124,92,252,.10); color: var(--violet); }
 .ifb-day.on b { color: var(--violet); }
+
+/* ── ชื่องาน/รายละเอียด (Task Detail) แบบกะทัดรัด — ชื่องานเป็นหัวเรื่องมีเส้นใต้ + ไอคอนดินสอ (บอกว่าแก้ได้)
+   · รายละเอียดเป็นช่องพื้นอ่อนขอบประ 1 บรรทัด ขยายตามข้อความ ── */
+.imt-td-titlebox { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.imt-td-name, .imt-td-desc { display: block; box-sizing: border-box; width: 100%; font-family: inherit; color: var(--txt); transition: border-color .15s, background-color .15s, box-shadow .15s; }
+.imt-td-name { font-size: 18px; font-weight: 700; line-height: 1.6; padding: 4px 34px 4px 10px; border: 1px solid transparent; border-bottom-color: var(--border2); border-radius: 8px 8px 0 0;
+  background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ba3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 20h9'/%3E%3Cpath d='M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z'/%3E%3C/svg%3E") no-repeat right 10px center; }
+.imt-td-desc { font-size: 13px; line-height: 1.55; color: var(--txt2); padding: 8px 12px; min-height: 40px; max-height: 240px; resize: none; overflow: hidden;
+  border: 1px dashed var(--border2); border-radius: 10px; background: var(--surface2, var(--bg)); }
+.imt-td-name:hover:not(:disabled) { border-color: var(--border); border-bottom-color: var(--violet); background-color: var(--surface2, var(--bg)); }
+.imt-td-desc:hover:not(:disabled) { border-style: solid; border-color: var(--violet); }
+.imt-td-name:focus, .imt-td-desc:focus { outline: none; border: 1px solid var(--violet); border-radius: 10px; background-color: var(--surface); box-shadow: 0 0 0 3px rgba(124,92,252,.15); }
+.imt-td-desc:focus { overflow-y: auto; color: var(--txt); }
+.imt-td-name::placeholder, .imt-td-desc::placeholder { color: var(--txt3); font-weight: 400; }
+.imt-td-name:disabled { background-image: none; border-bottom-color: transparent; }

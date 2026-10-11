@@ -20,7 +20,21 @@
     return;
   }
 
+  // คำขอข้อมูล (REST) แนบ token ของ session ใน header x-bo-session — ฐานข้อมูลใช้ตรวจสิทธิ์เขียนตาราง users/roles
+  // (policy bo_req_can ใน db-schema.sql) · เฉพาะ /rest/v1/ ซึ่งวิ่งผ่าน nginx หน้าเว็บเดียวกัน (ไฟล์แนบ/อื่น ๆ ส่งตามเดิม)
+  function _fetchWithSession(input, init) {
+    var url = typeof input === 'string' ? input : (input && input.url) || '';
+    var tok = window.BmsSession && window.BmsSession.token();
+    if (tok && url.indexOf('/rest/v1/') > -1) {
+      var h = new Headers((init && init.headers) || (input && input.headers) || {});
+      h.set('x-bo-session', tok);
+      init = Object.assign({}, init, { headers: h });
+    }
+    return window.fetch(input, init);
+  }
+
   var _sb = window.supabase.createClient(DB_URL, DB_KEY, {
+    global: { fetch: _fetchWithSession },
     realtime: { params: { eventsPerSecond: cfg.realtimeEventsPerSecond || 10 } },
   });
 
@@ -32,7 +46,7 @@
     LODGINGS:'lodgings', HOLIDAYS:'holidays', LEAVES:'leaves',
     TIMESHEETS:'timesheets', COSTS:'costs', CONTRACTS:'contracts',
     HSP_PRODUCTS:'hsp_products', HOSPITALS:'hospitals',
-    SETTINGS:'settings', WORK_LOGS:'work_logs',
+    SETTINGS:'settings', WORK_LOGS:'work_logs', ROLES:'roles',
   };
 
   function _sbName(fsName) {

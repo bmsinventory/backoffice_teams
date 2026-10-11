@@ -1,5 +1,5 @@
-const CACHE      = 'bms-app-v1791571710';
-const IMG_CACHE  = 'bms-img-v1791571710';
+const CACHE      = 'bms-app-v1791744750';
+const IMG_CACHE  = 'bms-img-v1791744750';
 
 const IMG_EXTS = ['.png', '.jpg', '.jpeg', '.gif', '.ico', '.webp', '.woff', '.woff2'];
 
@@ -33,7 +33,8 @@ self.addEventListener('fetch', (e) => {
 
   if (e.request.method !== 'GET') return;
   if (url.origin !== self.location.origin) return;
-  if (url.pathname.startsWith('/db/')) return; // Backend (ข้อมูล /db/rest/v1/) — ไม่เก็บแคช
+  if (url.pathname.startsWith('/db/') || url.pathname.startsWith('/api/')) return; // Backend (ข้อมูล /db/rest/v1/, AI/TTS /api/) — ไม่เก็บแคช
+  if (url.pathname.endsWith('.mp4')) return;   // วิดีโอแนะนำ — เบราว์เซอร์ขอเป็นช่วง (Range/206) แคชไม่ได้ ให้โหลดตรง
 
   const ext = '.' + url.pathname.split('.').pop().toLowerCase();
 

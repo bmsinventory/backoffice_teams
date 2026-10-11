@@ -182,7 +182,7 @@
       else {
         try {
           await this.enrich(sb, cert);
-          var r = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+          var r = await fetch('/api/emailjs/send', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               service_id: st.emailjs_service_id, template_id: st.emailjs_template_id, user_id: st.emailjs_public_key,

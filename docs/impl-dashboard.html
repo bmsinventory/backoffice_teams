@@ -523,10 +523,16 @@
     } catch (e) {}
 
     // ── รหัสพนักงาน → ชื่อ-นามสกุล (impl_issues.fixed_by และ PM/ผู้ประสานงานของโครงการต้นทาง เก็บเป็นรหัสพนักงาน) ──
-    var staffNames = {};
+    var staffNames = {}, staffRank = {}; // staffRank = ลำดับตำแหน่ง (positions.rank: 1 = สูงสุด) ใช้เรียงตัวเลือกผู้แก้ไข
     try {
-      var str = await db.from('staff').select('id,staff_id,full_name');
-      (str.data || []).forEach(function (s) { if (s.full_name) staffNames[s.staff_id || s.id] = s.full_name; });
+      var res = await Promise.all([db.from('staff').select('id,staff_id,full_name,position'), db.from('positions').select('id,position_id,rank')]);
+      var posRank = {};
+      (res[1].data || []).forEach(function (p) { posRank[p.position_id || p.id] = Number(p.rank) || 99; });
+      (res[0].data || []).forEach(function (s) {
+        if (!s.full_name) return;
+        staffNames[s.staff_id || s.id] = s.full_name;
+        staffRank[s.staff_id || s.id] = posRank[s.position] || 99;
+      });
     } catch (e) {}
 
     // ── PM / ผู้ประสานงาน อ่านจากโครงการต้นทาง (projects.site_owner / installer_name — รหัสพนักงาน) ──
@@ -540,10 +546,10 @@
     proj.pmName = src ? staffNames[src.site_owner] || '' : '';
     proj.coordinatorName = src ? staffNames[src.installer_name] || '' : '';
 
-    render(proj, issues, staffNames);
+    render(proj, issues, staffNames, staffRank);
   }
 
-  function render(proj, issues, staffNames) {
+  function render(proj, issues, staffNames, staffRank) {
     var st = projectTimelineStatus(proj);
     var heroTotal = issues.length;
     var heroResolved = issues.filter(function (i) { return i.status === 'closed'; }).length;
@@ -584,7 +590,7 @@
     // ── impl_issues.fixed_by เก็บรหัสพนักงาน — option value = รหัส (ใช้กรอง) · label = ชื่อ-นามสกุล ──
     function fixedByOptionsHtml() {
       var rows = distinctValues('fixed_by').map(function (n) { return { value: n, label: staffNames[n] || '(พนักงานที่ถูกลบ)' }; });
-      rows.sort(function (a, b) { return a.label.localeCompare(b.label, 'th'); });
+      rows.sort(function (a, b) { return (staffRank[a.value] || 99) - (staffRank[b.value] || 99) || a.label.localeCompare(b.label, 'th'); });
       return '<option value="">ทั้งหมด</option>' + rows.map(function (r) { return '<option value="' + esc(r.value) + '">' + esc(r.label) + '</option>'; }).join('');
     }
 

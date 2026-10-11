@@ -3,16 +3,33 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 
 global.window = global;
-const elements = {
-  'ask-q': { value: '' },
-  'ask-out': { innerHTML: '' },
-  'ask-btn': { disabled: false },
-  'ask-ex': { style: {} },
-};
+// DOM จำลองขั้นต่ำ — ask-ai.js สร้างหน้าต่างแชทเอง แล้วเขียนคำตอบลงบับเบิลของบอทใน #ask-msgs
+function el(tag) {
+  return {
+    tagName: tag, className: '', innerHTML: '', value: '', disabled: false, style: {},
+    children: [], isConnected: true,
+    classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
+    appendChild(child) { this.children.push(child); return child; },
+    querySelector(sel) { return sel === '.ask-bubble' ? (this.bubble ||= el('div')) : null; },
+    querySelectorAll: () => [],
+    focus() {},
+    remove() { this.isConnected = false; },
+  };
+}
+const elements = {};
+for (const id of ['ask-chat', 'ask-q', 'ask-btn', 'ask-msgs']) elements[id] = el(id);
+global.localStorage = { getItem: () => null, setItem() {} };
 global.document = {
+  readyState: 'complete',
+  body: el('body'),
   getElementById: (id) => elements[id],
+  createElement: el,
   addEventListener: () => {},
+  querySelector: () => null,
+  querySelectorAll: () => [],
 };
+// AI สรุปคำตอบไม่ได้ → แสดงรายการจริงจากโค้ดอย่างเดียว (สิ่งที่ test ตรวจ)
+global.aiChat = async () => { throw new Error('summary disabled in test'); };
 global.esc = (value) => String(value ?? '');
 global.canView = () => true;
 global.fd = (value) => value;
@@ -23,6 +40,9 @@ const now = new Date();
 const year = now.getFullYear();
 const month = String(now.getMonth() + 1).padStart(2, '0');
 const ym = `${year}-${month}`;
+// วันที่ที่แสดงเป็นแบบไทย เช่น "1 ต.ค. 2569"
+const thMonth = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'][now.getMonth()];
+const monthStart = `📅 1 ${thMonth} ${year + 543} –`;
 global.LEAVES = [
   { id: 'L1', staffId: 'S1', leaveType: 'sick', startDate: `${ym}-10`, endDate: `${ym}-11`, status: 'approved', note: '' },
   { id: 'L2', staffId: 'S2', leaveType: 'personal', startDate: `${ym}-12`, endDate: `${ym}-12`, status: 'rejected', note: '' },
@@ -41,7 +61,6 @@ vm.runInThisContext(fs.readFileSync('docs/src/modules/ask-ai.js', 'utf8'));
 
 async function ask(question, plan) {
   elements['ask-q'].value = question;
-  elements['ask-out'].innerHTML = '';
   const basePlan = {
     source: 'none', understood: 'ทดสอบ', hospital: '', keyword: '', person: '', status: 'all',
     priority: [], severity: [], minAgeDays: 0, unassigned: false, overdue: false,
@@ -49,7 +68,8 @@ async function ask(question, plan) {
   };
   aiPlan = plan instanceof Error ? plan : Object.assign(basePlan, plan);
   await global.askAiRun();
-  return elements['ask-out'].innerHTML;
+  const msgs = elements['ask-msgs'].children;
+  return msgs[msgs.length - 1].querySelector('.ask-bubble').innerHTML;
 }
 
 (async () => {
@@ -57,12 +77,13 @@ async function ask(question, plan) {
     source: 'none', keyword: 'เดือนนี้มีลาไหม', person: 'ใคร', status: 'open', dateFrom: '2000-01-01', dateTo: '2000-01-31',
   });
   assert.match(leaveHtml, /การลางาน/);
-  assert.match(leaveHtml, /พบ <b>1<\/b> รายการ/);
-  assert.match(leaveHtml, new RegExp(`${ym}-01`));
+  assert.match(leaveHtml, /พบ <b>1<\/b> คน/);
+  assert.ok(leaveHtml.includes(monthStart), 'ช่วงวันที่ผิดจาก AI ต้องถูกแทนด้วยเดือนนี้');
 
   const rejectedHtml = await ask('เดือนนี้มีใบลาที่ไม่อนุมัติไหม', { source: 'projects', status: 'all' });
   assert.match(rejectedHtml, /ไม่อนุมัติ/);
-  assert.match(rejectedHtml, /พบ <b>1<\/b> รายการ/);
+  assert.match(rejectedHtml, /พบ <b>1<\/b> คน/);
+  assert.match(rejectedHtml, /บี — ลากิจ/);
 
   const holidayHtml = await ask('เดือนนี้มีวันหยุดไหม', { source: 'leaves', keyword: 'วันหยุด' });
   assert.match(holidayHtml, /วันหยุด/);

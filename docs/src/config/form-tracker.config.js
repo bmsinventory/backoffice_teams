@@ -9,7 +9,7 @@
   // ── Global Data Stores ──
   window.FORM_GROUPS    = [];
   window.FORM_ITEMS     = [];
-  window.FORM_TEMPLATES = [];   // รายชื่อเอกสารมาตรฐาน ใช้ร่วมกันทุกโครงการ/ทุกคลัง (ไม่ผูก project/group)
+  window.FORM_TEMPLATES = [];   // รายชื่อเอกสาร Template (kind: standard=มาตรฐาน / contract=ตามสัญญา) ผูกประเภทโครงการได้ 1 ประเภท (ptypeId ว่าง = ใช้ร่วม) ไม่ผูก project/group
 
   // ── Status Flow (ใช้ร่วมกันทั้ง Item) ──
   window.FORM_STATUS = [
@@ -22,11 +22,11 @@
   window.FORM_TYPE = [
     { id:'form_new',  label:'แบบฟอร์มใหม่',   color:'#4361ee' },
     { id:'form_base', label:'แบบฟอร์มตั้งต้น', color:'#06a6a0' },
+    { id:'form_contract', label:'แบบฟอร์มตามสัญญา', color:'#f59e0b' },
   ];
 
   // ── UI State ──
-  window.ftkFilter = { q:'', groupId:'', formType:'', status:'', owner:'' };
-  window.ftkHideDone = true;   // ค่าเริ่มต้น: แสดงเฉพาะแบบฟอร์มที่ยังไม่เสร็จ
+  window.ftkFilter = { q:'', groupId:'', formType:'', status:'open', owner:'' };   // status 'open' = แสดงเฉพาะที่ยังไม่เสร็จ (ค่าเริ่มต้น)
   window.ftkTemplatePickGroupId = null;  // group ปลายทางตอนเปิด Template modal แบบ "ดึงมาใช้" (null = โหมดจัดการอย่างเดียว)
 
 })();

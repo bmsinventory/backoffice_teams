@@ -17,9 +17,10 @@
     return Math.random().toString(36).slice(2, 9);
   };
 
-  // ── Role Label ──
-  window.roleLabel = function (r) {
-    return r === 'pm' ? 'DM/PM' : r === 'viewer' ? 'Viewer' : r ? r.toUpperCase() : '';
+  // ── ชื่อกลุ่มสิทธิ์ของผู้ใช้ (ตาราง roles) — หลายกลุ่มคั่นด้วย ", " · ไม่มีกลุ่ม → "ไม่มีกลุ่มสิทธิ์" ──
+  window.userRoleLabel = function (u) {
+    var names = window.rolesOf(u).map(function (r) { return r.name; });
+    return names.length ? names.join(', ') : 'ไม่มีกลุ่มสิทธิ์';
   };
 
   // ── Lookup Helpers (cached lookups against global stores) ──
@@ -74,6 +75,33 @@
   window.sortPositionsByRank = function (a, b) { return (a.rank || 99) - (b.rank || 99) || (a.label || '').localeCompare(b.label || '', 'th'); };
   window.sortStaffByRank = function (a, b) {
     return window.positionRank(a.positionId) - window.positionRank(b.positionId) || (a.name || '').localeCompare(b.name || '', 'th');
+  };
+  // ── เรียง window.STAFF ตามตำแหน่งไว้ตั้งแต่ต้น — ทุกจอที่วนรายชื่อจาก STAFF ได้ลำดับตำแหน่งโดยอัตโนมัติ
+  // เรียกหลังโหลด/แก้ STAFF หรือ POSITIONS (rank เปลี่ยน) ──
+  window.resortStaff = function () { if (Array.isArray(window.STAFF)) window.STAFF.sort(window.sortStaffByRank); };
+  // ── ลำดับของพนักงานใน STAFF ที่เรียงแล้ว (ไม่พบ = ท้ายสุด) — ใช้เรียงรายการที่อ้างถึงพนักงานด้วยรหัส ──
+  window.staffOrderIdx = function () {
+    var m = {};
+    (window.STAFF || []).forEach(function (s, i) { if (!(s.id in m)) m[s.id] = i; });
+    return function (sid) { return sid in m ? m[sid] : 1e9; };
+  };
+  // รายการใด ๆ ที่มีรหัสพนักงาน → เรียงตามตำแหน่ง · keyFn(x) คืน staff.id (ค่าเริ่มต้น: x เป็นรหัสเอง หรือ x.sid / x.staffId)
+  window.sortByStaffRank = function (list, keyFn) {
+    var idx = window.staffOrderIdx();
+    var key = keyFn || function (x) { return x && typeof x === 'object' ? (x.sid || x.staffId || x.id) : x; };
+    return (list || []).slice().sort(function (a, b) { return idx(key(a)) - idx(key(b)); });
+  };
+  // ── ผู้ใช้ระบบ: เรียงตามตำแหน่งของพนักงานที่ผูกไว้ · ไม่ผูกพนักงาน → ท้ายสุด เรียงตามชื่อ ──
+  window.sortUsersByRank = function (list) {
+    var idx = window.staffOrderIdx();
+    var nm = function (u) { return u.name || u.username || ''; };
+    return (list || []).slice().sort(function (a, b) { return idx(a.staffId) - idx(b.staffId) || nm(a).localeCompare(nm(b), 'th'); });
+  };
+  // ── เพิ่มแถวสมาชิก (element ที่มี data-sid) เข้ากล่องรายชื่อให้อยู่ตามลำดับตำแหน่ง แทน appendChild ต่อท้าย ──
+  window.insertByStaffRank = function (box, el) {
+    var idx = window.staffOrderIdx(), me = idx(el.getAttribute('data-sid'));
+    var next = Array.prototype.find.call(box.children, function (c) { return c.hasAttribute('data-sid') && idx(c.getAttribute('data-sid')) > me; });
+    box.insertBefore(el, next || null);
   };
   // ── ตัวเลือกรายชื่อพนักงาน: กลุ่มแผนก (ตามตัวอักษร, ไม่ระบุแผนกไว้ท้าย) → ระดับตำแหน่ง → ชื่อ ──
   window.sortStaffByDeptRank = function (a, b) {

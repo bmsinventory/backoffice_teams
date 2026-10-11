@@ -33,7 +33,10 @@
       return { id:d.staff_id||d.id, name:d.full_name||d.name||'', nickname:d.nickname||(d.full_name||d.name||'').split(' ')[0], deptId:d.department||'', positionId:d.position||'', get dept(){ return window.deptLabel(this.deptId); }, get role(){ return window.positionLabel(this.positionId); }, email:d.email, phone:d.phone, active:d.is_active!==false&&d.is_active!=='FALSE', start_date:d.start_date, birth_date:d.birth_date, remark:d.remark, dailyRate:d.daily_rate!=null?Number(d.daily_rate):null };
     },
     USERS: function (d) {
-      return { id:d.user_id||d.id, username:d.username, password:d.password, name:d.name||d.display_name||'', role:d.role, active:d.is_active!==false&&d.is_active!=='FALSE', staffId:d.staff_id||'', resetRequestedAt:d.pw_reset_requested_at||'' };
+      return { id:d.user_id||d.id, username:d.username, name:d.name||d.display_name||'', roles:Array.isArray(d.roles)?d.roles:[], active:d.is_active!==false&&d.is_active!=='FALSE', staffId:d.staff_id||'', resetRequestedAt:d.pw_reset_requested_at||'' };
+    },
+    ROLES: function (d) {
+      return { id:d.id, name:d.name||d.id, color:d.color||'#7c5cfc', order:Number(d.sort_order)||99, super:d.is_super===true, home:d.home_view||'', perms:d.perms&&typeof d.perms==='object'?d.perms:{} };
     },
     PROJECTS: function (d) {
       return { id:d.project_id||d.id, name:d.project_name||d.name||'', groupId:d.group_id||'', siteOwnerId:d.site_owner||'', installerId:d.installer_name||'', get siteOwner(){ return window.staffNameByRef(this.siteOwnerId); }, get installer(){ return window.staffNameByRef(this.installerId); }, typeId:d.type_id||'', stage:d.stage_id||d.stage||'init', cost:Number(d.budget||d.cost)||0, start:d.start_date||d.startDate||'', end:d.end_date||d.endDate||'', revisit1:d.revisit_1||d.revisit1||'', revisit2:d.revisit_2||d.revisit2||'', parentProjectId:d.parent_project_id||'', revisitRound:Number(d.revisit_round)||0, progress:Number(d.progress_pct||d.progress)||0, note:d.note||'', status:d.status||'active', pm:d.pm_staff_id||d.pm||'', team:d.team||[], members:d.members||[], isBorder:d.is_border===true||d.is_border==='TRUE', contractId:d.contract_id||'', noRevisit:d.no_revisit===true, hospitalId:d.hospital_id||'', visits:(d.visits||[]).map(function(v){return{id:v.id||('V'+Math.random().toString(36).slice(2,7)),no:v.no||1,start:v.start||v.start_date||'',end:v.end||v.end_date||'',purpose:v.purpose||'',team:v.team||[],status:v.status||'planned',note:v.note||''};}) };
@@ -69,7 +72,7 @@
       return { id:d.product_id||d.id, name:d.name||'', color:d.color||'#7c3aed', note:d.note||'', group:d.group||'' };
     },
     HOSPITALS: function (d) {
-      return { id:d.hospital_id||d.id, code:d.code||'', name:d.name||'', type:d.type||'other', beds:Number(d.beds)||0, province:d.province||'', district:d.district||'', tambon:d.tambon||'', address:d.address||'', tel:d.tel||'', website:d.website||'', affiliation:d.affiliation||'', note:d.note||'', contacts:Array.isArray(d.contacts)?d.contacts:[], products:Array.isArray(d.products)?d.products:[], systems:d.systems&&typeof d.systems==='object'?d.systems:{} };
+      return { id:d.hospital_id||d.id, code:d.code||'', name:d.name||'', type:d.type||'other', beds:Number(d.beds)||0, province:d.province||'', district:d.district||'', tambon:d.tambon||'', address:d.address||'', tel:d.tel||'', website:d.website||'', affiliation:d.affiliation||'', note:d.note||'', contacts:Array.isArray(d.contacts)?d.contacts:[], products:Array.isArray(d.products)?d.products:[], systems:d.systems&&typeof d.systems==='object'?d.systems:{}, lat:d.lat==null||d.lat===''?null:Number(d.lat), lng:d.lng==null||d.lng===''?null:Number(d.lng) };
     },
   };
 
@@ -86,6 +89,8 @@
     var obj = fn ? fn(rawData) : Object.assign({}, rawData, { id: id });
     var idx = arr.findIndex(function (x) { return x.id === id; });
     if (idx >= 0) arr[idx] = obj; else arr.push(obj);
+    if (collection === 'POSITIONS') arr.sort(window.sortPositionsByRank);
+    if (collection === 'STAFF' || collection === 'POSITIONS') window.resortStaff();
   };
 
   window._removeLocalDoc = function (collection, id) {
@@ -96,7 +101,7 @@
   // ── Setup All Realtime Listeners ──
   window.RealtimeService = {
     setup: function () {
-      var CORE_COLS = ['STAGES','PTYPES','PGROUPS','STAFF','USERS','PROJECTS','ADVANCES','LODGINGS','POSITIONS','HOLIDAYS','LEAVES','TIMESHEETS','COSTS','DEPARTMENTS'];
+      var CORE_COLS = ['STAGES','PTYPES','PGROUPS','STAFF','USERS','ROLES','PROJECTS','ADVANCES','LODGINGS','POSITIONS','HOLIDAYS','LEAVES','TIMESHEETS','COSTS','DEPARTMENTS'];
       var loadCount = 0;
       var _initialLoadDone = false;
 
@@ -158,21 +163,31 @@
 
       window.onSnapshot(window.getColRef('POSITIONS'), function (s) {
         window.POSITIONS = s.docs.map(function (doc) { return transform.POSITIONS(doc.data()); }).sort(window.sortPositionsByRank);
+        window.resortStaff();
         checkLoaded();
         if (!_ownWrite('POSITIONS')) _deferRenderAll();
       }, window.showDbError);
 
       window.onSnapshot(window.getColRef('STAFF'), function (s) {
-        window.STAFF = s.docs.map(function (doc) { return transform.STAFF(doc.data()); });
+        window.STAFF = s.docs.map(function (doc) { return transform.STAFF(doc.data()); }).sort(window.sortStaffByRank);
         checkLoaded();
         if (!_ownWrite('STAFF')) _deferRenderAll();
       }, window.showDbError);
 
       window.onSnapshot(window.getColRef('USERS'), function (s) {
         window.USERS = s.docs.map(function (doc) { return transform.USERS(doc.data()); });
+        // ผู้ใช้ที่ Login อยู่ → ข้อมูลล่าสุด (Admin เปลี่ยนกลุ่มสิทธิ์ให้ = เห็นผลทันทีไม่ต้อง Login ใหม่)
+        if (window.cu) { var me = window.USERS.find(function (u) { return u.id === window.cu.id; }); if (me) window.cu = me; }
         checkLoaded();
         if (window.cu && window.isDbLoaded) window.setupUser && window.setupUser();
         if (!_ownWrite('USERS')) _deferRenderAll();
+      }, window.showDbError);
+
+      window.onSnapshot(window.getColRef('ROLES'), function (s) {
+        window.ROLES = s.docs.map(function (doc) { return transform.ROLES(doc.data()); }).sort(function (a, b) { return a.order - b.order || a.name.localeCompare(b.name, 'th'); });
+        checkLoaded();
+        if (window.cu && window.isDbLoaded) window.setupUser && window.setupUser();
+        if (!_ownWrite('ROLES')) _deferRenderAll();
       }, window.showDbError);
 
       window.onSnapshot(window.getColRef('PROJECTS'), function (s) {
@@ -332,13 +347,9 @@
       // ── Settings Document ──
       window.onSnapshot(window.getDocRef('SETTINGS', 'app'), function (snap) {
         var d = snap.exists() ? snap.data() : {};
-        window.NOTIFY_TOKEN          = d.notify_token || '';
-        window.NOTIFY_ADVANCE_TOKEN  = d.notify_advance_token || '';
-        window.NOTIFY_PROJECT_TOKEN  = d.notify_project_token || '';
-        window.NOTIFY_HELPDESK_TOKEN = d.notify_helpdesk_token || '';
-        window.NOTIFY_TRAINING_TOKEN = d.notify_training_token || '';
-        window.NOTIFY_SERVER_TOKEN   = d.notify_server_token || '';
         window.SRV_REQ_CONFIG        = d.srv_req_config || {};
+        window.WL_CATS_CFG           = d.worklog_categories || [];
+        window.wlApplyCats && window.wlApplyCats(window.WL_CATS_CFG);
         window._settingsLoaded = true;
         if (window.isDbLoaded && window._pendingDailyCheck && window.checkDailyNotifications) {
           window._pendingDailyCheck = false;
@@ -369,11 +380,6 @@
         // callback บน channel ที่ subscribe() ไปแล้ว เคยพังจน ImplTrackerService/FormTrackerService.setup()
         // ที่เรียกต่อจากกันใน auth.service.js ไม่ทำงานเลยทั้งคู่) เรียกผ่านฟังก์ชันนี้แทน ──
         window.hdApplySettingsOverrides && window.hdApplySettingsOverrides(d);
-      });
-
-      window.onSnapshot(window.getDocRef('SETTINGS', 'role_permissions'), function (snap) {
-        window.ROLE_PERMISSIONS = snap.exists() ? snap.data() : {};
-        if (window.cu) window.setupUser && window.setupUser();
       });
     },
   };

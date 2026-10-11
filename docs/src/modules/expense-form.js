@@ -460,7 +460,7 @@ window.ecfOnProjectChange = function () {
   var radio = document.getElementById('ecf-cat-' + catKey);
   if (radio) radio.checked = true;
 
-  var mems = (proj.members && proj.members.length) ? proj.members : (proj.team || []).map(function (sid) { return { sid:sid }; });
+  var mems = window.sortByStaffRank((proj.members && proj.members.length) ? proj.members : (proj.team || []).map(function (sid) { return { sid:sid }; }));
   var names = mems.map(function (m) {
     var s = window.STAFF.find(function (x) { return x.id === m.sid; });
     return s ? s.name : '';

@@ -99,7 +99,7 @@ function _ctRenderTxns(c){
       +'</div>'
       +'<div style="font-size:11px;color:var(--txt2);white-space:nowrap;flex-shrink:0;">'+(t.date?fd(t.date):'—')+'</div>'
       +'<div style="font-size:13px;font-weight:700;color:var(--teal);white-space:nowrap;flex-shrink:0;">'+fca(t.amount||0)+'</div>'
-      +'<button class="btn btn-ghost btn-sm ce-only" style="color:var(--coral);flex-shrink:0;" onclick="window._ctDelManualTxn('+i+',\''+safeId+'\')">🗑</button>'
+      +(window.canEdit('contract')?'<button class="btn btn-ghost btn-sm" style="color:var(--coral);flex-shrink:0;" onclick="window._ctDelManualTxn('+i+',\''+safeId+'\')">🗑</button>':'')
     +'</div>';
   }).join('');
 

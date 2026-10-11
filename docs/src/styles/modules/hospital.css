@@ -1,0 +1,58 @@
+/* ================================================================
+   HOSPITAL.CSS — หัวหน้ารายชื่อ รพ.
+   แถวบน: แท็บมุมมอง (ซ้าย) + ปุ่มคำสั่ง (ขวา) · แถวล่าง: ตัวกรอง (ตัดบรรทัดได้)
+================================================================ */
+.hsp-head {
+  position: sticky; top: 0; z-index: 10;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 12px 24px; display: flex; flex-direction: column; gap: 10px;
+}
+.hsp-head-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.hsp-vtabs .adv-subtab { display: inline-flex; align-items: center; gap: 5px; padding: 6px 14px; font-size: 13px; }
+.hsp-head-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+
+/* เมนูเครื่องมือผู้ดูแล */
+.hsp-tools { position: relative; }
+.hsp-tools-menu {
+  position: absolute; top: calc(100% + 4px); right: 0; z-index: 40; min-width: 200px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: 0 6px 24px rgba(0,0,0,.14); padding: 6px;
+}
+.hsp-tools-menu button {
+  display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+  padding: 8px 10px; border: none; background: none; border-radius: 8px;
+  font: inherit; font-size: 13px; color: var(--txt); cursor: pointer;
+}
+.hsp-tools-menu button:hover { background: var(--surface2); color: var(--violet); }
+
+/* แถวตัวกรอง */
+.hsp-filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.hsp-filters .t-search { flex: 1 1 220px; min-width: 200px; max-width: 320px; }
+.hsp-filters .t-search input,
+.hsp-filters .t-search input:focus { width: 100%; }
+.hsp-filters .t-sel { width: 145px; text-overflow: ellipsis; }
+#hsp-type { width: 130px; }
+#hsp-prod-usage-filter { width: 170px; }
+.hsp-clear {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 6px 10px; border: none; border-radius: 8px; background: none;
+  font: inherit; font-size: 12px; font-weight: 600; color: var(--coral); cursor: pointer;
+}
+.hsp-clear:hover { background: rgba(255,107,107,.1); }
+.hsp-count {
+  white-space: nowrap; font-size: 12px; font-weight: 600;
+  color: var(--txt2); background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 999px; padding: 4px 12px;
+}
+.hsp-count:empty { display: none; }
+
+@media (max-width: 768px) {
+  .hsp-head { padding: 10px 12px; }
+  .hsp-vtabs { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .hsp-vtabs::-webkit-scrollbar { display: none; }
+  .hsp-head-actions { margin-left: 0; }
+  .hsp-filters .t-search { flex: 1 1 100%; max-width: none; }
+  .hsp-filters .t-sel, #hsp-prod-multi-wrap { flex: 1 1 calc(50% - 4px); width: auto; min-width: 0; }
+  #hsp-prod-multi-wrap > button { width: 100%; justify-content: center; }
+  .hsp-tools-menu { right: auto; left: 0; }
+}

@@ -281,6 +281,21 @@
     }).join('');
   }
 
+  // ── แท็บย่อยเมนู ผู้ช่วยทีม: ถาม-ตอบ | ตรวจไฟล์ข้อมูลพื้นฐาน (view-assist / view-datacheck ใช้แถบเดียวกัน) ──
+  // แต่ละแท็บยังเป็น module/สิทธิ์ของตัวเอง (assist / datacheck) — มีสิทธิ์แท็บเดียวแสดงเป็นหัวข้อธรรมดา
+  window.assistRenderSubnav = function () {
+    var cur = document.body.getAttribute('data-view');
+    var tabs = [{ id: 'assist', label: '💬 ถาม-ตอบ' }, { id: 'datacheck', label: '🧹 ตรวจไฟล์ข้อมูลพื้นฐาน' }]
+      .filter(function (t) { return !window.canView || window.canView(t.id); });
+    var html = tabs.length > 1
+      ? tabs.map(function (t) { return '<div class="adv-subtab' + (t.id === cur ? ' on' : '') + '" onclick="window.goView(\'' + t.id + '\',this)">' + t.label + '</div>'; }).join('')
+      : '<div class="as-head-t">' + (cur === 'datacheck' ? '🧹 ตรวจไฟล์ข้อมูลพื้นฐาน' : '💬 ผู้ช่วยทีม') + '</div>';
+    document.querySelectorAll('[data-assist-subnav]').forEach(function (el) {
+      el.innerHTML = html;
+      el.classList.toggle('adv-seg', tabs.length > 1);
+    });
+  };
+
   // ══ หน้าหลัก ══
   window.renderAssist = function () {
     var view = document.getElementById('view-assist');
@@ -288,7 +303,7 @@
     if (!view.querySelector('.as-wrap')) {
       view.innerHTML = '<div class="as-wrap">'
         + '<section class="as-main">'
-        + '<div class="as-head"><div class="as-head-t">💬 ผู้ช่วยทีม</div><div style="flex:1"></div>'
+        + '<div class="as-head"><div class="adv-seg" data-assist-subnav></div><div style="flex:1"></div>'
         + '<button type="button" class="btn btn-ghost btn-sm" onclick="window.asClear()">ล้างแชท</button>'
         + '<button type="button" class="btn btn-ghost btn-sm as-lib-btn" onclick="window.asToggleLib()">📚 คลังคำตอบ</button></div>'
         + '<div class="as-chat" id="as-chat"></div>'
@@ -305,6 +320,7 @@
         + '<div class="as-lib-list" id="as-lib-list"></div>'
         + '</aside></div>';
     }
+    window.assistRenderSubnav();
     renderChat();
     renderLib();
     setTimeout(function () { var i = document.getElementById('as-q'); if (i && window.innerWidth > 768) i.focus(); }, 50);

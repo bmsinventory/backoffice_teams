@@ -37,12 +37,13 @@ let scanStream=null,scanLog=[],scanInterval=null,currentFacingMode='environment'
 let _charts={};
 let isAdminLoggedIn=false;
 let currentAdminUser=null;
-// Token แจ้งเตือนลงทะเบียน: Token กลาง (settings.notify_training_token จาก Admin Panel ของ Backoffice)
-// + ค่าทับรายโครงการ siteNotifyTokens[รหัส] = token เฉพาะโครงการ | NOTIFY_OFF · ไม่มี key = ใช้ Token กลาง
+// Token แจ้งเตือนลงทะเบียน อยู่ที่ฐานข้อมูลเท่านั้น (notify_tokens — หน้าเว็บอ่านไม่ได้): Token กลาง (ช่อง training จาก Admin Panel ของ Backoffice)
+// + ค่าทับรายโครงการ (key site:<รหัส> = token เฉพาะโครงการ | 'off') · ไม่มี = ใช้ Token กลาง
+// หน้าเว็บส่งแค่ { channel:'training', site, content } ไป /api/notify — เซิร์ฟเวอร์เลือก Token เอง
+// notifyStatus = bo_notify_status (เห็นแค่ 4 ตัวท้าย) โหลดตอนเปิดแท็บตั้งค่าโครงการ
 const NOTIFY_OFF='off';
-let globalNotifyToken='';
-let siteNotifyTokens={};
-const _siteNotifyToken=code=>{const v=siteNotifyTokens[code];return v===NOTIFY_OFF?'':(v||globalNotifyToken);};
+let notifyStatus={};
+const _notifyHeaders=()=>({'Content-Type':'application/json','x-bo-session':(window.BmsSession&&BmsSession.token())||''});
 let pendingPage='admin';
 // โครงการ = รหัสโครงการ (trn_sites.code เช่น 10700-01) — 1 โครงการในติดตามสถานะโครงการ = 1 การอบรม
 // ไม่ระบุ ?site= → ใช้โครงการแรก (ตั้งตอนโหลดข้อมูล)
@@ -159,8 +160,6 @@ const _mReg=r=>({id:r.id,sessionId:r.session_id,prefixId:r.prefix_id??null,prefi
 const _mDeptRow=r=>({...r,dept:_mVal(r.dept_id)});
 
 async function pushNotify(reg){
-  const token=_siteNotifyToken(currentSite);
-  if(!token)return;
   const s=getSess(reg.sessionId);
   const loc=locations.find(l=>l.code===currentSite);
   const dateStr=s?fmtDate(s.date):'-';
@@ -175,10 +174,10 @@ async function pushNotify(reg){
     `📅 เวลา: ${dateStr} เวลา ${timeStr}`,
   ];
   try{
-    await fetch('https://api-notify.bmscloud.in.th/api/v1/push-notify',{
+    await fetch('/api/notify',{
       method:'POST',
-      headers:{'Token':token,'Content-Type':'application/json'},
-      body:JSON.stringify({content:lines.join('\n'),receiver:null})
+      headers:_notifyHeaders(),
+      body:JSON.stringify({channel:'training',site:currentSite,content:lines.join('\n')})
     });
   }catch(e){}
 }
@@ -388,7 +387,7 @@ async function loadAllData(light=false){
   const site=currentSite,none=!site,needRef=!_refReady; // ยังไม่มีโครงการ → ไม่ต้องถามข้อมูลของโครงการ
   const regSites=none?[]:[site];
   // รอบ 2 (พร้อมกัน): ข้อมูลของโครงการ (+ ข้อมูลอ้างอิงถ้ายังไม่มี)
-  const [cR,scR,sR,rR,mR,lvR,qzR,snR,stR,gnR,psR]=await Promise.all([
+  const [cR,scR,sR,rR,mR,lvR,qzR,stR,psR]=await Promise.all([
     none?_NONE:_sb.from('trn_categories').select('*').order('id'),
     none?_NONE:_sb.from('trn_site_categories').select('cat_id,quiz_open').eq('site',site),
     none?_NONE:_sb.from('trn_sessions').select('*').eq('site',site).order('id'),
@@ -396,19 +395,16 @@ async function loadAllData(light=false){
     none?_NONE:_sb.from('trn_master_items').select('*').eq('site',site).order('type,sort_order,id'),
     none?_NONE:_sb.from('trn_login_verify').select('*').eq('site',site),
     none?_NONE:_sb.from('trn_quizzes').select('id,title').eq('is_active',true),
-    needRef?_sb.from('trn_settings').select('value').eq('key','site_notify_tokens').maybeSingle():_NONE,
     needRef?_sb.from('staff').select('id,staff_id,full_name,nickname,position,is_active'):_NONE,
-    needRef?_sb.from('settings').select('notify_training_token').eq('id','app').maybeSingle():_NONE,
-    needRef?_sb.from('positions').select('id,position_id,label_th,label'):_NONE, // staff.position = รหัสตำแหน่ง
+    needRef?_sb.from('positions').select('id,position_id,label_th,label,rank'):_NONE, // staff.position = รหัสตำแหน่ง
   ]);
   if(cR.error||scR.error||sR.error||rR.error||mR.error)throw new Error('โหลดข้อมูลล้มเหลว');
   if(needRef){ // ก่อน map รอบอบรม (_mSess ใช้ชื่อวิทยากรจาก trainerStaff)
     const posLabel=Object.fromEntries((psR.data||[]).map(p=>[p.position_id||p.id,p.label_th||p.label||'']));
+    const posRank=Object.fromEntries((psR.data||[]).map(p=>[p.position_id||p.id,Number(p.rank)||99]));
     trainerStaff=(stR.data||[]).filter(d=>d.is_active!==false&&d.is_active!=='FALSE')
-      .map(d=>({id:String(d.staff_id||d.id),name:d.full_name||'',nickname:d.nickname||'',position:posLabel[d.position]||''}))
-      .filter(t=>t.name).sort((a,b)=>a.name.localeCompare(b.name,'th'));
-    try{siteNotifyTokens=JSON.parse(snR.data?.value||'{}');}catch(e){siteNotifyTokens={};}
-    globalNotifyToken=gnR.data?.notify_training_token||'';
+      .map(d=>({id:String(d.staff_id||d.id),name:d.full_name||'',nickname:d.nickname||'',position:posLabel[d.position]||'',rank:posRank[d.position]||99}))
+      .filter(t=>t.name).sort((a,b)=>a.rank-b.rank||a.name.localeCompare(b.name,'th')); // ตำแหน่งสูงสุดก่อน
     _refReady=!stR.error;
   }
   const scOf=Object.fromEntries((scR.data||[]).map(x=>[x.cat_id,x]));
@@ -614,7 +610,7 @@ function showPage(p){
 }
 /* ══════════════════ ADMIN LOGIN ══════════════════
    ใช้บัญชีของ Backoffice (src/services/bo-auth.service.js) — Login ที่นี่ = Login Backoffice ด้วย (session เดียวกัน) และกลับกัน
-   Role admin ของ Backoffice = superadmin ที่นี่ · Role อื่นต้องมีสิทธิ์ "อบรม" ในหน้าสิทธิ์การใช้งานของ Backoffice */
+   กลุ่มสิทธิ์ is_super ของ Backoffice = superadmin ที่นี่ · กลุ่มอื่นต้องมีสิทธิ์ "อบรม" ในหน้าสิทธิ์การใช้งานของ Backoffice */
 function openAdminLogin(){
   document.getElementById('login-user').value='';
   document.getElementById('login-pass').value='';
@@ -635,7 +631,7 @@ function toggleLoginPass(){
 // ผู้ใช้ Backoffice → ผู้ดูแลของระบบอบรม (null = ไม่มีสิทธิ์อบรม)
 function _boToAdmin(u){
   if(!u||!u.perm||!u.perm.view)return null;
-  return{id:u.id,username:u.username,name:u.name,role:u.role==='admin'?'superadmin':u.role,staffId:u.staffId||'',perm:u.perm};
+  return{id:u.id,username:u.username,name:u.name,role:u.super?'superadmin':'user',staffId:u.staffId||'',perm:u.perm};
 }
 function _setAdmin(a){
   isAdminLoggedIn=true;
@@ -663,6 +659,7 @@ async function adminLogin(){
   let user=null;
   try{user=await BoAuth.login(_sb,u,p,document.getElementById('login-remember').checked);}catch(e){console.error(e);}
   if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-login"></i>เข้าสู่ระบบ';}
+  if(user&&user.locked){showErr(`ใส่รหัสผ่านผิดหลายครั้ง บัญชีถูกล็อกชั่วคราว ลองใหม่ในอีก ${user.locked} นาที`);return;}
   if(!user){
     showErr('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
     document.getElementById('login-pass').value='';
@@ -1142,6 +1139,7 @@ function switchAdminTab(name){
   if(ttl&&EMBED&&PROJECT_ID&&tabDef)ttl.textContent=tabDef.label; // แท็บอบรมของโครงการ: หัวข้อ = หน้าที่เลือกจากเมนูซ้าย
   closeAdminTabsMenu();
   if(name==='keyentry'){loadKeyEntryStatus();}
+  if(name==='loginverify')loadLoginVerify();
   if(name==='survey'){_initSvdSiteSelect();loadSurveyDashboard();}
   if(name==='quiz'){_initQuizAdmin();}
   if(name==='projsettings')renderProjSettings();
@@ -4579,12 +4577,19 @@ function _ovOpen(projectId){
    ค่าของโครงการปัจจุบันเท่านั้น: บังคับกรอกอีเมล · Token แจ้งเตือนเมื่อมีคนลงทะเบียน · ปิดอบรม
    ผู้ที่เข้าแท็บอบรมได้ (Admin / PM / ทีม) แก้ 2 อย่างแรกได้ · ปิดอบรม = Admin หรือสิทธิ์ "ลบ" ของอบรม */
 const _canCloseTraining=()=>!currentAdminUser||currentAdminUser.role==='superadmin'||!!currentAdminUser.perm?.del;
-function renderProjSettings(){
+async function renderProjSettings(){
   const el=document.getElementById('projsettings-content');
   if(!el)return;
+  if(!locations.find(l=>l.code===currentSite)){el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-muted);">ยังไม่ได้เลือกโครงการ</div>';return;}
+  let statusErr='';
+  try{
+    const r=await _sb.rpc('bo_notify_status',{p_token:(window.BmsSession&&BmsSession.token())||''});
+    if(r.error)throw r.error;
+    notifyStatus=r.data||{};
+  }catch(e){statusErr=e.message||String(e);}
   const loc=locations.find(l=>l.code===currentSite);
-  if(!loc){el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-muted);">ยังไม่ได้เลือกโครงการ</div>';return;}
-  const cur=siteNotifyTokens[loc.code]||'';
+  if(!loc)return;
+  const cur=notifyStatus['site:'+loc.code]||'';
   const mode=cur===NOTIFY_OFF?'off':cur?'own':'global';
   const opt=(val,label)=>`<label class="ps-radio"><input type="radio" name="ps-notify-mode" value="${val}" ${mode===val?'checked':''} onchange="onNotifyModeChange()"><span>${label}</span></label>`;
   const row=(icon,title,desc,ctrl)=>`<div class="ps-row"><div class="ps-text"><div class="ps-title"><i class="ti ti-${icon}"></i>${title}</div><div class="ps-desc">${desc}</div></div><div class="ps-ctrl">${ctrl}</div></div>`;
@@ -4595,9 +4600,11 @@ function renderProjSettings(){
       ${row('mail','บังคับกรอกอีเมล','ผู้เข้าอบรมต้องกรอกอีเมลตอนลงทะเบียน (เฉพาะโครงการนี้)',
         `<label class="ps-switch"><input type="checkbox" ${loc.require_email?'checked':''} onchange="toggleRequireEmail(this.checked)"><span></span></label>`)}
       ${row('bell-ringing','แจ้งเตือนเมื่อมีคนลงทะเบียน','ส่งแจ้งเตือนผ่าน <a href="https://api-notify.bmscloud.in.th" target="_blank" rel="noopener" style="color:var(--primary);">BMS Notify</a> ทุกครั้งที่มีผู้ลงทะเบียนใหม่ · ปกติใช้ Token กลางที่ตั้งใน Backoffice › Admin Panel › 🔔 ตั้งค่าการแจ้งเตือน (ทุกโครงการเข้ากลุ่มเดียวกัน)<br>'
-          +(globalNotifyToken?'<span style="color:var(--success,#16a34a);"><i class="ti ti-circle-check"></i> ตั้ง Token กลางไว้แล้ว</span>':'<span style="color:var(--danger);"><i class="ti ti-alert-triangle"></i> ยังไม่ได้ตั้ง Token กลาง — โครงการที่เลือก "ใช้ Token กลาง" จะไม่แจ้งเตือน</span>'),
+          +(statusErr?`<span style="color:var(--danger);"><i class="ti ti-alert-triangle"></i> โหลดสถานะ Token ไม่ได้: ${_esc(statusErr)}</span>`
+            :notifyStatus.training?'<span style="color:var(--success,#16a34a);"><i class="ti ti-circle-check"></i> ตั้ง Token กลางไว้แล้ว</span>':'<span style="color:var(--danger);"><i class="ti ti-alert-triangle"></i> ยังไม่ได้ตั้ง Token กลาง — โครงการที่เลือก "ใช้ Token กลาง" จะไม่แจ้งเตือน</span>')
+          +'<br><span style="font-size:11px;">Token เก็บที่เซิร์ฟเวอร์เท่านั้น หลังบันทึกจะไม่แสดงค่าเต็มอีก</span>',
         `${opt('global','ใช้ Token กลางของระบบ')}${opt('own','ใช้ Token เฉพาะโครงการนี้')}${opt('off','ไม่แจ้งเตือน')}
-         <input class="form-control" id="ps-token" value="${mode==='own'?_esc(cur):''}" placeholder="วาง Token เฉพาะโครงการนี้..." style="font-family:monospace;font-size:13px;margin-top:6px;${mode==='own'?'':'display:none;'}">
+         <input class="form-control" id="ps-token" type="password" autocomplete="off" value="" placeholder="${mode==='own'?`ตั้งไว้แล้ว (ลงท้าย ${_esc(cur.replace('…',''))}) — วาง Token ใหม่เพื่อเปลี่ยน`:'วาง Token เฉพาะโครงการนี้...'}" style="font-family:monospace;font-size:13px;margin-top:6px;${mode==='own'?'':'display:none;'}">
          <div style="display:flex;gap:6px;margin-top:8px;justify-content:flex-end;">
            <button class="btn btn-ghost btn-sm" onclick="testNotifyToken()"><i class="ti ti-send"></i>ทดสอบ</button>
            <button class="btn btn-primary btn-sm" onclick="saveNotifyToken()"><i class="ti ti-device-floppy"></i>บันทึก</button>
@@ -4620,20 +4627,19 @@ function onNotifyModeChange(){
   const inp=document.getElementById('ps-token');
   if(inp)inp.style.display=_notifyMode()==='own'?'':'none';
 }
-// ค่าทับทุกโครงการเก็บรวมใน trn_settings.site_notify_tokens — อ่านค่าล่าสุดก่อนบันทึก กันทับค่าของโครงการอื่นที่เพิ่งแก้
+// ค่าทับของโครงการ = notify_tokens key site:<รหัส> (บันทึกผ่าน bo_notify_token_set — ต้อง Login + สิทธิ์อบรม)
 async function saveNotifyToken(){
   const mode=_notifyMode();
   const token=(document.getElementById('ps-token')?.value||'').trim();
-  if(mode==='own'&&!token){showToast('กรุณาระบุ Token เฉพาะโครงการ','warn');return;}
-  const {data,error:rErr}=await _sb.from('trn_settings').select('value').eq('key','site_notify_tokens').maybeSingle();
-  if(rErr){showToast('บันทึกไม่สำเร็จ: '+rErr.message,'danger');return;}
-  let map={};try{map=JSON.parse(data?.value||'{}');}catch(e){}
-  if(mode==='own')map[currentSite]=token;
-  else if(mode==='off')map[currentSite]=NOTIFY_OFF;
-  else delete map[currentSite];
-  const {error}=await _sb.from('trn_settings').upsert({key:'site_notify_tokens',value:JSON.stringify(map),updated_at:new Date().toISOString()});
-  if(error){showToast('บันทึกไม่สำเร็จ: '+error.message,'danger');return;}
-  siteNotifyTokens=map;
+  const cur=notifyStatus['site:'+currentSite]||'';
+  const ownSaved=cur&&cur!==NOTIFY_OFF;
+  if(mode==='own'&&!token&&!ownSaved){showToast('กรุณาระบุ Token เฉพาะโครงการ','warn');return;}
+  // เลือก "เฉพาะโครงการ" อยู่แล้วและไม่ได้วาง Token ใหม่ = คง Token เดิม
+  if(!(mode==='own'&&!token)){
+    const {error}=await _sb.rpc('bo_notify_token_set',{p_token:(window.BmsSession&&BmsSession.token())||'',p_key:'site:'+currentSite,
+      p_value:mode==='own'?token:mode==='off'?NOTIFY_OFF:''});
+    if(error){showToast('บันทึกไม่สำเร็จ: '+error.message,'danger');return;}
+  }
   showToast(mode==='own'?'บันทึกแล้ว — ใช้ Token เฉพาะโครงการนี้':mode==='off'?'บันทึกแล้ว — โครงการนี้จะไม่แจ้งเตือน':'บันทึกแล้ว — ใช้ Token กลางของระบบ','success');
   renderProjSettings();
 }
@@ -4685,20 +4691,24 @@ function _applyAdminTabVisibility(){
   if(activeIsHidden&&firstAllowed)switchAdminTab(firstAllowed);
 }
 
+// ทดสอบตามตัวเลือกบนหน้าจอ (ยังไม่ต้องบันทึก): Token กลาง · Token เฉพาะโครงการที่เพิ่งวาง (ส่งผ่านเซิร์ฟเวอร์ ต้อง Login) หรือที่บันทึกไว้
 async function testNotifyToken(){
   const mode=_notifyMode();
   if(mode==='off'){showToast('เลือก "ไม่แจ้งเตือน" อยู่ — ไม่มีอะไรให้ทดสอบ','warn');return;}
-  const token=mode==='own'?(document.getElementById('ps-token')?.value||'').trim():globalNotifyToken;
-  if(!token){showToast(mode==='own'?'กรุณาระบุ Token ก่อน':'ยังไม่ได้ตั้ง Token กลางที่ Admin Panel ของ Backoffice','warn');return;}
+  const typed=mode==='own'?(document.getElementById('ps-token')?.value||'').trim():'';
+  const cur=notifyStatus['site:'+currentSite]||'';
+  const ownSaved=cur&&cur!==NOTIFY_OFF;
+  if(mode==='own'&&!typed&&!ownSaved){showToast('กรุณาระบุ Token ก่อน','warn');return;}
+  if(mode==='global'&&!notifyStatus.training){showToast('ยังไม่ได้ตั้ง Token กลางที่ Admin Panel ของ Backoffice','warn');return;}
   const siteCode=currentSite;
   const loc=locations.find(l=>l.code===siteCode);
+  const body={channel:'training',content:`🔔 ทดสอบการแจ้งเตือน\n🏢 โครงการ: ${loc?.name||siteCode}`};
+  if(typed)body.token=typed;
+  else if(mode==='own')body.site=siteCode; // Token เฉพาะโครงการที่บันทึกไว้ · ไม่ใส่ site = Token กลาง
   try{
-    const res=await fetch('https://api-notify.bmscloud.in.th/api/v1/push-notify',{
-      method:'POST',
-      headers:{'Token':token,'Content-Type':'application/json'},
-      body:JSON.stringify({content:`🔔 ทดสอบการแจ้งเตือน\n🏢 โครงการ: ${loc?.name||siteCode}`,receiver:null})
-    });
-    if(res.ok)showToast('ส่งทดสอบสำเร็จ — ตรวจสอบ Line ของคุณ','success');
+    const res=await fetch('/api/notify',{method:'POST',headers:_notifyHeaders(),body:JSON.stringify(body)});
+    if(res.status===204)showToast('ยังไม่ได้ตั้ง Token — ไม่ได้ส่ง','warn');
+    else if(res.ok)showToast('ส่งทดสอบสำเร็จ — ตรวจสอบ Line ของคุณ','success');
     else showToast('ส่งไม่สำเร็จ (status '+res.status+')','danger');
   }catch(e){showToast('เชื่อมต่อไม่ได้: '+e.message,'danger');}
 }
@@ -4710,6 +4720,7 @@ const _LV_STATUS=[
   {value:'disabled', label:'ปิดการใช้งาน',bg:'#fee2e2',c:'#991b1b',icon:'ban'},
   {value:'pending',  label:'ยังไม่ระบุสถานะ',bg:'#f1f5f9',c:'#64748b',icon:'help-circle'},
 ];
+let _lvStatusFilter=''; // กรองตามสถานะ — เลือกจากป้ายสรุปด้านบน ('' = ทั้งหมด)
 function _lvKey(fname,lname,dept){return`${fname}|${lname}|${dept}`;}
 function _lvGetVal(fname,lname,dept,field,def){
   const k=_lvKey(fname,lname,dept);
@@ -4720,11 +4731,11 @@ function _lvGetVal(fname,lname,dept,field,def){
 function _lvOnChange(key,field,value){
   if(!_lvEdits[key])_lvEdits[key]={};
   _lvEdits[key][field]=value;
+  _lvUpdateDirty();
   if(field==='login_status'){
     const sel=document.querySelector(`select[data-lv-key="${encodeURIComponent(key)}"]`);
     if(sel)_applyLvSelColor(sel);
-    const sfVal=document.getElementById('lv-status-filter')?.value||'';
-    if(sfVal&&value!==sfVal){
+    if(_lvStatusFilter&&value!==_lvStatusFilter){
       const tr=document.querySelector(`tr[data-lv-row="${encodeURIComponent(key)}"]`);
       if(tr)tr.style.display='none';
     }
@@ -4736,8 +4747,9 @@ function _applyLvSelColor(sel){
 }
 function renderLoginVerify(){
   const tbody=document.getElementById('lv-tbody');if(!tbody)return;
+  _lvUpdateDirty();
   const q=(document.getElementById('lv-search')?.value||'').toLowerCase();
-  const sf=document.getElementById('lv-status-filter')?.value||'';
+  const sf=_lvStatusFilter;
   // Build unique persons map from registrations of current site only
   const seen=new Map();
   registrations.filter(r=>!!getSess(r.sessionId)).forEach(r=>{
@@ -4751,7 +4763,7 @@ function renderLoginVerify(){
   if(summaryEl){
     const counts={};_LV_STATUS.forEach(s=>counts[s.value]=0);
     allPersons.forEach(p=>{const st=_lvGetVal(p.fname,p.lname,p.dept,'login_status','pending');counts[st]=(counts[st]||0)+1;});
-    const pill=(label,icon,bg,c,val,active)=>`<span onclick="document.getElementById('lv-status-filter').value='${val}';renderLoginVerify();"
+    const pill=(label,icon,bg,c,val,active)=>`<span onclick="_lvStatusFilter='${val}';renderLoginVerify();"
       style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;background:${bg};color:${c};${active?`box-shadow:0 0 0 2px ${c} inset;`:''}">
       <i class="ti ti-${icon}"></i>${label} ${val===''?allPersons.length:counts[val]||0}</span>`;
     summaryEl.innerHTML=pill('ทั้งหมด','users','var(--primary-light)','var(--primary)','',!sf)
@@ -4783,7 +4795,7 @@ function renderLoginVerify(){
       <td data-label="สถานะ Login">
         <select class="form-control" data-lv-key="${ek}" data-lv-field="status"
           onchange="_lvOnChange(decodeURIComponent(this.dataset.lvKey),'login_status',this.value);_applyLvSelColor(this)"
-          style="height:34px;font-size:13px;">
+          style="height:30px;font-size:12px;padding:2px 8px;width:130px;max-width:100%;">
           ${opts}
         </select>
       </td>
@@ -4834,12 +4846,24 @@ async function saveLoginVerifyAll(){
   }catch(e){showToast('บันทึกไม่สำเร็จ: '+e.message,'danger');}
   if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-device-floppy"></i>บันทึกสถานะ';}
 }
+// ปุ่ม "ยกเลิกการแก้ไข" โผล่เฉพาะตอนมีสถานะ/หมายเหตุที่แก้แต่ยังไม่บันทึก
+function _lvUpdateDirty(){
+  const btn=document.getElementById('lv-cancel-btn');if(!btn)return;
+  const n=Object.keys(_lvEdits).length;
+  btn.style.display=n?'':'none';
+  if(n)btn.innerHTML=`<i class="ti ti-arrow-back-up"></i>ยกเลิกการแก้ไข (ยังไม่บันทึก ${n} คน)`;
+}
+// ดึงข้อมูลล่าสุดทุกครั้งที่เปิดหน้านี้ — ค่าที่แก้ค้างไว้ (_lvEdits) ยังทับอยู่ ไม่หาย
 async function loadLoginVerify(){
-  const {data}=await _sb.from('trn_login_verify').select('*').eq('site',currentSite);
+  const {data,error}=await _sb.from('trn_login_verify').select('*').eq('site',currentSite);
+  if(error){showToast('โหลดข้อมูลตรวจสอบสิทธิ์ไม่สำเร็จ: '+error.message,'danger');return;}
   loginVerifyData=(data||[]).map(_mDeptRow);
-  _lvEdits={};
   renderLoginVerify();
-  showToast('โหลดข้อมูลใหม่แล้ว','success');
+}
+async function cancelLoginVerifyEdits(){
+  _lvEdits={};
+  await loadLoginVerify();
+  showToast('ยกเลิกการแก้ไขแล้ว','success');
 }
 
 /* ══ KEY ENTRY STATUS (ตรวจสอบคีย์ยอด) — รายแผนกของโครงการที่ล็อกอินอยู่ ══ */

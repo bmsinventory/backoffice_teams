@@ -22,7 +22,6 @@
   function imtTasksOfProject(pid) { return (imtGrp('IMPL_TASKS', 'projectId', pid) || window.IMPL_TASKS.filter(function (t) { return t.projectId === pid; })).sort(function (a,b) { return a.order - b.order; }); }
   function imtChecklistOf(tid) { return (imtGrp('IMPL_CHECKLIST_ITEMS', 'taskId', tid) || window.IMPL_CHECKLIST_ITEMS.filter(function (c) { return c.taskId === tid; })).sort(function (a,b) { return a.order - b.order; }); }
   function imtCommentsOf(tid)  { return window.IMPL_COMMENTS.filter(function (c) { return c.taskId === tid; }).sort(function (a,b) { return (a.createdAt||'').localeCompare(b.createdAt||''); }); }
-  function imtAttachmentsOf(tid) { return window.IMPL_ATTACHMENTS.filter(function (a) { return a.taskId === tid; }); }
   function imtIssue(id)        { return imtFirst('IMPL_ISSUES', id); }
   function imtIssuesOfProject(pid) { return (imtGrp('IMPL_ISSUES', 'projectId', pid) || window.IMPL_ISSUES.filter(function (i) { return i.projectId === pid; })).sort(function (a,b) { return (b.createdAt||'').localeCompare(a.createdAt||''); }); }
 
@@ -60,7 +59,8 @@
   function imtProjectTeamStaff(pid) {
     var seen = {};
     return window.ProjectTeam.staffIds(imtProject(pid), window.PROJECTS).map(function (sid) { return window.gSt(sid); })
-      .filter(function (s) { return s && s.id && !seen[s.id] && (seen[s.id] = true); });
+      .filter(function (s) { return s && s.id && !seen[s.id] && (seen[s.id] = true); })
+      .sort(window.sortStaffByRank); // เรียงตามระดับตำแหน่ง
   }
   window.imtProjectTeamStaff = imtProjectTeamStaff; // ── ใช้ร่วมกับแท็บ "แบบฟอร์ม" (form-tracker.js) กันซ้ำ ──
 
@@ -290,6 +290,12 @@
 
   // ── Main Dispatcher ──
   window.renderImplTracker = function () { window.imtIndexPass(renderImplTrackerNow); };
+  // ── วาดใหม่จากช่องค้นหา (oninput): ทั้งหน้าถูกสร้างใหม่ ช่องเดิมหายไป → คืนโฟกัส/เคอร์เซอร์ ไม่งั้นพิมพ์ได้ทีละตัว ──
+  window.imtRenderKeepFocus = function (inputId) {
+    var a = document.activeElement, sel = a && a.id === inputId ? [a.selectionStart, a.selectionEnd] : null;
+    window.renderImplTracker();
+    if (sel) { var i = document.getElementById(inputId); if (i) { i.focus({ preventScroll: true }); try { i.setSelectionRange(sel[0], sel[1]); } catch (e) {} } }
+  };
   function renderImplTrackerNow() {
     renderTabs();
     var mount = document.getElementById('imt-content');
@@ -302,7 +308,35 @@
       print: function (m) { window.renderImtPrintDocuments && window.renderImtPrintDocuments(m); },
       calendar: renderImtCalendar, report: renderImtReport, templates: renderImtTemplates,
     };
+    // ── re-render หลังแก้ข้อมูล (แท็บ/โครงการเดิม) ต้องคงตำแหน่ง scroll ไว้ ไม่งั้นจอเด้งกลับขึ้นบนสุดทุกครั้ง
+    // จำตามคลาส+ลำดับของกล่องที่เลื่อนอยู่ แล้วคืนค่าหลัง render เสร็จ · เปลี่ยนแท็บ/โครงการ = เริ่มบนสุดตามปกติ ──
+    var viewKey = window.imtTab + '|' + (window.imtCurrentProjectId || '');
+    var saved = viewKey === _imtLastViewKey ? imtSaveScroll(mount) : null;
+    _imtLastViewKey = viewKey;
     (fns[window.imtTab] || renderImtDashboard)(mount);
+    if (saved) imtRestoreScroll(mount, saved);
+  }
+  var _imtLastViewKey = '';
+  function imtScrollKey(el, mount) {
+    var cls = (el.className && typeof el.className === 'string') ? el.className.trim().split(/\s+/)[0] : '';
+    if (!cls) return null;
+    var same = mount.getElementsByClassName(cls);
+    return cls + '#' + Array.prototype.indexOf.call(same, el);
+  }
+  function imtSaveScroll(mount) {
+    var out = { self: mount.scrollTop, page: document.scrollingElement ? document.scrollingElement.scrollTop : 0, els: {} };
+    mount.querySelectorAll('*').forEach(function (el) {
+      if (el.scrollTop > 0 || el.scrollLeft > 0) { var k = imtScrollKey(el, mount); if (k) out.els[k] = [el.scrollTop, el.scrollLeft]; }
+    });
+    return out;
+  }
+  function imtRestoreScroll(mount, saved) {
+    mount.scrollTop = saved.self;
+    if (document.scrollingElement) document.scrollingElement.scrollTop = saved.page;
+    Object.keys(saved.els).forEach(function (k) {
+      var i = k.lastIndexOf('#'), el = mount.getElementsByClassName(k.slice(0, i))[+k.slice(i + 1)];
+      if (el) { el.scrollTop = saved.els[k][0]; el.scrollLeft = saved.els[k][1]; }
+    });
   }
 
   // ── % ที่ "ควรได้" ณ วันนี้ คิดจากกำหนดของแต่ละงาน ถ่วงแบบเดียวกับ calcProjectProgress (งาน → Phase → โครงการ)
@@ -1072,7 +1106,7 @@
     var container = document.getElementById('imt-p-cmb-container');
     if (!container) return;
     var curVal = (document.getElementById('imt-p-source') || {}).value || '';
-    container.innerHTML = imtProjComboMarkup('');
+    container.innerHTML = imtProjComboMarkup('', 'window.imtNewProjSourceChanged(this.value)');
     var projects = imtSrcProjectsForNew(showYear);
     window._initImtProjCombobox && window._initImtProjCombobox(projects, curVal);
   };
@@ -1092,17 +1126,18 @@
 
   window.openImtProjectModal = function (id) {
     window.imtEditProjectId = id;
+    window.imtPreferTplId = null;
     var body = document.getElementById('m-imt-project-body');
 
     if (!id) {
       // ── สร้างใหม่: เลือกโครงการต้นทาง + Template เท่านั้น ข้อมูลอื่น (ชื่อ/PM/วันที่)
       // ดึงมาจากโครงการต้นทางให้อัตโนมัติตอนบันทึก ไม่ต้องโชว์ในฟอร์ม ──
       // แสดงเฉพาะโครงการที่ยังไม่ถูกเพิ่มเข้า Impl Tracker — กันสร้างโครงการซ้ำซ้อนกับที่มีอยู่แล้ว
-      var tplOptions = '<option value="">— ไม่ใช้ Template —</option>' + window.IMPL_TEMPLATES.map(function (t) { return '<option value="'+t.id+'">'+esc(t.name)+'</option>'; }).join('');
+      var tplOptions = _imtTplOptionsHtml('', '');
       var availSrcProjects = imtSrcProjectsForNew(false);
       body.innerHTML =
         '<div class="f-group"><label class="f-label">เลือกโครงการ *</label>'
-        +   '<div id="imt-p-cmb-container">' + imtProjComboMarkup('') + '</div>'
+        +   '<div id="imt-p-cmb-container">' + imtProjComboMarkup('', 'window.imtNewProjSourceChanged(this.value)') + '</div>'
         +   '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--txt2);margin-top:6px;cursor:pointer;">'
         +     '<input type="checkbox" id="imt-p-show-year" onchange="window.imtToggleProjComboShowYear(this.checked)"> แสดงโครงการทั้งหมดในปีนี้'
         +   '</label>'
@@ -1237,7 +1272,7 @@
   window.imtSetTaskFilter = function (key, value) {
     window.imtTaskFilter = window.imtTaskFilter || {};
     window.imtTaskFilter[key] = value;
-    window.renderImplTracker();
+    window.imtRenderKeepFocus('imt-task-q');
   };
 
   function renderImtWorkspace(mount) {
@@ -1289,7 +1324,7 @@
       + '<input type="checkbox" '+(hideDone?'checked':'')+' onchange="window.imtToggleHideDonePhases(this.checked)"> แสดงเฉพาะ Phase ที่ยังไม่เสร็จ'
       + '</label>';
     var filterBar = '<div class="imt-ws-filterbar">'
-      + '<div class="t-search"><input placeholder="ค้นหางาน..." value="'+esc(f.q||'')+'" oninput="window.imtSetTaskFilter(\'q\',this.value)"></div>'
+      + '<div class="t-search"><input id="imt-task-q" placeholder="ค้นหางาน..." value="'+esc(f.q||'')+'" oninput="window.imtSetTaskFilter(\'q\',this.value)"></div>'
       + '<select class="t-sel" onchange="window.imtSetTaskFilter(\'status\',this.value)">'+statusOpts+'</select>'
       + '<select class="t-sel" onchange="window.imtSetTaskFilter(\'owner\',this.value)">'+ownerOpts+'</select>'
       + '<select class="t-sel" onchange="window.imtSetTaskFilter(\'phaseId\',this.value)">'+phaseOpts+'</select>'
@@ -1604,145 +1639,619 @@
   };
 
   // ── Task Modal (Detail: checklist / comment / attachment / activity / issue / status) ──
+  // ── V1.008 ออกแบบใหม่เพื่อลดงานซ้ำ: 2 คอลัมน์ (ซ้าย = ชื่อ/รายละเอียด/เช็คลิสต์ · ขวา = สถานะ/ผู้รับผิดชอบ/
+  // ความสำคัญ/วันที่) · สถานะ+ความสำคัญเป็นปุ่มกดครั้งเดียว · ปุ่มลัดวันกำหนดเสร็จ · "มอบให้ฉัน" · งานเดิม
+  // บันทึกอัตโนมัติ (ไม่ต้องกดบันทึก) · ติ๊กเช็คลิสต์แรก = เริ่มงานให้เอง · ไปงานก่อนหน้า/ถัดไปได้ในหน้าต่างเดียว ──
+  var IMT_TD_MAIN_STATUS = ['not_started','in_progress','review','done'];
+  var IMT_TD_MORE_STATUS = ['delayed','issue','cancelled'];
+  var IMT_TD_AUTOSAVE_FIELDS = ['imt-t-name','imt-t-desc','imt-t-owner','imt-t-priority','imt-t-start','imt-t-due','imt-t-status'];
+  var _imtTdTimer = null, _imtTdTimerId = null, _imtTdSavedAt = {}, _imtTdLogged = {};
+
+  function imtIso(d) { return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); }
+  function imtDateOf(iso) { return iso ? new Date(iso+'T00:00:00') : new Date(); }
+  function imtMyStaffId() {
+    var cu = window.cu; if (!cu) return '';
+    var u = (window.USERS||[]).find(function (x) { return x.id === cu.id; });
+    return u ? (u.staffId || '') : '';
+  }
+  function imtCanEditTask() { return window.canEdit(window.IMPL_MODULE) || window.canAdd(window.IMPL_MODULE); }
+  function imtTdVal(elId) { var el = document.getElementById(elId); return el ? el.value : ''; }
+  function imtTdModalOn() { var m = document.getElementById('m-imt-task'); return !!(m && m.classList.contains('on')); }
+
+  // ── งานทั้งหมดของโครงการตามลำดับที่เห็นบนหน้าจอ (Phase → งาน) ใช้กับปุ่มงานก่อนหน้า/ถัดไป ──
+  function imtTaskSeq(pid) {
+    var out = [];
+    imtPhasesOf(pid).forEach(function (ph) { out = out.concat(imtTasksOfPhase(ph.id)); });
+    return out;
+  }
+
+  function imtStatusPillsHtml(cur, canEdit) {
+    function pill(s, small) {
+      var on = s.id === cur;
+      return '<button type="button" class="imt-td-st'+(small?' sm':'')+(on?' on':'')+'" style="--c:'+s.color+'" aria-pressed="'+on+'"'+(canEdit?'':' disabled')
+        + ' onclick="window.imtPickTaskStatus(\''+s.id+'\')">'+(small?'':'<i></i>')+esc(s.label)+'</button>';
+    }
+    return '<div class="imt-td-st-grid">'+IMT_TD_MAIN_STATUS.map(function (sid) { return pill(imtStatus(sid)); }).join('')+'</div>'
+      + '<div class="imt-td-st-more">'+IMT_TD_MORE_STATUS.map(function (sid) { return pill(imtStatus(sid), true); }).join('')+'</div>';
+  }
+
+  function imtPriorityPillsHtml(cur, canEdit) {
+    return '<div class="imt-td-seg">'+window.IMPL_PRIORITY.map(function (p) {
+      var on = p.id === cur;
+      return '<button type="button" class="'+(on?'on':'')+'" style="--c:'+p.color+'" aria-pressed="'+on+'"'+(canEdit?'':' disabled')
+        + ' onclick="window.imtPickTaskPriority(\''+p.id+'\')">'+esc(p.label)+'</button>';
+    }).join('')+'</div>';
+  }
+
+  // ── ปุ่มลัดเลือกผู้รับผิดชอบ: "มอบให้ฉัน" + ชื่อเล่นทีมโครงการ (ทีมต่อโครงการมีไม่กี่คน กดทีเดียวไม่ต้องเปิดค้นหา) ──
+  function imtOwnerChipsHtml(curId) {
+    var me = imtMyStaffId();
+    var team = imtProjectTeamStaff(window.imtCurrentProjectId).filter(function (s) { return s.id !== me; }).slice(0, 8);
+    var chip = function (sid, label, cls) {
+      return '<button type="button" class="imt-td-chip'+(cls?' '+cls:'')+(sid===curId?' on':'')+'" onclick="window.imtPickOwner(\''+esc(sid)+'\')">'+esc(label)+'</button>';
+    };
+    return (me ? chip(me, 'มอบให้ฉัน', 'me') : '')
+      + team.map(function (s) { return chip(s.id, s.nickname || s.name); }).join('');
+  }
+
+  function imtDurationText(start, due) {
+    if (!due) return 'ยังไม่กำหนดวันเสร็จ — กดปุ่มด้านบนเพื่อเลือกเร็ว';
+    var s = imtDateOf(start), d = imtDateOf(due);
+    var days = Math.round((d - s) / 86400000);
+    if (start && days < 0) return '⚠️ วันกำหนดเสร็จอยู่ก่อนวันเริ่ม';
+    var left = Math.round((d - imtDateOf(window.todayStr())) / 86400000);
+    return (start ? 'รวม '+(days+1)+' วัน · ' : '') + (left > 0 ? 'เหลืออีก '+left+' วัน' : left === 0 ? 'ครบกำหนดวันนี้' : 'เลยกำหนดมา '+(-left)+' วัน');
+  }
+
+  function imtChecklistHtml(id, t, canEdit) {
+    var ck = imtChecklistOf(id);
+    var ckDone = ck.filter(function (c) { return c.done; }).length;
+    var ckPct = ck.length ? Math.round((ckDone / ck.length) * 100) : 0;
+    // ── รายการเยอะ (≥6): มีตัวกรอง ทั้งหมด/ยังไม่ทำ/เสร็จแล้ว — เลือก "ยังไม่ทำ" แล้วติ๊กไล่ไปเรื่อย ๆ รายการที่ติ๊กจะหายไปเอง ──
+    // เปิดงานครั้งแรก: ยังติ๊กไม่ครบ → เริ่มที่ "ยังไม่ทำ" · ครบแล้ว → "ทั้งหมด" (เลือกครั้งเดียว ระหว่างติ๊กไม่สลับเอง)
+    var many = ck.length >= 6;
+    if (many && !window._imtCkFilter) window._imtCkFilter = ckDone < ck.length ? 'todo' : 'all';
+    var filter = many ? window._imtCkFilter : 'all';
+    var shown = ck.map(function (c, i) { return { c:c, no:i+1 }; }).filter(function (x) {
+      return filter === 'todo' ? !x.c.done : filter === 'done' ? x.c.done : true;
+    });
+    var rows = shown.map(function (x) {
+      var c = x.c;
+      return '<div class="imt-ck-row'+(c.done?' is-done':'')+'"><label class="imt-td-ck-lbl"><input type="checkbox" data-ck="'+c.id+'" '+(c.done?'checked':'')+' '+(canEdit?'':'disabled')+' onclick="window.imtCkClick(event,\''+c.id+'\')">'
+        + '<span class="imt-ck-no">'+x.no+'</span>'
+        + '<span class="imt-ck-name'+(c.done?' done':'')+'">'+esc(c.name)+'</span>'
+        + (c.done ? '<span class="imt-ck-meta">✓ '+fd(c.doneDate)+(c.doneBy?(' · '+esc(c.doneBy)):'')+'</span>' : '')
+        + '</label>' + (canEdit ? '<button class="m-x imt-ck-x" title="ลบรายการ" aria-label="ลบรายการ" onclick="window.imtRemoveChecklistItem(\''+c.id+'\')">✕</button>' : '') + '</div>';
+    }).join('');
+    if (!rows && ck.length) rows = '<div class="imt-ck-empty">'+(filter === 'todo' ? '🎉 ติ๊กครบทุกรายการแล้ว' : 'ยังไม่มีรายการที่ทำเสร็จ')+'</div>';
+    var seg = many
+      ? '<div class="imt-ck-seg" role="tablist">'
+        + [['all','ทั้งหมด',ck.length],['todo','ยังไม่ทำ',ck.length-ckDone],['done','เสร็จแล้ว',ckDone]].map(function (f) {
+            return '<button type="button" role="tab" aria-selected="'+(filter===f[0])+'" class="'+(filter===f[0]?'on':'')+'" onclick="window.imtCkSetFilter(\''+id+'\',\''+f[0]+'\')">'+f[1]+' <b>'+f[2]+'</b></button>';
+          }).join('')
+        + '</div>'
+      : '';
+    var tools = ck.length && (many || canEdit)
+      ? '<div class="imt-td-tools">' + seg + '<div style="flex:1;"></div>'
+        + (canEdit && ckDone < ck.length ? '<button type="button" class="btn btn-sec btn-sm" onclick="window.imtSetAllChecklist(\''+id+'\',true)">☑ ติ๊กทั้งหมด</button>' : '')
+        + (canEdit && ckDone ? '<button type="button" class="btn btn-sec btn-sm" onclick="window.imtSetAllChecklist(\''+id+'\',false)">ล้างทั้งหมด</button>' : '')
+        + '</div>'
+        + (canEdit && many ? '<div class="imt-ck-tip">คลิกตรงไหนของแถวก็ติ๊กได้ · กด <kbd>Shift</kbd> ค้างแล้วคลิก = ติ๊กทั้งช่วงจากรายการที่คลิกล่าสุด</div>' : '')
+      : '';
+    var banner = canEdit && ck.length && ckDone === ck.length && t.status !== 'done'
+      ? '<div class="imt-td-banner"><span>🎉 ทำครบทุกรายการแล้ว — ปิดงานนี้เลยไหม?</span><button type="button" class="btn btn-teal btn-sm" onclick="window.imtMarkDone(\''+id+'\')">ปิดงาน = เสร็จแล้ว</button></div>'
+      : '';
+    return '<div class="imt-td-ck-head"><div class="sec-label" style="margin-bottom:0;">เช็คลิสต์</div><span class="imt-td-ck-count">'+ckDone+'/'+ck.length+'</span>'
+      + (ck.length ? '<div style="flex:1;min-width:80px;">'+pbarHtml(ckPct, 'var(--teal)')+'</div><b class="imt-td-ck-pct">'+ckPct+'%</b>' : '<div style="flex:1;"></div>')
+      + '</div>'
+      + tools
+      + '<div class="imt-td-ck-list">'+(rows || '<div style="color:var(--txt3);font-size:12px;padding:10px 12px;">ยังไม่มี Checklist</div>')
+      + (canEdit ? '<div class="imt-td-ck-add"><span aria-hidden="true">＋</span><input id="imt-t-ck-input" aria-label="เพิ่มรายการเช็คลิสต์" placeholder="เพิ่มรายการ แล้วกด Enter (วางหลายบรรทัด = เพิ่มหลายรายการ)" onkeydown="if(event.key===\'Enter\'&&!event.ctrlKey&&!event.metaKey){event.preventDefault();window.imtAddChecklistItem(\''+id+'\');}" onpaste="window.imtCkPaste(event,\''+id+'\')"><kbd>Enter</kbd></div>' : '')
+      + '</div>'
+      + banner;
+  }
+
+  // ── เช็คลิสต์ของ "งานใหม่" (ยังไม่มีรหัสงาน) — รายชื่อค้างไว้ใน window._imtNewCk จนกดบันทึก ──
+  function imtNewChecklistHtml() {
+    var ck = window._imtNewCk || [];
+    var rows = ck.map(function (name, i) {
+      return '<div class="imt-ck-row"><label class="imt-td-ck-lbl"><input type="checkbox" disabled><div style="flex:1;"><div class="imt-ck-name">'+esc(name)+'</div></div></label>'
+        + '<button class="m-x" title="ลบรายการ" aria-label="ลบรายการ" onclick="window.imtNewCkRemove('+i+')">✕</button></div>';
+    }).join('');
+    return '<div class="imt-td-ck-head"><div class="sec-label" style="margin-bottom:0;">เช็คลิสต์</div><span class="imt-td-ck-count">'+ck.length+' รายการ</span><div style="flex:1;"></div></div>'
+      + '<div class="imt-td-ck-list">'+(rows || '<div style="color:var(--txt3);font-size:12px;padding:10px 12px;">ยังไม่มี Checklist — พิมพ์รายการด้านล่างได้เลย</div>')
+      + '<div class="imt-td-ck-add"><span aria-hidden="true">＋</span><input id="imt-t-ck-input" aria-label="เพิ่มรายการเช็คลิสต์" placeholder="เพิ่มรายการ แล้วกด Enter (วางหลายบรรทัด = เพิ่มหลายรายการ)" onkeydown="if(event.key===\'Enter\'&&!event.ctrlKey&&!event.metaKey&&!event.isComposing){event.preventDefault();window.imtNewCkAdd();}" onpaste="window.imtNewCkPaste(event)"><kbd>Enter</kbd></div>'
+      + '</div>';
+  }
+  function imtNewCkRedraw() {
+    var wrap = document.getElementById('imt-t-ck-wrap');
+    if (wrap) wrap.innerHTML = imtNewChecklistHtml();
+    var input = document.getElementById('imt-t-ck-input');
+    if (input) input.focus();
+  }
+  window.imtNewCkAdd = function () {
+    var input = document.getElementById('imt-t-ck-input');
+    var name = input ? input.value.trim() : '';
+    if (!name) return;
+    (window._imtNewCk = window._imtNewCk || []).push(name);
+    imtNewCkRedraw();
+  };
+  window.imtNewCkPaste = function (e) {
+    var lines = imtCkLines((e.clipboardData || window.clipboardData).getData('text'));
+    if (lines.length < 2) return;
+    e.preventDefault();
+    window._imtNewCk = (window._imtNewCk || []).concat(lines);
+    imtNewCkRedraw();
+  };
+  window.imtNewCkRemove = function (i) { (window._imtNewCk || []).splice(i, 1); imtNewCkRedraw(); };
+  // ── วางข้อความหลายบรรทัด (เช่นคัดลอกจาก Excel/LINE) → แยกเป็นหลายรายการ ตัดเลขข้อ/สัญลักษณ์นำหน้า ──
+  function imtCkLines(txt) {
+    return String(txt || '').split(/\r?\n/).map(function (s) { return s.replace(/^\s*(?:[-*•☐☑✓]|\d+[.)])\s*/, '').trim(); }).filter(Boolean);
+  }
+
   window.openImtTaskModal = function (id, phaseId) {
+    imtFlushTaskAutosave();
+    if (!id) window._imtNewCk = [];
+    var bodyEl = document.getElementById('m-imt-task-body');
+    var keepScroll = !!(id && window.imtEditTaskId === id && imtTdModalOn());
+    var scrollTop = keepScroll ? bodyEl.scrollTop : 0;
+    if (!keepScroll) { window._imtCkFilter = null; window._imtCkLast = null; } // null = ให้ระบบเลือกตัวกรองเริ่มต้นตอนวาดเช็คลิสต์
     window.imtEditTaskId = id;
-    var t = id ? imtTask(id) : { phaseId:phaseId, name:'', description:'', owner:'', start:'', due:'', priority:'medium', status:'not_started', progress:0 };
+    var t = id ? imtTask(id) : Object.assign({ phaseId:phaseId, name:'', description:'', ownerId:'', start:window.todayStr(), due:'', priority:'medium', status:'not_started', progress:0 }, window._imtTaskPreset || {});
+    window._imtTaskPreset = null;
     document.getElementById('m-imt-task-title').textContent = id ? 'รายละเอียดงาน' : 'เพิ่ม Task ใหม่';
-    var canEdit = window.canEdit(window.IMPL_MODULE) || window.canAdd(window.IMPL_MODULE);
+    var canEdit = imtCanEditTask();
+    var dis = canEdit ? '' : ' disabled';
     var needsPhaseSelect = !id && !phaseId;
     var phaseFieldHtml = needsPhaseSelect
-      ? '<div class="f-group"><label class="f-label">Phase *</label><select class="f-input" id="imt-t-phase">'+imtPhasesOf(window.imtCurrentProjectId).map(function (ph) { return '<option value="'+ph.id+'">'+esc(ph.name)+'</option>'; }).join('')+'</select></div>'
+      ? '<div class="f-group"><label class="f-label" for="imt-t-phase">Phase *</label><select class="f-input" id="imt-t-phase">'+imtPhasesOf(window.imtCurrentProjectId).map(function (ph) { return '<option value="'+ph.id+'">'+esc(ph.name)+'</option>'; }).join('')+'</select></div>'
       : '';
 
     // ── บอกที่มาของรายชื่อทีมงานใน "ผู้รับผิดชอบ" ให้เห็นชัดว่าดึงจากโครงการต้นทางไหน — ช่วยจับได้ทันที
     // ถ้าโครงการ impl-tracker นี้ยังไม่ได้ผูก/ผูกผิดโครงการ แทนที่จะเดางงว่าทำไมรายชื่อไม่ตรง ──
     var teamSrcProj = imtResolveSourceProject(imtProject(window.imtCurrentProjectId));
     var teamHint = teamSrcProj
-      ? '<div style="font-size:10.5px;color:var(--txt3);margin-top:-8px;margin-bottom:10px;">ทีมงานจากโครงการ: '+esc(teamSrcProj.name)+'</div>'
-      : '<div style="font-size:10.5px;color:var(--coral);margin-top:-8px;margin-bottom:10px;">⚠️ โครงการนี้ยังไม่ได้ผูกกับโครงการต้นทาง — ไปที่ "แก้ไขโครงการ" เพื่อเลือกโครงการก่อน จะได้ดึงรายชื่อทีมงานมาให้เลือกได้</div>';
+      ? '<div class="imt-td-hint">ทีมงานจากโครงการ: '+esc(teamSrcProj.name)+'</div>'
+      : '<div class="imt-td-hint" style="color:var(--coral);">⚠️ โครงการนี้ยังไม่ได้ผูกกับโครงการต้นทาง — ไปที่ "แก้ไขโครงการ" เพื่อเลือกโครงการก่อน จะได้ดึงรายชื่อทีมงานมาให้เลือกได้</div>';
 
-    var formHtml =
-      '<div class="sec-label" style="margin-bottom:12px;">ข้อมูลทั่วไป</div>'
-      + '<div class="f-group"><label class="f-label">ชื่องาน *</label><input class="f-input" id="imt-t-name" value="'+esc(t.name)+'" '+(canEdit?'':'disabled')+'></div>'
-      + phaseFieldHtml
-      + '<div class="f-group"><label class="f-label">รายละเอียด</label><textarea class="f-input" id="imt-t-desc" '+(canEdit?'':'disabled')+'>'+esc(t.description)+'</textarea></div>'
-      + teamHint
-      + '<div class="f-grid"><div class="f-group"><label class="f-label">👤 ผู้รับผิดชอบ</label>' + imtStaffComboMarkup(t.ownerId, !canEdit) + '</div>'
-      + '<div class="f-group"><label class="f-label">⚡ ระดับความสำคัญ</label><select class="f-input" id="imt-t-priority" '+(canEdit?'':'disabled')+'>'+window.IMPL_PRIORITY.map(function (p) { return '<option value="'+p.id+'"'+(t.priority===p.id?' selected':'')+'>'+p.label+'</option>'; }).join('')+'</select></div></div>'
-      + '<div class="f-grid"><div class="f-group"><label class="f-label">📅 วันเริ่มต้น</label><input type="date" class="f-input" id="imt-t-start" value="'+esc(t.start)+'" '+(canEdit?'':'disabled')+'></div>'
-      + '<div class="f-group"><label class="f-label">⏰ กำหนดเสร็จ (Due Date)</label><input type="date" class="f-input" id="imt-t-due" value="'+esc(t.due)+'" '+(canEdit?'':'disabled')+'></div></div>'
-      + '<div class="f-group"><label class="f-label">🚦 สถานะ</label>'
-      +   '<select class="f-input imt-status-select" id="imt-t-status" '+(canEdit?'':'disabled')+' style="background-color:'+imtStatus(t.status).color+'22;color:'+imtStatus(t.status).color+';border-color:'+imtStatus(t.status).color+'55;" onchange="window.imtSetTaskStatusField(this.value)">'
-      +     window.IMPL_STATUS.map(function (s) { return '<option value="'+s.id+'"'+(t.status===s.id?' selected':'')+'>'+s.icon+' '+s.label+'</option>'; }).join('')
-      +   '</select>'
+    var mainHtml =
+      // ── ชื่องาน + รายละเอียด แบบกะทัดรัด: ไม่มีหัวข้อ/กรอบจนกว่าจะชี้หรือคลิก · รายละเอียด 1 บรรทัด ขยายตามข้อความ ──
+      '<div class="imt-td-titlebox"><input class="imt-td-name" id="imt-t-name" aria-label="ชื่องาน" placeholder="ชื่องาน *" value="'+esc(t.name)+'"'+dis+'>'
+      + '<textarea class="imt-td-desc" id="imt-t-desc" rows="1" aria-label="รายละเอียด" placeholder="คลิกเพื่อพิมพ์รายละเอียดงาน…" oninput="window.imtGrow(this)"'+dis+'>'+esc(t.description)+'</textarea></div>'
+      + phaseFieldHtml;
+
+    var sideHtml =
+      '<div class="imt-td-sec"><div class="f-label">สถานะ</div><input type="hidden" id="imt-t-status" value="'+esc(t.status)+'">'
+      +   '<div id="imt-t-status-pills">'+imtStatusPillsHtml(t.status, canEdit)+'</div>'
+      +   (id && canEdit ? '<div class="imt-td-hint">ติ๊กเช็คลิสต์รายการแรก → เปลี่ยนเป็น “กำลังดำเนินการ” ให้อัตโนมัติ</div>' : '')
+      + '</div>'
+      + '<div class="imt-td-sec"><div class="f-label">ผู้รับผิดชอบ</div>' + imtStaffComboMarkup(t.ownerId, !canEdit)
+      +   (canEdit ? '<div class="imt-td-chips" id="imt-t-owner-chips">'+imtOwnerChipsHtml(t.ownerId)+'</div>' : '')
+      +   teamHint
+      + '</div>'
+      + '<div class="imt-td-sec"><div class="f-label">ความสำคัญ</div><input type="hidden" id="imt-t-priority" value="'+esc(t.priority)+'">'
+      +   '<div id="imt-t-priority-pills">'+imtPriorityPillsHtml(t.priority, canEdit)+'</div>'
+      + '</div>'
+      + '<div class="imt-td-sec"><div class="f-label">ช่วงเวลา</div>'
+      +   '<div class="imt-td-dates">'
+      +     '<label><span>เริ่ม</span><input type="date" class="f-input" id="imt-t-start" value="'+esc(t.start)+'"'+dis+'></label>'
+      +     '<label><span>กำหนดเสร็จ</span><input type="date" class="f-input" id="imt-t-due" value="'+esc(t.due)+'"'+dis+'></label>'
+      +   '</div>'
+      +   (canEdit ? '<div class="imt-td-chips">'
+      +     '<button type="button" class="imt-td-chip" onclick="window.imtQuickDue(1)">+1 วัน</button>'
+      +     '<button type="button" class="imt-td-chip" onclick="window.imtQuickDue(3)">+3 วัน</button>'
+      +     '<button type="button" class="imt-td-chip" onclick="window.imtQuickDue(7)">+1 สัปดาห์</button>'
+      +     '<button type="button" class="imt-td-chip" onclick="window.imtQuickDue(\'eom\')">สิ้นเดือน</button>'
+      +   '</div>' : '')
+      +   '<div class="imt-td-hint" id="imt-t-dur">'+esc(imtDurationText(t.start, t.due))+'</div>'
       + '</div>';
 
-    var checklistHtml = '', commentHtml = '', attachHtml = '';
+    var extraHtml = '';
     if (id) {
-      var ck = imtChecklistOf(id);
-      var ckDone = ck.filter(function(c){return c.done;}).length;
-      var ckPct = ck.length ? Math.round((ckDone / ck.length) * 100) : 0;
-      var ckRows = ck.map(function (c) {
-        return '<div class="imt-ck-row"><input type="checkbox" '+(c.done?'checked':'')+' '+(canEdit?'':'disabled')+' onchange="window.imtToggleChecklist(\''+c.id+'\')">'
-          + '<div style="flex:1;"><div class="imt-ck-name'+(c.done?' done':'')+'">'+esc(c.name)+'</div>'
-          + (c.done ? '<div style="font-size:10px;color:var(--txt3);">✓ '+fd(c.doneDate)+(c.doneBy?(' โดย '+esc(c.doneBy)):'')+'</div>' : '')
-          + '</div>' + (canEdit ? '<button class="m-x" onclick="window.imtRemoveChecklistItem(\''+c.id+'\')">✕</button>' : '') + '</div>';
-      }).join('') || '<div style="color:var(--txt3);font-size:12px;">ยังไม่มี Checklist</div>';
-
-      // ── ปุ่ม "✅ Mark as Done" ย้ายมาไว้ที่หัวข้อ "เช็คลิสต์" (มุมซ้ายบนของส่วนนี้) เฉพาะตอนมี Checklist
-      // มากกว่า 1 รายการ — กรณีมีแค่ 1 รายการ ติ๊ก Checkbox รายการเดียวก็เพียงพอ (auto เปลี่ยนสถานะให้เองใน
-      // imtToggleChecklist แล้ว ไม่ต้องมีปุ่มซ้ำ) กรณีไม่มี Checklist เลย ปุ่มนี้จะไปอยู่ที่ท้าย modal แทน ──
-      var markDoneInChecklist = (canEdit && t.status !== 'done' && ck.length > 1)
-        ? '<button class="btn btn-teal btn-sm" onclick="window.imtMarkDone(\''+id+'\')">✅ Mark as Done</button>'
-        : '';
-      // ── จัดชิดซ้ายด้วยกันทั้งคู่ (ไม่ใช้ .sec-head แบบ space-between ที่จะดันปุ่มไปสุดขวาแถวซึ่งกว้างเท่า modal) ──
-      checklistHtml = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;"><div class="sec-label" style="margin-bottom:0;">เช็คลิสต์ ('+ckDone+'/'+ck.length+')</div>'+markDoneInChecklist+'</div>'
-        + (ck.length ? '<div style="margin-bottom:10px;">'+pbarHtml(ckPct, 'var(--teal)')+'</div>' : '')
-        + ckRows
-        + (canEdit ? '<div style="display:flex;gap:8px;margin-top:10px;"><input class="f-input" id="imt-t-ck-input" placeholder="พิมพ์รายการแล้วกด Enter..." onkeydown="if(event.key===\'Enter\'){event.preventDefault();window.imtAddChecklistItem(\''+id+'\');}"><button class="btn btn-sec btn-sm" onclick="window.imtAddChecklistItem(\''+id+'\')">+ เพิ่ม</button></div>' : '');
-
       var comments = imtCommentsOf(id);
-      commentHtml = '<div class="sec-label" style="margin-bottom:8px;">ความคิดเห็น</div>'
+      var commentHtml = '<div class="sec-label" style="margin-bottom:8px;">ความคิดเห็น</div>'
         + comments.map(function (c) { return '<div class="imt-comment"><div class="imt-comment-head"><b>'+esc(c.author)+'</b><span>'+fd(c.createdAt)+'</span></div>'+esc(c.text)+'</div>'; }).join('')
         + '<div style="display:flex;gap:8px;margin-top:10px;"><input class="f-input" id="imt-t-comment-input" placeholder="เขียนความคิดเห็น..." onkeydown="if(event.key===\'Enter\'){event.preventDefault();window.imtAddComment(\''+id+'\');}"><button class="btn btn-sec btn-sm" onclick="window.imtAddComment(\''+id+'\')">ส่ง</button></div>';
 
-      var atts = imtAttachmentsOf(id);
-      attachHtml = '<div class="sec-label" style="margin-bottom:8px;">ไฟล์แนบ</div>'
-        + atts.map(function (a) { return '<div class="m-row"><a href="'+esc(a.fileUrl)+'" target="_blank" download="'+esc(a.fileName)+'" style="flex:1;color:var(--indigo);">📎 '+esc(a.fileName)+'</a><button class="m-x" onclick="window.imtDeleteAttachmentUI(\''+a.id+'\')">✕</button></div>'; }).join('')
-        + (canEdit ? '<input type="file" id="imt-t-file-input" style="margin-top:8px;" onchange="window.imtHandleFileInput(\''+id+'\',this)">' : '');
+      extraHtml = '<div class="imt-td-block" id="imt-t-ck-wrap">'+imtChecklistHtml(id, t, canEdit)+'</div>'
+        + '<div class="imt-td-block">'+commentHtml+'</div>';
+    } else if (canEdit) {
+      // ── งานใหม่: เพิ่มเช็คลิสต์ได้ทันทีไม่ต้องบันทึกก่อน (ค้างไว้ในหน่วยความจำ สร้างจริงตอนกดบันทึก) ──
+      extraHtml = '<div class="imt-td-block" id="imt-t-ck-wrap">'+imtNewChecklistHtml()+'</div>'
+        + '<div class="imt-td-hint" style="padding:0 2px;">💬 ความคิดเห็น เพิ่มได้หลังบันทึกงาน</div>';
     }
 
-    document.getElementById('m-imt-task-body').innerHTML = formHtml
-      + (id ? '<hr style="border:none;border-top:1px solid var(--border);margin:18px 0;">' + checklistHtml
-             + '<hr style="border:none;border-top:1px solid var(--border);margin:18px 0;">' + commentHtml
-             + '<hr style="border:none;border-top:1px solid var(--border);margin:18px 0;">' + attachHtml
-        : '');
+    bodyEl.dataset.taskId = id || '';
+    bodyEl.dataset.phaseId = phaseId || t.phaseId || '';
+    if (id && !keepScroll) delete _imtTdLogged[id]; // log "แก้ไขงาน" 1 ครั้งต่อการเปิดงาน (ไม่ใช่ทุกครั้งที่บันทึกอัตโนมัติ)
+    // ── งานใหม่: สลับ "ทีละงาน" / "วางเป็นข้อความ (หลายงาน)" แบบเดียวกับหน้าต่าง Template — ซ่อน/แสดงเฉย ๆ
+    // ไม่วาดใหม่ ค่าที่กรอกไว้ (ชื่อ/ผู้รับผิดชอบ/วันที่) จึงไม่หาย ──
+    var bulk = !id && canEdit && window._imtTaskBulk === true;
+    var mainInner = mainHtml + extraHtml;
+    if (!id && canEdit) {
+      var phases = imtPhasesOf(window.imtCurrentProjectId), defPh = phaseId || (phases[0] && phases[0].id) || '';
+      mainInner = '<div class="imt-td-modebar"><div class="imt-tplb-seg" role="group" aria-label="วิธีเพิ่มงาน">'
+        +   '<button type="button" class="'+(bulk ? '' : 'on')+'" onclick="window.imtTaskSetBulk(false)">📌 ทีละงาน</button>'
+        +   '<button type="button" class="'+(bulk ? 'on' : '')+'" onclick="window.imtTaskSetBulk(true)">📋 วางเป็นข้อความ (หลายงาน)</button>'
+        + '</div></div>'
+        + '<div id="imt-t-single"'+(bulk ? ' hidden' : '')+'>' + mainInner + '</div>'
+        + '<div id="imt-t-bulkwrap" class="imt-td-bulk"'+(bulk ? '' : ' hidden')+'>'
+        +   '<div class="imt-tplb-hint">คัดลอกจาก Excel / Word / LINE มาวางได้เลย — 1 บรรทัด = 1 งาน · ถ้ามีหัวข้อ: บรรทัดปกติ = <b>Phase</b> (ชื่อตรงกับที่มี = ใช้ Phase เดิม ไม่ตรง = สร้างใหม่) · ขึ้นต้นด้วย <code>-</code> = <b>งาน</b> · ย่อหน้าแล้ว <code>-</code> = <b>เช็คลิสต์</b> · ใส่ <code>(3)</code> ท้ายงาน = จำนวนวัน (นับจากวันเริ่ม)</div>'
+        +   '<div class="f-group" style="margin:10px 0;"><label class="f-label" for="imt-t-bulk-phase">Phase ตั้งต้น <span class="imt-tplb-opt">(งานที่ไม่อยู่ใต้หัว Phase)</span></label>'
+        +   '<select class="f-input" id="imt-t-bulk-phase" onchange="window.imtBulkPreview()">'
+        +     phases.map(function (ph) { return '<option value="'+ph.id+'"'+(ph.id === defPh ? ' selected' : '')+'>'+esc(ph.name)+'</option>'; }).join('')
+        +     (phases.length ? '' : '<option value="">— ยังไม่มี Phase (ใส่หัว Phase ในข้อความ) —</option>')
+        +   '</select></div>'
+        +   '<div class="imt-td-bulk-grid">'
+        +     '<textarea class="f-input" id="imt-t-bulk" aria-label="รายการงานแบบข้อความ" spellcheck="false" placeholder="- ติดตั้งโปรแกรม (2)\n    - ลงฐานข้อมูล\n    - ตั้งค่าเครื่องลูกข่าย\n- อบรมผู้ใช้งาน\n- เซ็นเอกสารส่งมอบ" oninput="window.imtBulkPreview()" onkeydown="window.imtTplTextKey(event);window.imtBulkPreview()">'+esc(window._imtBulkText || '')+'</textarea>'
+        +     '<div class="imt-tplb-tcol"><div class="imt-tplb-prevhead"><b>ตัวอย่างผลลัพธ์</b><span id="imt-t-bulk-sum"></span></div><div class="imt-tplb-preview" id="imt-t-bulk-prev"></div></div>'
+        +   '</div>'
+        +   '<div class="imt-tplb-hint" style="margin-top:8px;">สถานะ / ผู้รับผิดชอบ / ความสำคัญ / วันที่ ด้านขวา ใช้กับทุกงานที่วาง</div>'
+        + '</div>';
+    }
+    bodyEl.innerHTML = '<div class="imt-td"><div class="imt-td-main">'+mainInner+'</div><aside class="imt-td-side">'+sideHtml+'</aside></div>';
+
+    // ── หัว modal: สถานะบันทึกอัตโนมัติ + งานก่อนหน้า/ถัดไป (เฉพาะงานที่มีอยู่แล้ว) ──
+    var headx = document.getElementById('m-imt-task-headx');
+    if (headx) {
+      var nav = '';
+      if (id) {
+        var seq = imtTaskSeq(t.projectId), ix = seq.findIndex(function (x) { return x.id === id; });
+        var prev = ix > 0 ? seq[ix-1] : null, next = ix > -1 && ix < seq.length-1 ? seq[ix+1] : null;
+        nav = '<button type="button" class="imt-td-nav" aria-label="งานก่อนหน้า" title="'+(prev?esc('ก่อนหน้า: '+prev.name):'')+'"'+(prev?' onclick="window.openImtTaskModal(\''+prev.id+'\')"':' disabled')+'>‹</button>'
+          + '<span class="imt-td-pos">'+(ix+1)+'/'+seq.length+'</span>'
+          + '<button type="button" class="imt-td-nav" aria-label="งานถัดไป" title="'+(next?esc('ถัดไป: '+next.name):'')+'"'+(next?' onclick="window.openImtTaskModal(\''+next.id+'\')"':' disabled')+'>›</button>';
+      }
+      headx.innerHTML = (id && canEdit ? '<span class="imt-td-saved" id="imt-t-saved">'+imtSavedLabel(id)+'</span>' : '') + nav;
+    }
 
     var foot = document.getElementById('m-imt-task-foot');
-    // ปุ่ม "ลบ" ไว้ซ้ายมือสุด แยกจากปุ่มบันทึก/Mark as Done ทางขวา — margin-right:auto ดันปุ่มอื่น
-    // ที่ตามมาไปชิดขวาตาม justify-content:flex-end ปกติของ .m-foot กันกดลบพลาดเวลาจะกดบันทึก
-    // ── ปุ่ม "✅ Mark as Done" อยู่ตรงนี้เฉพาะกรณีไม่มี Checklist เลย (ck ยังไม่ถูกกำหนดถ้า !id จึงเช็ค id
-    // ก่อนเสมอ) — ถ้ามี Checklist ปุ่มจะย้ายไปอยู่ที่หัวข้อ "เช็คลิสต์" แทน (ดูตอนสร้าง checklistHtml) ──
-    foot.innerHTML = (id && window.canDel(window.IMPL_MODULE) ? '<button class="btn btn-red" style="margin-right:auto;" onclick="window.askDel(\'imt_task\',\''+id+'\',\''+esc(t.name)+'\')">ลบ</button>' : '')
-      + (id && canEdit && t.status !== 'done' && (!ck || !ck.length) ? '<button class="btn btn-teal" onclick="window.imtMarkDone(\''+id+'\')">✅ Mark as Done</button>' : '')
-      + (canEdit ? '<button class="btn btn-pri" onclick="window.saveImtTask(\''+(phaseId||(t.phaseId||''))+'\')">💾 บันทึก</button>' : '');
+    var savePhase = phaseId || t.phaseId || '';
+    var showDone = id && canEdit && t.status !== 'done';
+    // ปุ่ม "ลบ" ไว้ซ้ายมือสุด แยกจากปุ่มบันทึกทางขวา กันกดลบพลาดเวลาจะกดบันทึก
+    foot.innerHTML = (id && window.canDel(window.IMPL_MODULE) ? '<button class="btn btn-red" onclick="window.askDel(\'imt_task\',\''+id+'\',\''+esc(t.name)+'\')">ลบ</button>' : '')
+      + (id && window.canAdd(window.IMPL_MODULE) ? '<button class="btn btn-sec" title="สร้างงานใหม่จากงานนี้ (รวมเช็คลิสต์)" onclick="window.imtDuplicateTask(\''+id+'\')">⧉ คัดลอกเป็นงานใหม่</button>' : '')
+      + '<div style="flex:1;"></div>'
+      + (showDone ? '<button class="btn btn-teal" title="ติ๊กเช็คลิสต์ครบ + เปลี่ยนสถานะเป็นเสร็จแล้ว" onclick="window.imtMarkDone(\''+id+'\')">✅ ทำเสร็จแล้ว</button>' : '')
+      + (canEdit && !id ? '<button class="btn btn-sec imt-t-fs" title="บันทึก แล้วเปิดฟอร์มงานใหม่ต่อทันที (ใช้ Phase/ผู้รับผิดชอบ/วันที่เดิม)" onclick="window.saveImtTask(\''+savePhase+'\',\'next\')"'+(bulk ? ' style="display:none"' : '')+'>💾 บันทึก + เพิ่มงานถัดไป</button>' : '')
+      + (canEdit ? '<button class="btn btn-pri imt-t-fs" title="คีย์ลัด Ctrl+Enter" onclick="window.saveImtTask(\''+savePhase+'\')"'+(bulk ? ' style="display:none"' : '')+'>💾 '+(id?'บันทึกและปิด':'บันทึก')+'</button>' : '')
+      + (canEdit && !id ? '<button class="btn btn-pri imt-t-fb" id="imt-t-bulk-save" title="คีย์ลัด Ctrl+Enter" onclick="window.saveImtTask(\''+savePhase+'\')"'+(bulk ? '' : ' style="display:none"')+'>💾 บันทึกทั้งหมด</button>' : '');
+
     window.openM('m-imt-task');
     if (canEdit) window._initImtStaffCombobox && window._initImtStaffCombobox(imtProjectTeamStaff(window.imtCurrentProjectId), t.ownerId);
+    imtBindTaskModal();
+    var descEl = document.getElementById('imt-t-desc');
+    if (descEl && descEl.value) window.imtGrow(descEl);
+    bodyEl.scrollTop = scrollTop;
+    if (bulk) { window.imtBulkPreview(); var bt = document.getElementById('imt-t-bulk'); if (bt) bt.focus(); }
+    else if (!id && canEdit) { var nm = document.getElementById('imt-t-name'); if (nm) nm.focus(); }
   };
 
-  window.imtSetTaskStatusField = function (statusId) {
-    var sel = document.getElementById('imt-t-status');
-    if (!sel) return;
-    var st = imtStatus(statusId);
-    sel.style.backgroundColor = st.color + '22';
-    sel.style.color = st.color;
-    sel.style.borderColor = st.color + '55';
-  };
+  // ── ช่องรายละเอียดขยายสูงตามข้อความ (เริ่ม 1 บรรทัด ไม่กินที่) ──
+  window.imtGrow = function (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; };
 
-  window.saveImtTask = async function (phaseId) {
+  function imtSavedLabel(id) {
+    var at = _imtTdSavedAt[id];
+    return at ? '✓ บันทึกอัตโนมัติ '+at+' น.' : '✓ แก้แล้วบันทึกให้อัตโนมัติ';
+  }
+
+  // ── ผูก event ครั้งเดียวต่อหน้า: แก้ช่องไหน → บันทึกอัตโนมัติ (งานเดิม) · Ctrl+Enter = บันทึกและปิด ──
+  function imtBindTaskModal() {
+    var modal = document.getElementById('m-imt-task');
+    if (!modal || modal.dataset.tdBound) return;
+    modal.dataset.tdBound = '1';
+    var onEdit = function (e) {
+      var tid = e.target && e.target.id;
+      if (IMT_TD_AUTOSAVE_FIELDS.indexOf(tid) < 0) return;
+      if (tid === 'imt-t-start' || tid === 'imt-t-due') {
+        var dur = document.getElementById('imt-t-dur');
+        if (dur) dur.textContent = imtDurationText(imtTdVal('imt-t-start'), imtTdVal('imt-t-due'));
+      }
+      if (tid === 'imt-t-owner') { var oc = document.getElementById('imt-t-owner-chips'); if (oc) oc.innerHTML = imtOwnerChipsHtml(imtTdVal('imt-t-owner')); }
+      imtScheduleAutosave(e.type === 'input' && (tid === 'imt-t-name' || tid === 'imt-t-desc') ? 900 : 0);
+    };
+    // capture: combobox ผู้รับผิดชอบยิง change แบบไม่ bubble — ฟังขาลงถึงจะจับได้
+    modal.addEventListener('input', onEdit, true);
+    modal.addEventListener('change', onEdit, true);
+    modal.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter' || !(e.ctrlKey || e.metaKey) || !imtCanEditTask()) return;
+      e.preventDefault();
+      window.saveImtTask(document.getElementById('m-imt-task-body').dataset.phaseId || '');
+    });
+  }
+
+  function imtScheduleAutosave(delay) {
     var id = window.imtEditTaskId;
-    var isNew = !id;
-    var name = document.getElementById('imt-t-name').value.trim();
+    if (!id || !imtCanEditTask()) return; // งานใหม่ยังไม่มีรหัส → รอกดบันทึก
+    var saved = document.getElementById('imt-t-saved');
+    if (saved) saved.textContent = '… กำลังบันทึก';
+    clearTimeout(_imtTdTimer);
+    _imtTdTimerId = id;
+    _imtTdTimer = setTimeout(function () { _imtTdTimer = null; imtPersistTaskForm(id, { auto:true }); }, delay);
+  }
+
+  // ── บันทึกที่ค้างอยู่ทันที (ก่อนเปลี่ยนหน้า/วาด modal ใหม่ ไม่ให้ค่าที่พิมพ์ค้างไว้หาย) ──
+  function imtFlushTaskAutosave() {
+    if (!_imtTdTimer) return;
+    clearTimeout(_imtTdTimer); _imtTdTimer = null;
+    imtPersistTaskForm(_imtTdTimerId, { auto:true });
+  }
+
+  // ── อ่านฟอร์ม → บันทึกงานเดิม (imtApplyLocal ทำทันทีแบบ sync ก่อน await แรก) ──
+  async function imtPersistTaskForm(id, opts) {
+    opts = opts || {};
+    var bodyEl = document.getElementById('m-imt-task-body');
+    if (!id || !bodyEl || bodyEl.dataset.taskId !== id) return false;
+    var t = imtTask(id); if (!t) return false;
+    var name = imtTdVal('imt-t-name').trim();
+    if (!name) { if (!opts.auto) window.showAlert && window.showAlert('กรุณาระบุชื่องาน', 'error'); return false; }
+    var oldStatus = t.status;
+    var row = imtTaskRow(t, {
+      task_name: name,
+      description: imtTdVal('imt-t-desc').trim(),
+      owner: imtTdVal('imt-t-owner'), // รหัสพนักงาน
+      start_date: imtTdVal('imt-t-start') || null,
+      due_date: imtTdVal('imt-t-due') || null,
+      priority: imtTdVal('imt-t-priority'),
+      status: imtTdVal('imt-t-status') || t.status,
+      updated_at: new Date().toISOString(),
+    });
+    var changed = row.task_name !== t.name || row.description !== (t.description||'') || row.owner !== (t.ownerId||'')
+      || (row.start_date||'') !== (t.start||'') || (row.due_date||'') !== (t.due||'') || row.priority !== t.priority || row.status !== oldStatus;
+    if (!changed) return true;
+    window.imtApplyLocal('IMPL_TASKS', id, row);
+    var now = new Date();
+    _imtTdSavedAt[id] = ('0'+now.getHours()).slice(-2)+':'+('0'+now.getMinutes()).slice(-2);
+    var savedEl = document.getElementById('imt-t-saved');
+    if (savedEl && window.imtEditTaskId === id) savedEl.textContent = imtSavedLabel(id);
+    try { await window.setDoc(window.getDocRef('IMPL_TASKS', id), row); }
+    catch (e) { window.showDbError && window.showDbError(e); return false; }
+    // ย้ายสถานะเป็น "เสร็จแล้ว" → ติ๊ก Checklist ที่เหลือให้ครบอัตโนมัติ (ไม่ต้องไล่ติ๊กเองทีละอัน)
+    // เช็คเฉพาะตอน "เพิ่งเปลี่ยน" มาเป็น done เท่านั้น ไม่งั้นติ๊กออกบางรายการแล้วบันทึกซ้ำจะถูกบังคับติ๊กกลับ ──
+    if (row.status === 'done' && oldStatus !== 'done') {
+      var undone = imtChecklistOf(id).filter(function (c) { return !c.done; });
+      for (var i = 0; i < undone.length; i++) await imtSetChecklistDone(undone[i], true);
+    }
+    if (oldStatus !== row.status) window.imtLogActivity(t.projectId, 'task', id, 'status_change', 'เปลี่ยนสถานะ "'+name+'" เป็น '+imtStatus(row.status).label);
+    else if (!_imtTdLogged[id]) { _imtTdLogged[id] = true; window.imtLogActivity(t.projectId, 'task', id, 'update', 'แก้ไขงาน '+name); }
+    window.renderImplTracker();
+    return true;
+  }
+
+  window.imtPickTaskStatus = function (sid) {
+    var hid = document.getElementById('imt-t-status'); if (!hid) return;
+    hid.value = sid;
+    document.getElementById('imt-t-status-pills').innerHTML = imtStatusPillsHtml(sid, true);
+    var id = window.imtEditTaskId;
+    if (!id) return;
+    clearTimeout(_imtTdTimer); _imtTdTimer = null;
+    // วาดใหม่หลังบันทึก — เปลี่ยนเป็นเสร็จแล้วจะติ๊กเช็คลิสต์ครบ + ซ่อนปุ่ม "ทำเสร็จแล้ว"
+    imtPersistTaskForm(id, { auto:true }).then(function () { if (imtTdModalOn() && window.imtEditTaskId === id) window.openImtTaskModal(id); });
+  };
+
+  window.imtPickTaskPriority = function (pid) {
+    var hid = document.getElementById('imt-t-priority'); if (!hid) return;
+    hid.value = pid;
+    document.getElementById('imt-t-priority-pills').innerHTML = imtPriorityPillsHtml(pid, true);
+    imtScheduleAutosave(0);
+  };
+
+  window.imtPickOwner = function (sid) {
+    var wrap = document.getElementById('imt-t-owner-wrap'); if (!wrap) return;
+    if (imtTdVal('imt-t-owner') === sid) return;
+    wrap.outerHTML = imtStaffComboMarkup(sid, false);
+    window._initImtStaffCombobox(imtProjectTeamStaff(window.imtCurrentProjectId), sid);
+    var oc = document.getElementById('imt-t-owner-chips'); if (oc) oc.innerHTML = imtOwnerChipsHtml(sid);
+    imtScheduleAutosave(0);
+  };
+
+  // ── ปุ่มลัดกำหนดเสร็จ: นับจากวันเริ่ม (ไม่มีวันเริ่ม = นับจากวันนี้) ──
+  window.imtQuickDue = function (n) {
+    var dueEl = document.getElementById('imt-t-due'); if (!dueEl) return;
+    var base = imtDateOf(imtTdVal('imt-t-start') || window.todayStr());
+    dueEl.value = n === 'eom' ? imtIso(new Date(base.getFullYear(), base.getMonth()+1, 0)) : imtIso(new Date(base.getFullYear(), base.getMonth(), base.getDate()+n));
+    dueEl.dispatchEvent(new Event('change', { bubbles:true }));
+  };
+
+  // ══ เพิ่มหลายงานจากข้อความ (โหมด "วางเป็นข้อความ" ของหน้าต่างเพิ่ม Task) — กติกาเดียวกับ Template:
+  // บรรทัดปกติ = Phase · "- " = งาน · ย่อหน้า + "- " = เช็คลิสต์ · "(3)" ท้ายงาน = จำนวนวัน
+  // ไม่มีบรรทัดไหนขึ้นต้นด้วย "-" เลย = ทุกบรรทัดเป็นงาน (วางรายการธรรมดาจาก Excel/LINE ได้ตรง ๆ) ══
+  window.imtTaskSetBulk = function (on) {
+    on = !!on;
+    window._imtTaskBulk = on;
+    var single = document.getElementById('imt-t-single'), wrap = document.getElementById('imt-t-bulkwrap');
+    if (single) single.hidden = on;
+    if (wrap) wrap.hidden = !on;
+    document.querySelectorAll('#m-imt-task .imt-td-modebar button').forEach(function (b, i) { b.classList.toggle('on', i === (on ? 1 : 0)); });
+    document.querySelectorAll('#m-imt-task-foot .imt-t-fs').forEach(function (b) { b.style.display = on ? 'none' : ''; });
+    document.querySelectorAll('#m-imt-task-foot .imt-t-fb').forEach(function (b) { b.style.display = on ? '' : 'none'; });
+    if (on) {
+      // ชื่องาน/เช็คลิสต์ที่พิมพ์ไว้ในโหมดทีละงาน ยกมาเป็นบรรทัดแรกให้ ไม่ต้องพิมพ์ซ้ำ
+      var ta = document.getElementById('imt-t-bulk'), nm = imtTdVal('imt-t-name').trim();
+      if (ta && !ta.value.trim() && nm) {
+        ta.value = '- ' + nm + (window._imtNewCk || []).map(function (c) { return '\n    - ' + c; }).join('') + '\n';
+        window._imtBulkText = ta.value;
+      }
+      window.imtBulkPreview();
+      if (ta) { ta.focus(); ta.selectionStart = ta.selectionEnd = ta.value.length; }
+    } else {
+      var n = document.getElementById('imt-t-name'); if (n) n.focus();
+    }
+  };
+
+  function imtBulkGroups(text) {
+    var src = String(text || '');
+    if (!/^\s*[-*•▪◦]/m.test(src)) {
+      src = src.split(/\r?\n/).map(function (l) { l = l.replace(/^\s*\d+[.)]\s*/, '').trim(); return l ? '- ' + l : ''; }).join('\n');
+    }
+    var phases = imtPhasesOf(window.imtCurrentProjectId);
+    var defId = imtTdVal('imt-t-bulk-phase');
+    var defPh = phases.find(function (p) { return p.id === defId; });
+    return _imtTplParse(src, true).filter(function (g) { return g.tasks.length || !g._auto; }).map(function (g) {
+      if (g._auto) return { phaseId: defPh ? defPh.id : '', name: defPh ? defPh.name : '', tasks: g.tasks, missing: !defPh };
+      var key = g.name.trim().toLowerCase();
+      var hit = phases.find(function (p) { return (p.name || '').trim().toLowerCase() === key; });
+      return { phaseId: hit ? hit.id : '', name: hit ? hit.name : g.name, tasks: g.tasks, isNew: !hit };
+    });
+  }
+
+  window.imtBulkPreview = function () {
+    var ta = document.getElementById('imt-t-bulk'), pv = document.getElementById('imt-t-bulk-prev');
+    if (!ta || !pv) return;
+    window._imtBulkText = ta.value;
+    var groups = imtBulkGroups(ta.value), nT = 0, nC = 0;
+    pv.innerHTML = groups.map(function (g) {
+      nT += g.tasks.length;
+      var tag = g.missing ? '<span class="imt-td-bulk-tag warn">ยังไม่มี Phase</span>'
+        : g.isNew ? '<span class="imt-td-bulk-tag new">+ Phase ใหม่</span>' : '<span class="imt-td-bulk-tag">Phase เดิม</span>';
+      return '<div class="imt-tplb-pv-ph"><div class="imt-tplb-pv-name">'+tag+'<b>'+esc(g.name || '—')+'</b></div>'
+        + g.tasks.map(function (t) {
+          nC += t.checklist.length;
+          return '<div class="imt-tplb-pv-tk"><span>• '+esc(t.name)+'</span><em>'+(t.days != null ? t.days+' วัน' : '')+'</em></div>'
+            + t.checklist.map(function (c) { return '<div class="imt-tplb-pv-ck">☐ '+esc(c)+'</div>'; }).join('');
+        }).join('')
+        + '</div>';
+    }).join('') || '<div class="imt-tplb-hint">ยังไม่มีข้อความ — วางรายการงานทางซ้ายได้เลย</div>';
+    var sum = document.getElementById('imt-t-bulk-sum');
+    if (sum) sum.textContent = nT + ' งาน' + (nC ? ' · ' + nC + ' เช็คลิสต์' : '');
+    var btn = document.getElementById('imt-t-bulk-save');
+    if (btn) btn.textContent = '💾 บันทึก ' + nT + ' งาน';
+  };
+
+  function imtAddDaysStr(dateStr, n) {
+    var d = pd(dateStr); d.setDate(d.getDate() + n);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  async function imtSaveTaskBulk() {
+    var ta = document.getElementById('imt-t-bulk');
+    var groups = imtBulkGroups(ta ? ta.value : '');
+    var total = groups.reduce(function (s, g) { return s + g.tasks.length; }, 0);
+    if (!total) { window.showAlert && window.showAlert('กรุณาวางรายการงานอย่างน้อย 1 งาน', 'error'); if (ta) ta.focus(); return; }
+    if (groups.some(function (g) { return g.missing && g.tasks.length; })) { window.showAlert && window.showAlert('โครงการนี้ยังไม่มี Phase — ใส่ชื่อ Phase เป็นบรรทัดแรก (ไม่ต้องมี -) แล้วตามด้วยงาน', 'error'); return; }
+    var pid = window.imtCurrentProjectId;
+    var base = {
+      owner: imtTdVal('imt-t-owner'), start: imtTdVal('imt-t-start') || '', due: imtTdVal('imt-t-due') || '',
+      priority: imtTdVal('imt-t-priority'), status: imtTdVal('imt-t-status') || 'not_started',
+    };
+    var docs = [], phOrder = imtPhasesOf(pid).length, nowIso = new Date().toISOString();
+    groups.forEach(function (g) {
+      var phId = g.phaseId;
+      if (!phId) {
+        phId = window.imtUid('IPH');
+        var prow = { project_id:pid, phase_name:g.name, description:'', status:'not_started', sort_order:++phOrder, progress_percent:0 };
+        window.imtApplyLocal('IMPL_PHASES', phId, prow);
+        docs.push(['IMPL_PHASES', phId, prow]);
+      }
+      var order = imtTasksOfPhase(phId).length;
+      g.tasks.forEach(function (t) {
+        var tid = window.imtUid('ITK');
+        var due = t.days && base.start ? imtAddDaysStr(base.start, Math.max(1, Math.ceil(t.days)) - 1) : base.due;
+        var row = { phase_id:phId, project_id:pid, task_name:t.name, description:'', owner:base.owner,
+          start_date:base.start || null, due_date:due || null, priority:base.priority, status:base.status,
+          sort_order:++order, updated_at:nowIso };
+        window.imtApplyLocal('IMPL_TASKS', tid, row);
+        docs.push(['IMPL_TASKS', tid, row]);
+        t.checklist.forEach(function (c, i) {
+          var cid = window.imtUid('ICK'), crow = { task_id:tid, checklist_name:c, is_done:false, sort_order:i + 1 };
+          window.imtApplyLocal('IMPL_CHECKLIST_ITEMS', cid, crow);
+          docs.push(['IMPL_CHECKLIST_ITEMS', cid, crow]);
+        });
+      });
+    });
+    window._imtBulkText = '';
+    window.closeM('m-imt-task');
+    window.renderImplTracker();
+    window.showAlert && window.showAlert('เพิ่ม ' + total + ' งานแล้ว', 'success');
+    try {
+      for (var i = 0; i < docs.length; i++) await window.setDoc(window.getDocRef(docs[i][0], docs[i][1]), docs[i][2]);
+    } catch (e) { window.showDbError && window.showDbError(e); return; }
+    window.imtLogActivity(pid, 'task', '', 'create', 'เพิ่มงานจากข้อความ ' + total + ' งาน');
+    window.renderImplTracker();
+  }
+
+  window.saveImtTask = async function (phaseId, mode) {
+    var id = window.imtEditTaskId;
+    clearTimeout(_imtTdTimer); _imtTdTimer = null;
+    if (id) {
+      if (await imtPersistTaskForm(id) === false) return;
+      window.closeM('m-imt-task');
+      return;
+    }
+    if (window._imtTaskBulk === true) return imtSaveTaskBulk();
+    var name = imtTdVal('imt-t-name').trim();
     if (!name) { window.showAlert && window.showAlert('กรุณาระบุชื่องาน', 'error'); return; }
     var phaseSelectEl = document.getElementById('imt-t-phase');
     var finalPhaseId = phaseSelectEl ? phaseSelectEl.value : phaseId;
     if (!finalPhaseId) { window.showAlert && window.showAlert('กรุณาเพิ่ม Phase ก่อนสร้างงาน', 'error'); return; }
     var pid = window.imtCurrentProjectId;
-    if (isNew) id = window.imtUid('ITK');
-    var oldStatus = isNew ? null : imtTask(id).status;
-    var newStatus = document.getElementById('imt-t-status').value;
+    id = window.imtUid('ITK');
     var row = {
       phase_id: finalPhaseId, project_id: pid, task_name: name,
-      description: document.getElementById('imt-t-desc').value.trim(),
-      owner: document.getElementById('imt-t-owner').value, // รหัสพนักงาน
-      start_date: document.getElementById('imt-t-start').value || null,
-      due_date: document.getElementById('imt-t-due').value || null,
-      priority: document.getElementById('imt-t-priority').value,
-      status: newStatus,
-      sort_order: isNew ? (imtTasksOfPhase(finalPhaseId).length + 1) : imtTask(id).order,
+      description: imtTdVal('imt-t-desc').trim(),
+      owner: imtTdVal('imt-t-owner'), // รหัสพนักงาน
+      start_date: imtTdVal('imt-t-start') || null,
+      due_date: imtTdVal('imt-t-due') || null,
+      priority: imtTdVal('imt-t-priority'),
+      status: imtTdVal('imt-t-status') || 'not_started',
+      sort_order: imtTasksOfPhase(finalPhaseId).length + 1,
       updated_at: new Date().toISOString(),
     };
-    window.closeM('m-imt-task');
+    // เช็คลิสต์ที่เพิ่มไว้ก่อนบันทึก + ที่พิมพ์ค้างในช่องแต่ยังไม่กด Enter
+    var pendInput = document.getElementById('imt-t-ck-input');
+    var ckNames = (window._imtNewCk || []).concat(pendInput && pendInput.value.trim() ? [pendInput.value.trim()] : []);
+    var ckRows = ckNames.map(function (n, i) { return { id: window.imtUid('ICK'), row: { task_id:id, checklist_name:n, is_done:false, sort_order:i + 1 } }; });
     window.imtApplyLocal('IMPL_TASKS', id, row);
-    await window.setDoc(window.getDocRef('IMPL_TASKS', id), row);
-    // ย้ายสถานะเป็น "เสร็จแล้ว" → ติ๊ก Checklist ที่เหลือให้ครบอัตโนมัติ (ไม่ต้องไล่ติ๊กเองทีละอัน)
-    // เช็คเฉพาะตอน "เพิ่งเปลี่ยน" มาเป็น done เท่านั้น (oldStatus !== 'done') ไม่งั้นถ้า Task เป็น done
-    // อยู่แล้ว แล้วผู้ใช้ติ๊กออกบาง Checklist ในหน้านี้เอง กด "บันทึก" ซ้ำจะไปบังคับติ๊กกลับให้ครบทุกครั้ง ──
-    if (newStatus === 'done' && oldStatus !== 'done') {
-      var undoneItems = imtChecklistOf(id).filter(function (c) { return !c.done; });
-      for (var ci = 0; ci < undoneItems.length; ci++) await window.imtToggleChecklist(undoneItems[ci].id, true);
+    ckRows.forEach(function (c) { window.imtApplyLocal('IMPL_CHECKLIST_ITEMS', c.id, c.row); });
+    if (mode === 'next') {
+      // ── เปิดฟอร์มงานถัดไปทันที ใช้ Phase/ผู้รับผิดชอบ/ความสำคัญ/วันที่เดิม — พิมพ์แค่ชื่องานก็เพิ่มต่อได้เลย ──
+      window._imtTaskPreset = { ownerId:row.owner, priority:row.priority, start:row.start_date || '', due:row.due_date || '' };
+      window.openImtTaskModal(null, finalPhaseId);
+      window.showAlert && window.showAlert('บันทึก "'+name+'" แล้ว — เพิ่มงานถัดไปได้เลย', 'success');
+    } else {
+      window.closeM('m-imt-task');
     }
-    if (isNew) window.imtLogActivity(pid, 'task', id, 'create', 'สร้างงาน '+name);
-    else if (oldStatus !== newStatus) window.imtLogActivity(pid, 'task', id, 'status_change', 'เปลี่ยนสถานะ "'+name+'" เป็น '+imtStatus(newStatus).label);
-    else window.imtLogActivity(pid, 'task', id, 'update', 'แก้ไขงาน '+name);
+    await window.setDoc(window.getDocRef('IMPL_TASKS', id), row);
+    for (var ci = 0; ci < ckRows.length; ci++) await window.setDoc(window.getDocRef('IMPL_CHECKLIST_ITEMS', ckRows[ci].id), ckRows[ci].row);
+    window.imtLogActivity(pid, 'task', id, 'create', 'สร้างงาน '+name);
     window.renderImplTracker();
   };
 
+  // ── คัดลอกงาน (รวมเช็คลิสต์ที่ยังไม่ติ๊ก) แล้วเปิดงานใหม่ให้แก้ต่อ — ไม่ต้องพิมพ์รายการซ้ำ ──
+  window.imtDuplicateTask = async function (srcId) {
+    imtFlushTaskAutosave();
+    var t = imtTask(srcId); if (!t) return;
+    var id = window.imtUid('ITK');
+    var row = imtTaskRow(t, { task_name: t.name + ' (สำเนา)', status:'not_started', progress_percent:0,
+      sort_order: imtTasksOfPhase(t.phaseId).length + 1, updated_at: new Date().toISOString() });
+    window.imtApplyLocal('IMPL_TASKS', id, row);
+    await window.setDoc(window.getDocRef('IMPL_TASKS', id), row);
+    var ck = imtChecklistOf(srcId);
+    for (var i = 0; i < ck.length; i++) {
+      var cid = window.imtUid('ICK');
+      var crow = { task_id:id, checklist_name:ck[i].name, is_done:false, sort_order:i + 1 };
+      window.imtApplyLocal('IMPL_CHECKLIST_ITEMS', cid, crow);
+      await window.setDoc(window.getDocRef('IMPL_CHECKLIST_ITEMS', cid), crow);
+    }
+    window.imtLogActivity(t.projectId, 'task', id, 'create', 'คัดลอกงาน "'+t.name+'"');
+    window.renderImplTracker();
+    window.openImtTaskModal(id);
+    var nm = document.getElementById('imt-t-name'); if (nm) { nm.focus(); nm.select(); }
+  };
+
+  // ── เปลี่ยนสถานะงานจากการกระทำกับเช็คลิสต์ (ไม่ผ่านฟอร์ม) ──
+  async function imtSetTaskStatusAuto(t, status) {
+    var iso = new Date().toISOString();
+    window.imtApplyLocal('IMPL_TASKS', t.id, imtTaskRow(t, { status:status, updated_at:iso }));
+    await window.updateDoc(window.getDocRef('IMPL_TASKS', t.id), { status:status, updated_at:iso });
+    window.imtLogActivity(t.projectId, 'task', t.id, 'status_change', 'เปลี่ยนสถานะ "'+t.name+'" เป็น '+imtStatus(status).label);
+  }
+
   window.imtMarkDone = async function (id) {
+    imtFlushTaskAutosave();
     var t = imtTask(id); if (!t) return;
-    var ck = imtChecklistOf(id);
-    var ops = ck.filter(function (c) { return !c.done; });
-    for (var i = 0; i < ops.length; i++) await window.imtToggleChecklist(ops[i].id, true);
+    var ops = imtChecklistOf(id).filter(function (c) { return !c.done; });
+    for (var i = 0; i < ops.length; i++) await imtSetChecklistDone(ops[i], true);
     var nowIso = new Date().toISOString();
     window.imtApplyLocal('IMPL_TASKS', id, imtTaskRow(t, { status:'done', updated_at:nowIso }));
     await window.updateDoc(window.getDocRef('IMPL_TASKS', id), { status:'done', updated_at:nowIso });
@@ -1752,48 +2261,143 @@
   };
 
   // ── Checklist ──
-  window.imtToggleChecklist = async function (ckId, forceDone) {
-    var c = window.IMPL_CHECKLIST_ITEMS.find(function (x) { return x.id === ckId; });
-    if (!c) return;
-    var done = forceDone !== undefined ? forceDone : !c.done;
+  // ── ติ๊ก/ยกเลิก 1 รายการ (ไม่วาดหน้าใหม่ ไม่เปลี่ยนสถานะงาน) ใช้ร่วมกับติ๊กทั้งหมด/ทำเสร็จแล้ว ──
+  async function imtSetChecklistDone(c, done) {
     var actor = window.meId(); // รหัสผู้ใช้ (users.id)
     var row = { task_id:c.taskId, checklist_name:c.name, is_done:done, done_date: done ? window.todayStr() : null, done_by: done ? actor : '', remark:c.remark, sort_order:c.order };
-    window.imtApplyLocal('IMPL_CHECKLIST_ITEMS', ckId, row);
-    await window.setDoc(window.getDocRef('IMPL_CHECKLIST_ITEMS', ckId), row);
+    window.imtApplyLocal('IMPL_CHECKLIST_ITEMS', c.id, row);
+    await window.setDoc(window.getDocRef('IMPL_CHECKLIST_ITEMS', c.id), row);
     var t = imtTask(c.taskId);
-    if (t) window.imtLogActivity(t.projectId, 'checklist', ckId, 'update', (done?'✓ ทำเสร็จ: ':'☐ ยกเลิกทำ: ')+c.name);
-    // ── Task ที่มี Checklist แค่ 1 รายการ: ติ๊กเสร็จ = งานเสร็จเลย เปลี่ยนสถานะเป็น "เสร็จแล้ว" อัตโนมัติ
-    // ทำเฉพาะตอนติ๊ก "เข้า" เท่านั้น (ไม่ทำตอนติ๊กออก กันไปบังคับดึงสถานะกลับโดยที่ผู้ใช้ไม่ได้สั่ง) ──
-    if (t && done && imtChecklistOf(t.id).length === 1 && t.status !== 'done') {
-      var taskDoneIso = new Date().toISOString();
-      window.imtApplyLocal('IMPL_TASKS', t.id, imtTaskRow(t, { status:'done', updated_at:taskDoneIso }));
-      await window.updateDoc(window.getDocRef('IMPL_TASKS', t.id), { status:'done', updated_at:taskDoneIso });
-      window.imtLogActivity(t.projectId, 'task', t.id, 'status_change', 'เปลี่ยนสถานะ "'+t.name+'" เป็น '+imtStatus('done').label);
-    }
-    if (document.getElementById('m-imt-task').classList.contains('on')) window.openImtTaskModal(window.imtEditTaskId, window.imtEditPhaseId);
+    if (t) window.imtLogActivity(t.projectId, 'checklist', c.id, 'update', (done?'✓ ทำเสร็จ: ':'☐ ยกเลิกทำ: ')+c.name);
+  }
+
+  // ── หลังติ๊กเข้า: เช็คลิสต์รายการเดียว = งานเสร็จ · งานยังไม่เริ่ม = เริ่มงานให้ (ทำเฉพาะตอนติ๊ก "เข้า"
+  // ไม่ทำตอนติ๊กออก กันไปบังคับดึงสถานะกลับโดยที่ผู้ใช้ไม่ได้สั่ง) ──
+  async function imtAutoStatusAfterCheck(taskId) {
+    var t = imtTask(taskId); if (!t || t.status === 'done') return false;
+    if (imtChecklistOf(taskId).length === 1) await imtSetTaskStatusAuto(t, 'done');
+    else if (t.status === 'not_started') await imtSetTaskStatusAuto(t, 'in_progress');
+    else return false;
+    return true;
+  }
+
+  function imtRefreshOpenTask() {
+    if (imtTdModalOn() && window.imtEditTaskId) window.openImtTaskModal(window.imtEditTaskId);
     window.renderImplTracker();
+  }
+
+  // ── วาดใหม่เฉพาะกล่องเช็คลิสต์ (ไม่วาดทั้ง modal) — ติ๊กรัว ๆ ได้ไม่กระตุก ไม่เด้ง scroll · โฟกัสกลับที่รายการเดิม ──
+  var _imtCkRenderTimer = null;
+  function imtCkRedraw(taskId, focusCkId) {
+    var wrap = document.getElementById('imt-t-ck-wrap');
+    if (wrap && imtTdModalOn() && window.imtEditTaskId === taskId) {
+      wrap.innerHTML = imtChecklistHtml(taskId, imtTask(taskId), imtCanEditTask());
+      var f = focusCkId && wrap.querySelector('input[data-ck="'+focusCkId+'"]');
+      if (f) f.focus({ preventScroll:true });
+    }
+    clearTimeout(_imtCkRenderTimer); // หน้าหลังรวมวาดทีเดียวหลังหยุดติ๊ก
+    _imtCkRenderTimer = setTimeout(function () { window.renderImplTracker(); }, 500);
+  }
+  // ── สถานะงานเปลี่ยนเองจากการติ๊ก → อัปเดตปุ่มสถานะด้านขวาให้ตรง (และค่าที่ autosave จะใช้) ──
+  function imtCkSyncStatus(taskId) {
+    var t = imtTask(taskId); if (!t || window.imtEditTaskId !== taskId) return;
+    var hid = document.getElementById('imt-t-status'), pills = document.getElementById('imt-t-status-pills');
+    if (hid) hid.value = t.status;
+    if (pills) pills.innerHTML = imtStatusPillsHtml(t.status, imtCanEditTask());
+    imtCkRedraw(taskId);
+  }
+
+  // ── ติ๊กหลายรายการ: อัปเดตจอก่อน แล้วค่อยบันทึกเบื้องหลัง (บันทึกไม่สำเร็จ → ย้อนค่าเดิม) ──
+  async function imtCkApply(taskId, items, done, focusCkId) {
+    imtFlushTaskAutosave();
+    var ops = items.filter(function (c) { return c.done !== done; });
+    if (!ops.length) return;
+    var saves = ops.map(function (c) { return imtSetChecklistDone(c, done); }); // ใส่ค่าในเครื่องทันที (sync) ก่อนรอ server
+    imtCkRedraw(taskId, focusCkId);
+    try {
+      await Promise.all(saves);
+      if (done && await imtAutoStatusAfterCheck(taskId)) imtCkSyncStatus(taskId);
+    } catch (e) {
+      ops.forEach(function (c) {
+        window.imtApplyLocal('IMPL_CHECKLIST_ITEMS', c.id, { task_id:c.taskId, checklist_name:c.name, is_done:c.done, done_date:c.doneDate || null, done_by:c.doneById, remark:c.remark, sort_order:c.order });
+      });
+      imtCkRedraw(taskId, focusCkId);
+      window.showDbError(e);
+    }
+  }
+
+  window.imtToggleChecklist = function (ckId, forceDone) {
+    var c = window.IMPL_CHECKLIST_ITEMS.find(function (x) { return x.id === ckId; });
+    if (!c) return;
+    return imtCkApply(c.taskId, [c], forceDone !== undefined ? forceDone : !c.done, ckId);
   };
+
+  // ── คลิก checkbox: ปกติ = ติ๊ก 1 รายการ · Shift+คลิก = ติ๊ก/เอาออก ทั้งช่วงจากรายการที่คลิกล่าสุด (ตามที่เห็นในรายการ) ──
+  window.imtCkClick = function (e, ckId) {
+    var c = window.IMPL_CHECKLIST_ITEMS.find(function (x) { return x.id === ckId; });
+    if (!c) return;
+    var done = e.target.checked, items = [c];
+    var last = window._imtCkLast;
+    if (e.shiftKey && last && last !== ckId) {
+      var ids = Array.prototype.map.call(document.querySelectorAll('#imt-t-ck-wrap input[data-ck]'), function (el) { return el.dataset.ck; });
+      var a = ids.indexOf(last), b = ids.indexOf(ckId);
+      if (a > -1 && b > -1) {
+        var seg = ids.slice(Math.min(a, b), Math.max(a, b) + 1);
+        items = imtChecklistOf(c.taskId).filter(function (x) { return seg.indexOf(x.id) > -1; });
+      }
+    }
+    window._imtCkLast = ckId;
+    imtCkApply(c.taskId, items, done, ckId);
+  };
+
+  window.imtCkSetFilter = function (taskId, f) {
+    window._imtCkFilter = f;
+    window._imtCkLast = null;
+    imtCkRedraw(taskId);
+  };
+
+  window.imtSetAllChecklist = async function (taskId, done) {
+    var ck = imtChecklistOf(taskId);
+    var nDone = ck.filter(function (c) { return c.done; }).length;
+    if (!done && nDone >= 3 && !window.confirm('เอาเครื่องหมายออกทั้ง '+nDone+' รายการ?')) return;
+    await imtCkApply(taskId, ck, done);
+  };
+
+  async function imtAddChecklistNames(taskId, names) {
+    var order = imtChecklistOf(taskId).length;
+    for (var i = 0; i < names.length; i++) {
+      var id = window.imtUid('ICK');
+      var row = { task_id:taskId, checklist_name:names[i], is_done:false, sort_order:++order };
+      window.imtApplyLocal('IMPL_CHECKLIST_ITEMS', id, row);
+      await window.setDoc(window.getDocRef('IMPL_CHECKLIST_ITEMS', id), row);
+    }
+    window.openImtTaskModal(taskId);
+    var newInput = document.getElementById('imt-t-ck-input');
+    if (newInput) newInput.focus();
+    window.renderImplTracker();
+  }
 
   window.imtAddChecklistItem = async function (taskId) {
     var input = document.getElementById('imt-t-ck-input');
     var name = input ? input.value.trim() : '';
     if (!name) { if (input) input.focus(); return; }
-    var id = window.imtUid('ICK');
-    var order = imtChecklistOf(taskId).length + 1;
-    var row = { task_id:taskId, checklist_name:name, is_done:false, sort_order:order };
-    window.imtApplyLocal('IMPL_CHECKLIST_ITEMS', id, row);
-    await window.setDoc(window.getDocRef('IMPL_CHECKLIST_ITEMS', id), row);
-    window.openImtTaskModal(taskId, window.imtEditPhaseId);
-    var newInput = document.getElementById('imt-t-ck-input');
-    if (newInput) newInput.focus();
-    window.renderImplTracker();
+    await imtAddChecklistNames(taskId, [name]);
+  };
+
+  // ── วางข้อความหลายบรรทัด (เช่นคัดลอกจาก Excel/LINE) → แยกเป็นหลายรายการให้เอง ตัดเลขข้อ/สัญลักษณ์นำหน้า ──
+  window.imtCkPaste = function (e, taskId) {
+    var lines = imtCkLines((e.clipboardData || window.clipboardData).getData('text'));
+    if (lines.length < 2) return;
+    e.preventDefault();
+    imtAddChecklistNames(taskId, lines);
   };
 
   window.imtRemoveChecklistItem = async function (ckId) {
+    var c = window.IMPL_CHECKLIST_ITEMS.find(function (x) { return x.id === ckId; });
     window.imtRemoveLocal('IMPL_CHECKLIST_ITEMS', ckId);
+    if (c) imtCkRedraw(c.taskId);
     await window.deleteDoc(window.getDocRef('IMPL_CHECKLIST_ITEMS', ckId));
-    window.openImtTaskModal(window.imtEditTaskId, window.imtEditPhaseId);
-    window.renderImplTracker();
+    if (!c) imtRefreshOpenTask();
   };
 
   // ── Comment ──
@@ -1809,23 +2413,6 @@
     var t = imtTask(taskId);
     if (t) window.imtLogActivity(t.projectId, 'comment', id, 'comment', author+' แสดงความคิดเห็นในงาน "'+t.name+'"');
     window.openImtTaskModal(taskId, window.imtEditPhaseId);
-  };
-
-  // ── Attachment ──
-  window.imtHandleFileInput = async function (taskId, inputEl) {
-    var file = inputEl.files[0];
-    if (!file) return;
-    try {
-      await window.imtUploadAttachment(taskId, file);
-      var t = imtTask(taskId);
-      if (t) window.imtLogActivity(t.projectId, 'attachment', taskId, 'attach', 'แนบไฟล์ '+file.name);
-      window.openImtTaskModal(taskId, window.imtEditPhaseId);
-    } catch (e) { window.showDbError(e); }
-  };
-
-  window.imtDeleteAttachmentUI = async function (attId) {
-    await window.imtDeleteAttachment(attId);
-    window.openImtTaskModal(window.imtEditTaskId, window.imtEditPhaseId);
   };
 
   // ================================================================
@@ -1865,7 +2452,7 @@
   window.imtSetIssueFilter = function (key, val) {
     window.imtIssueFilter = window.imtIssueFilter || {};
     window.imtIssueFilter[key] = val;
-    window.renderImplTracker();
+    window.imtRenderKeepFocus('imt-issue-q');
   };
 
   function imtFilteredIssues(pid) {
@@ -1925,7 +2512,7 @@
       return '<option value="'+esc(c)+'"'+(f.category===c?' selected':'')+'>'+esc(c)+'</option>';
     })).join('');
     var filterBar = '<div class="imt-ws-filterbar imt-issue-filterbar">'
-      + '<div class="t-search"><input placeholder="ค้นหาปัญหา/หน่วยงาน..." value="'+esc(f.q||'')+'" oninput="window.imtSetIssueFilter(\'q\',this.value)"></div>'
+      + '<div class="t-search"><input id="imt-issue-q" placeholder="ค้นหาปัญหา/หน่วยงาน..." value="'+esc(f.q||'')+'" oninput="window.imtSetIssueFilter(\'q\',this.value)"></div>'
       // ── ตัวกรองสถานะ = ชิปพร้อมจำนวน (แทน select "ทุกสถานะ") · กดชิป = กรองสถานะนั้น
       // มือถือเหลือไอคอน+ตัวเลข (ซ่อน .lbl — มี title บอกชื่อเต็ม) ──
       + '<div class="imt-iss-stats">' + [['', '🗂️', 'ทั้งหมด', all.length, 'var(--indigo)'], ['open', '🔴', 'รอดำเนินการ', openN, 'var(--coral)'],
@@ -2212,7 +2799,7 @@
           solution: solution,
           fixedBy: fixer ? fixer.id : '', // รหัสพนักงาน
           fixedDate: closed ? String(ex.endAt || '').slice(0, 10) : '',
-          createdAt: ex.createdAt, whenLabel: ex.whenLabel, chat: ex.chat, dup: '',
+          createdAt: ex.createdAt, whenLabel: ex.whenLabel, chat: ex.chat, view: ex.view, dup: '',
         };
         // ซ้ำกับปัญหาเดิมของโครงการ หรือซ้ำกับข้อก่อนหน้าในรอบนี้ (ก้อนแชทคาบเกี่ยว)
         var dup = null, best = 0;
@@ -2232,7 +2819,6 @@
   // ── ขั้นตรวจทาน: กำหนดช่องของปัญหาให้ aiReview ──
   function imtBulkReview(items) {
     var pid = window.imtCurrentProjectId, proj = imtProject(pid);
-    var stOf = function (id) { return window.IMPL_ISSUE_STATUS.find(function (x) { return x.id === id; }) || window.IMPL_ISSUE_STATUS[0]; };
     window.aiReview.mount({
       modalId: 'm-imt-bulk', step1Id: 'imtbk-step1', step2Id: 'imtbk-step2', reviewId: 'imtbk-review', footId: 'm-imt-bulk-foot',
       items: items, unit: 'รายการ',
@@ -2240,12 +2826,16 @@
         var recv = window.staffNameByRef(imtBkVal('imt-bk-recv'));
         return '📁 <b>' + esc(proj ? proj.name : '') + '</b> · ผู้รับปัญหา: ' + (recv ? esc(recv) : '<span style="color:var(--coral);">ยังไม่ระบุ</span>');
       },
+      // ช่องที่เลือกได้ในการ์ดที่ข้อมูลไม่ครบ (ใช้กับเรื่องอื่นที่ยังว่างได้)
+      bulk: [
+        { k: 'department', label: 'หน่วยงาน', type: 'text', list: 'imt-bk-dept-dl' },
+        { k: 'reportedBy', label: 'ผู้แจ้ง', type: 'text' },
+        { k: 'category', label: 'กลุ่มปัญหา', options: function () { return imtIssueCategories().map(function (c) { return [c, c]; }); } },
+      ],
       title: function (x) { return x.problem; },
       card: function (x) {
-        var st = stOf(x.status);
         return {
           done: x.status === 'closed',
-          status: '<span class="air-st" style="color:' + st.color + ';">' + st.icon + ' ' + esc(st.label) + '</span>',
           chips: [
             ['🏢', 'หน่วยงาน', x.department || imtBkVal('imt-bk-dept')],
             ['👤', 'ผู้แจ้ง', x.reportedBy || imtBkVal('imt-bk-rep')],
@@ -2552,6 +3142,7 @@
     if (!s) return '';
     return (s.role || '') + (s.dept || '');
   }
+  window.imtStaffPositionByName = imtStaffPositionByName; // ── ใช้ร่วมกับใบส่งมอบแบบฟอร์ม (form-handover.js) ──
   window.imtOnIssueSignLNameChange = function () {
     var nameEl = document.getElementById('iip-lname'), posEl = document.getElementById('iip-lpos');
     if (!nameEl || !posEl) return;
@@ -2660,11 +3251,15 @@
       }
       return out;
     }
-    return function () {
-      var inp = document.getElementById('iip-lname'), drop = document.getElementById('iip-lname-drop'),
-        lst = document.getElementById('iip-lname-list');
+    // o (ไม่บังคับ) = { id: id ช่อง (มี -drop/-list/-wrap ต่อท้าย), onPick: เรียกหลังเลือกชื่อ } —
+    // ใบส่งมอบแบบฟอร์ม (form-handover.js) ใช้ตัวเดียวกันกับช่องของตัวเอง ──
+    return function (o) {
+      o = o || {};
+      var pre = o.id || 'iip-lname', onPick = o.onPick || window.imtOnIssueSignLNameChange;
+      var inp = document.getElementById(pre), drop = document.getElementById(pre + '-drop'),
+        lst = document.getElementById(pre + '-list');
       if (!inp || !drop || !lst) return;
-      var items = (window.STAFF || []).filter(function (s) { return s.active !== false; }).sort(window.sortStaffByDeptRank)
+      var items = (window.STAFF || []).filter(function (s) { return s.active !== false; }).sort(window.sortStaffByRank)
         .map(function (s) { return { name: s.name, sub: (s.role || '') + (s.role && s.dept ? ' · ' : '') + (s.dept || '') }; });
       var q = '', fi = -1, flat = [], dt = null, isOpen = false;
       function bFlat(sq) {
@@ -2685,7 +3280,7 @@
       function positionDrop() { window.placeDropdown(inp, drop, lst, 260); }
       function openDrop() { if (isOpen) return; isOpen = true; flat = bFlat(inp.value.trim()); fi = -1; lst.scrollTop = 0; render(); positionDrop(); drop.style.display = 'block'; window.addEventListener('resize', positionDrop); window.addEventListener('scroll', positionDrop, true); }
       function closeDrop() { if (!isOpen) return; isOpen = false; drop.style.display = 'none'; window.removeEventListener('resize', positionDrop); window.removeEventListener('scroll', positionDrop, true); }
-      function selItem(name) { inp.value = name; closeDrop(); window.imtOnIssueSignLNameChange(); }
+      function selItem(name) { inp.value = name; closeDrop(); onPick(); }
       lst.addEventListener('click', function (e) { var it = e.target.closest('.imtsg-i'); if (it) selItem(it.dataset.name); });
       lst.addEventListener('mousemove', function (e) { var it = e.target.closest('.imtsg-i'); if (it) { var ni = +it.dataset.idx; if (ni !== fi) { fi = ni; render(); } } });
       inp.addEventListener('click', function () { if (isOpen) closeDrop(); else openDrop(); });
@@ -2698,7 +3293,7 @@
         else if (e.key === 'ArrowUp') { e.preventDefault(); fi = fi > 0 ? fi - 1 : 0; render(); }
         else if (e.key === 'Enter') { e.preventDefault(); if (flat[fi]) selItem(flat[fi].name); }
       });
-      document.addEventListener('mousedown', function onOut(e) { var wrap = document.getElementById('iip-lname-wrap'); if (!wrap) { document.removeEventListener('mousedown', onOut); return; } if (!wrap.contains(e.target) && !drop.contains(e.target)) closeDrop(); });
+      document.addEventListener('mousedown', function onOut(e) { var wrap = document.getElementById(pre + '-wrap'); if (!wrap) { document.removeEventListener('mousedown', onOut); return; } if (!wrap.contains(e.target) && !drop.contains(e.target)) closeDrop(); });
     };
   })();
 
@@ -3416,7 +4011,7 @@
     if (!imtProject(pid)) return;
     var counts = {};
     imtFixerIssues(pid).forEach(function (i) { counts[i.fixedById] = (counts[i.fixedById] || 0) + 1; });
-    var ids = Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; });
+    var ids = window.sortByStaffRank(Object.keys(counts)); // เรียงตามตำแหน่ง
     var body = document.getElementById('m-imt-fixer-blog-body');
     var foot = document.getElementById('m-imt-fixer-blog-foot');
     if (!ids.length) {
@@ -3581,123 +4176,435 @@
   // TEMPLATE MANAGEMENT — สร้าง/แก้ไข Checklist Template (Phase → Task)
   // ใช้ตอนสร้างโครงการใหม่ (Apply Template) หรือ "บันทึกเป็น Template" จากโครงการที่มีอยู่
   // ================================================================
+  // ── ผูกประเภทโครงการได้ 1 ประเภท (ptypeId = PTYPES.id) · ว่าง = ใช้ร่วมทุกประเภท ──
+  function _imtPtype(id) { return (window.PTYPES || []).find(function (p) { return p.id === id; }); }
+  function _imtTplPtLabel(id) { var p = id && _imtPtype(id); return !id ? 'ใช้ร่วมทุกประเภท' : p ? p.label : 'ประเภทที่ถูกลบแล้ว'; }
+  function _imtTplPtColor(id) { var p = id && _imtPtype(id); return (p && p.color) || 'var(--txt3)'; }
+  // ── ลำดับกลุ่ม: ตามลำดับ PTYPES → ใช้ร่วม → ประเภทที่ถูกลบแล้วแต่ยังมี Template ค้าง ──
+  function _imtTplSectionIds() {
+    var ids = (window.PTYPES || []).map(function (p) { return p.id; }).concat(['']);
+    window.IMPL_TEMPLATES.forEach(function (t) { if (t.ptypeId && ids.indexOf(t.ptypeId) === -1) ids.push(t.ptypeId); });
+    return ids;
+  }
+  function _imtTplCounts(t) {
+    var ph = (t.structure && t.structure.phases) || [];
+    return { phases: ph, tasks: ph.reduce(function (s, p) { return s + (p.tasks || []).length; }, 0) };
+  }
+  // ── ตัวเลือก Template ตอนเพิ่มโครงการ: รู้ประเภทแล้ว = เฉพาะประเภทนั้น + ใช้ร่วม · ยังไม่รู้ = ทุกกลุ่ม ──
+  function _imtTplOptionsHtml(typeId, selId) {
+    var ids = typeId ? [typeId, ''] : _imtTplSectionIds();
+    return '<option value="">— ไม่ใช้ Template —</option>' + ids.map(function (sid) {
+      var list = window.IMPL_TEMPLATES.filter(function (t) { return (t.ptypeId || '') === sid; });
+      if (!list.length) return '';
+      return '<optgroup label="'+esc((sid && sid === typeId ? 'เฉพาะ ' : '') + _imtTplPtLabel(sid))+'">'
+        + list.map(function (t) { return '<option value="'+t.id+'"'+(t.id === selId ? ' selected' : '')+'>'+esc(t.name)+'</option>'; }).join('')
+        + '</optgroup>';
+    }).join('');
+  }
+  // ── เปลี่ยนโครงการในฟอร์มเพิ่มโครงการ → กรอง Template ตามประเภท และเลือก Template เฉพาะประเภทตัวแรกให้อัตโนมัติ ──
+  window.imtNewProjSourceChanged = function (srcId) {
+    var sel = document.getElementById('imt-p-template');
+    if (!sel) return;
+    var sp = srcId ? (window.PROJECTS || []).find(function (x) { return x.id === srcId; }) : null;
+    var typeId = (sp && sp.typeId) || '';
+    var first = typeId && window.IMPL_TEMPLATES.find(function (t) { return t.ptypeId === typeId; });
+    // มาจากปุ่ม "บันทึก แล้วสร้างโครงการ" → คง Template ที่เพิ่งบันทึกไว้ ถ้าใช้กับประเภทนี้ได้
+    var pref = window.imtPreferTplId && window.IMPL_TEMPLATES.find(function (t) { return t.id === window.imtPreferTplId; });
+    if (pref && (!typeId || !pref.ptypeId || pref.ptypeId === typeId)) first = pref;
+    sel.innerHTML = _imtTplOptionsHtml(typeId, first ? first.id : '');
+  };
+
+  window.imtTplFilter = '__all';
+  window.imtTplQ = '';
+  window.imtTplCollapsed = {};
+  // ── เดาประเภทโครงการของ Template ที่ยังไม่ผูก: (1) โครงการต้นทางจากคำอธิบาย 'สร้างจากโครงการ "…"' / ชื่อ "… (Template)"
+  // (2) ชื่อประเภท (หรือคำในวงเล็บของชื่อประเภท เช่น BMS INVENTORY) อยู่ในชื่อ/คำอธิบาย Template ──
+  function _imtTplGuessPtype(t) {
+    var m = /สร้างจากโครงการ\s*"([^"]+)"/.exec(t.description || '');
+    var srcNames = [m && m[1], t.name.replace(/\s*\(Template\)\s*$/i, '')].filter(Boolean);
+    for (var i = 0; i < srcNames.length; i++) {
+      var sp = (window.PROJECTS || []).find(function (p) { return p.name === srcNames[i]; });
+      if (sp && sp.typeId && _imtPtype(sp.typeId)) return sp.typeId;
+    }
+    var txt = (t.name + ' ' + (t.description || '')).toLowerCase();
+    var hit = (window.PTYPES || []).find(function (p) {
+      var lbl = (p.label || '').toLowerCase();
+      var keys = [lbl, lbl.replace(/\(.*?\)/g, '').trim()];
+      (lbl.match(/\(([^)]+)\)/g) || []).forEach(function (x) { keys.push(x.slice(1, -1).trim()); });
+      return keys.some(function (k) { return k.length >= 3 && txt.indexOf(k) !== -1; });
+    });
+    return hit ? hit.id : '';
+  }
+  function _imtTplRaw(t, patch) {
+    return Object.assign({ template_name: t.name, description: t.description, ptype_id: t.ptypeId || '', structure: t.structure }, patch);
+  }
   window.renderImtTemplates = function () { renderImtTemplates(document.getElementById('imt-content')); };
   function renderImtTemplates(mount) {
-    var toolbar = '<div class="toolbar"><div style="flex:1"></div>'
-      + (window.canAdd(window.IMPL_MODULE) ? '<button class="btn btn-pri btn-sm" onclick="window.openImtTemplateModal(null)">+ สร้าง Template</button>' : '') + '</div>';
-    var cards = window.IMPL_TEMPLATES.map(function (t) {
-      var phaseCount = (t.structure && t.structure.phases) ? t.structure.phases.length : 0;
-      var taskCount = (t.structure && t.structure.phases) ? t.structure.phases.reduce(function (s,p) { return s + (p.tasks||[]).length; }, 0) : 0;
-      return '<div class="imt-pcard" onclick="window.openImtTemplateModal(\''+t.id+'\')">'
-        + '<div class="imt-pcard-title">'+esc(t.name)+'</div>'
-        + '<div class="imt-pcard-sub">'+esc(t.description||'-')+'</div>'
-        + '<div class="imt-pcard-meta"><span>'+phaseCount+' Phase</span><span>'+taskCount+' Task</span></div>'
-        + (window.canDel(window.IMPL_MODULE) ? '<button class="btn btn-red btn-sm" style="margin-top:8px;" onclick="event.stopPropagation();window.askDel(\'imt_template\',\''+t.id+'\',\''+esc(t.name)+'\')">ลบ</button>' : '')
-        + '</div>';
-    }).join('') || '<div style="padding:40px;text-align:center;color:var(--txt3);">ยังไม่มี Template — กด "+ สร้าง Template" หรือเปิดโครงการแล้วกด "บันทึกเป็น Template"</div>';
-    mount.innerHTML = toolbar + '<div class="imt-pgrid">'+cards+'</div>';
+    var f = window.imtTplFilter;
+    var secIds = _imtTplSectionIds();
+    if (f !== '__all' && secIds.indexOf(f) === -1) f = window.imtTplFilter = '__all';
+    var chip = function (id, label, color, n) {
+      return '<button type="button" class="imt-tpl-chip'+(f === id ? ' on' : '')+'" onclick="window.imtTplSetFilter(\''+esc(id)+'\')">'
+        + (color ? '<span class="imt-tpl-dot" style="background:'+esc(color)+'"></span>' : '')
+        + esc(label)+'<b>'+n+'</b></button>';
+    };
+    var chips = chip('__all', 'ทั้งหมด', '', window.IMPL_TEMPLATES.length) + secIds.map(function (sid) {
+      var n = window.IMPL_TEMPLATES.filter(function (t) { return (t.ptypeId || '') === sid; }).length;
+      return n ? chip(sid, _imtTplPtLabel(sid), _imtTplPtColor(sid), n) : '';
+    }).join('');
+    // ── แถบแนะนำ: Template ที่ยังไม่ผูกประเภท แต่ระบบเดาประเภทได้ → กดผูกทีเดียวทั้งหมด ──
+    var unbound = window.IMPL_TEMPLATES.filter(function (t) { return !t.ptypeId; });
+    var guessN = window.canEdit(window.IMPL_MODULE) ? unbound.filter(function (t) { return _imtTplGuessPtype(t); }).length : 0;
+    var hint = guessN
+      ? '<div class="imt-tpl-hint"><span>💡 มี <b>'+unbound.length+'</b> Template ยังไม่ผูกประเภทโครงการ — ระบบหาประเภทที่น่าจะใช่ได้ <b>'+guessN+'</b> รายการ</span>'
+        + '<button class="btn btn-pri btn-sm" onclick="window.imtTplAutoGroup()">✨ จัดกลุ่มอัตโนมัติ</button></div>'
+      : '';
+    mount.innerHTML = '<div class="toolbar imt-tpl-toolbar">'
+      +   '<input class="f-input imt-tpl-search" type="search" placeholder="🔍 ค้นหา Template / Phase..." value="'+esc(window.imtTplQ)+'" oninput="window.imtTplQ=this.value;window.imtTplRenderList()">'
+      +   '<div style="flex:1"></div>'
+      +   (window.canAdd(window.IMPL_MODULE) ? '<button class="btn btn-pri btn-sm" onclick="window.openImtTemplateModal(null)">+ สร้าง Template</button>' : '')
+      + '</div>'
+      + '<div class="imt-tpl-chips">'+chips+'</div>'
+      + hint
+      + '<div id="imt-tpl-list"></div>';
+    window.imtTplRenderList();
   }
+  window.imtTplSetFilter = function (id) { window.imtTplFilter = id; window.renderImtTemplates(); };
+  window.imtTplToggleSec = function (sid) { window.imtTplCollapsed[sid] = !window.imtTplCollapsed[sid]; window.imtTplRenderList(); };
+
+  window.imtTplAutoGroup = function () {
+    var todo = window.IMPL_TEMPLATES.filter(function (t) { return !t.ptypeId; })
+      .map(function (t) { return { t: t, pt: _imtTplGuessPtype(t) }; }).filter(function (x) { return x.pt; });
+    if (!todo.length) return;
+    var msg = 'ผูกประเภทโครงการให้ ' + todo.length + ' Template:\n\n' + todo.map(function (x) { return '• ' + x.t.name + ' → ' + _imtTplPtLabel(x.pt); }).join('\n')
+      + '\n\nเปลี่ยนประเภทภายหลังได้ที่หน้าต่างแก้ไข Template';
+    window.showConfirm(msg, async function () {
+      todo.forEach(function (x) { window.imtApplyLocal('IMPL_TEMPLATES', x.t.id, _imtTplRaw(x.t, { ptype_id: x.pt })); });
+      window.renderImtTemplates();
+      for (var i = 0; i < todo.length; i++) {
+        try { await window.updateDoc(window.getDocRef('IMPL_TEMPLATES', todo[i].t.id), { ptype_id: todo[i].pt }); }
+        catch (e) { window.showDbError(e); return; }
+      }
+      window.showToast && window.showToast('จัดกลุ่ม ' + todo.length + ' Template แล้ว', 'success');
+    });
+  };
+
+  window.imtTplRenderList = function () {
+    var el = document.getElementById('imt-tpl-list');
+    if (!el) return;
+    if (!window.IMPL_TEMPLATES.length) {
+      el.innerHTML = '<div class="imt-tpl-empty">ยังไม่มี Template — กด "+ สร้าง Template" หรือเปิดโครงการแล้วกด "บันทึกเป็น Template"</div>';
+      return;
+    }
+    var f = window.imtTplFilter, q = (window.imtTplQ || '').trim().toLowerCase();
+    var canDel = window.canDel(window.IMPL_MODULE);
+    var allSec = _imtTplSectionIds();
+    var html = allSec.map(function (sid) {
+      if (f !== '__all' && f !== sid) return '';
+      var list = window.IMPL_TEMPLATES.filter(function (t) {
+        if ((t.ptypeId || '') !== sid) return false;
+        if (!q) return true;
+        var phn = ((t.structure && t.structure.phases) || []).map(function (p) { return p.phase_name; }).join(' ');
+        return (t.name + ' ' + t.description + ' ' + phn).toLowerCase().indexOf(q) !== -1;
+      }).sort(function (a, b) { return a.name.localeCompare(b.name, 'th'); });
+      if (!list.length) return '';
+      var color = _imtTplPtColor(sid), col = !q && window.imtTplCollapsed[sid];
+      // ── 1 Template = 1 แถว: ชื่อ/คำอธิบาย/ลำดับ Phase · จำนวน Phase · จำนวน Task · แก้ไข/ลบ ──
+      var rows = col ? '' : list.map(function (t) {
+        var c = _imtTplCounts(t);
+        var phs = c.phases.map(function (p, i) { return '<span class="imt-tpl-ph" title="'+(p.tasks||[]).length+' Task"><i>'+(i+1)+'</i>'+esc(p.phase_name || ('Phase '+(i+1)))+'</span>'; }).join('');
+        return '<div class="imt-tpl-row" onclick="window.openImtTemplateModal(\''+t.id+'\')" title="คลิกเพื่อดู/แก้ไข">'
+          + '<div class="imt-tpl-row-main">'
+          +   '<div class="imt-tpl-row-name">'+esc(t.name)+'</div>'
+          +   (t.description ? '<div class="imt-tpl-row-sub">'+esc(t.description)+'</div>' : '')
+          +   (phs ? '<div class="imt-tpl-phs">'+phs+'</div>' : '')
+          + '</div>'
+          + '<div class="imt-tpl-row-stat"><b>'+c.phases.length+'</b>Phase</div>'
+          + '<div class="imt-tpl-row-stat"><b>'+c.tasks+'</b>Task</div>'
+          + '<div class="imt-tpl-row-act">'
+          +   '<button class="btn btn-ghost btn-sm" title="แก้ไข" onclick="event.stopPropagation();window.openImtTemplateModal(\''+t.id+'\')">✏️</button>'
+          +   (canDel ? '<button class="btn btn-ghost btn-sm imt-tpl-del" title="ลบ Template" onclick="event.stopPropagation();window.askDel(\'imt_template\',\''+t.id+'\',\''+esc(t.name)+'\')">🗑</button>' : '')
+          + '</div></div>';
+      }).join('');
+      return '<section class="imt-tpl-sec" style="--tc:'+esc(color)+'">'
+        + '<button type="button" class="imt-tpl-sec-head" onclick="window.imtTplToggleSec(\''+esc(sid)+'\')">'
+        +   '<span class="imt-tpl-sec-bar"></span><span class="imt-tpl-sec-name">'+esc(_imtTplPtLabel(sid))+'</span>'
+        +   '<span class="imt-tpl-sec-cnt">'+list.length+' Template</span><span class="imt-tpl-sec-caret">'+(col ? '▶' : '▼')+'</span></button>'
+        + (rows ? '<div class="imt-tpl-rows">'+rows+'</div>' : '') + '</section>';
+    }).join('');
+    el.innerHTML = html || '<div class="imt-tpl-empty">ไม่พบ Template ที่ตรงกับการค้นหา</div>';
+  };
 
   // Task ใน Template draft เก็บเป็น {name, days, checklist} เสมอ (days=null = ให้ระบบประเมินอัตโนมัติจากชื่องาน,
   // checklist=[] = ยังไม่กำหนด จะใช้ชื่อ Task เป็นรายการ Checklist เดียวตอน apply เหมือนเดิม)
   // — normalize รองรับ Template เก่าที่เคยเก็บเป็น string ล้วน หรือ {name,days} ที่ยังไม่มี checklist
-  function _imtTplNormTask(tk) { return typeof tk === 'string' ? { name:tk, days:null, checklist:[] } : { name:(tk&&tk.name)||'', days:(tk&&tk.days)||null, checklist:(tk&&tk.checklist)||[] }; }
+  function _imtTplNormTask(tk) { return typeof tk === 'string' ? { name:tk, days:null, checklist:[] } : { name:(tk&&tk.name)||'', days:(tk&&tk.days)||null, checklist:((tk&&tk.checklist)||[]).slice() }; }
+
+  // ── สถานะของหน้าต่าง Template Builder (ไม่บันทึกลง DB): โหมด แบบรายการ/วางเป็นข้อความ, Phase ที่กำลังทำงานอยู่
+  // (ปุ่ม "Task ที่ใช้บ่อย" เพิ่มเข้า Phase นี้) และร่างอัตโนมัติใน localStorage กันข้อมูลหายตอนปิดหน้าต่าง/รีเฟรชโดยไม่ตั้งใจ
+  // field ที่ขึ้นต้นด้วย _ บน phase/task (_col พับ Phase, _ck เปิด Checklist) เป็นสถานะหน้าจอ ไม่ถูกบันทึก ──
+  var IMT_TPL_DRAFT_KEY = 'imtTplDraft:';
+  var IMT_TPL_DEFAULT_CHIPS = ['ติดตั้งโปรแกรม', 'ตั้งค่าระบบ', 'นำเข้าข้อมูลเดิม', 'ทดสอบระบบ', 'อบรมผู้ใช้งาน', 'Go-live', 'ติดตามหลังใช้งาน', 'ตรวจรับงาน', 'เซ็นเอกสารส่งมอบ'];
+  var _imtTplSaveTimer = null;
+
+  function _imtTplKey() { return IMT_TPL_DRAFT_KEY + (window.imtEditTemplateId || 'new'); }
+  function _imtTplLoadStored() { try { var s = JSON.parse(localStorage.getItem(_imtTplKey()) || 'null'); return s && s.draft && s.draft.phases ? s : null; } catch (e) { return null; } }
+  function _imtTplClearStored() { clearTimeout(_imtTplSaveTimer); try { localStorage.removeItem(_imtTplKey()); } catch (e) {} }
+  function _imtTplPlain(d) {
+    return { name:d.name || '', description:d.description || '', ptypeId:d.ptypeId || '', phases:d.phases.map(function (p) {
+      return { name:p.name || '', tasks:p.tasks.map(function (t) { return { name:t.name || '', days:t.days == null ? null : t.days, checklist:(t.checklist || []).slice() }; }) };
+    }) };
+  }
+  function _imtTplHm(ts) { var d = new Date(ts); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
+  function _imtTplSavedText() { return window.imtTplSavedAt ? '✓ บันทึกร่างอัตโนมัติ ' + _imtTplHm(window.imtTplSavedAt) : ''; }
+
+  // ── เรียกทุกครั้งที่ draft เปลี่ยน: อัปเดตตัวเลขสรุป + เก็บร่าง (หน่วง 0.5 วิ) — ระหว่างยังไม่ตัดสินใจกู้คืน/ทิ้งร่างเก่า
+  // จะไม่เขียนทับ กันร่างเก่าหายก่อนผู้ใช้เลือก ──
+  function _imtTplTouch() {
+    _imtTplUpdateStats();
+    if (window.imtTplRestore) return;
+    clearTimeout(_imtTplSaveTimer);
+    _imtTplSaveTimer = setTimeout(function () {
+      try { localStorage.setItem(_imtTplKey(), JSON.stringify({ at:Date.now(), draft:_imtTplPlain(window.imtTplDraft) })); } catch (e) { return; }
+      window.imtTplSavedAt = Date.now();
+      var el = document.getElementById('imt-tplb-saved');
+      if (el) el.textContent = _imtTplSavedText();
+    }, 500);
+  }
+  window.imtTplTouch = _imtTplTouch;
+
+  function _imtTplTaskDays(tk) { return tk.days != null && tk.days !== '' ? (Number(tk.days) || 0) : window.imtEstimateTaskWeight(tk.name); }
+  function _imtTplFmtDays(n) { return Math.round(n * 10) / 10; }
+  function _imtTplPhaseMeta(p) {
+    var n = 0, d = 0;
+    p.tasks.forEach(function (t) { if ((t.name || '').trim()) { n++; d += _imtTplTaskDays(t); } });
+    return n + ' Task · ~' + _imtTplFmtDays(d) + ' วัน';
+  }
+  function _imtTplUpdateStats() {
+    var s = { ph:0, tk:0, ck:0, dy:0 };
+    window.imtTplDraft.phases.forEach(function (p) {
+      s.ph++;
+      p.tasks.forEach(function (t) {
+        if (!(t.name || '').trim()) return;
+        s.tk++; s.dy += _imtTplTaskDays(t);
+        s.ck += (t.checklist || []).filter(function (c) { return (c || '').trim(); }).length;
+      });
+    });
+    var set = function (id, v) { var el = document.getElementById(id); if (el) el.textContent = v; };
+    set('imt-tplb-st-ph', s.ph); set('imt-tplb-st-tk', s.tk); set('imt-tplb-st-dy', '~' + _imtTplFmtDays(s.dy));
+    set('imt-tpl-foot-sum', s.ph + ' Phase · ' + s.tk + ' Task · ' + s.ck + ' Checklist · ประมาณ ' + _imtTplFmtDays(s.dy) + ' วันทำงาน');
+    window.imtTplDraft.phases.forEach(function (p, pi) { set('imt-tplph-meta-' + pi, _imtTplPhaseMeta(p)); });
+  }
+
+  function _imtTplActive() { return Math.max(0, Math.min(window.imtTplActivePi || 0, window.imtTplDraft.phases.length - 1)); }
+  function _imtTplChipTarget() {
+    var ap = _imtTplActive(), p = window.imtTplDraft.phases[ap];
+    return p ? 'Phase ' + (ap + 1) + (p.name ? ' · ' + p.name : '') : 'Phase ใหม่';
+  }
+  // ── "Task ที่ใช้บ่อย": ชื่อ Task ที่ซ้ำกันใน Template อื่น ๆ (เรียงตามความถี่) ไม่พอค่อยเติมรายการตั้งต้น
+  // ตัดชื่อที่มีอยู่แล้วใน Template นี้ออก กดแล้วชิปนั้นหายไป ──
+  function _imtTplChipNames() {
+    var used = {};
+    window.imtTplDraft.phases.forEach(function (p) { p.tasks.forEach(function (t) { used[(t.name || '').trim().toLowerCase()] = 1; }); });
+    var cnt = {}, label = {};
+    window.IMPL_TEMPLATES.forEach(function (t) {
+      if (t.id === window.imtEditTemplateId) return;
+      ((t.structure && t.structure.phases) || []).forEach(function (p) {
+        (p.tasks || []).forEach(function (tk) {
+          var n = (typeof tk === 'string' ? tk : (tk && tk.name) || '').trim(), k = n.toLowerCase();
+          if (!n || n.length > 40) return;
+          cnt[k] = (cnt[k] || 0) + 1; label[k] = n;
+        });
+      });
+    });
+    var names = Object.keys(cnt).filter(function (k) { return cnt[k] > 1; })
+      .sort(function (a, b) { return cnt[b] - cnt[a]; }).map(function (k) { return label[k]; });
+    if (names.length < 6) IMT_TPL_DEFAULT_CHIPS.forEach(function (n) { if (names.indexOf(n) === -1) names.push(n); });
+    return names.filter(function (n) { return !used[n.toLowerCase()]; }).slice(0, 10);
+  }
+
+  function _imtTplPhasesFromProject(pid) {
+    // ถ้า Task มีวันเริ่ม/วันแล้วเสร็จอยู่แล้ว ใช้ระยะเวลาที่เกิดขึ้นจริงเป็นค่า "จำนวนวัน" เลย (แม่นกว่าให้เดาใหม่)
+    return imtPhasesOf(pid).map(function (ph) {
+      return { name:ph.name, tasks: imtTasksOfPhase(ph.id).map(function (t) {
+        var days = null;
+        if (t.start && t.due) { var n = Math.round((pd(t.due) - pd(t.start)) / 86400000) + 1; days = n > 0 ? n : null; }
+        return { name:t.name, days:days, checklist:imtChecklistOf(t.id).map(function (c) { return c.name; }) };
+      }) };
+    });
+  }
+
+  function _imtTplOpen(title) {
+    window.imtTplMode = 'list';
+    window.imtTplActivePi = 0;
+    window.imtTplSavedAt = null;
+    window.imtTplRestore = null;
+    document.getElementById('m-imt-template-title').textContent = title;
+    var saved = document.getElementById('imt-tplb-saved'); if (saved) saved.textContent = '';
+    var sc = document.getElementById('imt-tpl-save-create'); if (sc) sc.style.display = window.canAdd(window.IMPL_MODULE) ? '' : 'none';
+    renderTplBuilderBody();
+    window.openM('m-imt-template');
+  }
 
   window.openImtTemplateModal = function (id) {
     window.imtEditTemplateId = id;
     var tpl = id ? window.IMPL_TEMPLATES.find(function (x) { return x.id === id; }) : null;
     if (tpl) {
       window.imtTplDraft = {
-        name: tpl.name, description: tpl.description,
+        name: tpl.name, description: tpl.description, ptypeId: tpl.ptypeId || '',
         phases: ((tpl.structure && tpl.structure.phases) || []).map(function (p) { return { name:p.phase_name, tasks:(p.tasks||[]).map(_imtTplNormTask) }; }),
       };
     } else {
-      window.imtTplDraft = { name:'', description:'', phases:[{ name:'', tasks:[{ name:'', days:null, checklist:[] }] }] };
+      window.imtTplDraft = { name:'', description:'', ptypeId: window.imtTplFilter !== '__all' ? window.imtTplFilter : '', phases:[{ name:'', tasks:[] }] };
     }
-    document.getElementById('m-imt-template-title').textContent = id ? 'แก้ไข Template' : 'สร้าง Template ใหม่';
-    renderTplBuilderBody();
-    window.openM('m-imt-template');
+    var st = _imtTplLoadStored();
+    var stale = st && JSON.stringify(st.draft) !== JSON.stringify(_imtTplPlain(window.imtTplDraft));
+    _imtTplOpen(id ? 'แก้ไข Template' : 'สร้าง Template ใหม่');
+    if (stale) { window.imtTplRestore = st; renderTplBuilderBody(); }
+    if (!id) setTimeout(function () { var el = document.getElementById('imt-tpl-name'); if (el) el.focus(); }, 250);
   };
 
-  // ── สร้าง Template จากโครงสร้าง Phase/Task ของโครงการที่มีอยู่แล้ว (ไม่ต้องพิมพ์ใหม่)
-  // ถ้า Task มีวันเริ่ม/วันแล้วเสร็จอยู่แล้ว ใช้ระยะเวลาที่เกิดขึ้นจริงเป็นค่า "จำนวนวัน" เลย (แม่นกว่าให้เดาใหม่) ──
+  // ── สร้าง Template จากโครงสร้าง Phase/Task ของโครงการที่มีอยู่แล้ว (ไม่ต้องพิมพ์ใหม่) ──
   window.imtSaveProjectAsTemplate = function (pid) {
     var proj = imtProject(pid);
     if (!proj) return;
-    var phases = imtPhasesOf(pid);
     window.imtEditTemplateId = null;
     window.imtTplDraft = {
       name: proj.name + ' (Template)',
       description: 'สร้างจากโครงการ "'+proj.name+'"',
-      phases: phases.map(function (ph) {
-        return { name:ph.name, tasks: imtTasksOfPhase(ph.id).map(function (t) {
-          var days = null;
-          if (t.start && t.due) { var n = Math.round((pd(t.due) - pd(t.start)) / 86400000) + 1; days = n > 0 ? n : null; }
-          var ck = imtChecklistOf(t.id).map(function (c) { return c.name; });
-          return { name:t.name, days:days, checklist:ck };
-        }) };
-      }),
+      ptypeId: (proj.source && proj.source.typeId) || '',
+      phases: _imtTplPhasesFromProject(pid),
     };
-    document.getElementById('m-imt-template-title').textContent = 'บันทึกเป็น Template ใหม่';
-    renderTplBuilderBody();
-    window.openM('m-imt-template');
+    _imtTplOpen('บันทึกเป็น Template ใหม่');
   };
 
+  // ── หน้าต่าง 2 ฝั่ง: ซ้าย = ข้อมูล Template + ตัวช่วยลดงานซ้ำ · ขวา = โครงสร้าง (แบบรายการ / วางเป็นข้อความ) ──
   function renderTplBuilderBody() {
-    var d = window.imtTplDraft;
     var body = document.getElementById('m-imt-template-body');
+    var oldList = document.getElementById('imt-tplb-list');
+    var scroll = oldList ? oldList.scrollTop : 0;
+    body.classList.add('imt-tplb');
+    body.innerHTML = '<aside class="imt-tplb-side">' + _imtTplSideHtml() + '</aside>'
+      + '<section class="imt-tplb-main">' + _imtTplMainHtml() + '</section>';
+    var list = document.getElementById('imt-tplb-list');
+    if (list) list.scrollTop = scroll;
+    if (window.imtTplMode === 'text') window.imtTplPreviewText();
+    _imtTplUpdateStats();
+  }
+
+  function _imtTplSideHtml() {
+    var d = window.imtTplDraft;
+    var secIds = _imtTplSectionIds().filter(function (s) { return s; });
+    if (d.ptypeId && secIds.indexOf(d.ptypeId) === -1) secIds.push(d.ptypeId);
+    var types = [''].concat(secIds).map(function (sid) {
+      return '<button type="button" class="imt-tplb-type'+(sid === (d.ptypeId || '') ? ' on' : '')+'" data-pt="'+esc(sid)+'" onclick="window.imtTplSetType(this.dataset.pt)">'+esc(_imtTplPtLabel(sid))+'</button>';
+    }).join('');
+    var byName = function (a, b) { return (a.name || '').localeCompare(b.name || '', 'th'); };
+    var tpls = window.IMPL_TEMPLATES.filter(function (t) { return t.id !== window.imtEditTemplateId; }).sort(byName);
+    var projs = (window.IMPL_PROJECTS || []).slice().sort(byName);
+    var chips = _imtTplChipNames().map(function (n) {
+      return '<button type="button" class="imt-tplb-chip" data-name="'+esc(n)+'" onclick="window.imtTplAddChip(this.dataset.name)">+ '+esc(n)+'</button>';
+    }).join('');
+    return '<div class="f-group"><label class="f-label" for="imt-tpl-name">ชื่อ Template *</label>'
+      +   '<input class="f-input" id="imt-tpl-name" value="'+esc(d.name)+'" placeholder="เช่น ติดตั้งระบบคลังสินค้า" oninput="window.imtTplDraft.name=this.value;window.imtTplTouch()"></div>'
+      + '<div class="f-group"><div class="f-label">ประเภทโครงการ</div><div class="imt-tplb-types">'+types+'</div>'
+      +   '<div class="imt-tplb-hint">ตอนเพิ่มโครงการ จะเห็น Template ของประเภทนั้น + ใช้ร่วมทุกประเภท</div></div>'
+      + '<div class="f-group"><label class="f-label" for="imt-tpl-desc">รายละเอียด <span class="imt-tplb-opt">(ไม่บังคับ)</span></label>'
+      +   '<textarea class="f-input" id="imt-tpl-desc" rows="2" oninput="window.imtTplDraft.description=this.value;window.imtTplTouch()">'+esc(d.description)+'</textarea></div>'
+      + '<div class="imt-tplb-stats">'
+      +   '<div><b id="imt-tplb-st-ph">0</b><span>Phase</span></div>'
+      +   '<div><b id="imt-tplb-st-tk">0</b><span>Task</span></div>'
+      +   '<div><b id="imt-tplb-st-dy">0</b><span>วันทำงาน</span></div></div>'
+      + (chips ? '<div class="imt-tplb-block"><div class="imt-tplb-bt">Task ที่ใช้บ่อย</div>'
+      +   '<div class="imt-tplb-hint">คลิกเพื่อเพิ่มเข้า <b id="imt-tplb-chip-target">'+esc(_imtTplChipTarget())+'</b></div>'
+      +   '<div class="imt-tplb-chips">'+chips+'</div></div>' : '')
+      + (tpls.length || projs.length ? '<div class="imt-tplb-block"><div class="imt-tplb-bt">เริ่มเร็วขึ้น</div>'
+      +   (tpls.length ? '<select class="f-input" aria-label="คัดลอกโครงสร้างจาก Template" onchange="window.imtTplCopyFrom(\'tpl\',this.value);this.value=\'\'"><option value="">📋 คัดลอกโครงสร้างจาก Template…</option>'
+      +     tpls.map(function (t) { return '<option value="'+t.id+'">'+esc(t.name)+'</option>'; }).join('') + '</select>' : '')
+      +   (projs.length ? '<select class="f-input" aria-label="ดึงโครงสร้างจากโครงการ" onchange="window.imtTplCopyFrom(\'proj\',this.value);this.value=\'\'"><option value="">🏗️ ดึงโครงสร้างจากโครงการ…</option>'
+      +     projs.map(function (p) { return '<option value="'+p.id+'">'+esc(p.name)+'</option>'; }).join('') + '</select>' : '')
+      +   '<div class="imt-tplb-hint">มีโครงสร้างอยู่แล้ว จะเพิ่มต่อท้ายให้</div></div>' : '')
+      + '<div class="imt-tplb-keys"><div class="imt-tplb-bt">คีย์ลัด</div>'
+      +   '<div><span>เพิ่ม Task ถัดไป</span><kbd>Enter</kbd></div>'
+      +   '<div><span>ทำซ้ำ Task นี้</span><kbd>Ctrl+D</kbd></div>'
+      +   '<div><span>บันทึก</span><kbd>Ctrl+S</kbd></div></div>';
+  }
+
+  function _imtTplMainHtml() {
+    var d = window.imtTplDraft, text = window.imtTplMode === 'text';
+    var head = '<div class="imt-tplb-head"><div class="imt-tplb-title">โครงสร้าง Phase / Task</div>'
+      + '<div class="imt-tplb-seg" role="group" aria-label="โหมดแก้ไขโครงสร้าง">'
+      +   '<button type="button" class="'+(text ? '' : 'on')+'" onclick="window.imtTplSetMode(\'list\')">☰ แบบรายการ</button>'
+      +   '<button type="button" class="'+(text ? 'on' : '')+'" onclick="window.imtTplSetMode(\'text\')">📋 วางเป็นข้อความ</button>'
+      + '</div></div>';
+    var rs = window.imtTplRestore;
+    var restore = rs ? '<div class="imt-tplb-restore"><span>📝 มีร่างที่ยังไม่ได้บันทึก (แก้ไขล่าสุด '+_imtTplHm(rs.at)+')</span>'
+      + '<button type="button" class="btn btn-pri btn-sm" onclick="window.imtTplRestoreDraft(true)">กู้คืนร่าง</button>'
+      + '<button type="button" class="btn btn-ghost btn-sm" onclick="window.imtTplRestoreDraft(false)">ทิ้ง</button></div>' : '';
+
+    if (text) {
+      var src = _imtTplToText(d.phases);
+      window._imtTplTextOrig = src;
+      return head + restore + '<div class="imt-tplb-text">'
+        + '<div class="imt-tplb-tcol">'
+        +   '<div class="imt-tplb-hint">คัดลอกจาก Excel / Word / LINE มาวางได้เลย — บรรทัดปกติ = <b>Phase</b> · ขึ้นต้นด้วย <code>-</code> = <b>Task</b> · ย่อหน้าแล้วตามด้วย <code>-</code> = <b>Checklist</b> · ใส่ <code>(3)</code> ท้าย Task = จำนวนวัน</div>'
+        +   '<textarea class="f-input" id="imt-tplb-textarea" aria-label="โครงสร้างแบบข้อความ" spellcheck="false" oninput="window.imtTplPreviewText()" onkeydown="window.imtTplTextKey(event)">'+esc(src)+'</textarea></div>'
+        + '<div class="imt-tplb-tcol">'
+        +   '<div class="imt-tplb-prevhead"><b>ตัวอย่างผลลัพธ์</b><span id="imt-tplb-prevsum"></span></div>'
+        +   '<div class="imt-tplb-preview" id="imt-tplb-preview"></div>'
+        +   '<button type="button" class="btn btn-pri" onclick="window.imtTplApplyText()">✓ ใช้โครงสร้างนี้</button></div>'
+        + '</div>';
+    }
+
+    var ap = _imtTplActive();
     var phasesHtml = d.phases.map(function (ph, pi) {
-      var tasksHtml = ph.tasks.map(function (tk, ti) {
+      var col = !!ph._col;
+      var tasksHtml = col ? '' : ph.tasks.map(function (tk, ti) {
         var guess = window.imtEstimateTaskWeight(tk.name);
         var ckList = tk.checklist || [];
-        // ── สถานะพับ/ขยาย: ถ้ายังไม่เคยกดเปิด/ปิดเองในรอบนี้ (undefined) ให้ default ตามว่ามีรายการอยู่แล้วหรือไม่
-        // กันปัญหา Checklist ที่มีอยู่แล้ว (เช่นจาก "บันทึกเป็น Template") ถูกซ่อนไว้จนดูเหมือนหายไป ──
-        var ckKey = '_imtTplCkOpen_'+pi+'_'+ti;
-        var ckOpen = window[ckKey] !== undefined ? window[ckKey] === true : ckList.length > 0;
+        // ── Checklist ที่มีรายการอยู่แล้วเปิดไว้ตั้งแต่แรก กันดูเหมือนข้อมูลหาย (เช่นจาก "บันทึกเป็น Template") ──
+        var ckOpen = tk._ck !== undefined ? tk._ck : ckList.length > 0;
         var ckRows = ckList.map(function (ckName, ci) {
-          return '<div class="imt-tpl-ckrow"><span class="imt-tpl-ckdot">☑</span><input class="f-input" value="'+esc(ckName)+'" placeholder="รายการ Checklist" oninput="window.imtTplUpdateChecklistItem('+pi+','+ti+','+ci+',this.value)">'
-            + '<button class="m-x" onclick="window.imtTplRemoveChecklistItem('+pi+','+ti+','+ci+')">✕</button></div>';
+          return '<div class="imt-tpl-ckrow"><span class="imt-tpl-ckdot">☐</span><input class="f-input" value="'+esc(ckName)+'" placeholder="รายการ Checklist" aria-label="รายการ Checklist" oninput="window.imtTplUpdateChecklistItem('+pi+','+ti+','+ci+',this.value)">'
+            + '<button type="button" class="imt-tplb-ib del" title="ลบรายการ" aria-label="ลบรายการ Checklist" onclick="window.imtTplRemoveChecklistItem('+pi+','+ti+','+ci+')">✕</button></div>';
         }).join('');
-        var ckToggleLabel = ckList.length ? ('☑ Checklist ('+ckList.length+')') : '+ เพิ่ม Checklist';
         var ckBlock = ckOpen
           ? '<div class="imt-tpl-cklist">' + ckRows
-            + '<div class="imt-tpl-ckrow imt-tpl-ckadd"><input class="f-input" id="imt-tpl-ckinput-'+pi+'-'+ti+'" placeholder="พิมพ์รายการแล้วกด Enter..." onkeydown="if(event.key===\'Enter\'){event.preventDefault();window.imtTplAddChecklistItem('+pi+','+ti+');}"><button class="btn btn-ghost btn-sm" onclick="window.imtTplAddChecklistItem('+pi+','+ti+')">+ เพิ่ม</button></div>'
+            + '<div class="imt-tpl-ckrow imt-tpl-ckadd"><input class="f-input imt-tplb-add" id="imt-tpl-ckinput-'+pi+'-'+ti+'" placeholder="+ พิมพ์รายการ Checklist แล้วกด Enter (วางหลายบรรทัดได้)" aria-label="เพิ่มรายการ Checklist" onkeydown="if(event.key===\'Enter\'&&!event.isComposing){event.preventDefault();window.imtTplAddChecklistItem('+pi+','+ti+');}" onpaste="window.imtTplCkPaste(event,'+pi+','+ti+')"></div>'
             + '</div>'
           : '';
-        // ── ลากสลับลำดับ Task แทนปุ่ม ▲▼ เดิม — drag handle อยู่ที่ตัวแถว .m-row เท่านั้น (ไม่รวม
-        // ckBlock ด้านล่างที่มี input ของตัวเอง กันชนกับการลากเลือกข้อความในช่อง Checklist) ──
+        // ── ลากสลับลำดับ Task — drag handle อยู่ที่ตัวแถว .m-row เท่านั้น (ไม่รวม ckBlock ที่มี input ของตัวเอง) ──
         var taskDragAttrs = ' draggable="true" ondragstart="window.imtTplTaskDragStart(event,'+pi+','+ti+')" ondragover="window.imtTplTaskDragOver(event)" ondragleave="window.imtTplTaskDragLeave(event)" ondrop="window.imtTplTaskDrop(event,'+pi+','+ti+')" ondragend="window.imtTplTaskDragEnd()"';
         return '<div class="imt-tpltask" id="imt-tpltask-'+pi+'-'+ti+'">'
-          + '<div class="m-row" style="margin-bottom:0;"'+taskDragAttrs+'><span class="imt-tpl-draghandle" title="ลากเพื่อสลับลำดับ Task">⠿</span><input class="f-input" style="flex:1;" value="'+esc(tk.name)+'" placeholder="ชื่อ Task" oninput="window.imtTplUpdateTask('+pi+','+ti+',this.value)">'
-          +   '<input type="number" min="0.5" step="0.5" class="f-input imt-tpl-days" value="'+(tk.days!=null?esc(String(tk.days)):'')+'" placeholder="~'+guess+'ว." title="จำนวนวันโดยประมาณ (เว้นว่าง = ให้ระบบประเมินอัตโนมัติจากชื่องาน)" oninput="window.imtTplUpdateTaskDays('+pi+','+ti+',this.value)">'
-          +   '<button class="btn btn-ghost btn-sm" style="white-space:nowrap;" onclick="window.imtTplToggleChecklist('+pi+','+ti+')">'+ckToggleLabel+'</button>'
-          +   '<button class="m-x" onclick="window.imtTplRemoveTask('+pi+','+ti+')">✕</button></div>'
+          + '<div class="m-row" style="margin-bottom:0;"'+taskDragAttrs+'><span class="imt-tpl-draghandle" title="ลากเพื่อสลับลำดับ Task">⠿</span>'
+          +   '<input class="f-input" style="flex:1;" value="'+esc(tk.name)+'" placeholder="ชื่อ Task" aria-label="ชื่อ Task" oninput="window.imtTplUpdateTask('+pi+','+ti+',this.value)" onkeydown="window.imtTplTaskKey(event,'+pi+','+ti+')">'
+          +   '<input type="number" min="0.5" step="0.5" class="f-input imt-tpl-days" value="'+(tk.days!=null?esc(String(tk.days)):'')+'" placeholder="~'+guess+'ว." aria-label="จำนวนวัน" title="จำนวนวันโดยประมาณ (เว้นว่าง = ให้ระบบประเมินอัตโนมัติจากชื่องาน)" oninput="window.imtTplUpdateTaskDays('+pi+','+ti+',this.value)">'
+          +   '<button type="button" class="imt-tplb-ckbtn'+(ckList.length ? ' has' : '')+'" onclick="window.imtTplToggleChecklist('+pi+','+ti+')">'+(ckList.length ? '☑ Checklist ('+ckList.length+')' : '+ Checklist')+'</button>'
+          +   '<button type="button" class="imt-tplb-ib del" title="ลบ Task" aria-label="ลบ Task" onclick="window.imtTplRemoveTask('+pi+','+ti+')">✕</button></div>'
           + ckBlock
           + '</div>';
       }).join('');
-      // ── ลากสลับลำดับ Phase แทนปุ่ม ▲▼ เดิม ──
       var phaseDragAttrs = ' draggable="true" ondragstart="window.imtTplPhaseDragStart(event,'+pi+')" ondragover="window.imtTplPhaseDragOver(event)" ondragleave="window.imtTplPhaseDragLeave(event)" ondrop="window.imtTplPhaseDrop(event,'+pi+')" ondragend="window.imtTplPhaseDragEnd()"';
-      return '<div class="imt-tplphase" id="imt-tplphase-'+pi+'">'
-        + '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;"'+phaseDragAttrs+'><span class="imt-tpl-draghandle" title="ลากเพื่อสลับลำดับ Phase">⠿</span>'
+      return '<div class="imt-tplphase'+(pi === ap ? ' on' : '')+(col ? ' col' : '')+'" id="imt-tplphase-'+pi+'" onfocusin="window.imtTplSetActive('+pi+')" onclick="window.imtTplSetActive('+pi+')">'
+        + '<div class="imt-tplph-head"'+phaseDragAttrs+'><span class="imt-tpl-draghandle" title="ลากเพื่อสลับลำดับ Phase">⠿</span>'
+        +   '<button type="button" class="imt-tplb-ib" title="'+(col ? 'ขยาย' : 'ย่อ')+'" aria-label="'+(col ? 'ขยาย Phase' : 'ย่อ Phase')+'" aria-expanded="'+(!col)+'" onclick="window.imtTplTogglePhase('+pi+')">'+(col ? '▸' : '▾')+'</button>'
         +   '<span class="imt-phase-num">Phase '+(pi+1)+'</span>'
-        +   '<input class="f-input" style="flex:1;font-weight:700;" value="'+esc(ph.name)+'" placeholder="ชื่อ Phase" oninput="window.imtTplUpdatePhaseName('+pi+',this.value)">'
-        +   '<button class="btn btn-red btn-sm" onclick="window.imtTplRemovePhase('+pi+')">ลบ Phase</button>'
+        +   '<input class="f-input imt-tplph-name" value="'+esc(ph.name)+'" placeholder="ชื่อ Phase" aria-label="ชื่อ Phase" oninput="window.imtTplUpdatePhaseName('+pi+',this.value)" onkeydown="if(event.key===\'Enter\'&&!event.isComposing){event.preventDefault();window.imtTplFocusAdd('+pi+');}">'
+        +   '<span class="imt-tplph-meta" id="imt-tplph-meta-'+pi+'">'+_imtTplPhaseMeta(ph)+'</span>'
+        +   '<button type="button" class="imt-tplb-ib" title="ทำซ้ำ Phase (รวม Task และ Checklist)" aria-label="ทำซ้ำ Phase" onclick="window.imtTplDupPhase('+pi+')">⧉</button>'
+        +   '<button type="button" class="imt-tplb-ib del" title="ลบ Phase" aria-label="ลบ Phase" onclick="window.imtTplRemovePhase('+pi+')">🗑</button>'
         + '</div>'
-        + tasksHtml
-        + '<button class="btn btn-ghost btn-sm" style="margin-top:6px;" onclick="window.imtTplAddTask('+pi+')">+ เพิ่ม Task</button>'
+        + (col ? '' : '<div class="imt-tplph-body">' + tasksHtml
+        +   '<div class="imt-tplb-addrow"><span class="imt-tplb-plus" aria-hidden="true">+</span>'
+        +   '<input class="f-input imt-tplb-add" id="imt-tpl-add-'+pi+'" placeholder="พิมพ์ชื่อ Task แล้วกด Enter — วางหลายบรรทัดได้ทีเดียว" aria-label="เพิ่ม Task ใน Phase '+(pi+1)+'" onkeydown="window.imtTplAddKey(event,'+pi+')" onpaste="window.imtTplAddPaste(event,'+pi+')"></div>'
+        + '</div>')
         + '</div>';
     }).join('');
-
-    body.innerHTML =
-      '<div class="f-group"><label class="f-label">ชื่อ Template *</label><input class="f-input" id="imt-tpl-name" value="'+esc(d.name)+'" oninput="window.imtTplDraft.name=this.value"></div>'
-      + '<div class="f-group"><label class="f-label">รายละเอียด</label><textarea class="f-input" id="imt-tpl-desc" oninput="window.imtTplDraft.description=this.value">'+esc(d.description)+'</textarea></div>'
-      + '<div class="sec-head"><div class="sec-label">โครงสร้าง Phase / Task</div><button class="btn btn-ghost btn-sm" onclick="window.imtTplAddPhase()">+ เพิ่ม Phase</button></div>'
-      + '<div style="font-size:11px;color:var(--txt3);margin:-2px 0 10px;">ช่อง "จำนวนวัน" ไม่บังคับกรอก — เว้นว่างไว้ ระบบจะประเมินให้เองจากชื่องาน (เช่น "ติดตั้ง/ทดสอบ" ใช้เวลามากกว่า "เซ็นเอกสาร/ส่งมอบ") ตอนสร้างโครงการจาก Template นี้'
-        + '<br>กด "+ เพิ่ม Checklist" ที่ Task เพื่อกำหนดรายการ Checklist ย่อยไว้ล่วงหน้า — ถ้าไม่กำหนด ระบบจะสร้าง Checklist 1 รายการชื่อเดียวกับ Task ให้อัตโนมัติเหมือนเดิม</div>'
-      + phasesHtml;
+    return head + restore + '<div class="imt-tplb-list" id="imt-tplb-list">' + phasesHtml
+      + '<button type="button" class="imt-tplb-addphase" onclick="window.imtTplAddPhase()">+ เพิ่ม Phase</button></div>';
   }
 
-  // หลังเพิ่ม Phase/Task ใหม่ ต้อง scroll+focus ให้เห็นทันที เพราะ modal body ยาวมาก
+  // หลังเพิ่ม Phase/Task ใหม่ ต้อง scroll+focus ให้เห็นทันที เพราะรายการยาวมาก
   // (template ต้นแบบมี 7 phase / 47 task) ไม่งั้นรายการใหม่จะถูกเพิ่มไปอยู่ล่างสุดแบบมองไม่เห็น
   function _imtTplScrollFocus(elId, inputSelector) {
     var el = document.getElementById(elId);
@@ -3706,24 +4613,253 @@
     var input = inputSelector ? el.querySelector(inputSelector) : el.querySelector('input');
     if (input) setTimeout(function () { input.focus(); }, 300);
   }
+  function _imtTplRerender() { renderTplBuilderBody(); _imtTplTouch(); }
+  function _imtTplFocusAdd(pi) {
+    var el = document.getElementById('imt-tpl-add-'+pi);
+    if (el) { el.focus(); el.scrollIntoView({ block:'nearest' }); }
+  }
+  function _imtTplFlash(elId) {
+    var el = document.getElementById(elId);
+    if (!el) return;
+    el.scrollIntoView({ block:'nearest' });
+    el.classList.add('flash');
+    setTimeout(function () { el.classList.remove('flash'); }, 900);
+  }
+  // ── แยกข้อความที่วางมาหลายบรรทัดเป็นรายการ (ตัด bullet - * • หน้าบรรทัดออก) · "(3)" ท้ายชื่อ = จำนวนวัน ──
+  var IMT_TPL_DAYS_RE = /\s*\((\d+(?:\.\d+)?)\s*(?:วัน|ว\.?)?\)\s*$/;
+  function _imtTplSplitLines(v) {
+    return String(v || '').replace(/\r/g, '').split('\n').map(function (s) { return s.replace(/^\s*[-*•▪◦]\s*/, '').replace(/\t+/g, ' ').trim(); }).filter(Boolean);
+  }
+  function _imtTplMakeTask(line) {
+    var m = IMT_TPL_DAYS_RE.exec(line);
+    return { name: line.replace(IMT_TPL_DAYS_RE, '').trim(), days: m ? Number(m[1]) : null, checklist: [] };
+  }
+  function _imtTplPushTasks(pi, lines) {
+    var ph = window.imtTplDraft.phases[pi];
+    lines.forEach(function (l) { var t = _imtTplMakeTask(l); if (t.name) ph.tasks.push(t); });
+    ph._col = false;
+  }
 
+  window.imtTplSetActive = function (pi) {
+    if (window.imtTplActivePi === pi) return;
+    window.imtTplActivePi = pi;
+    document.querySelectorAll('#m-imt-template .imt-tplphase').forEach(function (el, i) { el.classList.toggle('on', i === pi); });
+    var t = document.getElementById('imt-tplb-chip-target');
+    if (t) t.textContent = _imtTplChipTarget();
+  };
+  window.imtTplSetType = function (pt) {
+    window.imtTplDraft.ptypeId = pt || '';
+    document.querySelectorAll('#m-imt-template .imt-tplb-type').forEach(function (b) { b.classList.toggle('on', b.dataset.pt === (pt || '')); });
+    _imtTplTouch();
+  };
   window.imtTplAddPhase = function () {
-    window.imtTplDraft.phases.push({ name:'', tasks:[{ name:'', days:null, checklist:[] }] });
-    var newIdx = window.imtTplDraft.phases.length - 1;
-    renderTplBuilderBody();
-    _imtTplScrollFocus('imt-tplphase-'+newIdx);
+    window.imtTplDraft.phases.push({ name:'', tasks:[] });
+    window.imtTplActivePi = window.imtTplDraft.phases.length - 1;
+    _imtTplRerender();
+    _imtTplScrollFocus('imt-tplphase-'+window.imtTplActivePi, '.imt-tplph-name');
   };
-  window.imtTplRemovePhase = function (pi) { window.imtTplDraft.phases.splice(pi,1); renderTplBuilderBody(); };
-  window.imtTplAddTask = function (pi) {
-    window.imtTplDraft.phases[pi].tasks.push({ name:'', days:null, checklist:[] });
-    var newTi = window.imtTplDraft.phases[pi].tasks.length - 1;
-    renderTplBuilderBody();
-    _imtTplScrollFocus('imt-tpltask-'+pi+'-'+newTi);
+  window.imtTplDupPhase = function (pi) {
+    var p = window.imtTplDraft.phases[pi];
+    window.imtTplDraft.phases.splice(pi + 1, 0, {
+      name: (p.name || ('Phase ' + (pi + 1))) + ' (สำเนา)',
+      tasks: p.tasks.map(function (t) { return { name:t.name, days:t.days, checklist:(t.checklist || []).slice() }; }),
+    });
+    window.imtTplActivePi = pi + 1;
+    _imtTplRerender();
+    _imtTplScrollFocus('imt-tplphase-'+(pi + 1), '.imt-tplph-name');
   };
-  window.imtTplRemoveTask  = function (pi, ti) { window.imtTplDraft.phases[pi].tasks.splice(ti,1); renderTplBuilderBody(); };
-  window.imtTplUpdatePhaseName = function (pi, v) { window.imtTplDraft.phases[pi].name = v; };
-  window.imtTplUpdateTask      = function (pi, ti, v) { window.imtTplDraft.phases[pi].tasks[ti].name = v; };
-  window.imtTplUpdateTaskDays  = function (pi, ti, v) { window.imtTplDraft.phases[pi].tasks[ti].days = v ? Number(v) : null; };
+  window.imtTplRemovePhase = function (pi) {
+    var p = window.imtTplDraft.phases[pi];
+    var n = p.tasks.filter(function (t) { return (t.name || '').trim(); }).length;
+    var go = function () { window.imtTplDraft.phases.splice(pi, 1); _imtTplRerender(); };
+    if (!n) return go();
+    window.showConfirm('ลบ "' + (p.name || ('Phase ' + (pi + 1))) + '" พร้อม ' + n + ' Task ข้างใน?', go, { title:'ลบ Phase', okText:'ลบ' });
+  };
+  window.imtTplTogglePhase = function (pi) {
+    var p = window.imtTplDraft.phases[pi];
+    p._col = !p._col;
+    renderTplBuilderBody();
+  };
+  window.imtTplFocusAdd = function (pi) {
+    var p = window.imtTplDraft.phases[pi];
+    if (p && p._col) { p._col = false; renderTplBuilderBody(); }
+    _imtTplFocusAdd(pi);
+  };
+  // ── ช่องเพิ่ม Task ท้าย Phase: Enter = เพิ่มแล้วพิมพ์ตัวถัดไปได้ต่อทันที · วางหลายบรรทัด = หลาย Task ──
+  window.imtTplAddKey = function (ev, pi) {
+    if (ev.key !== 'Enter' || ev.isComposing) return;
+    ev.preventDefault();
+    var v = ev.target.value.trim();
+    if (!v) return;
+    _imtTplPushTasks(pi, [v]);
+    _imtTplRerender();
+    _imtTplFocusAdd(pi);
+  };
+  window.imtTplAddPaste = function (ev, pi) {
+    var t = (ev.clipboardData || window.clipboardData).getData('text');
+    if (!t || !/\n/.test(t.trim())) return;
+    ev.preventDefault();
+    var lines = _imtTplSplitLines(t);
+    _imtTplPushTasks(pi, lines);
+    _imtTplRerender();
+    _imtTplFocusAdd(pi);
+    window.showToast && window.showToast('เพิ่ม ' + lines.length + ' Task แล้ว', 'success');
+  };
+  window.imtTplAddTask = function (pi) { window.imtTplFocusAdd(pi); };
+  window.imtTplAddChip = function (name) {
+    var d = window.imtTplDraft;
+    if (!d.phases.length) d.phases.push({ name:'', tasks:[] });
+    var ap = _imtTplActive();
+    _imtTplPushTasks(ap, [name]);
+    _imtTplRerender();
+    _imtTplFlash('imt-tpltask-'+ap+'-'+(d.phases[ap].tasks.length - 1));
+  };
+  // ── Enter ในชื่อ Task = ไปแถวถัดไป (แถวสุดท้าย → ช่องเพิ่ม Task) · Ctrl+D = ทำซ้ำแถวนี้ ──
+  window.imtTplTaskKey = function (ev, pi, ti) {
+    if (ev.key === 'Enter' && !ev.isComposing) {
+      ev.preventDefault();
+      var next = document.querySelector('#imt-tpltask-'+pi+'-'+(ti + 1)+' .m-row input');
+      if (next) next.focus(); else _imtTplFocusAdd(pi);
+    } else if ((ev.ctrlKey || ev.metaKey) && (ev.key === 'd' || ev.key === 'D')) {
+      ev.preventDefault();
+      window.imtTplDupTask(pi, ti);
+    }
+  };
+  window.imtTplDupTask = function (pi, ti) {
+    var tasks = window.imtTplDraft.phases[pi].tasks, t = tasks[ti];
+    tasks.splice(ti + 1, 0, { name:t.name, days:t.days, checklist:(t.checklist || []).slice() });
+    _imtTplRerender();
+    var el = document.querySelector('#imt-tpltask-'+pi+'-'+(ti + 1)+' .m-row input');
+    if (el) { el.focus(); el.select(); }
+  };
+  window.imtTplRemoveTask  = function (pi, ti) { window.imtTplDraft.phases[pi].tasks.splice(ti,1); _imtTplRerender(); };
+  window.imtTplUpdatePhaseName = function (pi, v) {
+    window.imtTplDraft.phases[pi].name = v;
+    var t = document.getElementById('imt-tplb-chip-target');
+    if (t && pi === _imtTplActive()) t.textContent = _imtTplChipTarget();
+    _imtTplTouch();
+  };
+  window.imtTplUpdateTask      = function (pi, ti, v) { window.imtTplDraft.phases[pi].tasks[ti].name = v; _imtTplTouch(); };
+  window.imtTplUpdateTaskDays  = function (pi, ti, v) { window.imtTplDraft.phases[pi].tasks[ti].days = v ? Number(v) : null; _imtTplTouch(); };
+
+  // ── เริ่มเร็วขึ้น: ดึงโครงสร้างจาก Template อื่น / โครงการจริง — ยังว่างอยู่ = ใช้แทน · มีของเดิมแล้ว = ต่อท้าย (ไม่ทับของเดิม) ──
+  window.imtTplCopyFrom = function (kind, id) {
+    if (!id) return;
+    var d = window.imtTplDraft, phases, label;
+    if (kind === 'tpl') {
+      var t = window.IMPL_TEMPLATES.find(function (x) { return x.id === id; });
+      if (!t) return;
+      phases = ((t.structure && t.structure.phases) || []).map(function (p) { return { name:p.phase_name, tasks:(p.tasks || []).map(_imtTplNormTask) }; });
+      label = t.name;
+      if (!d.ptypeId && t.ptypeId) d.ptypeId = t.ptypeId;
+    } else {
+      var proj = imtProject(id);
+      if (!proj) return;
+      phases = _imtTplPhasesFromProject(id);
+      label = proj.name;
+      if (!(d.name || '').trim()) d.name = proj.name + ' (Template)';
+      if (!(d.description || '').trim()) d.description = 'สร้างจากโครงการ "' + proj.name + '"';
+      if (!d.ptypeId && proj.source && proj.source.typeId) d.ptypeId = proj.source.typeId;
+    }
+    if (!phases.length) { window.showToast && window.showToast('"' + label + '" ยังไม่มี Phase/Task', 'error'); return; }
+    var kept = d.phases.filter(function (p) { return (p.name || '').trim() || p.tasks.some(function (t) { return (t.name || '').trim(); }); });
+    d.phases = kept.concat(phases);
+    window.imtTplActivePi = kept.length;
+    _imtTplRerender();
+    if (kept.length) _imtTplScrollFocus('imt-tplphase-'+kept.length, '.imt-tplph-name');
+    window.showToast && window.showToast((kept.length ? 'เพิ่มต่อท้าย ' : 'ดึง ') + phases.length + ' Phase จาก "' + label + '" แล้ว', 'success');
+  };
+
+  // ── ร่างที่ค้างจากครั้งก่อน: กู้คืน = ใช้ร่าง · ทิ้ง = ลบร่าง แล้วเริ่มเก็บร่างใหม่ตามที่แก้ต่อจากนี้ ──
+  window.imtTplRestoreDraft = function (yes) {
+    var st = window.imtTplRestore;
+    window.imtTplRestore = null;
+    if (yes && st) {
+      var s = st.draft;
+      window.imtTplDraft = { name:s.name || '', description:s.description || '', ptypeId:s.ptypeId || '',
+        phases:(s.phases || []).map(function (p) { return { name:p.name || '', tasks:(p.tasks || []).map(_imtTplNormTask) }; }) };
+      window.imtTplActivePi = 0;
+      _imtTplRerender();
+      window.showToast && window.showToast('กู้คืนร่างแล้ว', 'success');
+    } else {
+      _imtTplClearStored();
+      renderTplBuilderBody();
+    }
+  };
+
+  // ── โหมด "วางเป็นข้อความ": บรรทัดปกติ = Phase · "- " = Task · ย่อหน้า + "- " = Checklist · "(3)" ท้าย Task = จำนวนวัน ──
+  function _imtTplToText(phases) {
+    return phases.map(function (p, i) {
+      return [p.name || ('Phase ' + (i + 1))].concat(p.tasks.filter(function (t) { return (t.name || '').trim(); }).map(function (t) {
+        return '- ' + t.name + (t.days != null && t.days !== '' ? ' (' + t.days + ')' : '')
+          + (t.checklist || []).filter(function (c) { return (c || '').trim(); }).map(function (c) { return '\n    - ' + c; }).join('');
+      })).join('\n');
+    }).join('\n\n');
+  }
+  // autoFirst = งานที่อยู่ก่อนหัว Phase แรก ให้รวมเป็นกลุ่ม _auto (ใช้ตอนวางงานในโครงการ → เข้า Phase ตั้งต้นที่เลือก)
+  function _imtTplParse(text, autoFirst) {
+    var out = [];
+    var curPhase = function () { if (!out.length) out.push(autoFirst ? { name:'', tasks:[], _auto:true } : { name:'Phase 1', tasks:[] }); return out[out.length - 1]; };
+    String(text || '').replace(/\r/g, '').split('\n').forEach(function (raw) {
+      if (!raw.trim()) return;
+      var m = /^([ \t ]*)[-*•▪◦]\s*(.*)$/.exec(raw);
+      if (!m) { out.push({ name:raw.replace(/^#+\s*/, '').replace(/\t+/g, ' ').trim(), tasks:[] }); return; }
+      var label = m[2].replace(/\t+/g, ' ').trim();
+      if (!label) return;
+      var ph = curPhase(), last = ph.tasks[ph.tasks.length - 1];
+      var indent = m[1].replace(/\t/g, '    ').length;
+      if (indent >= 2 && last) last.checklist.push(label);
+      else { var t = _imtTplMakeTask(label); if (t.name) ph.tasks.push(t); }
+    });
+    return out;
+  }
+  window.imtTplPreviewText = function () {
+    var ta = document.getElementById('imt-tplb-textarea'), pv = document.getElementById('imt-tplb-preview');
+    if (!ta || !pv) return;
+    var ph = _imtTplParse(ta.value), nT = 0;
+    pv.innerHTML = ph.map(function (p, i) {
+      nT += p.tasks.length;
+      return '<div class="imt-tplb-pv-ph"><div class="imt-tplb-pv-name"><span class="imt-phase-num">Phase '+(i+1)+'</span><b>'+esc(p.name)+'</b></div>'
+        + p.tasks.map(function (t) {
+          return '<div class="imt-tplb-pv-tk"><span>• '+esc(t.name)+'</span><em>'+(t.days != null ? t.days : '~' + window.imtEstimateTaskWeight(t.name))+' วัน</em></div>'
+            + t.checklist.map(function (c) { return '<div class="imt-tplb-pv-ck">☐ '+esc(c)+'</div>'; }).join('');
+        }).join('')
+        + '</div>';
+    }).join('') || '<div class="imt-tplb-hint">ยังไม่มีข้อความ — วางรายการทางซ้ายได้เลย</div>';
+    var sum = document.getElementById('imt-tplb-prevsum');
+    if (sum) sum.textContent = ph.length + ' Phase · ' + nT + ' Task';
+  };
+  // Tab ในกล่องข้อความ = ใส่ย่อหน้า (ทำ Checklist) แทนการกระโดดออกจากกล่อง
+  window.imtTplTextKey = function (ev) {
+    if (ev.key !== 'Tab' || ev.shiftKey) return;
+    ev.preventDefault();
+    var ta = ev.target, s = ta.selectionStart, e = ta.selectionEnd;
+    ta.value = ta.value.slice(0, s) + '    ' + ta.value.slice(e);
+    ta.selectionStart = ta.selectionEnd = s + 4;
+    window.imtTplPreviewText();
+  };
+  // ข้อความที่แก้แล้วยังไม่กด "ใช้โครงสร้างนี้" → ใช้ให้อัตโนมัติตอนสลับกลับ/บันทึก (ไม่ทิ้งสิ่งที่พิมพ์ไว้)
+  function _imtTplApplyPendingText() {
+    var ta = document.getElementById('imt-tplb-textarea');
+    if (window.imtTplMode !== 'text' || !ta || ta.value === window._imtTplTextOrig) return;
+    window.imtTplDraft.phases = _imtTplParse(ta.value);
+    window._imtTplTextOrig = ta.value;
+    window.imtTplActivePi = 0;
+    _imtTplTouch();
+  }
+  window.imtTplApplyText = function () {
+    _imtTplApplyPendingText();
+    window.imtTplMode = 'list';
+    renderTplBuilderBody();
+    _imtTplUpdateStats();
+  };
+  window.imtTplSetMode = function (m) {
+    if (m === window.imtTplMode) return;
+    if (m === 'list') _imtTplApplyPendingText();
+    window.imtTplMode = m;
+    renderTplBuilderBody();
+    if (m === 'text') { var ta = document.getElementById('imt-tplb-textarea'); if (ta) ta.focus(); }
+  };
 
   // ── ลากสลับลำดับ Phase ใน Template Builder (แก้ array ใน draft ตรง ๆ ไม่ต้องรอบันทึกก็เห็นผลทันที) ──
   window.imtTplPhaseDragStart = function (ev, pi) {
@@ -3750,7 +4886,8 @@
     var targetRef = phases[targetPi];
     var moved = phases.splice(fromPi, 1)[0];
     phases.splice(phases.indexOf(targetRef), 0, moved);
-    renderTplBuilderBody();
+    window.imtTplActivePi = phases.indexOf(moved);
+    _imtTplRerender();
   };
 
   // ── ลากสลับลำดับ Task ใน Template Builder (จำกัดแค่ภายใน Phase เดียวกัน) ──
@@ -3780,37 +4917,63 @@
     var targetRef = tasks[targetTi];
     var moved = tasks.splice(fromTi, 1)[0];
     tasks.splice(tasks.indexOf(targetRef), 0, moved);
-    renderTplBuilderBody();
+    _imtTplRerender();
   };
 
   // ── Checklist ย่อยของแต่ละ Task ใน Template (พับ/ขยายทีละ Task กันรกตอนมีหลาย Task) ──
   window.imtTplToggleChecklist = function (pi, ti) {
-    var key = '_imtTplCkOpen_'+pi+'_'+ti;
-    window[key] = window[key] !== true;
+    var tk = window.imtTplDraft.phases[pi].tasks[ti];
+    var open = tk._ck !== undefined ? tk._ck : (tk.checklist || []).length > 0;
+    tk._ck = !open;
     renderTplBuilderBody();
-    if (window[key]) _imtTplScrollFocus('imt-tpltask-'+pi+'-'+ti, '#imt-tpl-ckinput-'+pi+'-'+ti);
+    if (tk._ck) _imtTplScrollFocus('imt-tpltask-'+pi+'-'+ti, '#imt-tpl-ckinput-'+pi+'-'+ti);
   };
+  function _imtTplPushChecks(pi, ti, items) {
+    var tk = window.imtTplDraft.phases[pi].tasks[ti];
+    if (!tk.checklist) tk.checklist = [];
+    items.forEach(function (v) { tk.checklist.push(v); });
+    tk._ck = true;
+    _imtTplRerender();
+    var input = document.getElementById('imt-tpl-ckinput-'+pi+'-'+ti);
+    if (input) { input.focus(); input.scrollIntoView({ block:'nearest' }); }
+  }
   window.imtTplAddChecklistItem = function (pi, ti) {
     var input = document.getElementById('imt-tpl-ckinput-'+pi+'-'+ti);
     var v = input ? input.value.trim() : '';
-    if (!v) return;
-    var tk = window.imtTplDraft.phases[pi].tasks[ti];
-    if (!tk.checklist) tk.checklist = [];
-    tk.checklist.push(v);
-    window['_imtTplCkOpen_'+pi+'_'+ti] = true;
-    renderTplBuilderBody();
-    _imtTplScrollFocus('imt-tpltask-'+pi+'-'+ti, '#imt-tpl-ckinput-'+pi+'-'+ti);
+    if (v) _imtTplPushChecks(pi, ti, [v]);
+  };
+  window.imtTplCkPaste = function (ev, pi, ti) {
+    var t = (ev.clipboardData || window.clipboardData).getData('text');
+    if (!t || !/\n/.test(t.trim())) return;
+    ev.preventDefault();
+    _imtTplPushChecks(pi, ti, _imtTplSplitLines(t));
   };
   window.imtTplRemoveChecklistItem = function (pi, ti, ci) {
     window.imtTplDraft.phases[pi].tasks[ti].checklist.splice(ci,1);
-    renderTplBuilderBody();
+    _imtTplRerender();
   };
-  window.imtTplUpdateChecklistItem = function (pi, ti, ci, v) { window.imtTplDraft.phases[pi].tasks[ti].checklist[ci] = v; };
+  window.imtTplUpdateChecklistItem = function (pi, ti, ci, v) { window.imtTplDraft.phases[pi].tasks[ti].checklist[ci] = v; _imtTplTouch(); };
 
-  window.saveImtTemplate = async function () {
+  // Ctrl+S ในหน้าต่าง Template = บันทึก
+  if (!window._imtTplKeyBound) {
+    window._imtTplKeyBound = true;
+    document.addEventListener('keydown', function (e) {
+      var m = document.getElementById('m-imt-template');
+      if (!m || !m.classList.contains('on')) return;
+      if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) { e.preventDefault(); window.saveImtTemplate(); }
+    });
+  }
+
+  // andCreateProject = ปุ่ม "บันทึก แล้วสร้างโครงการ" — บันทึกแล้วเปิดหน้าต่างเพิ่มโครงการโดยเลือก Template นี้ไว้ให้
+  window.saveImtTemplate = async function (andCreateProject) {
+    _imtTplApplyPendingText();
     var d = window.imtTplDraft;
     var name = (d.name||'').trim();
-    if (!name) { window.showAlert && window.showAlert('กรุณาระบุชื่อ Template', 'error'); return; }
+    if (!name) {
+      window.showAlert && window.showAlert('กรุณาระบุชื่อ Template', 'error');
+      var ni = document.getElementById('imt-tpl-name'); if (ni) ni.focus();
+      return;
+    }
     var phases = d.phases.map(function (p, i) {
       return { phase_name: (p.name||'').trim() || ('Phase '+(i+1)), sort_order: i+1,
         tasks: p.tasks.map(function (t) {
@@ -3820,11 +4983,18 @@
     }).filter(function (p) { return p.tasks.length; });
     if (!phases.length) { window.showAlert && window.showAlert('กรุณาเพิ่มอย่างน้อย 1 Phase ที่มี Task', 'error'); return; }
     var id = window.imtEditTemplateId || window.imtUid('ITPL');
-    var row = { template_name: name, description: (d.description||'').trim(), structure: { phases: phases } };
+    var row = { template_name: name, description: (d.description||'').trim(), ptype_id: d.ptypeId || '', structure: { phases: phases } };
+    _imtTplClearStored();
     window.closeM('m-imt-template');
     window.imtApplyLocal('IMPL_TEMPLATES', id, row);
     await window.setDoc(window.getDocRef('IMPL_TEMPLATES', id), row);
     window.renderImplTracker();
+    if (andCreateProject === true && window.canAdd(window.IMPL_MODULE)) {
+      window.openImtProjectModal(null);
+      window.imtPreferTplId = id;
+      var sel = document.getElementById('imt-p-template');
+      if (sel) sel.value = id;
+    }
   };
 
   // ══════════════════════════════════════════════════════════════════════

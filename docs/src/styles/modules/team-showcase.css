@@ -1,0 +1,206 @@
+/* ================================================================
+   TEAM-SHOWCASE.CSS — 🧸 แนะนำทีม (src/modules/team-showcase.js)
+   แถบเลือกทีม (บน) + Hero carousel ตัวการ์ตูน 3D (เต็มพื้นที่) · แท็บคลังรูปทีม = กริดการ์ดพนักงาน
+   ตัวอักษรใหญ่ = Anton (index.html โหลดจาก Google Fonts)
+================================================================ */
+.ts-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.ts-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 24px; border-bottom: 1px solid var(--border); background: var(--surface); flex-shrink: 0; }
+.ts-seg { display: inline-flex; padding: 3px; border-radius: 10px; background: var(--surface3); gap: 2px; }
+.ts-seg button { border: 0; background: transparent; color: var(--txt2); font: inherit; font-size: 12.5px; font-weight: 600; padding: 6px 12px; border-radius: 8px; cursor: pointer; }
+.ts-seg button.on { background: var(--surface); color: var(--txt); box-shadow: var(--sh-sm); }
+.ts-chips { flex: 1; min-width: 0; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.ts-chips::-webkit-scrollbar { display: none; }
+.ts-chip { flex-shrink: 0; border: 1px solid var(--border); background: var(--surface); color: var(--txt2); border-radius: 999px; padding: 6px 14px; font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.ts-chip span { margin-left: 4px; font-size: 11px; color: var(--txt3); }
+.ts-chip.on { background: var(--txt); border-color: var(--txt); color: var(--surface); }
+.ts-chip.on span { color: inherit; opacity: .7; }
+.ts-acts { display: flex; gap: 6px; flex-wrap: wrap; }
+.ts-body { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; }
+
+/* ── Hero carousel ── */
+.ts-hero { --ease: cubic-bezier(0.4, 0, 0.2, 1); position: relative; flex: 1; min-height: 520px; overflow: hidden; color: #fff;
+  background: #F4845F; transition: background-color 650ms var(--ease); font-family: 'Inter', 'Noto Sans Thai', sans-serif; user-select: none; container-type: inline-size; }
+.ts-hero:fullscreen { min-height: 100vh; }
+.ts-grain { position: absolute; inset: 0; pointer-events: none; z-index: 50; opacity: .4; background-size: 200px 200px; background-repeat: repeat;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E"); }
+.ts-ghost { position: absolute; inset-inline: 0; top: 18%; z-index: 2; display: flex; justify-content: center; pointer-events: none;
+  font-family: 'Anton', Impact, sans-serif; font-weight: 900; font-size: min(380px, calc(170cqw / var(--len, 8)));  /* ตัวอักษร Anton กว้าง ~0.5em → ข้อความยาวแค่ไหนก็ไม่ล้นกว้าง stage */ line-height: 1; letter-spacing: -0.02em; text-transform: uppercase; white-space: nowrap; }
+.ts-brand { position: absolute; top: 24px; left: 32px; z-index: 60; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .18em; opacity: .9; }
+.ts-stage { position: absolute; inset: 0; z-index: 3; }
+.ts-fig { position: absolute; aspect-ratio: .6 / 1; max-width: 100%; cursor: pointer;
+  transition: transform 650ms var(--ease), filter 650ms var(--ease), opacity 650ms var(--ease), left 650ms var(--ease), height 650ms var(--ease), bottom 650ms var(--ease);
+  will-change: transform, filter, opacity; }
+.ts-fig img, .ts-fig svg { width: 100%; height: 100%; display: block; object-fit: contain; object-position: bottom center; -webkit-user-drag: none; }
+
+.ts-copy { position: absolute; bottom: 80px; left: 96px; z-index: 60; max-width: 340px; }
+.ts-role { margin: 0 0 8px; font-size: 22px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; opacity: .95; line-height: 1.25; }
+.ts-name { margin: 0 0 8px; font-size: 13px; font-weight: 600; opacity: .95; }
+.ts-desc { margin: 0 0 20px; font-size: 14px; line-height: 1.6; opacity: .85; }
+.ts-desc:empty { display: none; }
+.ts-nav { display: flex; align-items: center; gap: 12px; }
+.ts-nav button { width: 64px; height: 64px; border-radius: 50%; border: 2px solid #fff; background: transparent; color: #fff; display: grid; place-items: center;
+  cursor: pointer; padding: 0; font-size: 26px; transition: transform 150ms, background-color 150ms; }
+.ts-nav button:hover { transform: scale(1.08); background: rgba(255,255,255,.12); }
+.ts-nav button:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+.ts-nav .ts-play { width: 40px; height: 40px; font-size: 18px; border-width: 1.5px; }
+.ts-nav .ts-play.on { background: #fff; color: #1a1d2e; }
+.ts-count { font-size: 12px; font-weight: 600; opacity: .85; letter-spacing: .08em; font-variant-numeric: tabular-nums; }
+.ts-total { position: absolute; bottom: 80px; right: 40px; z-index: 60; display: flex; align-items: baseline; gap: 8px;
+  font-family: 'Anton', Impact, sans-serif; font-size: clamp(20px, 4vw, 56px); line-height: 1; letter-spacing: -0.02em; opacity: .95; }
+.ts-total small { font-size: .45em; letter-spacing: .04em; }
+
+/* stage แคบ (มือถือ / หน้าจอเล็ก) — คลาส mob ตั้งจากความกว้างจริงของ stage */
+.ts-hero.mob .ts-brand { left: 16px; }
+.ts-hero.mob .ts-copy { bottom: 24px; left: 16px; right: 16px; }
+.ts-hero.mob .ts-role { font-size: 16px; }
+.ts-hero.mob .ts-desc { display: none; }
+.ts-hero.mob .ts-nav button { width: 48px; height: 48px; font-size: 22px; }
+.ts-hero.mob .ts-nav .ts-play { width: 36px; height: 36px; font-size: 16px; }
+.ts-hero.mob .ts-total { bottom: 24px; right: 16px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ts-hero, .ts-fig { transition: none; }
+}
+
+/* ── ว่าง ── */
+.ts-empty { margin: auto; text-align: center; color: var(--txt2); padding: 48px 24px; max-width: 420px; font-size: 13px; line-height: 1.7; }
+.ts-empty b { display: block; color: var(--txt); font-size: 15px; margin-bottom: 4px; }
+.ts-empty-ic { font-size: 44px; margin-bottom: 8px; }
+
+/* ── คลังรูปทีม ── */
+.ts-lib { padding: 18px 24px 32px; display: flex; flex-direction: column; gap: 14px; }
+.ts-lib-info { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 14px; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 12px 16px; }
+.ts-lib-stat { font-size: 12.5px; color: var(--txt2); }
+.ts-lib-stat b { font-size: 20px; color: var(--txt); font-variant-numeric: tabular-nums; }
+.ts-lib-pbar { height: 6px; border-radius: 3px; background: var(--surface3); margin-top: 6px; overflow: hidden; }
+.ts-lib-pbar span { display: block; height: 100%; background: #F4845F; border-radius: 3px; }
+.ts-lib-spec { font-size: 12.5px; color: var(--txt2); line-height: 1.6; }
+.ts-lib-spec a { color: var(--violet); font-weight: 600; text-decoration: none; }
+.ts-lib-filter { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.ts-lib-filter .f-input { width: auto; flex: 0 1 260px; min-width: 0; }
+.ts-lib-cb { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--txt2); cursor: pointer; }
+.ts-lib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.ts-lib-none { grid-column: 1 / -1; text-align: center; color: var(--txt3); padding: 32px; font-size: 13px; }
+.ts-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 10px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+/* ลายตารางหมากรุก = เห็นว่ารูปพื้นใสจริงไหม */
+.ts-card-img { aspect-ratio: .6 / 1; max-width: 100%; border-radius: 8px; overflow: hidden; margin-bottom: 4px;
+  background: repeating-conic-gradient(var(--surface3) 0 25%, var(--surface) 0 50%) 0 0 / 16px 16px; }
+.ts-card-img.none { background: linear-gradient(160deg, #F79B7F, #F4845F); }
+.ts-card-img img, .ts-card-img svg { width: 100%; height: 100%; display: block; object-fit: contain; object-position: bottom center; }
+.ts-card-n { font-size: 13px; font-weight: 700; color: var(--txt); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ts-card-s { font-size: 11.5px; color: var(--txt3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ts-card-a { display: flex; gap: 6px; margin-top: 6px; }
+.ts-card-a .btn:first-child { flex: 1; }
+.ts-del:hover { color: var(--coral); border-color: var(--coral); }
+
+/* ── Modal แก้ไขทีม ── */
+.ts-ed-n { font-size: 12px; color: var(--txt3); font-weight: 600; }
+.ts-ed-hint { font-size: 11.5px; color: var(--txt3); font-weight: 400; }
+.ts-ed-none { text-align: center; color: var(--txt3); font-size: 12.5px; line-height: 1.7; padding: 24px; border: 1px dashed var(--border2); border-radius: var(--r); }
+/* สมาชิก: รายชื่อซ้าย / แก้ไขขวา */
+.ts-ed-split { display: grid; grid-template-columns: 300px minmax(0, 1fr); height: min(560px, 62vh); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; }
+.ts-ed-side { display: flex; flex-direction: column; min-height: 0; background: var(--surface2); border-right: 1px solid var(--border); }
+.ts-ed-side-h { padding: 12px 12px 8px; font-size: 13.5px; color: var(--txt); }
+.ts-ed-addsel { margin: 0 12px 10px; width: auto; border-style: dashed; }
+.ts-ed-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; padding: 0 8px 10px; }
+.ts-ed-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 8px; border: 2px solid transparent; border-radius: 10px; background: none; font: inherit; color: var(--txt); text-align: left; cursor: pointer; transition: background .15s; }
+.ts-ed-item:hover { background: var(--surface); }
+.ts-ed-item.on { background: var(--surface); border-color: var(--violet); box-shadow: 0 2px 8px rgba(124,92,252,.12); }
+.ts-ed-thumb { width: 44px; height: 54px; flex-shrink: 0; border-radius: 8px; overflow: hidden; }
+.ts-ed-thumb img, .ts-ed-thumb svg { width: 100%; height: 100%; display: block; object-fit: contain; object-position: bottom center; }
+.ts-ed-item-t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ts-ed-item-t b, .ts-ed-item-t > span:not(.ts-ed-tags) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ts-ed-item-t b { font-size: 13px; font-weight: 600; }
+.ts-ed-item-t > span:not(.ts-ed-tags) { font-size: 11.5px; color: var(--txt3); }
+.ts-ed-tags { display: flex; gap: 4px; margin-top: 2px; }
+.ts-ed-tag { font-size: 10.5px; line-height: 17px; padding: 0 6px; border-radius: 5px; background: var(--surface); border: 1px solid var(--border); color: var(--txt3); }
+.ts-ed-tag.on { background: rgba(107,191,122,.16); border-color: transparent; color: #2f7a3e; }
+.ts-ed-pane { min-width: 0; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 4px; }
+.ts-ed-pane-none { margin: auto; border: 0; }
+.ts-ed-head { display: flex; gap: 16px; align-items: center; margin-bottom: 10px; }
+.ts-ed-big { position: relative; width: 112px; height: 138px; flex-shrink: 0; border-radius: 12px; overflow: hidden; transition: background .2s; }
+.ts-ed-big img, .ts-ed-big svg { width: 100%; height: 100%; display: block; object-fit: contain; object-position: bottom center; }
+.ts-ed-up { position: absolute; left: 6px; right: 6px; bottom: 6px; height: 30px; border: 0; border-radius: 8px; background: rgba(20,16,36,.75); color: #fff; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.ts-ed-up:hover { background: rgba(20,16,36,.9); }
+.ts-ed-meta { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.ts-ed-meta b { font-size: 17px; color: var(--txt); }
+.ts-ed-meta > span:not(.ts-ed-hint) { font-size: 12.5px; color: var(--txt2); }
+.ts-ed-nav { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.ts-ed-sw { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.ts-ed-swb { width: 32px; height: 32px; border-radius: 50%; border: 0; padding: 0; cursor: pointer; transition: transform .12s; }
+.ts-ed-swb:hover { transform: scale(1.08); }
+.ts-ed-swb.on { box-shadow: 0 0 0 3px var(--surface), 0 0 0 5px var(--txt); }
+.ts-ed-swc { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px 0 4px; border: 1px dashed var(--border2); border-radius: 999px; font-size: 12px; color: var(--txt2); cursor: pointer; }
+.ts-ed-swc.on { border-style: solid; border-color: var(--txt); color: var(--txt); }
+.ts-ed-swc input { width: 24px; height: 24px; border: 0; padding: 0; background: none; cursor: pointer; }
+.ts-ed-speech { resize: vertical; font-family: inherit; line-height: 1.6; }
+.ts-ed-sprow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; }
+.ts-ed-rm { border-top: 1px solid var(--border); margin-top: 8px; padding-top: 10px; }
+.ts-ed-rmb { border: 0; background: none; color: var(--coral); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; padding: 6px 4px; }
+.ts-ed-rmb:hover { text-decoration: underline; }
+.ts-ed-voice { border: 1px solid var(--border); border-radius: var(--r); background: var(--surface2); padding: 8px 12px; margin-bottom: 12px; }
+.ts-ed-voice summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--txt); }
+.ts-ed-voice[open] summary { margin-bottom: 8px; }
+.ts-ed-voice textarea { resize: vertical; font-family: inherit; }
+.ts-ed-vhelp { font-size: 11.5px; color: var(--txt3); line-height: 1.8; margin-bottom: 8px; }
+.ts-ed-vhelp code { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; font-size: 11px; color: var(--txt2); }
+.ts-ed-polite { flex-wrap: wrap; margin: 2px 0 10px; }
+.ts-ed-reset { font-weight: 400; font-size: 11.5px; color: var(--violet); margin-left: 6px; }
+
+/* ── Modal Prompt ── */
+.ts-pr-steps { margin: 0 0 14px; padding-left: 20px; font-size: 13px; line-height: 1.7; color: var(--txt2); }
+.ts-pr-steps b { color: var(--txt); }
+.ts-pr-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 10px 0 6px; font-size: 13px; color: var(--txt); }
+.ts-pr-note { font-size: 11px; color: var(--txt3); }
+.ts-pr-styles { display: flex; flex-wrap: wrap; gap: 6px; }
+.ts-pr-chip { border: 1px solid var(--border); background: var(--surface); color: var(--txt2); border-radius: 999px; padding: 5px 12px; font: inherit; font-size: 12px; cursor: pointer; transition: .15s; }
+.ts-pr-chip:hover { border-color: var(--coral); color: var(--txt); }
+.ts-pr-chip.on { background: rgba(244,132,95,.15); border-color: var(--coral); color: var(--txt); font-weight: 600; }
+.ts-pr-ai { display: flex; gap: 8px; margin: 10px 0 4px; }
+.ts-pr-ai .f-input { flex: 1; min-width: 0; }
+.ts-pr-ai .btn { white-space: nowrap; }
+@media (max-width: 600px) { .ts-pr-ai { flex-direction: column; } }
+.ts-pr-box { font-family: var(--mono); font-size: 12px; line-height: 1.6; resize: vertical; }
+.ts-pr-tip { margin-top: 12px; font-size: 12px; color: var(--txt2); background: rgba(255,166,43,.1); border-radius: 8px; padding: 8px 12px; line-height: 1.6; }
+
+/* ── Modal แชร์ลิงก์ ── */
+#m-ts-share .m-title { min-width: 0; }
+.ts-sh-team { font-size: 12px; font-weight: 500; color: var(--txt3); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ts-sh-lbl { font-size: 11.5px; font-weight: 700; color: var(--txt3); text-transform: uppercase; letter-spacing: .04em; margin: 0 0 6px; }
+.ts-sh-opts { border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; margin-bottom: 16px; }
+.ts-sh-opt { display: flex; align-items: center; gap: 12px; padding: 10px 12px; cursor: pointer; transition: background .12s; }
+.ts-sh-opt + .ts-sh-opt { border-top: 1px solid var(--border); }
+.ts-sh-opt:hover { background: var(--surface2); }
+.ts-sh-opt > .ti { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; flex-shrink: 0; font-size: 17px; background: rgba(244,132,95,.14); color: #E5703F; }
+.ts-sh-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.35; }
+.ts-sh-txt b { font-size: 13px; font-weight: 600; color: var(--txt); }
+.ts-sh-txt small { font-size: 11.5px; color: var(--txt3); }
+/* สวิตช์เปิด/ปิด (checkbox ที่แต่งหน้าตา — กดได้ทั้งแถวผ่าน label) */
+.ts-sh-sw { appearance: none; -webkit-appearance: none; flex-shrink: 0; width: 38px; height: 22px; margin: 0; border-radius: 999px; background: var(--border2); position: relative; cursor: pointer; transition: background .18s; }
+.ts-sh-sw::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform .18s; }
+.ts-sh-sw:checked { background: #F4845F; }
+.ts-sh-sw:checked::after { transform: translateX(16px); }
+.ts-sh-sw:focus-visible { outline: 2px solid #F4845F; outline-offset: 2px; }
+.ts-sh-url { width: 100%; font-family: var(--mono); font-size: 12px; color: var(--txt2); text-overflow: ellipsis; background: var(--surface2); }
+.ts-sh-acts { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 8px; }
+.ts-sh-acts .btn { justify-content: center; white-space: nowrap; }
+.ts-sh-note { display: flex; gap: 6px; align-items: flex-start; margin-top: 12px; font-size: 11.5px; color: var(--txt3); line-height: 1.5; }
+.ts-sh-note .ti { font-size: 14px; margin-top: 1px; }
+.ts-sh-new { border: 0; background: none; padding: 4px 0; font: inherit; font-size: 12px; color: var(--txt3); cursor: pointer; }
+.ts-sh-new:hover { color: var(--coral); text-decoration: underline; }
+
+@media (max-width: 768px) {
+  .ts-bar { padding: 10px 14px; }
+  .ts-chips { order: 3; flex: 1 0 100%; }
+  .ts-acts { margin-left: auto; }
+  .ts-hero { min-height: 460px; }
+  .ts-lib { padding: 14px; }
+  .ts-lib-info { grid-template-columns: 1fr; }
+  .ts-lib-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+  /* มือถือ: รายชื่อด้านบน (สูงจำกัด) แผงแก้ไขด้านล่าง */
+  .ts-ed-split { grid-template-columns: 1fr; height: auto; }
+  .ts-ed-side { border-right: 0; border-bottom: 1px solid var(--border); }
+  .ts-ed-list { max-height: 220px; }
+  .ts-ed-pane { overflow: visible; padding: 14px; }
+  .ts-ed-big { width: 92px; height: 116px; }
+}

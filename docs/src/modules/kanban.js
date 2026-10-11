@@ -43,7 +43,7 @@ window.renderKanban = function(){
       }
       var displayProg=p.progress;
       if((sg.id==='exec'||sg.label==='ดำเนินการ')&&p.start&&p.end){var sDate=pd(p.start);var eDate=pd(p.end);var totalMs=eDate-sDate;if(totalMs>0)displayProg=Math.min(100,Math.max(0,Math.round((now-sDate)/totalMs*100)));}
-      var mems=(p.members&&p.members.length>0?p.members:p.team.map(function(id){return{sid:id};}));
+      var mems=window.sortByStaffRank(p.members&&p.members.length>0?p.members:p.team.map(function(id){return{sid:id};}));
       var nicknames=mems.slice(0,3).map(function(m){var s=staffIdx.get(m.sid);return s?s.nickname||s.name.split(' ')[0]:'';}).filter(Boolean);
       var extraMems=mems.length>3?`<span style="font-size:9px;color:var(--txt3);font-weight:600;">+${mems.length-3}</span>`:'';
       var avatarHtml=nicknames.map(function(n,i){return`<div style="width:20px;height:20px;border-radius:50%;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:${avC(i)};color:#fff;border:1.5px solid var(--surface);">${n.charAt(0)}</div>`;}).join('');
@@ -266,7 +266,7 @@ function kbPlaceName(p){
 function kbAdvFacts(p){
   var now=new Date();now.setHours(0,0,0,0);
   var pt=gT(p.typeId),pg=gG(p.groupId);
-  var mems=(p.members&&p.members.length?p.members:(p.team||[]).map(function(id){return{sid:id};}));
+  var mems=window.sortByStaffRank(p.members&&p.members.length?p.members:(p.team||[]).map(function(id){return{sid:id};}));
   var memLines=mems.map(function(m){
     var s=window.STAFF.find(function(x){return x.id===m.sid;});
     var ms=m.s||p.start,me=m.e||p.end,c=kbCountDays(ms,me);

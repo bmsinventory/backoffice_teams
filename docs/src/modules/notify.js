@@ -1,254 +1,193 @@
 const { esc, fd, fc, fca, pd, gS, gT, gG, gSt, gC, avC, uid, getFY, getYearBE, getStaffOverlaps, overlapWarnText, getStaffLeaveConflicts, getColRef, getDocRef } = window;
 const setDoc = (...a) => window.setDoc(...a);
 
-// ── HELPERS ──────────────────────────────────────────────────────────────────
-function _tokenCard(opts) {
-  // opts: { id, title, desc, tokenVar, saveFunc, testFunc, events }
-  return '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:20px 24px;margin-bottom:16px;">'
-    +'<div style="font-size:13px;font-weight:700;color:var(--txt);margin-bottom:4px;">'+opts.title+'</div>'
-    +'<div style="font-size:12px;color:var(--txt3);margin-bottom:14px;line-height:1.6;">'+opts.desc+'</div>'
-    +'<div class="f-group" style="margin-bottom:12px;">'
-    +'<label class="f-label">API Token</label>'
-    +'<div style="display:flex;gap:8px;">'
-    +'<input class="f-input" id="'+opts.id+'-input" type="password" placeholder="ใส่ Token ที่นี่..." value="'+esc(opts.tokenVar||'')+'" style="flex:1;font-family:monospace;font-size:12px;">'
-    +'<button onclick="document.getElementById(\''+opts.id+'-input\').type=document.getElementById(\''+opts.id+'-input\').type===\'password\'?\'text\':\'password\'" style="padding:8px 12px;background:var(--surface3);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:13px;" title="แสดง/ซ่อน Token">👁</button>'
-    +'</div>'
-    +'</div>'
-    +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
-    +'<button onclick="window.'+opts.saveFunc+'()" style="padding:8px 20px;background:var(--violet);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">💾 บันทึก Token</button>'
-    +'<button onclick="window.'+opts.testFunc+'()" style="padding:8px 20px;background:var(--surface2);color:var(--txt2);border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">🧪 ทดสอบส่ง</button>'
-    +'<span id="'+opts.id+'-msg" style="font-size:12px;color:var(--teal);"></span>'
-    +'</div>'
-    +(opts.events ? '<div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px;"><div style="font-size:11px;font-weight:700;color:var(--txt3);margin-bottom:6px;">เหตุการณ์ที่แจ้งเตือน</div><div style="display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--txt2);">'+opts.events.map(function(e){return'<div style="display:flex;align-items:center;gap:8px;"><span style="width:20px;text-align:center;">'+e[0]+'</span>'+e[1]+'</div>';}).join('')+'</div></div>' : '')
-    +'</div>';
-}
+// ── Token BMS Notify อยู่ที่ฐานข้อมูลเท่านั้น (ตาราง notify_tokens — หน้าเว็บอ่านไม่ได้) ─────────────
+// ส่ง: หน้าเว็บส่งแค่ช่อง + ข้อความไป /api/notify → push-worker ใน container อ่าน Token เองแล้วส่งต่อ
+// ตั้ง/ลบ: bo_notify_token_set · ดูสถานะ: bo_notify_status (เห็นแค่ 4 ตัวท้าย) — ดู NOTIFY TOKENS ใน db-schema.sql
+// ช่อง: leave · advance · project · helpdesk · training · server
+var _notifyStatus = {};
 
-// ── NOTIFY SETTINGS UI ───────────────────────────────────────────────────────
-window.renderNotifySettings=function(){
-  var c=document.getElementById('adm-body');if(!c)return;
-  var titleEl=document.getElementById('adm-head-title');
-  if(titleEl)titleEl.innerHTML='🔔 ตั้งค่าการแจ้งเตือน';
-  c.innerHTML='<div style="max-width:580px;padding:8px 4px;">'
-    +_tokenCard({
-      id:'notify-token',
-      title:'🔔 แจ้งเตือนการลางาน',
-      desc:'Token สำหรับส่งแจ้งเตือนเมื่อมีการลางาน อนุมัติ หรือไม่อนุมัติ',
-      tokenVar:window.NOTIFY_TOKEN||'',
-      saveFunc:'saveNotifyToken',
-      testFunc:'testNotify',
-      events:[['📋','บันทึกการลางานใหม่'],['✏️','แก้ไขการลางาน'],['✅','อนุมัติการลา'],['❌','ไม่อนุมัติการลา']]
-    })
-    +_tokenCard({
-      id:'notify-advance-token',
-      title:'📋 แจ้งเตือน Advance',
-      desc:'Token สำหรับแจ้งเตือนการสร้าง/อัปเดต Advance, เมื่อโครงการเข้า Stage plan, เตือนล่วงหน้า 14 วัน และอัปเดตสถานะอัตโนมัติ',
-      tokenVar:window.NOTIFY_ADVANCE_TOKEN||'',
-      saveFunc:'saveNotifyAdvanceToken',
-      testFunc:'testNotifyAdvance',
-      events:[
-        ['✅','จัดทำ Advance แล้ว (บันทึกใหม่)'],
-        ['🔄','อัปเดตสถานะ Advance (บันทึกแก้ไข) — สถานะ เคลียร์แล้ว จะแสดงสรุปใช้ไป/คงเหลือ'],
-        ['📋','ถึงกำหนดจัดทำ Advance (โครงการเข้า Stage: plan)'],
-        ['⚠️','เตือนซ้ำ: ก่อนเริ่มโครงการ 14 วัน ยังไม่มี Advance'],
-        ['⚡','อัปเดตอัตโนมัติ → เบิกแล้ว (เมื่อถึงวันเริ่มโครงการ)'],
-        ['⚡','อัปเดตอัตโนมัติ → รอเคลียร์ (เมื่อถึงวันสิ้นสุด +3 วัน)']
-      ]
-    })
-    +_tokenCard({
-      id:'notify-project-token',
-      title:'🚀 แจ้งเตือนเริ่ม/ปิดโครงการ',
-      desc:'Token สำหรับแจ้งเตือนวันเริ่มต้น วันสิ้นสุด และเมื่อโครงการเข้า Stage close',
-      tokenVar:window.NOTIFY_PROJECT_TOKEN||'',
-      saveFunc:'saveNotifyProjectToken',
-      testFunc:'testNotifyProject',
-      events:[
-        ['🚀','เริ่มดำเนินการโครงการแล้ว (วันเริ่มต้น)'],
-        ['🏁','ปิดโครงการแล้ว (วันสิ้นสุด)'],
-        ['💰','ปิดโครงการ/จ่ายเงินแล้ว + มูลค่าโครงการ (Stage: close)']
-      ]
-    })
-    +_tokenCard({
-      id:'notify-helpdesk-token',
-      title:'📞 แจ้งเตือน Helpdesk (ตั๋วด่วนที่สุด / โทรด่วน)',
-      desc:'Token สำหรับแจ้งเตือนตอนมีตั๋วระดับ "ทำงานไม่ได้เลย" เข้าใหม่ และตอนลูกค้ากดเข้าห้องคุยสด (Jitsi) สำเร็จจริง',
-      tokenVar:window.NOTIFY_HELPDESK_TOKEN||'',
-      saveFunc:'saveNotifyHelpdeskToken',
-      testFunc:'testNotifyHelpdesk',
-      events:[
-        ['🔴','ตั๋วด่วนที่สุดเข้าใหม่ (ทำงานไม่ได้เลย)'],
-        ['📞','ลูกค้ากดเข้าห้องคุยสดสำเร็จ']
-      ]
-    })
-    +_tokenCard({
-      id:'notify-training-token',
-      title:'📝 แจ้งเตือนลงทะเบียนอบรม',
-      desc:'Token กลางสำหรับแจ้งเตือนเมื่อมีผู้ลงทะเบียนอบรมใหม่ ใช้กับทุกโครงการ — โครงการที่ต้องการแยกกลุ่มหรือปิดแจ้งเตือน ตั้งทับได้ที่ ระบบอบรม › ⚙️ ตั้งค่าโครงการ',
-      tokenVar:window.NOTIFY_TRAINING_TOKEN||'',
-      saveFunc:'saveNotifyTrainingToken',
-      testFunc:'testNotifyTraining',
-      events:[
-        ['📢','มีผู้ลงทะเบียนอบรมใหม่ (ระบุโครงการ ชื่อ หน่วยงาน หัวข้อ และเวลาอบรม)']
-      ]
-    })
-    +_tokenCard({
-      id:'notify-server-token',
-      title:'🖥 แจ้งเตือนคำขอใช้งานทีม Server',
-      desc:'Token สำหรับแจ้ง DM/PM เมื่อมีคำขอใช้งานทีม Server ใหม่จากฟอร์มภายนอก และเมื่อสถานะคำขอเปลี่ยน',
-      tokenVar:window.NOTIFY_SERVER_TOKEN||'',
-      saveFunc:'saveNotifyServerToken',
-      testFunc:'testNotifyServer',
-      events:[
-        ['🖥','คำขอใหม่ — รออนุมัติ'],
-        ['✅','อนุมัติ / ❌ ไม่อนุมัติ'],
-        ['👥','จัดคนแล้ว (พร้อมรายชื่อและช่วงวัน)'],
-        ['🚫','ผู้ขอยกเลิกคำขอ']
-      ]
-    })
-    +'</div>';
-};
-
-// ── SAVE TOKENS ──────────────────────────────────────────────────────────────
-window.saveNotifyToken=async function(){
-  var val=(document.getElementById('notify-token-input')||{}).value||'';
-  var msg=document.getElementById('notify-token-msg');
-  try{
-    await setDoc(getDocRef('SETTINGS','app'),{notify_token:val},{merge:true});
-    window.NOTIFY_TOKEN=val;
-    if(msg){msg.textContent='✅ บันทึกแล้ว';setTimeout(function(){msg.textContent='';},2500);}
-  }catch(e){window.showDbError(e);}
-};
-
-window.saveNotifyAdvanceToken=async function(){
-  var val=(document.getElementById('notify-advance-token-input')||{}).value||'';
-  var msg=document.getElementById('notify-advance-token-msg');
-  try{
-    await setDoc(getDocRef('SETTINGS','app'),{notify_advance_token:val},{merge:true});
-    window.NOTIFY_ADVANCE_TOKEN=val;
-    if(msg){msg.textContent='✅ บันทึกแล้ว';setTimeout(function(){msg.textContent='';},2500);}
-  }catch(e){window.showDbError(e);}
-};
-
-window.saveNotifyProjectToken=async function(){
-  var val=(document.getElementById('notify-project-token-input')||{}).value||'';
-  var msg=document.getElementById('notify-project-token-msg');
-  try{
-    await setDoc(getDocRef('SETTINGS','app'),{notify_project_token:val},{merge:true});
-    window.NOTIFY_PROJECT_TOKEN=val;
-    if(msg){msg.textContent='✅ บันทึกแล้ว';setTimeout(function(){msg.textContent='';},2500);}
-  }catch(e){window.showDbError(e);}
-};
-
-window.saveNotifyServerToken=async function(){
-  var val=((document.getElementById('notify-server-token-input')||{}).value||'').trim();
-  var msg=document.getElementById('notify-server-token-msg');
-  try{
-    await setDoc(getDocRef('SETTINGS','app'),{notify_server_token:val},{merge:true});
-    window.NOTIFY_SERVER_TOKEN=val;
-    if(msg){msg.textContent='✅ บันทึกแล้ว';setTimeout(function(){msg.textContent='';},2500);}
-  }catch(e){window.showDbError(e);}
-};
-
-window.saveNotifyHelpdeskToken=async function(){
-  var val=(document.getElementById('notify-helpdesk-token-input')||{}).value||'';
-  var msg=document.getElementById('notify-helpdesk-token-msg');
-  try{
-    await setDoc(getDocRef('SETTINGS','app'),{notify_helpdesk_token:val},{merge:true});
-    window.NOTIFY_HELPDESK_TOKEN=val;
-    if(msg){msg.textContent='✅ บันทึกแล้ว';setTimeout(function(){msg.textContent='';},2500);}
-  }catch(e){window.showDbError(e);}
-};
-
-window.saveNotifyTrainingToken=async function(){
-  var val=((document.getElementById('notify-training-token-input')||{}).value||'').trim();
-  var msg=document.getElementById('notify-training-token-msg');
-  try{
-    await setDoc(getDocRef('SETTINGS','app'),{notify_training_token:val},{merge:true});
-    window.NOTIFY_TRAINING_TOKEN=val;
-    if(msg){msg.textContent='✅ บันทึกแล้ว';setTimeout(function(){msg.textContent='';},2500);}
-  }catch(e){window.showDbError(e);}
-};
-
-// ── CORE FETCH (ตรวจ HTTP status + คืน error message) ────────────────────────
-async function _doNotifyFetch(token, content) {
-  var url = (window.NOTIFY_PROXY_URL || '').trim() || 'https://api-notify.bmscloud.in.th/api/v1/push-notify';
-  var res = await fetch(url, {
+// → { ok, status, body, skipped } · skipped = ช่องนี้ยังไม่ได้ตั้ง Token (ไม่ได้ส่ง)
+async function _doNotifyFetch(channel, content) {
+  var res = await fetch('/api/notify', {
     method: 'POST',
-    headers: { 'Token': token, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ content: content, receiver: null })
+    headers: { 'Content-Type': 'application/json', 'x-bo-session': (window.BmsSession && window.BmsSession.token()) || '' },
+    body: JSON.stringify({ channel: channel, content: content })
   });
   var body = '';
   try { body = await res.text(); } catch(e) {}
-  return { ok: res.ok, status: res.status, body: body };
+  return { ok: res.ok && res.status !== 204, status: res.status, body: body, skipped: res.status === 204 };
 }
 
-// ── TEST WITH UI FEEDBACK ─────────────────────────────────────────────────────
-async function _testWithFeedback(token, content, msgId) {
-  var msgEl = document.getElementById(msgId);
-  function _msg(color, text, autoClear) {
-    if (!msgEl) return;
-    msgEl.style.color = color;
-    msgEl.textContent = text;
-    if (autoClear) setTimeout(function(){ msgEl.textContent = ''; }, 3000);
-  }
-  if (!token) { _msg('var(--coral)', '❌ ยังไม่ได้บันทึก Token'); return; }
-  _msg('var(--txt3)', '⏳ กำลังส่ง...', false);
-  try {
-    var r = await _doNotifyFetch(token, content);
-    if (r.ok) {
-      _msg('var(--teal)', '✅ ส่งสำเร็จ! (HTTP ' + r.status + ')', true);
-    } else {
-      _msg('var(--coral)', '❌ HTTP ' + r.status + ' — ' + (r.body || 'server ไม่ตอบกลับ'));
-    }
-  } catch(e) {
-    _msg('var(--coral)', '❌ ส่งไม่ได้: ' + (e.message || String(e)));
-  }
+async function _loadNotifyStatus() {
+  var r = await window.getDb().rpc('bo_notify_status', { p_token: window.BmsSession.token() });
+  if (r.error) throw r.error;
+  _notifyStatus = r.data || {};
 }
 
-// ── TEST BUTTONS ─────────────────────────────────────────────────────────────
-window.testNotify = async function() {
-  await _testWithFeedback(
-    window.NOTIFY_TOKEN || '',
-    '🔔 **ทดสอบระบบแจ้งเตือน**\nการแจ้งเตือนทำงานปกติ ✅',
-    'notify-token-msg'
-  );
-};
-window.testNotifyAdvance = async function() {
-  var fake = { name:'[ทดสอบ] โครงการตัวอย่าง', siteOwner:'ทดสอบไซต์', installer:'ทดสอบผู้ติดตั้ง', start:window.todayStr(), end:'' };
-  await _testWithFeedback(
-    window.NOTIFY_ADVANCE_TOKEN || '',
-    '📋 **ทดสอบ: ถึงกำหนดจัดทำ Advance**\n' + _projNotifyBlock(fake),
-    'notify-advance-token-msg'
-  );
-};
-window.testNotifyProject = async function() {
-  var fake = { name:'[ทดสอบ] โครงการตัวอย่าง', siteOwner:'ทดสอบไซต์', installer:'ทดสอบผู้ติดตั้ง', start:window.todayStr(), end:window.todayStr() };
-  await _testWithFeedback(
-    window.NOTIFY_PROJECT_TOKEN || '',
-    '🚀 **ทดสอบ: เริ่มดำเนินการโครงการแล้ว**\n' + _projNotifyBlock(fake),
-    'notify-project-token-msg'
-  );
-};
-window.testNotifyHelpdesk = async function() {
-  await _testWithFeedback(
-    window.NOTIFY_HELPDESK_TOKEN || '',
-    '🔴 **ทดสอบ: ตั๋วด่วนที่สุด — ทำงานไม่ได้เลย**\n🎫 เลขที่: [ทดสอบ]\n🏢 โรงพยาบาล: ทดสอบ',
-    'notify-helpdesk-token-msg'
-  );
-};
-window.testNotifyTraining = async function() {
-  await _testWithFeedback(
-    window.NOTIFY_TRAINING_TOKEN || '',
-    '📢 ทดสอบ: มีผู้ลงทะเบียนใหม่\n🏢 โครงการ: [ทดสอบ] โครงการตัวอย่าง\n👤 ชื่อ-สกุล: [ทดสอบ]',
-    'notify-training-token-msg'
-  );
+// ── NOTIFY SETTINGS UI ───────────────────────────────────────────────────────
+var _NOTIFY_CARDS = [
+  { key:'leave', icon:'🔔', name:'การลางาน', short:'บันทึก / แก้ไข / อนุมัติการลา',
+    desc:'Token สำหรับส่งแจ้งเตือนเมื่อมีการลางาน อนุมัติ หรือไม่อนุมัติ',
+    test:function(){ return '🔔 **ทดสอบระบบแจ้งเตือน**\nการแจ้งเตือนทำงานปกติ ✅'; },
+    events:[['📋','บันทึกการลางานใหม่'],['✏️','แก้ไขการลางาน'],['✅','อนุมัติการลา'],['❌','ไม่อนุมัติการลา']] },
+  { key:'advance', icon:'📋', name:' Advance', short:'สร้าง/อัปเดต Advance, เตือนล่วงหน้า 14 วัน',
+    desc:'Token สำหรับแจ้งเตือนการสร้าง/อัปเดต Advance, เมื่อโครงการเข้า Stage plan, เตือนล่วงหน้า 14 วัน และอัปเดตสถานะอัตโนมัติ',
+    test:function(){ return '📋 **ทดสอบ: ถึงกำหนดจัดทำ Advance**\n' + _projNotifyBlock({ name:'[ทดสอบ] โครงการตัวอย่าง', siteOwner:'ทดสอบไซต์', installer:'ทดสอบผู้ติดตั้ง', start:window.todayStr(), end:'' }); },
+    events:[
+      ['✅','จัดทำ Advance แล้ว (บันทึกใหม่)'],
+      ['🔄','อัปเดตสถานะ Advance (บันทึกแก้ไข) — สถานะ เคลียร์แล้ว จะแสดงสรุปใช้ไป/คงเหลือ'],
+      ['📋','ถึงกำหนดจัดทำ Advance (โครงการเข้า Stage: plan)'],
+      ['⚠️','เตือนซ้ำ: ก่อนเริ่มโครงการ 14 วัน ยังไม่มี Advance'],
+      ['⚡','อัปเดตอัตโนมัติ → เบิกแล้ว (เมื่อถึงวันเริ่มโครงการ)'],
+      ['⚡','อัปเดตอัตโนมัติ → รอเคลียร์ (เมื่อถึงวันสิ้นสุด +3 วัน)']
+    ] },
+  { key:'project', icon:'🚀', name:'เริ่ม/ปิดโครงการ', short:'วันเริ่ม วันสิ้นสุด และ Stage close',
+    desc:'Token สำหรับแจ้งเตือนวันเริ่มต้น วันสิ้นสุด และเมื่อโครงการเข้า Stage close',
+    test:function(){ return '🚀 **ทดสอบ: เริ่มดำเนินการโครงการแล้ว**\n' + _projNotifyBlock({ name:'[ทดสอบ] โครงการตัวอย่าง', siteOwner:'ทดสอบไซต์', installer:'ทดสอบผู้ติดตั้ง', start:window.todayStr(), end:window.todayStr() }); },
+    events:[
+      ['🚀','เริ่มดำเนินการโครงการแล้ว (วันเริ่มต้น)'],
+      ['🏁','ปิดโครงการแล้ว (วันสิ้นสุด)'],
+      ['💰','ปิดโครงการ/จ่ายเงินแล้ว + มูลค่าโครงการ (Stage: close)']
+    ] },
+  { key:'helpdesk', icon:'📞', name:' Helpdesk ด่วน', short:'ตั๋วด่วนที่สุด / ลูกค้าโทรด่วน',
+    desc:'Token สำหรับแจ้งเตือนตอนมีตั๋วระดับ "ทำงานไม่ได้เลย" เข้าใหม่ และตอนลูกค้ากดเข้าห้องคุยสด (Jitsi) สำเร็จจริง',
+    test:function(){ return '🔴 **ทดสอบ: ตั๋วด่วนที่สุด — ทำงานไม่ได้เลย**\n🎫 เลขที่: [ทดสอบ]\n🏢 โรงพยาบาล: ทดสอบ'; },
+    events:[['🔴','ตั๋วด่วนที่สุดเข้าใหม่ (ทำงานไม่ได้เลย)'],['📞','ลูกค้ากดเข้าห้องคุยสดสำเร็จ']] },
+  { key:'training', icon:'📝', name:'ลงทะเบียนอบรม', short:'มีผู้ลงทะเบียนอบรมใหม่',
+    desc:'Token กลางสำหรับแจ้งเตือนเมื่อมีผู้ลงทะเบียนอบรมใหม่ ใช้กับทุกโครงการ — โครงการที่ต้องการแยกกลุ่มหรือปิดแจ้งเตือน ตั้งทับได้ที่ ระบบอบรม › ⚙️ ตั้งค่าโครงการ',
+    test:function(){ return '📢 ทดสอบ: มีผู้ลงทะเบียนใหม่\n🏢 โครงการ: [ทดสอบ] โครงการตัวอย่าง\n👤 ชื่อ-สกุล: [ทดสอบ]'; },
+    events:[['📢','มีผู้ลงทะเบียนอบรมใหม่ (ระบุโครงการ ชื่อ หน่วยงาน หัวข้อ และเวลาอบรม)']] },
+  { key:'server', icon:'🖥', name:'คำขอใช้งานทีม Server', short:'คำขอใหม่ และเมื่อสถานะเปลี่ยน',
+    desc:'Token สำหรับแจ้ง DM/PM เมื่อมีคำขอใช้งานทีม Server ใหม่จากฟอร์มภายนอก และเมื่อสถานะคำขอเปลี่ยน',
+    test:function(){ return '🖥 **ทดสอบ: คำขอใช้งานทีม Server ใหม่ — รออนุมัติ**\n🧾 เลขที่: **[ทดสอบ]**\n👤 ผู้ขอ: ทดสอบ (ติดตั้งระบบ)\n🏥 โรงพยาบาลทดสอบ\n📅 12 ต.ค. 69 – 14 ต.ค. 69 (2 คน)\n🛠 ติดตั้ง Server Master\n🧑‍💻 IT รพ. : ทดสอบ · 0812345678\n[🔗 เปิดลิงค์เพื่ออนุมัติ](https://backoffice-teams.bmscloud.in.th/#server_request=test)'; },
+    events:[['🖥','คำขอใหม่ — รออนุมัติ'],['✅','อนุมัติ / ❌ ไม่อนุมัติ'],['👥','จัดคนแล้ว (พร้อมรายชื่อและช่วงวัน)'],['🚫','ผู้ขอยกเลิกคำขอ']] }
+];
+
+// แบบรายการซ้าย (สถานะทุกช่องทาง) + รายละเอียดขวา (Token / ทดสอบ / เหตุการณ์) — ช่องที่ตั้งแล้วซ่อนช่องกรอกไว้หลังปุ่ม "เปลี่ยน Token"
+var _ntfSel = 'leave', _ntfEdit = false, _ntfDelAsk = false;
+
+function _ntfSuffix(key) { return (_notifyStatus[key] || '').replace('…', ''); }
+
+function _ntfListItem(c) {
+  var on = !!_notifyStatus[c.key], sel = c.key === _ntfSel;
+  return '<button type="button" class="ntf-item'+(sel?' is-sel':'')+'" aria-pressed="'+sel+'" onclick="window.pickNotifyChannel(\''+c.key+'\')">'
+    +'<span class="ntf-item-ic">'+c.icon+'</span>'
+    +'<span class="ntf-item-txt"><span class="ntf-item-name">'+c.name.trim()+'</span><span class="ntf-item-short">'+c.short+'</span></span>'
+    +'<span class="ntf-pill '+(on?'is-on':'is-off')+'" title="'+(on?'พร้อมใช้':'ยังไม่ตั้ง Token')+'">'+(on?'พร้อมใช้':'ยังไม่ตั้ง')+'</span>'
+    +'</button>';
+}
+
+function _ntfDetail(c) {
+  var suf = _ntfSuffix(c.key), empty = !suf, form = empty || _ntfEdit, id = 'ntf-' + c.key;
+  var h = '<div class="ntf-d-head"><span class="ntf-d-ic">'+c.icon+'</span><div style="min-width:0;">'
+    +'<div class="ntf-d-title">แจ้งเตือน'+c.name+'</div><div class="ntf-d-desc">'+c.desc+'</div></div></div>';
+  if (!form) {
+    h += '<div class="ntf-ok"><span class="ntf-ok-ic">✓</span>'
+      +'<div class="ntf-ok-txt"><b>เชื่อมต่อแล้ว</b><span>Token ลงท้าย <code>'+esc(suf)+'</code> · เก็บที่เซิร์ฟเวอร์เท่านั้น</span></div>'
+      +'<div class="ntf-actions"><button type="button" class="ntf-btn primary" onclick="window.testNotifyKey(\''+c.key+'\')">🧪 ทดสอบส่ง</button>'
+      +'<button type="button" class="ntf-btn" onclick="window.editNotifyKey(true)">เปลี่ยน Token</button></div></div>';
+  } else {
+    h += '<div class="ntf-form">'
+      +(empty ? '<div class="ntf-warn">⚠️ ยังไม่ได้ตั้ง Token — ช่องทางนี้จะยังไม่ส่งแจ้งเตือน</div>' : '')
+      +'<label class="f-label" for="'+id+'-input">'+(empty?'API Token':'Token ใหม่ (แทนที่ของเดิม)')+'</label>'
+      +'<div class="ntf-actions"><input class="f-input ntf-input" id="'+id+'-input" type="password" autocomplete="off" placeholder="วาง Token ที่นี่" onkeydown="if(event.key===\'Enter\')window.saveNotifyKey(\''+c.key+'\')">'
+      +'<button type="button" class="ntf-btn primary" onclick="window.saveNotifyKey(\''+c.key+'\')">💾 บันทึก</button>'
+      +(empty ? '' : '<button type="button" class="ntf-btn" onclick="window.editNotifyKey(false)">ยกเลิก</button>')
+      +'</div><div class="ntf-hint">Token เก็บที่เซิร์ฟเวอร์เท่านั้น หลังบันทึกจะแสดงแค่ 4 ตัวท้าย</div></div>';
+  }
+  h += '<div id="'+id+'-msg" class="ntf-msg" role="status"></div>';
+  h += '<div><div class="ntf-sec">จะแจ้งเตือนเมื่อ</div><ul class="ntf-events">'
+    + c.events.map(function(e){ return '<li><span>'+e[0]+'</span>'+e[1]+'</li>'; }).join('') + '</ul></div>';
+  if (!form) {
+    h += '<div class="ntf-danger"><span>ลบ Token แล้วช่องทางนี้จะหยุดส่งแจ้งเตือนทันที</span>'
+      +(_ntfDelAsk
+        ? '<div class="ntf-actions"><b style="color:var(--coral);font-size:13px;">ยืนยันลบ?</b>'
+          +'<button type="button" class="ntf-btn danger-fill" onclick="window.clearNotifyKey(\''+c.key+'\')">ลบเลย</button>'
+          +'<button type="button" class="ntf-btn" onclick="window.askClearNotifyKey(false)">ไม่ลบ</button></div>'
+        : '<button type="button" class="ntf-btn danger" onclick="window.askClearNotifyKey(true)">🗑 ลบ Token</button>')
+      +'</div>';
+  }
+  return h;
+}
+
+function _ntfRender() {
+  var c = document.getElementById('adm-body'); if (!c) return;
+  var cur = _NOTIFY_CARDS.find(function(x){ return x.key === _ntfSel; }) || _NOTIFY_CARDS[0];
+  var ready = _NOTIFY_CARDS.filter(function(x){ return _notifyStatus[x.key]; }).length, total = _NOTIFY_CARDS.length;
+  c.innerHTML = '<div class="ntf-wrap">'
+    +'<div class="ntf-top"><div class="ntf-top-sub">เลือกช่องทางทางซ้าย แล้วตั้ง Token / ทดสอบส่งได้ทางขวา</div>'
+    +'<div class="ntf-sum"><div><b>'+ready+' จาก '+total+'</b> ช่องทางพร้อมใช้งาน</div>'
+    +'<div class="ntf-bar"><div style="width:'+Math.round(ready/total*100)+'%"></div></div></div></div>'
+    +'<div class="ntf-body"><nav class="ntf-list" aria-label="ช่องทางแจ้งเตือน">'+_NOTIFY_CARDS.map(_ntfListItem).join('')+'</nav>'
+    +'<section class="ntf-detail">'+_ntfDetail(cur)+'</section></div></div>';
+  if (_ntfEdit) { var inp = document.getElementById('ntf-'+cur.key+'-input'); if (inp) inp.focus(); }
+}
+
+window.pickNotifyChannel = function(key){ _ntfSel = key; _ntfEdit = false; _ntfDelAsk = false; _ntfRender(); };
+window.editNotifyKey = function(on){ _ntfEdit = !!on; _ntfDelAsk = false; _ntfRender(); };
+window.askClearNotifyKey = function(on){ _ntfDelAsk = !!on; _ntfRender(); };
+
+window.renderNotifySettings=async function(){
+  var c=document.getElementById('adm-body');if(!c)return;
+  var titleEl=document.getElementById('adm-head-title');
+  if(titleEl)titleEl.innerHTML='🔔 ตั้งค่าการแจ้งเตือน';
+  c.innerHTML='<div style="padding:24px;color:var(--txt3);font-size:13px;">⏳ กำลังโหลด...</div>';
+  try{ await _loadNotifyStatus(); }
+  catch(e){ c.innerHTML='<div style="padding:24px;color:var(--coral);font-size:13px;">❌ โหลดสถานะการแจ้งเตือนไม่ได้: '+esc(e.message||String(e))+'</div>'; return; }
+  if(window.admCur!=='notify')return; // ระหว่างโหลดเปลี่ยนแท็บไปแล้ว
+  _ntfEdit = false; _ntfDelAsk = false;
+  _ntfRender();
 };
 
-window.testNotifyServer = async function() {
-  await _testWithFeedback(
-    window.NOTIFY_SERVER_TOKEN || '',
-    '🖥 **ทดสอบ: คำขอใช้งานทีม Server ใหม่ — รออนุมัติ**\n🧾 เลขที่: **[ทดสอบ]**\n👤 ผู้ขอ: ทดสอบ (ติดตั้งระบบ)\n🏥 โรงพยาบาลทดสอบ\n📅 12 ต.ค. 69 – 14 ต.ค. 69 (2 คน)\n🛠 ติดตั้ง Server Master\n🧑‍💻 IT รพ. : ทดสอบ · 0812345678\n[🔗 เปิดลิงค์เพื่ออนุมัติ](https://backoffice-teams.bmscloud.in.th/#server_request=test)',
-    'notify-server-token-msg'
-  );
+function _ntfMsg(key, color, text, autoClear) {
+  var el = document.getElementById('ntf-' + key + '-msg');
+  if (!el) return;
+  el.style.color = color;
+  el.textContent = text;
+  el.classList.toggle('is-show', !!text);
+  if (autoClear) setTimeout(function(){ el.textContent = ''; el.classList.remove('is-show'); }, 3000);
+}
+
+async function _setNotifyKey(key, value) {
+  var r = await window.getDb().rpc('bo_notify_token_set', { p_token: window.BmsSession.token(), p_key: key, p_value: value });
+  if (r.error) throw r.error;
+  await _loadNotifyStatus();
+  _ntfEdit = false; _ntfDelAsk = false;
+  _ntfRender();
+}
+
+// ── SAVE / DELETE TOKENS ─────────────────────────────────────────────────────
+window.saveNotifyKey=async function(key){
+  var val=((document.getElementById('ntf-'+key+'-input')||{}).value||'').trim();
+  if(!val){_ntfMsg(key,'var(--coral)','❌ กรุณาใส่ Token');return;}
+  try{
+    await _setNotifyKey(key,val);
+    _ntfMsg(key,'var(--teal)','✅ บันทึกแล้ว — กด 🧪 ทดสอบส่ง เพื่อตรวจได้เลย',true);
+  }catch(e){window.showDbError(e);}
+};
+
+window.clearNotifyKey=async function(key){
+  try{
+    await _setNotifyKey(key,'');
+    _ntfMsg(key,'var(--teal)','✅ ลบแล้ว',true);
+  }catch(e){window.showDbError(e);}
+};
+
+// ── TEST WITH UI FEEDBACK (ใช้ Token ที่บันทึกไว้) ──────────────────────────────
+window.testNotifyKey=async function(key){
+  var c=_NOTIFY_CARDS.find(function(x){return x.key===key;});
+  if(!c)return;
+  if(!_notifyStatus[key]){_ntfMsg(key,'var(--coral)','❌ ยังไม่ได้บันทึก Token');return;}
+  _ntfMsg(key,'var(--txt3)','⏳ กำลังส่ง...');
+  try{
+    var r=await _doNotifyFetch(key,c.test());
+    if(r.skipped)_ntfMsg(key,'var(--coral)','❌ ยังไม่ได้บันทึก Token');
+    else if(r.ok)_ntfMsg(key,'var(--teal)','✅ ส่งสำเร็จ! (HTTP '+r.status+')',true);
+    else _ntfMsg(key,'var(--coral)','❌ HTTP '+r.status+' — '+(r.body||'server ไม่ตอบกลับ'));
+  }catch(e){
+    _ntfMsg(key,'var(--coral)','❌ ส่งไม่ได้: '+(e.message||String(e)));
+  }
 };
 
 // ── PROJECT INFO BLOCK ────────────────────────────────────────────────────────
@@ -261,7 +200,6 @@ function _projNotifyBlock(p){
 
 // ── SEND ADVANCE SAVED / STATUS NOTIFY ───────────────────────────────────────
 window.sendAdvanceSavedNotify=async function(adv,isNew){
-  var token=window.NOTIFY_ADVANCE_TOKEN||'';if(!token)return;
   var p=((window.PROJECTS||[]).find(function(x){return x.id===adv.pid;})||{});
   var sf=(window.AFLW||[]).find(function(x){return x.id===adv.status;})||{label:adv.status||'—'};
   var header=isNew?'✅ **จัดทำ Advance แล้ว**':'🔄 **อัปเดตสถานะ Advance**';
@@ -277,37 +215,35 @@ window.sendAdvanceSavedNotify=async function(adv,isNew){
     +(adv.amount?'\n💰 จำนวน: '+fc(adv.amount)+' บาท':'')
     +clearedBlock;
   try{
-    var r=await _doNotifyFetch(token,content);
-    if(!r.ok)console.warn('Advance saved notify HTTP '+r.status+':',r.body);
+    var r=await _doNotifyFetch('advance',content);
+    if(!r.ok&&!r.skipped)console.warn('Advance saved notify HTTP '+r.status+':',r.body);
   }catch(e){console.warn('Advance saved notify error:',e);}
 };
 
 // ── SEND ADVANCE NOTIFY (stage plan / 14-day reminder) ────────────────────────
 var _NO_ADV_NOTIFY_GRPS=['GRP17733355541905','GRP17733355541906'];
 window.sendAdvanceNotify=async function(p,isReminder){
-  var token=window.NOTIFY_ADVANCE_TOKEN||'';if(!token)return;
   if(p&&_NO_ADV_NOTIFY_GRPS.includes(p.groupId))return;
   var header=isReminder
     ?'⚠️ **เตือนซ้ำ: ยังไม่มีการจัดทำ Advance**\nเหลืออีก 14 วัน ก่อนเริ่มโครงการ'
     :'📋 **ถึงกำหนดที่ต้องจัดทำ Advance แล้ว**';
   var content=header+'\n'+_projNotifyBlock(p);
   try{
-    var r=await _doNotifyFetch(token,content);
-    if(!r.ok)console.warn('Advance notify HTTP '+r.status+':',r.body);
+    var r=await _doNotifyFetch('advance',content);
+    if(!r.ok&&!r.skipped)console.warn('Advance notify HTTP '+r.status+':',r.body);
   }catch(e){console.warn('Advance notify error:',e);}
 };
 
 // ── SEND PROJECT START/END NOTIFY ────────────────────────────────────────────
 window.sendProjectNotify=async function(p,eventType){
-  var token=window.NOTIFY_PROJECT_TOKEN||'';if(!token)return;
   var header=eventType==='start'?'🚀 **เริ่มดำเนินการโครงการแล้ว**'
             :eventType==='close'?'💰 **ปิดโครงการ/จ่ายเงินแล้ว**'
             :'🏁 **ปิดโครงการแล้ว**';
   var costLine=(eventType==='close'&&p.cost)?'\n💵 มูลค่าโครงการ: '+fc(p.cost)+' บาท':'';
   var content=header+'\n'+_projNotifyBlock(p)+costLine;
   try{
-    var r=await _doNotifyFetch(token,content);
-    if(!r.ok)console.warn('Project notify HTTP '+r.status+':',r.body);
+    var r=await _doNotifyFetch('project',content);
+    if(!r.ok&&!r.skipped)console.warn('Project notify HTTP '+r.status+':',r.body);
   }catch(e){console.warn('Project notify error:',e);}
 };
 
@@ -383,21 +319,17 @@ window.checkDailyNotifications=async function(){
 };
 
 // ── HELPDESK URGENT NOTIFY (ตั๋วด่วนที่สุด / ลูกค้าเข้าห้องคุยสดแล้ว) ─────────────
-// ใช้ token จาก Admin Panel → 🔔 ตั้งค่าการแจ้งเตือน เหมือน sendLeaveNotify/sendAdvanceNotify/
-// sendProjectNotify — เรียกจากแอปหลัก (helpdesk.js) ที่โหลด window.NOTIFY_HELPDESK_TOKEN ไว้แล้วตอน boot
+// ช่อง helpdesk (Token ตั้งที่ Admin Panel → 🔔 ตั้งค่าการแจ้งเตือน) เหมือน sendLeaveNotify/sendAdvanceNotify/
+// sendProjectNotify — เรียกจากแอปหลัก (helpdesk.js)
 window.sendHdUrgentNotify = async function (content) {
-  var token = window.NOTIFY_HELPDESK_TOKEN || '';
-  if (!token) return;
   try {
-    var r = await _doNotifyFetch(token, content);
-    if (!r.ok) console.warn('Helpdesk urgent notify HTTP ' + r.status + ':', r.body);
+    var r = await _doNotifyFetch('helpdesk',content);
+    if(!r.ok&&!r.skipped) console.warn('Helpdesk urgent notify HTTP ' + r.status + ':', r.body);
   } catch (e) { console.warn('Helpdesk urgent notify error:', e); }
 };
 
 // ── LEAVE NOTIFY (existing) ───────────────────────────────────────────────────
 window.sendLeaveNotify=async function(eventType,lv){
-  var token=window.NOTIFY_TOKEN||'';
-  if(!token)return;
   var LEAVE_LABEL={sick:'ลาป่วย',vacation:'ลาพักร้อน',personal:'ลากิจ',maternity:'ลาคลอด',ordain:'ลาบวช',other:'อื่นๆ'};
   var LEAVE_EMOJI={sick:'🤒',vacation:'🏖',personal:'📋',maternity:'🤱',ordain:'🙏',other:'📝'};
   var STATUS_LABEL={pending:'⏳ รออนุมัติ',approved:'✅ อนุมัติแล้ว',rejected:'❌ ไม่อนุมัติ'};
@@ -442,7 +374,7 @@ window.sendLeaveNotify=async function(eventType,lv){
   }
   if(!content)return;
   try{
-    var r=await _doNotifyFetch(token,content);
-    if(!r.ok)console.warn('Leave notify HTTP '+r.status+':',r.body);
+    var r=await _doNotifyFetch('leave',content);
+    if(!r.ok&&!r.skipped)console.warn('Leave notify HTTP '+r.status+':',r.body);
   }catch(e){console.warn('Leave notify error:',e);}
 };
