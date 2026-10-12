@@ -17,11 +17,23 @@ build-push:
   stage: build
   tags:
     - backoffice-teams
-  # docker executor (mount /var/run/docker.sock) ใช้ image นี้ · shell executor ไม่สนบรรทัดนี้ ใช้ docker ของเครื่อง runner
+  # docker executor: ใช้ docker.sock ของเครื่อง runner ถ้า mount ไว้ ไม่งั้นใช้ docker:dind (runner ต้อง privileged)
+  # shell executor ไม่สน image/services ใช้ docker ของเครื่อง runner
   image: docker:27
+  services:
+    - name: docker:27-dind
+      command: ["--tls=false", "--host=tcp://0.0.0.0:2375"]
+  variables:
+    DOCKER_TLS_CERTDIR: ""
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   before_script:
+    - |
+      if [ -z "${DOCKER_HOST:-}" ] && [ ! -S /var/run/docker.sock ]; then
+        export DOCKER_HOST=tcp://docker:2375
+      fi
+      for i in 1 2 3 4 5 6 7 8 9 10; do docker info >/dev/null 2>&1 && break; sleep 3; done
+      docker info >/dev/null 2>&1 || { echo "ต่อ Docker daemon ไม่ได้ (DOCKER_HOST=${DOCKER_HOST:-unix:///var/run/docker.sock})"; exit 1; }
     - |
       if [ -z "${DOCKER_USERNAME:-}" ] || [ -z "${DOCKER_PASSWORD:-}" ]; then
         echo "ยังไม่ได้ตั้ง CI/CD Variables DOCKER_USERNAME / DOCKER_PASSWORD"; exit 1
