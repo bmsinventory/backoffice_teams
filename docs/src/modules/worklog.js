@@ -38,7 +38,43 @@ const WL_LOCS = [
   {id:'overseas',  emoji:'🌏', label:'ต่างประเทศ'},
 ];
 
+// ── เวลา / ลิงก์ประชุม / เตือนก่อนเริ่ม ──
+// reminders = นาทีก่อนเวลาเริ่ม · null = ค่าเริ่มต้น (settings.worklog_reminders) · [] = ไม่เตือน
+// เตือนจริง: หน้าเว็บ (worklog-remind.js) + Web Push จากตัวส่ง (worklog_reminder_worker_claim ใน db-schema.sql) — กติกาเดียวกัน
+var WL_REM_QUICK = [1440, 180, 60, 30];
+var WL_REM_MAX = 20160, WL_REM_LIMIT = 5; // สูงสุด 14 วันล่วงหน้า · ไม่เกิน 5 รอบต่องาน
+var WL_TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+function _remClean(list){
+  var seen = {};
+  return (Array.isArray(list) ? list : []).map(Number)
+    .filter(function(n){ if(!(n>=1 && n<=WL_REM_MAX) || Math.floor(n)!==n || seen[n]) return false; seen[n] = 1; return true; })
+    .sort(function(a,b){ return b-a; });
+}
+window.wlRemDefault = function(){ return _remClean(Array.isArray(window.WL_REMIND_CFG) ? window.WL_REMIND_CFG : [1440, 60]); };
+// 90 → "1 ชม. 30 นาที" · 1440 → "1 วัน"
+window.wlRemLabel = function(min){
+  var d = Math.floor(min/1440), h = Math.floor(min%1440/60), m = min%60, out = [];
+  if(d) out.push(d+' วัน');
+  if(h) out.push(h+' ชม.');
+  if(m) out.push(m+' นาที');
+  return out.join(' ') || '0 นาที';
+};
+// ชื่อบริการประชุมจากลิงก์ (ใช้บนปุ่ม/เสียงอ่าน)
+window.wlMeetVia = function(url){
+  if(!url) return '';
+  if(/zoom\./i.test(url)) return 'Zoom';
+  if(/meet\.google\./i.test(url)) return 'Google Meet';
+  if(/teams\.(microsoft|live)\./i.test(url)) return 'Teams';
+  return 'ลิงก์ออนไลน์';
+};
+function _safeUrl(u){ return /^https?:\/\/\S+$/i.test(u||'') ? u : ''; }
+function _wlTimeLabel(wl){
+  return wl.startTime ? ' · '+wl.startTime+(wl.endTime ? '–'+wl.endTime : '')+' น.' : '';
+}
+
 function _cat(id){ return WL_CATS.find(function(c){return c.id===id;})||{emoji:'📌',label:id||'อื่นๆ'}; }
+window.wlCatOf = _cat;
 function _loc(id){ return WL_LOCS.find(function(l){return l.id===id;})||{emoji:'📌',label:id||''}; }
 
 function _wlDateLabel(wl){
@@ -124,8 +160,7 @@ window.renderWorkLog = function(){
 
   var q = ((document.getElementById('wl-q')||{}).value||'').toLowerCase();
   if(q) logs = logs.filter(function(wl){
-    return (wl.title||'').toLowerCase().includes(q)
-        || _cat(wl.category).label.toLowerCase().includes(q)
+    return (wl.title||'').toLowerCase().includes(q)        || _cat(wl.category).label.toLowerCase().includes(q)
         || (wl.destination||'').toLowerCase().includes(q);
   });
 
@@ -179,10 +214,13 @@ window.renderWorkLog = function(){
           +'<span style="font-size:22px;line-height:1;flex-shrink:0;">'+window.esc(cat.emoji)+'</span>'
           +'<div style="flex:1;min-width:0;">'
             +'<div style="font-size:13px;font-weight:700;color:var(--txt);line-height:1.3;">'+window.esc(wl.title)+'</div>'
-            +'<div style="font-size:10px;color:var(--txt-muted);margin-top:2px;">'+window.esc(cat.label)+' · '+_wlDateLabel(wl)+'</div>'
+            +'<div style="font-size:10px;color:var(--txt-muted);margin-top:2px;">'+window.esc(cat.label)+' · '+_wlDateLabel(wl)+window.esc(_wlTimeLabel(wl))+'</div>'
           +'</div>'
           +locBadge
         +'</div>'
+        +(_safeUrl(wl.meetingUrl)
+          ? '<a class="wl-join" href="'+window.esc(wl.meetingUrl)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="'+window.esc(wl.meetingUrl)+'">🎥 เข้าร่วม '+window.esc(window.wlMeetVia(wl.meetingUrl))+'</a>'
+          : '')
         +(ptNames.length
           ? '<div style="font-size:10px;color:var(--txt-muted);">👥 '+window.esc(ptNames.join(' · '))+'</div>'
           : (creatorName ? '<div style="font-size:10px;color:var(--txt-muted);">👤 '+window.esc(creatorName)+'</div>' : ''))
@@ -229,62 +267,87 @@ window.openWorkLogModal = function(id){
     +'</div>';
   });
 
-  var html = '<div class="wlf">'
-    // ซ้าย: รายละเอียดงาน
+  // หัวขั้นตอน (เลขวงกลม + คำถามสั้น ๆ) — ไล่ตอบทีละข้อจากบนลงล่าง
+  function step(n, q, opt){ return '<div class="wlf-step-hd"><span class="wlf-step">'+n+'</span>'+q+(opt?' <span class="wlf-opt">(ไม่บังคับ)</span>':'')+'</div>'; }
+
+  var html = '<div class="wlf'+(multi?' multi':'')+'">'
+    // ซ้าย: รายละเอียดงาน แบ่งเป็นขั้น ① งานอะไร ② เมื่อไร ③ ที่ไหน ④ รายละเอียด
     +'<div class="wlf-main">'
-    // ชื่องาน + งานล่าสุด
-    +'<div>'
-      +'<div class="wlf-lbl-row"><label class="f-label" for="wlf-title">ชื่องาน / หัวข้อ *</label>'
-        +'<button type="button" class="wlf-link wlf-ai" id="wlf-ai-fill" onclick="window._wlAiFill()" title="พิมพ์เป็นประโยค เช่น “13-15 ต.ค. ลงพื้นที่ติดตั้ง รพ.ขอนแก่น กับเอี้ยม เต้ย” แล้วกด Enter หรือกดปุ่มนี้ · Ctrl+Enter = บันทึกทันทีไม่ผ่าน AI">✨ AI กรอกให้</button>'
-      +'</div>'
-      +'<input type="text" class="f-input wlf-title" id="wlf-title" autocomplete="off" placeholder="'+(wl ? 'ชื่องาน · Enter = บันทึก' : 'พิมพ์งานเป็นประโยค แล้วกด Enter ให้ AI กรอกให้ · Enter อีกครั้ง = บันทึก')+'" value="'+window.esc(wl?wl.title||'':'')+'" oninput="window._wlTitleInput()" onkeydown="window._wlTitleKey(event)">'
-      +'<div id="wlf-ai-note" class="wlf-ai-note" style="display:none;"></div>'
-      +(wl ? '' : '<div id="wlf-recents-wrap">'+_recentsHtml()+'</div>')
-    +'</div>'
-    // วันที่ | สถานที่
-    +'<div class="wlf-row2">'
+    // ① งานอะไร — ชื่องาน + งานล่าสุด + หมวดงาน
+    +'<section class="wlf-sec">'
+      +step(1, 'ทำงานอะไร')
       +'<div>'
-        +'<label class="f-label">วันที่</label>'
-        +'<div class="wlf-dates">'
-          +'<input type="date" class="f-input" id="wlf-date" value="'+dFrom+'" onchange="window._wlAutoEndDate()" aria-label="วันที่เริ่ม">'
-          +'<span id="wlf-end-wrap"'+(multi?'':' style="display:none;"')+'><span>ถึง</span>'
-            +'<input type="date" class="f-input" id="wlf-end" value="'+dTo+'" onchange="window._wlAutoEndDate()" aria-label="วันที่สิ้นสุด">'
-          +'</span>'
-          +'<label class="wlf-check"><input type="checkbox" id="wlf-multi"'+(multi?' checked':'')+' onchange="window._wlMultiToggle(this.checked)">หลายวัน</label>'
+        +'<div class="wlf-lbl-row"><label class="f-label" for="wlf-title">ชื่องาน / หัวข้อ <b class="wlf-req">*</b></label>'
+          +'<button type="button" class="wlf-link wlf-ai" id="wlf-ai-fill" onclick="window._wlAiFill()" title="พิมพ์เป็นประโยค เช่น “13-15 ต.ค. ลงพื้นที่ติดตั้ง รพ.ขอนแก่น กับเอี้ยม เต้ย” แล้วกด Enter หรือกดปุ่มนี้ · Ctrl+Enter = บันทึกทันทีไม่ผ่าน AI">✨ AI กรอกให้</button>'
         +'</div>'
+        +'<input type="text" class="f-input wlf-title" id="wlf-title" autocomplete="off" placeholder="'+(wl ? 'ชื่องาน · Enter = บันทึก' : 'เช่น ประชุม รพ.ขอนแก่น พรุ่งนี้ 10 โมง → Enter ให้ AI กรอกให้')+'" value="'+window.esc(wl?wl.title||'':'')+'" oninput="window._wlTitleInput()" onkeydown="window._wlTitleKey(event)">'
+        +'<div id="wlf-ai-note" class="wlf-ai-note" style="display:none;"></div>'
+        +(wl ? '' : '<div id="wlf-recents-wrap">'+_recentsHtml()+'</div>')
       +'</div>'
       +'<div>'
-        +'<label class="f-label">สถานที่</label>'
-        +'<div class="wlf-seg" role="radiogroup" aria-label="สถานที่">'
-          +WL_LOCS.map(function(l){
-            var on = locType===l.id;
-            return '<button type="button" role="radio" aria-checked="'+on+'" class="wl-loc-btn'+(on?' on':'')+'" data-lid="'+l.id+'" onclick="window._wlLocToggle(\''+l.id+'\')">'+l.emoji+' '+l.label+'</button>';
-          }).join('')
+        // หมวดงาน — แถวเดียว: หัวข้อ | ตัวเลือก (dropdown) | ⚙ ตั้งค่า
+        +'<div class="wlf-cat-row"><label class="f-label" for="wlf-cat-sel">หมวดงาน <b class="wlf-req">*</b></label>'
+          +'<div class="wlf-cats" id="wlf-cats"></div>'
+          +(_canCfgCats() ? '<button type="button" class="wlf-link" id="wlf-cat-cfg" onclick="window._wlCatEdit(true)" title="ตั้งค่าหมวด" aria-label="ตั้งค่าหมวด">⚙ ตั้งค่า</button>' : '')
         +'</div>'
-        +'<div id="wl-dest-wrap"'+(locType==='local'?' style="display:none;"':'')+'>'
-          +'<input type="text" class="f-input" id="wlf-dest" placeholder="ปลายทาง เช่น เชียงใหม่, โตเกียว ญี่ปุ่น" value="'+window.esc(wl?wl.destination||'':'')+'" aria-label="ปลายทาง">'
+        +'<input type="hidden" id="wlf-cat" value="'+window.esc(catId)+'">'
+        +'<div id="wlf-cat-edit" class="wlf-ce" style="display:none;"></div>'
+      +'</div>'
+    +'</section>'
+    // ② เมื่อไร — วันที่ | เวลา → เตือนก่อนเริ่ม (แสดงเมื่อใส่เวลาเริ่ม)
+    +'<section class="wlf-sec">'
+      +step(2, 'เมื่อไร')
+      +'<div class="wlf-row2">'
+        +'<div>'
+          +'<div class="wlf-lbl-row"><label class="f-label" for="wlf-date">วันที่</label>'
+            +'<label class="wlf-check"><input type="checkbox" id="wlf-multi"'+(multi?' checked':'')+' onchange="window._wlMultiToggle(this.checked)">หลายวัน</label>'
+          +'</div>'
+          +'<div class="wlf-dates">'
+            +'<input type="date" class="f-input" id="wlf-date" value="'+dFrom+'" onchange="window._wlAutoEndDate()" aria-label="วันที่เริ่ม">'
+            +'<span id="wlf-end-wrap"'+(multi?'':' style="display:none;"')+'><span>ถึง</span>'
+              +'<input type="date" class="f-input" id="wlf-end" value="'+dTo+'" onchange="window._wlAutoEndDate()" aria-label="วันที่สิ้นสุด">'
+            +'</span>'
+          +'</div>'
+        +'</div>'
+        +'<div>'
+          +'<div class="wlf-lbl-row"><label class="f-label" for="wlf-t1">เวลา <span class="wlf-opt">(ไม่บังคับ)</span></label></div>'
+          +'<div class="wlf-dates">'
+            +'<input type="time" class="f-input" id="wlf-t1" value="'+window.esc(wl?wl.startTime||'':'')+'" oninput="window._wlTimeChange()" aria-label="เวลาเริ่ม">'
+            +'<span class="wlf-to">ถึง</span>'
+            +'<input type="time" class="f-input" id="wlf-t2" value="'+window.esc(wl?wl.endTime||'':'')+'" aria-label="เวลาเลิก">'
+          +'</div>'
         +'</div>'
       +'</div>'
-    +'</div>'
-    // หมวดงาน
-    +'<div>'
-      +'<div class="wlf-lbl-row"><label class="f-label">หมวดงาน *</label>'
-        +(_canCfgCats() ? '<button type="button" class="wlf-link" id="wlf-cat-cfg" onclick="window._wlCatEdit(true)">⚙ ตั้งค่าหมวด</button>' : '')
+      +'<div id="wlf-rem" class="wlf-rem"></div>'
+    +'</section>'
+    // ③ ที่ไหน — สถานที่ + ปลายทาง + ลิงก์ประชุมออนไลน์
+    +'<section class="wlf-sec">'
+      +step(3, 'ที่ไหน')
+      +'<div class="wlf-seg" role="radiogroup" aria-label="สถานที่">'
+        +WL_LOCS.map(function(l){
+          var on = locType===l.id;
+          return '<button type="button" role="radio" aria-checked="'+on+'" class="wl-loc-btn'+(on?' on':'')+'" data-lid="'+l.id+'" onclick="window._wlLocToggle(\''+l.id+'\')">'+l.emoji+' '+l.label+'</button>';
+        }).join('')
       +'</div>'
-      +'<input type="hidden" id="wlf-cat" value="'+window.esc(catId)+'">'
-      +'<div class="wlf-cats" id="wlf-cats"></div>'
-      +'<div id="wlf-cat-edit" class="wlf-ce" style="display:none;"></div>'
-    +'</div>'
-    // รายละเอียด
-    +'<div>'
-      +'<div class="wlf-lbl-row"><label class="f-label" for="wlf-detail">รายละเอียด</label>'
+      +'<div id="wl-dest-wrap"'+(locType==='local'?' style="display:none;"':'')+'>'
+        +'<input type="text" class="f-input" id="wlf-dest" placeholder="ปลายทาง เช่น เชียงใหม่, โตเกียว ญี่ปุ่น" value="'+window.esc(wl?wl.destination||'':'')+'" aria-label="ปลายทาง">'
+      +'</div>'
+      +'<div>'
+        +'<label class="f-label" for="wlf-url">🎥 ประชุมออนไลน์ <span class="wlf-opt">(ไม่บังคับ)</span></label>'
+        +'<input type="url" class="f-input wlf-url" id="wlf-url" autocomplete="off" placeholder="วางลิงก์ Zoom / Google Meet / Teams" value="'+window.esc(wl?wl.meetingUrl||'':'')+'">'
+      +'</div>'
+    +'</section>'
+    // ④ รายละเอียด
+    +'<section class="wlf-sec">'
+      +'<div class="wlf-lbl-row">'+step(4, 'รายละเอียดเพิ่มเติม', true)
         +'<button type="button" class="wlf-link wlf-ai" id="wlf-ai-detail" onclick="window._wlAiDetail()" title="จดสั้น ๆ เป็นข้อ ๆ แล้วให้ AI เรียบเรียงเป็นข้อความทางการ">✨ เรียบเรียง</button>'
       +'</div>'
-      +'<textarea class="f-input" id="wlf-detail" rows="2" placeholder="ไม่บังคับ" oninput="if(event.isTrusted)window._wlDetailEdited()">'+window.esc(wl?wl.detail||'':'')+'</textarea>'
+      +'<textarea class="f-input" id="wlf-detail" rows="2" placeholder="จดสั้น ๆ ได้ แล้วกด ✨ เรียบเรียง" aria-label="รายละเอียด" oninput="if(event.isTrusted)window._wlDetailEdited()">'+window.esc(wl?wl.detail||'':'')+'</textarea>'
+    +'</section>'
     +'</div>'
-    +'</div>'
-    // ขวา: ผู้เข้าร่วม — บน: ที่เลือกแล้ว · ล่าง: ค้นหา + รายชื่อทั้งหมด
+    // ขวา: ⑤ ผู้เข้าร่วม — บน: ที่เลือกแล้ว · ล่าง: ค้นหา + รายชื่อทั้งหมด
     +'<div id="wl-pt-section" class="wlf-side'+(multi?' multi':'')+'">'
+      +step(5, 'ใครร่วมงานบ้าง')
       +'<div class="wlf-lbl-row"><label class="f-label" for="wl-pt-q">ผู้เข้าร่วม <span id="wl-pt-cnt">'+(parts.length?'('+parts.length+')':'')+'</span></label><span class="wlf-pt-hint">ไม่เลือก = บันทึกของตนเอง</span></div>'
       +'<div id="wl-pt-selected" class="wl-pk-sel">'+ptHtml+'</div>'
       +'<div class="wl-pk-col">'
@@ -297,6 +360,9 @@ window.openWorkLogModal = function(id){
 
   document.getElementById('m-worklog-body').innerHTML = html;
   _renderCatChips();
+  _wlRem = wl && Array.isArray(wl.reminders) ? _remClean(wl.reminders) : null;
+  _wlRemCfg = null;
+  _renderRem();
   _wlAiSeq++;
   _wlCatTouched = !!wl; // แก้บันทึกเดิม = ไม่เดาหมวดทับ
   _wlAiOrig = null; _wlDetailOrig = null; _wlAiDone = null;
@@ -323,6 +389,8 @@ window._wlMultiToggle = function(on){
   if(on && f && e && (!e.value || e.value < f.value)) e.value = f.value;
   var sec = document.getElementById('wl-pt-section');
   if(sec) sec.classList.toggle('multi', on);
+  var form = document.querySelector('#m-worklog-body .wlf');
+  if(form) form.classList.toggle('multi', on);
   _wlPtSyncDates();
 };
 
@@ -337,10 +405,12 @@ function _renderCatChips(){
   // หมวดที่ซ่อนแล้วยังแสดงถ้าเป็นหมวดของบันทึกที่กำลังแก้
   var list = WL_CATS.filter(function(c){ return !c.hidden || c.id===cur; });
   if(h && !list.some(function(c){ return c.id===cur; }) && list.length){ cur = list[0].id; h.value = cur; }
-  box.innerHTML = list.map(function(c){
-    var on = c.id===cur;
-    return '<button type="button" class="wlf-chip wlf-cat'+(on?' on':'')+'" data-cid="'+window.esc(c.id)+'" aria-pressed="'+on+'" onclick="window._wlCatPick(this.getAttribute(\'data-cid\'))">'+window.esc(c.emoji+' '+c.label)+'</button>';
-  }).join('');
+  box.innerHTML = '<select class="f-input" id="wlf-cat-sel" onchange="window._wlCatPick(this.value)">'
+    +list.map(function(c){
+      return '<option value="'+window.esc(c.id)+'"'+(c.id===cur?' selected':'')+'>'+window.esc(c.emoji+' '+c.label)+'</option>';
+    }).join('')
+  +'</select>'
+  +'<span class="wlf-cat-sug" id="wlf-cat-sug" style="display:none;">แนะนำ</span>';
 }
 
 function _catEditRow(c){
@@ -406,11 +476,10 @@ window._wlCatPick = function(cid, auto){
   if(!auto) _wlCatTouched = true;
   var h = document.getElementById('wlf-cat');
   if(h) h.value = cid;
-  document.querySelectorAll('.wlf-cat').forEach(function(b){
-    var on = b.getAttribute('data-cid')===cid;
-    b.classList.toggle('on', on); b.setAttribute('aria-pressed', on);
-    b.classList.toggle('sug', on && !!auto);
-  });
+  var sel = document.getElementById('wlf-cat-sel');
+  if(sel) sel.value = cid;
+  var sug = document.getElementById('wlf-cat-sug');
+  if(sug) sug.style.display = auto ? '' : 'none';
 };
 
 window._wlLocToggle = function(lid){
@@ -420,6 +489,97 @@ window._wlLocToggle = function(lid){
   });
   var dw = document.getElementById('wl-dest-wrap');
   if(dw) dw.style.display = lid==='local' ? 'none' : '';
+};
+
+// ── เตือนก่อนเริ่ม: ป้ายรอบเตือน (✕ ลบ) + ปุ่มลัด + ตั้งเอง (ตัวเลข + วัน/ชม./นาที) ──
+// _wlRemCfg != null = กำลังแก้ "ค่าเริ่มต้นของทั้งระบบ" (ผู้มีสิทธิ์แก้ไขบันทึกงาน) แทนค่าของงานนี้
+var _wlRem = null, _wlRemCfg = null;
+
+function _remCur(){ return _wlRemCfg ? _wlRemCfg : (_wlRem===null ? window.wlRemDefault() : _wlRem); }
+function _remSet(list){
+  list = _remClean(list);
+  if(_wlRemCfg) _wlRemCfg = list; else _wlRem = list;
+  _renderRem();
+}
+
+function _renderRem(){
+  var box = document.getElementById('wlf-rem');
+  if(!box) return;
+  var t1 = (document.getElementById('wlf-t1')||{}).value||'';
+  if(!t1 && !_wlRemCfg){
+    box.innerHTML = '<div class="wlf-rem-hint">🔔 ใส่เวลาเริ่ม เพื่อให้ระบบเตือนผู้ร่วมงานก่อนถึงเวลา (มีเสียงอ่านเตือน)</div>';
+    return;
+  }
+  var cfg = !!_wlRemCfg, cur = _remCur(), off = !cfg && _wlRem!==null && !_wlRem.length;
+  var h = '<div class="wlf-lbl-row"><label class="f-label">'+(cfg ? '⚙ ค่าเริ่มต้นการเตือน (ทั้งระบบ)' : '🔔 เตือนก่อนเริ่ม')+'</label>'
+    +(!cfg && _canCfgCats() ? '<button type="button" class="wlf-link" onclick="window._wlRemCfgEdit(true)">⚙ ค่าเริ่มต้น</button>' : '')
+    +'</div>';
+  h += '<div class="wlf-rem-row">';
+  if(off) h += '<span class="wlf-rem-off">🔕 ไม่เตือน</span>';
+  else {
+    h += cur.map(function(m){
+      return '<span class="wlf-chip on wlf-rem-chip">'+window.esc(window.wlRemLabel(m))
+        +'<button type="button" onclick="window._wlRemDel('+m+')" aria-label="ลบรอบเตือน '+window.esc(window.wlRemLabel(m))+'" title="ลบ">✕</button></span>';
+    }).join('');
+    if(cur.length < WL_REM_LIMIT){
+      h += WL_REM_QUICK.filter(function(m){ return cur.indexOf(m)<0; }).map(function(m){
+        return '<button type="button" class="wlf-recent" onclick="window._wlRemAdd('+m+')">+ '+window.esc(window.wlRemLabel(m))+'</button>';
+      }).join('');
+    }
+  }
+  h += '</div>';
+  if(!off && cur.length < WL_REM_LIMIT){
+    h += '<div class="wlf-rem-own">'
+      +'<span>ตั้งเอง:</span>'
+      +'<input type="number" class="f-input" id="wlf-rem-n" min="1" max="999" inputmode="numeric" placeholder="2" aria-label="จำนวน" onkeydown="if(event.key===\'Enter\'){event.preventDefault();window._wlRemAddOwn();}">'
+      +'<select class="f-input" id="wlf-rem-u" aria-label="หน่วย"><option value="1440">วัน</option><option value="60" selected>ชม.</option><option value="1">นาที</option></select>'
+      +'<button type="button" class="wlf-link" onclick="window._wlRemAddOwn()">+ เพิ่ม</button>'
+    +'</div>';
+  }
+  if(cfg){
+    h += '<div class="wlf-ce-foot"><span class="wlf-ce-note">ใช้กับงานที่ไม่ได้ตั้งเตือนเอง · งานที่ตั้งเองแล้วไม่เปลี่ยน</span>'
+      +'<button type="button" class="btn btn-ghost btn-sm" onclick="window._wlRemCfgEdit(false)">ยกเลิก</button>'
+      +'<button type="button" class="btn btn-pri btn-sm" onclick="window._wlRemCfgSave()">บันทึกค่าเริ่มต้น</button></div>';
+  } else {
+    h += '<div class="wlf-rem-note">'
+      +'<label class="wlf-check"><input type="checkbox"'+(off?' checked':'')+' onchange="window._wlRemOff(this.checked)">ไม่ต้องเตือน</label>'
+      +'<span>'+(_wlRem===null ? 'ใช้ค่าเริ่มต้นของระบบ' : 'ตั้งเฉพาะงานนี้ · <button type="button" class="wlf-link" onclick="window._wlRemReset()">↩ ใช้ค่าเริ่มต้น</button>')
+      +' · เตือนผู้ร่วมงานทุกคน (ไม่เลือก = ตัวคุณเอง) พร้อมเสียงอ่าน · ปิดหน้าเว็บอยู่ ต้องเปิด 📳 แจ้งเตือนที่กระดิ่งก่อน</span>'
+    +'</div>';
+  }
+  box.innerHTML = h;
+  box.classList.toggle('cfg', cfg);
+}
+
+window._wlTimeChange = function(){
+  var t1 = document.getElementById('wlf-t1'), t2 = document.getElementById('wlf-t2');
+  // เลื่อนเวลาเริ่มเลยเวลาเลิก → ล้างเวลาเลิก
+  if(t1 && t2 && t1.value && t2.value && t2.value <= t1.value) t2.value = '';
+  _renderRem();
+};
+window._wlRemAdd = function(m){ var c = _remCur().slice(); c.push(m); _remSet(c); };
+window._wlRemDel = function(m){ _remSet(_remCur().filter(function(x){ return x!==m; })); };
+window._wlRemAddOwn = function(){
+  var n = parseInt((document.getElementById('wlf-rem-n')||{}).value, 10);
+  var u = parseInt((document.getElementById('wlf-rem-u')||{}).value, 10) || 60;
+  if(!(n>=1)){ window.showAlert&&window.showAlert('ใส่จำนวนก่อน เช่น 2 ชม.','warn'); return; }
+  if(n*u > WL_REM_MAX){ window.showAlert&&window.showAlert('ตั้งเตือนล่วงหน้าได้ไม่เกิน 14 วัน','warn'); return; }
+  window._wlRemAdd(n*u);
+};
+window._wlRemOff = function(on){ _wlRem = on ? [] : null; _renderRem(); };
+window._wlRemReset = function(){ _wlRem = null; _renderRem(); };
+window._wlRemCfgEdit = function(on){ _wlRemCfg = on ? window.wlRemDefault() : null; _renderRem(); };
+window._wlRemCfgSave = async function(){
+  if(!_canCfgCats()){ window.showAlert&&window.showAlert('คุณไม่มีสิทธิ์ตั้งค่าเริ่มต้นการเตือน','warn'); return; }
+  var list = _remClean(_wlRemCfg);
+  try {
+    await window.setDoc(window.getDocRef('SETTINGS','app'), { worklog_reminders: list }, { merge:true });
+    window.WL_REMIND_CFG = list;
+    _wlRemCfg = null; _renderRem();
+    window.showAlert&&window.showAlert(list.length ? 'บันทึกค่าเริ่มต้นแล้ว: เตือนก่อน '+list.map(window.wlRemLabel).join(', ') : 'บันทึกแล้ว: ค่าเริ่มต้น = ไม่เตือน','success');
+  } catch(err){
+    window.showAlert&&window.showAlert('เกิดข้อผิดพลาด: '+err.message,'error');
+  }
 };
 
 window._wlUseRecent = function(i){
@@ -664,6 +824,14 @@ function _wlFixDate(v){
   return isNaN(new Date(d)) ? '' : d;
 }
 
+// "9:00" / "13.30" → "09:00" / "13:30" · อ่านไม่ได้ = ''
+function _wlFixTime(v){
+  var m = String(v||'').trim().match(/^(\d{1,2})[:.](\d{2})$/);
+  if(!m) return '';
+  var t = ('0'+m[1]).slice(-2)+':'+m[2];
+  return WL_TIME_RE.test(t) ? t : '';
+}
+
 // ✨ AI กรอกให้ — พิมพ์ประโยคเดียวในช่องชื่องาน แล้วแยกเป็นชื่องาน วันที่ หมวด สถานที่ ผู้เข้าร่วม รายละเอียด
 window._wlAiFill = async function(){
   var t = document.getElementById('wlf-title'), btn = document.getElementById('wlf-ai-fill');
@@ -674,6 +842,9 @@ window._wlAiFill = async function(){
     t.focus(); return;
   }
   var seq = _wlAiSeq;
+  // ลิงก์ประชุมแยกออกก่อน (ลิงก์ยาว ส่งให้ AI แล้วมักคัดลอกผิด)
+  var urlHit = text.match(/https?:\/\/[^\s]+/i);
+  var aiText = urlHit ? text.replace(urlHit[0], ' ').replace(/\s+/g, ' ').trim() : text;
   var today = window.todayStr(), base = window.pd(today), cal = [];
   for(var i=-7; i<=21; i++){
     var d = new Date(base); d.setDate(d.getDate()+i);
@@ -681,17 +852,18 @@ window._wlAiFill = async function(){
   }
   var cats = _wlVisCats().map(function(c){ return '- '+c.id+': '+c.label; }).join('\n');
   var sys = 'คุณแปลงข้อความบันทึกงานภาษาไทยเป็น JSON ตอบเป็น JSON อย่างเดียว ไม่มีคำอธิบาย\n'
-    +'รูปแบบ: {"title":"","category":"","location":"local","destination":"","start":"YYYY-MM-DD","end":"YYYY-MM-DD","detail":"","people":[]}\n'
+    +'รูปแบบ: {"title":"","category":"","location":"local","destination":"","start":"YYYY-MM-DD","end":"YYYY-MM-DD","time_start":"","time_end":"","detail":"","people":[]}\n'
     +'กติกา:\n'
     +'- title: ชื่องานสั้น กระชับ ไม่ใส่วันที่และชื่อคน\n'
     +'- category: id จากรายการหมวดเท่านั้น เลือกที่ตรงที่สุด\n'
     +'- location: local = ในพื้นที่/ที่ออฟฟิศ/ออนไลน์ · upcountry = ต่างจังหวัด · overseas = ต่างประเทศ\n'
     +'- destination: จังหวัด/สถานที่/ประเทศปลายทาง ถ้าไม่ได้ระบุ = ""\n'
     +'- start, end: ปี ค.ศ. ดูวันจากปฏิทินที่ให้ (พรุ่งนี้, จันทร์หน้า, 13-15 ต.ค.) · ไม่ระบุวัน = วันนี้ · งานวันเดียว end = start\n'
+    +'- time_start, time_end: เวลาแบบ 24 ชม. "HH:MM" เช่น บ่ายโมงครึ่ง = "13:30", 9 โมง = "09:00", ทุ่มนึง = "19:00" · ไม่ระบุเวลา = ""\n'
     +'- people: ชื่อหรือชื่อเล่นของคนที่ร่วมงานตามที่เขียนไว้ ไม่รวมผู้เขียน (ผม/ฉัน/หนู) · ไม่มี = []\n'
     +'- detail: ข้อมูลอื่นที่ไม่อยู่ในช่องข้างบน ไม่มี = ""\n'
     +'ห้ามแต่งข้อมูลที่ไม่มีในข้อความ';
-  var usr = 'ปฏิทิน:\n'+cal.join('\n')+'\n\nหมวดงาน:\n'+cats+'\n\nข้อความ: '+text;
+  var usr = 'ปฏิทิน:\n'+cal.join('\n')+'\n\nหมวดงาน:\n'+cats+'\n\nข้อความ: '+aiText;
 
   btn.disabled = true; btn.textContent = '⏳ AI กำลังอ่าน...';
   try {
@@ -711,6 +883,16 @@ window._wlAiFill = async function(){
     if(mc) mc.checked = multi;
     window._wlMultiToggle(multi);
     got.push(multi ? 'วันที่ '+window.fd(s)+' – '+window.fd(e) : 'วันที่ '+window.fd(s));
+
+    var ts = _wlFixTime(r.time_start), te = _wlFixTime(r.time_end);
+    if(ts){
+      document.getElementById('wlf-t1').value = ts;
+      document.getElementById('wlf-t2').value = te && te > ts ? te : '';
+      window._wlTimeChange();
+      got.push('เวลา '+ts+(te && te > ts ? '–'+te : '')+' น.');
+    }
+    var urlEl = document.getElementById('wlf-url');
+    if(urlHit && urlEl){ urlEl.value = urlHit[0].replace(/[)\].,]+$/, ''); got.push('ลิงก์ประชุม'); }
 
     if(_wlVisCats().some(function(c){ return c.id===r.category; })){
       window._wlCatPick(r.category, true);
@@ -829,6 +1011,16 @@ window.saveWorkLog = async function(){
     totalDays = Math.max(1, Math.round((new Date(endVal)-new Date(startVal))/86400000)+1);
   }
 
+  var t1 = (document.getElementById('wlf-t1')||{}).value||'';
+  var t2 = (document.getElementById('wlf-t2')||{}).value||'';
+  if(t1 && !WL_TIME_RE.test(t1)){ window.showAlert&&window.showAlert('เวลาเริ่มไม่ถูกต้อง','error'); return; }
+  if(!t1) t2 = '';
+  if(t2 && (!WL_TIME_RE.test(t2) || t2 <= t1)){ window.showAlert&&window.showAlert('เวลาเลิกต้องหลังเวลาเริ่ม','error'); return; }
+  var urlVal = ((document.getElementById('wlf-url')||{}).value||'').trim();
+  if(urlVal && !/^https?:\/\//i.test(urlVal) && /^[\w-]+(\.[\w-]+)+/.test(urlVal)) urlVal = 'https://'+urlVal;
+  if(urlVal && !_safeUrl(urlVal)){ window.showAlert&&window.showAlert('ลิงก์ประชุมไม่ถูกต้อง — วางลิงก์ที่ขึ้นต้นด้วย https://','error'); return; }
+  if(_wlRemCfg){ window.showAlert&&window.showAlert('บันทึกหรือยกเลิกการแก้ค่าเริ่มต้นการเตือนก่อน','warn'); return; }
+
   var participants = [];
   document.querySelectorAll('#wl-pt-selected .wl-prow').forEach(function(r){
     var sid = r.getAttribute('data-sid');
@@ -861,6 +1053,10 @@ window.saveWorkLog = async function(){
     title:         title,
     detail:        (document.getElementById('wlf-detail')||{}).value||'',
     participants:  participants,
+    start_time:    t1,
+    end_time:      t2,
+    meeting_url:   urlVal,
+    reminders:     _wlRem,
   };
   if(!_wlEditId) data.created_at = new Date().toISOString();
 
@@ -877,6 +1073,7 @@ window.saveWorkLog = async function(){
       // เพิ่มงานถัดไปต่อ: ล้างชื่อ/รายละเอียด คงวันที่ หมวด สถานที่ ผู้เข้าร่วมไว้
       titleEl.value = '';
       var det = document.getElementById('wlf-detail'); if(det) det.value = '';
+      var ue = document.getElementById('wlf-url'); if(ue) ue.value = '';
       window._wlDetailEdited(); _wlAiOrig = null; _wlAiDone = null; _wlAiNote('');
       var rw = document.getElementById('wlf-recents-wrap'); if(rw) rw.innerHTML = _recentsHtml();
       titleEl.focus();

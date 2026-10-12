@@ -66,7 +66,7 @@
       return { id:d.contract_id||d.id, name:d.project_name||'', customer:d.customer_name||'', value:Number(d.total_contract_value||d.value)||0, signDate:d.contract_sign_date||'', startDate:d.contract_start_date||'', endDate:d.end_date||'', note:d.note||'', status:d.status||'active', transactions:d.transactions||[] };
     },
     WORK_LOGS: function (d) {
-      return { id:d.id, uid:d.uid||'', staffId:d.staffId||d.staff_id||'', type:d.type||'daily', scope:d.scope||'personal', date:d.date||'', startDate:d.start_date||d.startDate||'', endDate:d.end_date||d.endDate||'', totalDays:Number(d.total_days||d.totalDays)||1, category:d.category||'other', locationType:d.location_type||d.locationType||'local', destination:d.destination||'', title:d.title||'', detail:d.detail||'', participants:d.participants||[], createdAt:d.created_at||d.createdAt||'' };
+      return { id:d.id, uid:d.uid||'', staffId:d.staffId||d.staff_id||'', type:d.type||'daily', scope:d.scope||'personal', date:d.date||'', startDate:d.start_date||d.startDate||'', endDate:d.end_date||d.endDate||'', totalDays:Number(d.total_days||d.totalDays)||1, category:d.category||'other', locationType:d.location_type||d.locationType||'local', destination:d.destination||'', title:d.title||'', detail:d.detail||'', participants:d.participants||[], startTime:d.start_time||'', endTime:d.end_time||'', meetingUrl:d.meeting_url||'', reminders:Array.isArray(d.reminders)?d.reminders:null, createdAt:d.created_at||d.createdAt||'' };
     },
     HSP_PRODUCTS: function (d) {
       return { id:d.product_id||d.id, name:d.name||'', color:d.color||'#7c3aed', note:d.note||'', group:d.group||'' };
@@ -350,6 +350,7 @@
         window.SRV_REQ_CONFIG        = d.srv_req_config || {};
         window.WL_CATS_CFG           = d.worklog_categories || [];
         window.wlApplyCats && window.wlApplyCats(window.WL_CATS_CFG);
+        window.WL_REMIND_CFG         = Array.isArray(d.worklog_reminders) ? d.worklog_reminders : [1440, 60];
         window._settingsLoaded = true;
         if (window.isDbLoaded && window._pendingDailyCheck && window.checkDailyNotifications) {
           window._pendingDailyCheck = false;

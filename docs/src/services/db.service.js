@@ -78,12 +78,27 @@
     };
   }
 
+  // ── อ่านข้อมูลพร้อมลองใหม่เมื่อพลาดชั่วคราว ──
+  // เปิดแอปยิงอ่านหลายตารางพร้อมกัน ฐานข้อมูลช้าชั่วขณะ = "canceling statement due to statement timeout" (57014)
+  // หรือเครือข่ายสะดุด → รอแล้วลองใหม่ (สูงสุด 3 ครั้ง) ก่อนแจ้ง error เต็มจอ · mk สร้าง query ใหม่ทุกครั้ง
+  function _transient(err) {
+    var s = String((err && ((err.code || '') + ' ' + (err.message || ''))) || err || '');
+    return /57014|statement timeout|canceling statement|PGRST00[0-3]|failed to fetch|networkerror|network request|load failed|timed out|\b50[234]\b/i.test(s);
+  }
+  async function _read(mk) {
+    for (var i = 0; ; i++) {
+      var res = await mk();
+      if (!res.error || i >= 3 || !_transient(res.error)) return res;
+      await new Promise(function (r) { setTimeout(r, 800 * Math.pow(2, i) + Math.random() * 500); });
+    }
+  }
+
   // ── Paginated Fetch (PostgREST default limit = 1000 rows/request) ──
   // คืนแถวทั้งตาราง · all.wm = sync_at ล่าสุด (ตารางที่ยังไม่มีคอลัมน์ = null → ไม่ใช้แคช/delta)
   async function _fullList(sbTable) {
     var all = [], page = 0;
     while (true) {
-      var res = await _sb.from(sbTable).select('*').range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+      var res = await _read(function () { return _sb.from(sbTable).select('*').range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1); });
       if (res.error) throw res.error;
       if (!res.data || res.data.length === 0) break;
       all = all.concat(res.data);
@@ -164,7 +179,7 @@
   async function _allPages(mk) {
     var all = [];
     for (var page = 0; ; page++) {
-      var res = await mk().order('id').range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+      var res = await _read(function () { return mk().order('id').range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1); });
       if (res.error) throw res.error;
       all = all.concat(res.data || []);
       if (!res.data || res.data.length < PAGE_SIZE) return all;
@@ -176,7 +191,7 @@
     var res = await Promise.all([
       _allPages(function () { return _sb.from(sbTable).select('*').gte('sync_at', since); }),
       _allPages(function () { return _sb.from('sync_deleted').select('id,deleted_at').eq('tbl', sbTable).gte('deleted_at', since); }),
-      _sb.from(sbTable).select('id', { count: 'exact', head: true }),
+      _read(function () { return _sb.from(sbTable).select('id', { count: 'exact', head: true }); }),
     ]);
     if (res[2].error) throw res[2].error;
     var changed = res[0], gone = res[1], byId = {}, del = {}, next = [];
@@ -276,13 +291,14 @@
       _dirty = {}; _needFull = false; // ดึงทั้งตาราง = ครอบคลุมทุกแถวที่รออัปเดตอยู่แล้ว
       try {
         if (isDoc) {
-          var res = await _sb.from(sbTable).select('*').eq('id', docId).maybeSingle();
+          var res = await _read(function () { return _sb.from(sbTable).select('*').eq('id', docId).maybeSingle(); });
           if (res.error) throw res.error;
           if (_changed(res.data)) callback(_makeDocSnap(res.data));
         } else {
           _emitCol(await _loadCol());
         }
       } catch (e) {
+        if (e && typeof e === 'object' && !e.table) e.table = sbTable; // ให้หน้าแจ้ง error บอกได้ว่าตารางไหน
         if (onError) onError(e);
         else console.error('[db.service] onSnapshot error [' + sbTable + ']:', e);
       }

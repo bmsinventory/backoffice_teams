@@ -1,5 +1,5 @@
-const CACHE      = 'bms-app-v1791744750';
-const IMG_CACHE  = 'bms-img-v1791744750';
+const CACHE      = 'bms-app-v1791795399';
+const IMG_CACHE  = 'bms-img-v1791795399';
 
 const IMG_EXTS = ['.png', '.jpg', '.jpeg', '.gif', '.ico', '.webp', '.woff', '.woff2'];
 
@@ -11,6 +11,8 @@ self.addEventListener('install', (e) => {
       c.addAll([
         './img/BMS_T.png',
         './img/icon_app.png',
+        './img/badge.png',
+        './img/icon-192.png',
         './manifest.json',
       ].map((u) => new Request(u, { cache: 'reload' }))).catch(() => {})
     )
@@ -83,10 +85,30 @@ self.addEventListener('push', (e) => {
     data = { body: e.data ? e.data.text() : 'มีข้อความใหม่' };
   }
   const title = data.title || 'BMS Backoffice Teams';
+  // เตือนก่อนประชุม: หน้าเว็บที่เปิดอยู่บนจอเตือน + อ่านออกเสียงเอง (worklog-remind.js) → แสดงแจ้งเตือนของเครื่องเมื่อไม่มีหน้าเว็บบนจอ
+  // ค้างไว้จนกว่าจะกด · กดแล้วเปิดหน้าเว็บให้อ่านออกเสียง
+  if (data.kind === 'meeting') {
+    e.waitUntil(
+      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+        if (clients.some((c) => c.visibilityState === 'visible')) return;
+        return self.registration.showNotification(title, {
+          body: data.body || '',
+          icon: './img/icon-192.png',
+          badge: './img/badge.png',
+          tag: data.tag || 'meeting',
+          renotify: true,
+          requireInteraction: true,
+          vibrate: [300, 120, 300, 120, 300],
+          data: { url: data.url || './#worklog', kind: 'meeting', logId: data.logId || '', offset: data.offset || 0 },
+        });
+      })
+    );
+    return;
+  }
   const options = {
     body: data.body || 'มีข้อความใหม่ในศูนย์ช่วยเหลือ',
-    icon: './img/icon_app.png',
-    badge: './img/icon_app.png',
+    icon: './img/icon-192.png',
+    badge: './img/badge.png',
     tag: data.tag || 'helpdesk-message',
     renotify: true,
     vibrate: [180, 80, 180],
@@ -104,9 +126,16 @@ self.addEventListener('push', (e) => {
 
 self.addEventListener('notificationclick', (e) => {
   e.notification.close();
-  const target = new URL((e.notification.data && e.notification.data.url) || './#helpdesk', self.location.origin).href;
+  const nd = e.notification.data || {};
+  const target = new URL(nd.url || './#helpdesk', self.location.origin).href;
   e.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      // เตือนประชุม + มีหน้าเว็บเปิดอยู่ → ไม่โหลดหน้าใหม่ ส่งให้หน้าเว็บเปิดกล่องเตือนและอ่านออกเสียง
+      if (nd.kind === 'meeting' && clients.length) {
+        const client = clients[0];
+        return client.focus().catch(() => {}).then(() =>
+          client.postMessage({ type: 'meeting-remind', logId: nd.logId, offset: nd.offset }));
+      }
       if (clients.length) {
         const client = clients[0];
         return client.navigate(target).then(() => client.focus());

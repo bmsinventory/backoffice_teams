@@ -164,7 +164,7 @@
     if (TABS_NEED_PROJECT.indexOf(tab) !== -1) window.imtLastProjTab = tab; // ปุ่ม "รายโครงการ" กลับมาแท็บล่าสุด
     // ── แท็บที่ต้องมีโครงการ (งาน/แบบฟอร์ม/Calendar/Report) แต่ยังไม่มีโครงการ "กำลังดู" อยู่ — auto-select ให้
     // แทนที่จะโผล่หน้าเปล่า ๆ ให้เลือกเอง (เริ่มแอปยังคงอยู่ที่ Dashboard ตามปกติ ไม่ถูกเรียกจุดนี้จนกว่าจะกดเข้าแท็บ) ──
-    if (tab === 'training' && !window.canView('training')) tab = window.imtTab = 'workspace';
+    if (tab === 'training' && !window.canView('impl_training')) tab = window.imtTab = 'workspace';
     if (TABS_NEED_PROJECT.indexOf(tab) !== -1 && !window.imtCurrentProjectId) window.imtIndexPass(_imtAutoSelectProject);
     window.renderImplTracker();
   };
@@ -220,7 +220,7 @@
       + '<input type="checkbox" '+(hideDoneProjects?'checked':'')+' onchange="window.imtToggleHideDoneProjects(this.checked)"> เฉพาะที่ยังไม่เสร็จ'
       + '</label>';
     var ptabs = TABS.filter(function (t) {
-      return TABS_NEED_PROJECT.indexOf(t.id) !== -1 && (t.id !== 'training' || window.canView('training'));
+      return TABS_NEED_PROJECT.indexOf(t.id) !== -1 && (t.id !== 'training' || window.canView('impl_training'));
     }).map(function (t) {
       return '<div class="adv-subtab'+(window.imtTab===t.id?' on':'')+'" onclick="window.imtGoTab(\''+t.id+'\')">'+t.icon+' '+t.label+'</div>';
     }).join('');

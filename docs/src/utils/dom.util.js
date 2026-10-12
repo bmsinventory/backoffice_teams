@@ -60,7 +60,7 @@
 
   window.showDbError = function (err) {
     console.error('Database Error:', err);
-    var raw  = err ? String(err.message || err.code || err) : '';
+    var raw  = err ? String(err.message || err.code || err) + (err.table ? ' [' + err.table + ']' : '') : '';
     var kind = dbeKind(raw + ' ' + (err && err.code ? err.code : ''));
     var k    = DBE_KIND[kind];
     var when = new Date().toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'medium' });

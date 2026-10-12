@@ -171,7 +171,8 @@
               + '<span class="nm-lbl">' + x.label + '</span><span class="nm-n">' + x.n + '</span></button>';
           }).join('')
         : '<div class="nm-empty">ไม่มีการแจ้งเตือน</div>')
-      + (window.webPushMenuHtml ? window.webPushMenuHtml() : '');
+      + (window.webPushMenuHtml ? window.webPushMenuHtml() : '')
+      + (window.wlRemindMenuHtml ? window.wlRemindMenuHtml() : '');
   }
   window.refreshNotiMenu = _renderNotiMenu;
   window.toggleNotiMenu = function (e) {
@@ -187,7 +188,10 @@
     m.addEventListener('click', function (ev) {
       var action = ev.target.closest('button[data-action]');
       if (action) {
-        if (action.getAttribute('data-action') === 'web-push') window.toggleWebPush && window.toggleWebPush();
+        var act = action.getAttribute('data-action');
+        if (act === 'web-push') window.toggleWebPush && window.toggleWebPush();
+        else if (act === 'wlr-voice') window.wlRemindCycleVoice && window.wlRemindCycleVoice();
+        else if (act === 'wlr-test') window.wlRemindTest && window.wlRemindTest();
         return;
       }
       var b = ev.target.closest('button[data-mod]');

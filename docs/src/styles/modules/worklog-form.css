@@ -8,6 +8,14 @@
 
 .wlf { padding: 12px 16px 14px; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; align-items: stretch; }
 .wlf-main { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+
+/* ขั้นตอน ①–⑤ — การ์ดแยกส่วน + หัวเป็นคำถามสั้น ๆ ให้ไล่กรอกจากบนลงล่าง */
+.wlf-sec { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.wlf-step-hd { display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 700; color: var(--txt); line-height: 1.3; }
+.wlf-step { width: 22px; height: 22px; flex-shrink: 0; border-radius: 50%; background: var(--violet); color: #fff; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
+.wlf-step-hd .wlf-opt { font-size: 11.5px; }
+.wlf-req { color: #ef4444; font-weight: 700; }
+.wlf-side > .wlf-step-hd { margin-bottom: 8px; }
 .wlf .f-label { display: block; margin-bottom: 4px; font-size: 12px; font-weight: 600; color: var(--txt2); }
 .wlf .f-input { font-size: 12.5px; padding: 6px 10px; }
 .wlf-title { height: 36px; font-size: 13px !important; }
@@ -19,8 +27,11 @@
 .wlf-recent { flex-shrink: 0; max-width: 220px; height: 24px; padding: 0 9px; border: 1px dashed var(--border); border-radius: 12px; background: var(--surface2); color: var(--txt2); font-family: inherit; font-size: 11.5px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wlf-recent:hover { border-color: var(--violet); color: var(--violet); }
 
-/* วันที่ / สถานที่ — เรียงบนลงล่าง ความสูงเท่ากัน 34px */
-.wlf-row2 { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+/* วันที่ | เวลา — คู่กันเมื่อกว้างพอ (งานหลายวันช่องวันที่กว้างขึ้นจนตัดลงบรรทัดใหม่เอง) · ความสูง 34px */
+.wlf-row2 { display: flex; flex-wrap: wrap; gap: 10px; }
+.wlf-row2 > div { flex: 1 1 160px; min-width: 0; }
+.wlf-row2 > div + div { flex: 1.6 1 250px; }
+.wlf.multi .wlf-row2 > div:first-child { flex-basis: 100%; }
 .wlf-dates { display: flex; align-items: center; gap: 8px; }
 .wlf-dates > .be-date, .wlf-dates > input { flex: 1; min-width: 0; }
 .wlf-dates .f-input { height: 34px; }
@@ -36,8 +47,14 @@
 #wl-dest-wrap { margin-top: 6px; }
 #wl-dest-wrap .f-input { height: 32px; }
 
-/* หมวดงาน — ป้ายแตะเดียว เรียงต่อกัน */
-.wlf-cats { display: flex; flex-wrap: wrap; gap: 5px; }
+/* หมวดงาน — แถวเดียว: หัวข้อ | dropdown | ⚙ ตั้งค่า */
+.wlf-cat-row { display: flex; align-items: center; gap: 10px; }
+.wlf-cat-row .f-label { margin-bottom: 0; flex-shrink: 0; }
+.wlf-cats { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
+#wlf-cat-sel { flex: 1; min-width: 0; height: 34px; cursor: pointer; }
+.wlf-cat-sug { flex-shrink: 0; padding: 0 6px; border-radius: 6px; background: var(--violet); color: #fff; font-size: 10px; font-weight: 600; line-height: 17px; }
+.wlf-cat-row .wlf-link { flex-shrink: 0; white-space: nowrap; }
+#wlf-cat-edit { margin-top: 8px; }
 .wlf-chip { display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--txt2); font-family: inherit; font-size: 12px; cursor: pointer; white-space: nowrap; transition: border-color .12s, background .12s; }
 .wlf-chip:hover { border-color: var(--violet); }
 .wlf-chip.on { border-color: var(--violet); background: rgba(124,92,252,.10); color: var(--violet); font-weight: 600; }
@@ -116,5 +133,29 @@
 .wlf-ai-note { margin-top: 5px; padding: 5px 9px; border-left: 3px solid var(--violet); border-radius: 6px; background: rgba(124,92,252,.08); font-size: 11.5px; line-height: 1.5; color: var(--txt2); }
 .wlf-ai-note.warn { border-left-color: var(--amber, #d97706); }
 .wlf-ai-note .wlf-link { font-size: 11.5px; }
-.wlf-chip.sug::after { content: 'แนะนำ'; margin-left: 6px; padding: 0 5px; border-radius: 6px; background: var(--violet); color: #fff; font-size: 9.5px; font-weight: 600; line-height: 15px; }
 .wl-pt-sug { margin: 0; padding: 6px 10px; border-bottom: 1px solid var(--border); background: var(--surface2); }
+
+/* เวลา / ลิงก์ประชุม / เตือนก่อนเริ่ม */
+.wlf-opt { font-weight: 400; color: var(--txt-muted); }
+.wlf-to { font-size: 12px; color: var(--txt-muted); flex-shrink: 0; }
+.wlf-url { height: 34px; }
+.wlf-rem { display: flex; flex-direction: column; gap: 6px; }
+.wlf-rem.cfg { padding: 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface2); }
+.wlf-rem .wlf-lbl-row { margin-bottom: 0; }
+.wlf-rem-hint { font-size: 11.5px; color: var(--txt-muted); }
+.wlf-rem-row { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.wlf-rem-row .wlf-recent { height: 28px; border-radius: 14px; }
+.wlf-rem-chip { cursor: default; gap: 4px; padding-right: 4px; }
+.wlf-rem-chip button { width: 20px; height: 20px; border: none; border-radius: 50%; background: none; color: inherit; font-size: 10px; cursor: pointer; }
+.wlf-rem-chip button:hover { background: rgba(124,92,252,.18); }
+.wlf-rem-off { font-size: 12px; color: var(--txt-muted); }
+.wlf-rem-own { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--txt-muted); }
+.wlf-rem-own .f-input { height: 30px; }
+#wlf-rem-n { width: 64px; }
+#wlf-rem-u { width: 76px; padding: 0 6px; }
+.wlf-rem-note { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 11px; color: var(--txt-muted); line-height: 1.5; }
+.wlf-rem-note .wlf-link { font-size: 11px; }
+.wl-join { display: inline-flex; align-items: center; gap: 4px; margin: 0 0 6px 32px; height: 28px; padding: 0 12px; border-radius: 14px; background: #2d8cff; color: #fff; font-size: 12px; font-weight: 600; text-decoration: none; }
+.wl-join:hover { filter: brightness(1.08); }
+.wlf-rem.cfg .wlf-ce-note { flex-basis: 100%; }
+.wlf-rem.cfg .wlf-ce-foot .btn:first-of-type { margin-left: auto; }

@@ -1,12 +1,16 @@
 /**
  * bo-auth.service.js — บัญชี/สิทธิ์ของ Backoffice สำหรับระบบอบรม (/training/) — รวมแท็บแบบทดสอบ
  * session ใช้ตัวเดียวกับ Backoffice (src/utils/session.util.js) — Login ที่ไหนก็เข้าได้ทุกส่วน
- * สิทธิ์: กลุ่ม is_super = ทุกอย่าง · นอกนั้นรวมสิทธิ์ "ระบบอบรม" (module training) ของทุกกลุ่มของผู้ใช้ (ตาราง roles)
- *   view = เข้าหน้าผู้ดูแลได้ · add = นำเข้าข้อมูล · del = เคลียร์ข้อมูลตามโครงการ (ตรวจใน src/modules/training-app.js)
+ * สิทธิ์: กลุ่ม is_super = ทุกอย่าง · นอกนั้นรวมสิทธิ์ของทุกกลุ่มของผู้ใช้ (ตาราง roles) แยก 2 แถว
+ *   perms.training      = เมนู "ระบบอบรม" (ภาพรวม + หลักสูตรกลาง/คลังแบบทดสอบ)
+ *   perms.impl_training = แท็บ "🎓 อบรม" ในติดตามสถานะโครงการ (?project=)
+ *   perms.impl_training_import.view = ปุ่มนำเข้าข้อมูลในแท็บอบรมของโครงการ
+ *   view = เข้าหน้าผู้ดูแลได้ · add = เปิดอบรม · del = เคลียร์ข้อมูล/ปิดอบรม (ตรวจใน src/modules/training-app.js)
  * ต้องโหลดหลัง ../env-config.js และ session.util.js
  */
 (function () {
   var ACTS = ['view', 'add', 'edit', 'del'];
+  var MODS = ['training', 'impl_training', 'impl_training_import'];
 
   // แถว users → รูปแบบเดียวกับ transform.USERS ของ Backoffice
   function norm(d) {
@@ -16,22 +20,24 @@
   // staffId = พนักงานที่ผูกกับบัญชี (ใช้หาว่าอยู่ในทีมโครงการไหน)
   function pub(u) { return { id: u.id, username: u.username, name: u.name || u.username, staffId: u.staffId }; }
 
-  // กลุ่มของผู้ใช้ → { super, perm } (perm = สิทธิ์ training รวมทุกกลุ่ม)
+  // กลุ่มของผู้ใช้ → { super, perms: { training, impl_training } } (แต่ละแถวรวมทุกกลุ่ม)
   async function access(sb, roleIds) {
     var r = roleIds.length ? await sb.from('roles').select('is_super,perms').in('id', roleIds) : { data: [] };
-    var out = { super: false, perm: {} };
-    ACTS.forEach(function (a) { out.perm[a] = false; });
+    var out = { super: false, perms: {} };
+    MODS.forEach(function (m) { out.perms[m] = {}; ACTS.forEach(function (a) { out.perms[m][a] = false; }); });
     (r.data || []).forEach(function (x) {
       if (x.is_super) out.super = true;
-      var p = (x.perms && x.perms.training) || {};
-      ACTS.forEach(function (a) { if (x.is_super || p[a] === true) out.perm[a] = true; });
+      MODS.forEach(function (m) {
+        var p = (x.perms && x.perms[m]) || {};
+        ACTS.forEach(function (a) { if (x.is_super || p[a] === true) out.perms[m][a] = true; });
+      });
     });
     return out;
   }
   async function withAccess(sb, row) {
     var u = pub(row), a = await access(sb, row.roles);
     u.super = a.super;
-    u.perm = a.perm;
+    u.perms = a.perms;
     return u;
   }
 
@@ -42,7 +48,7 @@
   }
 
   window.BoAuth = {
-    // ผู้ใช้ที่ Login อยู่ (ตรวจกับฐานข้อมูลทุกครั้ง) → { id, username, name, staffId, super, perm } หรือ null
+    // ผู้ใช้ที่ Login อยู่ (ตรวจกับฐานข้อมูลทุกครั้ง) → { id, username, name, staffId, super, perms } หรือ null
     current: async function (sb) {
       var id = await window.BmsSession.resolve(sb);
       var row = id && await rowOf(sb, id);

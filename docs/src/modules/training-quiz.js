@@ -15,7 +15,7 @@ const _tqaLink=catId=>`${location.origin}${location.pathname.replace(/[^/]*$/,''
 const _tqaName=q=>q?.title||'';
 const _tqaEl=()=>document.getElementById(OVERVIEW?'ov-content':'tqa-body');
 // แก้คลังกลาง (กระทบทุกโครงการ) = Admin หรือสิทธิ์ "แก้ไข" ของอบรม — ฐานข้อมูลตรวจซ้ำใน trn_quiz_admin
-const _tqaCanEdit=()=>!currentAdminUser||currentAdminUser.role==='superadmin'||!!currentAdminUser.perm?.edit;
+const _tqaCanEdit=()=>!currentAdminUser||currentAdminUser.role==='superadmin'||!!currentAdminUser.central?.edit;
 // โครงการที่ใช้ชุดนี้ (โครงการที่เปิดหลักสูตรอบรมที่ผูกชุดนี้ไว้)
 const _tqaUsedIn=id=>_tqaUse[id]?.sites||0; // จำนวนโครงการที่ใช้ชุดนี้ (trn_quiz_usage)
 
@@ -233,7 +233,7 @@ async function _tqaQuestions(){
           ${edit?`<button class="btn btn-primary btn-sm" onclick="_tqaEditQ()"><i class="ti ti-plus"></i>เพิ่มข้อ</button>
           <button class="btn btn-sm tqa-ai" onclick="_tqaAiOpen()"><i class="ti ti-sparkles"></i>AI ร่างข้อสอบ</button>
           <span class="tqa-sep"></span>
-          <button class="btn btn-ghost btn-sm" onclick="document.getElementById('tqa-xlsx').click()" title="นำเข้าข้อสอบจาก Excel"><i class="ti ti-file-import"></i>นำเข้า</button>`:''}
+          <button class="btn btn-ghost btn-sm" onclick="document.getElementById('tqa-xlsx').click()" title="นำเข้าข้อสอบจาก Excel — แถวที่มีรหัสข้อ = อัปเดตข้อเดิม · ว่าง = เพิ่มข้อใหม่"><i class="ti ti-file-import"></i>นำเข้า</button>`:''}
           <button class="btn btn-ghost btn-sm" onclick="_tqaExportQs()" title="ส่งออกข้อสอบเป็น Excel"><i class="ti ti-file-export"></i>ส่งออก</button>
         </div></div><div id="tqa-q-list"></div>`
     :!edit?'<div class="tqa-empty">แบบทดสอบชุดนี้ยังไม่มีข้อสอบ</div>'
@@ -282,7 +282,7 @@ async function _tqaDelQ(id){
 function _tqaEditQ(id){
   const q=id?_tqaQs.find(x=>x.id===id):{question:'',choices:['','','',''],answer:0,explanation:'',is_active:true};
   _tqaModal('modal-tqa-q',`<div class="modal-title"><i class="ti ti-${id?'pencil':'plus'}"></i>${id?'แก้ไขข้อสอบ':'เพิ่มข้อสอบ'}</div>
-    ${q.used?'<div class="tqa-warn"><i class="ti ti-info-circle"></i>ข้อนี้มีผู้สอบแล้ว — ถ้าแก้คำถาม/ตัวเลือก/เฉลย ระบบจะปิดข้อเดิมแล้วบันทึกเป็นข้อใหม่ (ผลสอบเก่ายังตรงกับข้อที่สอบจริง)</div>':''}
+    ${q.used?'<div class="tqa-warn"><i class="ti ti-info-circle"></i>ข้อนี้มีผู้สอบแล้ว — แก้ข้อความคำถาม/ตัวเลือกได้ทันที · ถ้าเปลี่ยนเฉลยหรือจำนวนตัวเลือก ระบบจะปิดข้อเดิมแล้วบันทึกเป็นข้อใหม่ (ผลสอบเก่ายังตรงกับข้อที่สอบจริง) · ห้ามสลับลำดับตัวเลือก</div>':''}
     <div class="form-group"><label class="form-label">คำถาม</label><textarea class="form-control" id="tqa-q-text" rows="3">${_esc(q.question)}</textarea></div>
     <label class="form-label">ตัวเลือก <span style="font-weight:400;color:var(--text-muted)">(เลือกวงกลมหน้าข้อที่ถูก)</span></label>
     <div id="tqa-q-ch"></div>
@@ -315,12 +315,13 @@ async function _tqaSaveQ(id){
   if(ans<0)return showToast('ตัวเลือกที่เลือกเป็นข้อถูกยังว่างอยู่','warn');
   const old=id?_tqaQs.find(x=>x.id===id):null,choices=keep.map(x=>x.c),explanation=document.getElementById('tqa-q-ex').value.trim();
   const row={...(old||{sort_order:(_tqaQs.at(-1)?.sort_order||0)+1,is_active:true}),question,choices,answer:ans,explanation};
-  // ข้อที่มีผู้สอบแล้ว + เนื้อหาเปลี่ยน → ปิดข้อเดิม แล้วเพิ่มเป็นข้อใหม่ (ฐานข้อมูลไม่ยอมให้แก้ทับ)
-  const changed=old&&(old.question!==question||old.answer!==ans||JSON.stringify(old.choices)!==JSON.stringify(choices));
-  const rows=old?.used&&changed?[{...old,is_active:false},{question,choices,answer:ans,explanation,sort_order:old.sort_order,is_active:old.is_active}]:[row];
+  // ข้อที่มีผู้สอบแล้ว + เปลี่ยนเฉลย/จำนวนตัวเลือก → ปิดข้อเดิม แล้วเพิ่มเป็นข้อใหม่ (ฐานข้อมูลไม่ยอมให้แก้ทับ)
+  const rows=old?.used&&_tqaReshaped(old,choices,ans)?[{...old,is_active:false},{question,choices,answer:ans,explanation,sort_order:old.sort_order,is_active:old.is_active}]:[row];
   if(!await _tqaSaveQs(rows))return;
   closeModal('modal-tqa-q');showToast('บันทึกแล้ว');await _tqaQuestions();
 }
+// ผลสอบเก็บแค่ลำดับตัวเลือกที่เลือก → แก้ข้อความทับรหัสเดิมได้ · เปลี่ยนเฉลย/จำนวนตัวเลือก = ข้อใหม่
+function _tqaReshaped(old,choices,ans){return old.answer!==ans||old.choices.length!==choices.length;}
 
 /* ── AI ร่างข้อสอบ (src/services/ai.service.js) — ตรวจ/เลือกก่อนเพิ่มเข้าคลังเสมอ ── */
 function _tqaAiOpen(){
@@ -447,12 +448,13 @@ async function _tqaAiAdd(){
   closeModal('modal-tqa-ai');showToast(`เพิ่ม ${rows.length} ข้อแล้ว`);await _tqaQuestions();
 }
 
-/* ── Excel: คำถาม | ตัวเลือก 1–6 | ข้อที่ถูก (1–6) | คำอธิบาย ── */
-const _TQA_XL=['คำถาม','ตัวเลือก 1','ตัวเลือก 2','ตัวเลือก 3','ตัวเลือก 4','ตัวเลือก 5','ตัวเลือก 6','ข้อที่ถูก (1-6)','คำอธิบาย'];
+/* ── Excel: คำถาม | ตัวเลือก 1–6 | ข้อที่ถูก (1–6) | คำอธิบาย | รหัสข้อ
+   รหัสข้อ = ข้อเดิมในคลัง → นำเข้าแล้วอัปเดตทับ · ว่าง = เพิ่มเป็นข้อใหม่ ── */
+const _TQA_XL=['คำถาม','ตัวเลือก 1','ตัวเลือก 2','ตัวเลือก 3','ตัวเลือก 4','ตัวเลือก 5','ตัวเลือก 6','ข้อที่ถูก (1-6)','คำอธิบาย','รหัสข้อ (ห้ามแก้ · ว่าง = ข้อใหม่)'];
 async function _tqaExportQs(){
   if(!await _needLib('xlsx'))return;
-  const rows=_tqaQs.map(q=>[q.question,...[0,1,2,3,4,5].map(j=>q.choices[j]||''),q.answer+1,q.explanation]);
-  const ws=XLSX.utils.aoa_to_sheet([_TQA_XL,...rows]);ws['!cols']=[{wch:50},...Array(6).fill({wch:22}),{wch:14},{wch:40}];
+  const rows=_tqaQs.map(q=>[q.question,...[0,1,2,3,4,5].map(j=>q.choices[j]||''),q.answer+1,q.explanation||'',q.id]);
+  const ws=XLSX.utils.aoa_to_sheet([_TQA_XL,...rows]);ws['!cols']=[{wch:50},...Array(6).fill({wch:22}),{wch:14},{wch:40},{wch:16}];
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'ข้อสอบ');
   XLSX.writeFile(wb,`ข้อสอบ_${_tqaName(_tqaQ)}.xlsx`.replace(/[\\/:*?"<>|]/g,'_'));
 }
@@ -461,17 +463,29 @@ async function _tqaImport(inp){
   if(!f||!await _needLib('xlsx'))return;
   const wb=XLSX.read(await f.arrayBuffer());
   const aoa=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''}).slice(1);
-  const bad=[],base=(_tqaQs.at(-1)?.sort_order||0)+1;
-  const rows=aoa.map((r,i)=>{
+  const bad=[],seen=new Set(),base=(_tqaQs.at(-1)?.sort_order||0)+1;
+  let add=0,upd=0,same=0;
+  const rows=aoa.flatMap((r,i)=>{
     const question=String(r[0]||'').trim(),raw=[1,2,3,4,5,6].map(k=>String(r[k]??'').trim());
-    if(!question&&!raw.some(Boolean))return null;
+    if(!question&&!raw.some(Boolean))return [];
     const ans=+r[7]-1,keep=raw.map((c,j)=>({c,j})).filter(x=>x.c),a=keep.findIndex(x=>x.j===ans);
-    if(!question||keep.length<2||a<0){bad.push(i+2);return null;}
-    return{question,choices:keep.map(x=>x.c),answer:a,explanation:String(r[8]||'').trim(),sort_order:base+i};
-  }).filter(Boolean);
-  if(!rows.length)return showToast(bad.length?`ข้อมูลไม่ครบทุกแถว (แถว ${bad.slice(0,8).join(', ')})`:'ไม่พบข้อสอบในไฟล์','warn');
-  if(!await showConfirm(`นำเข้า ${rows.length} ข้อ เข้าคลังข้อสอบ?`,bad.length?`ข้าม ${bad.length} แถวที่ไม่ครบ (แถว ${bad.slice(0,10).join(', ')}${bad.length>10?' …':''})`:'',{okLabel:'นำเข้า',danger:false}))return;
-  if(await _tqaSaveQs(rows)){showToast(`นำเข้า ${rows.length} ข้อแล้ว`);await _tqaQuestions();}
+    // รหัสข้อที่ไม่ใช่ของชุดนี้ (เช่น ไฟล์จากชุดอื่น) → เพิ่มเป็นข้อใหม่ · รหัสซ้ำในไฟล์ = แถวผิด
+    const old=_tqaQs.find(q=>q.id===+r[9]&&String(r[9]).trim()!=='');
+    if(!question||keep.length<2||a<0||(old&&seen.has(old.id))){bad.push(i+2);return [];}
+    const choices=keep.map(x=>x.c),explanation=String(r[8]||'').trim();
+    if(!old){add++;return [{question,choices,answer:a,explanation,sort_order:base+i}];}
+    seen.add(old.id);
+    if(old.question===question&&old.answer===a&&JSON.stringify(old.choices)===JSON.stringify(choices)&&(old.explanation||'')===explanation){same++;return [];}
+    upd++;
+    // ข้อที่มีผู้สอบแล้ว + เปลี่ยนเฉลย/จำนวนตัวเลือก → ปิดข้อเดิม แล้วเพิ่มเป็นข้อใหม่ · แก้แค่ข้อความ = อัปเดตทับรหัสเดิม
+    return old.used&&_tqaReshaped(old,choices,a)?[{...old,is_active:false},{question,choices,answer:a,explanation,sort_order:old.sort_order,is_active:old.is_active}]
+      :[{...old,question,choices,answer:a,explanation}];
+  });
+  const skip=bad.length?`ข้าม ${bad.length} แถวที่ไม่ครบ/รหัสข้อซ้ำ (แถว ${bad.slice(0,10).join(', ')}${bad.length>10?' …':''})`:'';
+  if(!rows.length)return showToast(bad.length?skip:same?`ไม่มีข้อที่เปลี่ยนแปลง (${same} ข้อเหมือนเดิม)`:'ไม่พบข้อสอบในไฟล์','warn');
+  const sum=[add&&`เพิ่มใหม่ ${add} ข้อ`,upd&&`อัปเดต ${upd} ข้อ`].filter(Boolean).join(' · ');
+  if(!await showConfirm(`${sum} ในคลังข้อสอบ?`,[same&&`เหมือนเดิม ${same} ข้อ (ไม่แตะ)`,skip].filter(Boolean).join(' · '),{okLabel:'นำเข้า',danger:false}))return;
+  if(await _tqaSaveQs(rows)){showToast(`นำเข้าแล้ว — ${sum}`);await _tqaQuestions();}
 }
 
 /* ══════════════════ ผลสอบ + ใบประกาศ ══════════════════ */

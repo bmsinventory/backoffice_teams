@@ -15,6 +15,11 @@
     { id:'expense_form', g:'Workspace', label:'Advance › เอกสารประกอบ', icon:'receipt-2' },
     { id:'lodging',      g:'Workspace', label:'ที่พัก',          icon:'bed', approve:true },
     { id:'impl_tracker', g:'Workspace', label:'ติดตามสถานะโครงการ', icon:'timeline-event' },
+    // แท็บ 🎓 อบรม ในติดตามสถานะโครงการ (src/modules/training.js ?project=) — สิทธิ์แยกจากเมนูระบบอบรม (training)
+    // ดู = เข้าแท็บ/งานอบรมของโครงการที่อยู่ในทีม · เพิ่ม = เปิดอบรม · ลบ = เคลียร์ข้อมูล/ปิดอบรม · นำเข้าข้อมูล = แถวถัดไป
+    { id:'impl_training', g:'Workspace', label:'ติดตามสถานะโครงการ › อบรม', icon:'school' },
+    // ปุ่ม 📥 นำเข้าข้อมูล (CSV/Excel) ในแท็บอบรมของโครงการ — แยกจาก "เพิ่ม" ของแถวบน · ใช้แค่สิทธิ์ "ดู" (ต้องดูแถวบนได้ด้วย)
+    { id:'impl_training_import', g:'Workspace', label:'ติดตามสถานะโครงการ › อบรม › นำเข้าข้อมูล', icon:'table-import' },
     { id:'all_issues',   g:'Workspace', label:'ภาพรวมปัญหาการใช้งาน', icon:'alert-hexagon' },
     // ระบบอบรม + ระบบสอบ (/training/) — view-training ฝังหน้า /training/?embed=1 (src/modules/training.js) ใช้ session เดียวกัน
     { id:'training',     g:'Workspace', label:'ระบบอบรม', icon:'school' },

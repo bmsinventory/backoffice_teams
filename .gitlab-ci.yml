@@ -1,0 +1,46 @@
+# build + push frontend image ขึ้น hub.hosxp.net ทุกครั้งที่ push เข้า branch หลัก
+# ต้องตั้ง CI/CD Variables (Settings → CI/CD → Variables, ติ๊ก Masked):
+#   DOCKER_USERNAME  ผู้ใช้ docker login hub.hosxp.net
+#   DOCKER_PASSWORD  รหัสผ่าน docker login hub.hosxp.net
+#   WORKER_SECRET    เนื้อหาไฟล์ push-worker/worker.secret (ไม่อยู่ใน git — ไม่มี = image ไม่ส่ง Web Push)
+# tag ที่ได้: :latest + :V1.xxx (อ่านจาก APP_VERSION ใน docs/src/config/changelog.config.js)
+# บน server: docker compose pull frontend && docker compose up -d frontend
+
+stages:
+  - build
+
+variables:
+  REGISTRY: hub.hosxp.net
+  IMAGE: hub.hosxp.net/bms/backoffice-teams-frontend
+
+build-push:
+  stage: build
+  tags:
+    - backoffice-teams
+  # docker executor (mount /var/run/docker.sock) ใช้ image นี้ · shell executor ไม่สนบรรทัดนี้ ใช้ docker ของเครื่อง runner
+  image: docker:27
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  before_script:
+    - |
+      if [ -z "${DOCKER_USERNAME:-}" ] || [ -z "${DOCKER_PASSWORD:-}" ]; then
+        echo "ยังไม่ได้ตั้ง CI/CD Variables DOCKER_USERNAME / DOCKER_PASSWORD"; exit 1
+      fi
+      if [ -z "${WORKER_SECRET:-}" ]; then
+        echo "ยังไม่ได้ตั้ง CI/CD Variable WORKER_SECRET — image จะส่ง Web Push / แจ้งเตือนก่อนประชุมไม่ได้"; exit 1
+      fi
+    - printf '%s' "$WORKER_SECRET" > push-worker/worker.secret
+    - echo "$DOCKER_PASSWORD" | docker login "$REGISTRY" -u "$DOCKER_USERNAME" --password-stdin
+  script:
+    - VERSION=$(sed -n "s/.*window\.APP_VERSION *= *'\(V[0-9.]*\)'.*/\1/p" docs/src/config/changelog.config.js | head -n 1)
+    - |
+      if [ -z "$VERSION" ]; then
+        echo "อ่าน APP_VERSION จาก docs/src/config/changelog.config.js ไม่ได้"; exit 1
+      fi
+    - echo "build $IMAGE:$VERSION (commit $CI_COMMIT_SHORT_SHA)"
+    - docker build --pull -t "$IMAGE:latest" -t "$IMAGE:$VERSION" .
+    - docker push "$IMAGE:$VERSION"
+    - docker push "$IMAGE:latest"
+  after_script:
+    - rm -f push-worker/worker.secret
+    - docker logout "$REGISTRY" || true

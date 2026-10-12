@@ -4,6 +4,20 @@
 -- หมายเหตุ: publication ชื่อ `supabase_realtime` เป็น object จริงของ Realtime service — ห้ามเปลี่ยนชื่อ
 -- =============================================================
 
+-- ── กันระบบค้างตอนรันสคริปต์ (หัวไฟล์ + หัวส่วนที่ต้องรัน · ท้ายมี COMMIT) ──
+-- lock_timeout: รอล็อกตารางเกิน 5 วิ = ยกเลิก — ไม่ให้คำสั่งอ่านของผู้ใช้ต่อคิวหลัง ALTER จน statement timeout (57014)
+-- idle_in_transaction_session_timeout: ลืม commit / สคริปต์ error กลางทางแล้วค้างเกิน 15 วิ = ตัด session ทิ้ง ล็อกปลดเอง
+SET lock_timeout = '5s';
+SET idle_in_transaction_session_timeout = '15s';
+
+-- ── กันลืม commit จากทุกโปรแกรม (ตั้งที่ระดับฐานข้อมูล · มีผลกับการเชื่อมต่อใหม่) ──
+-- session ไหนเปิด transaction ค้างไว้เฉยๆ เกิน 1 นาที → ตัดทิ้ง ล็อกปลดเอง (บริการของระบบไม่มีตัวไหนค้างนานขนาดนี้)
+DO $$ BEGIN
+  EXECUTE format('ALTER DATABASE %I SET idle_in_transaction_session_timeout = %L', current_database(), '60s');
+EXCEPTION WHEN insufficient_privilege THEN
+  RAISE NOTICE 'ข้ามการตั้ง idle_in_transaction_session_timeout ระดับฐานข้อมูล (ต้องรันด้วยผู้ใช้ postgres)';
+END $$;
+
 -- ── STAGES ──────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS stages (
   id              TEXT PRIMARY KEY,
@@ -343,6 +357,10 @@ CREATE TABLE IF NOT EXISTS work_logs (
   title          TEXT DEFAULT '',
   detail         TEXT DEFAULT '',
   participants   JSONB DEFAULT '[]',
+  start_time     TEXT DEFAULT '',                -- เวลาเริ่ม HH:MM (เวลาไทย) · ว่าง = ไม่ระบุเวลา (ไม่เตือน)
+  end_time       TEXT DEFAULT '',
+  meeting_url    TEXT DEFAULT '',                -- ลิงก์ประชุมออนไลน์ (Zoom / Meet / Teams)
+  reminders      JSONB,                          -- เตือนก่อนเริ่ม (นาที) เช่น [1440,60] · NULL = ค่าเริ่มต้น settings.worklog_reminders · [] = ไม่เตือน
   created_at     TEXT DEFAULT ''
 );
 
@@ -353,6 +371,7 @@ CREATE TABLE IF NOT EXISTS settings (
   -- app settings (Token แจ้งเตือนอยู่ที่ notify_tokens — ดู NOTIFY TOKENS ท้ายไฟล์)
   helpdesk_ai_auto_reply     JSONB DEFAULT '{}',
   worklog_categories         JSONB DEFAULT '[]',   -- หมวดบันทึกงาน [{id,emoji,label,hidden}] · ว่าง = ใช้หมวดเริ่มต้นใน worklog.js
+  worklog_reminders          JSONB DEFAULT '[1440,60]', -- ค่าเริ่มต้น "เตือนก่อนประชุม" (นาที) ของบันทึกงานที่ไม่ได้ตั้งเอง
   year_targets              JSONB DEFAULT '[]',
   tgt_grouped                BOOLEAN DEFAULT false,
   allowance_weekday_normal   NUMERIC DEFAULT 350,
@@ -401,7 +420,7 @@ BEGIN
     'overview',ro,'kanban',fu,'projects',fu,'advance',fu,'expense_form',fu,'lodging',fu,
     'workload',ro,'calendar',fu,'leave',fu,'timesheet',ro,'cost',ro,'budget',ro,
     'availability',ro,'holiday',ro,'hospital',ro,'contract',fu,'impl_tracker',fu,'all_issues',ro,
-    'helpdesk','{"view":true,"add":true,"edit":true,"del":false}'::jsonb,'assist',fu,'training',fu,'server_request',fu,'team_showcase',fu);
+    'helpdesk','{"view":true,"add":true,"edit":true,"del":false}'::jsonb,'assist',fu,'training',fu,'impl_training',fu,'server_request',fu,'team_showcase',fu);
   p_staff := jsonb_build_object(
     'overview',ro,'kanban',ro,'advance',fu,'expense_form',fu,'lodging',fu,
     'workload',ro,'calendar',ro,'leave',va,'timesheet',ro,'cost',ro,
@@ -449,6 +468,11 @@ END $$;
 -- รันซ้ำได้: เพิ่มเฉพาะกลุ่มที่ยังไม่เคยตั้งสิทธิ์ datacheck (Admin ปิดไปแล้วจะไม่ถูกเปิดคืน)
 UPDATE roles SET perms = perms || jsonb_build_object('datacheck', '{"view":true,"add":false,"edit":false,"del":false}'::jsonb)
 WHERE NOT is_super AND NOT (perms ? 'datacheck') AND COALESCE((perms -> 'assist' ->> 'view')::boolean, false);
+
+-- แท็บ 🎓 อบรม ในติดตามสถานะโครงการ (โมดูล 'impl_training') แยกสิทธิ์จากเมนูระบบอบรม (training)
+-- รันซ้ำได้: กลุ่มที่ยังไม่เคยตั้ง impl_training → ใช้ค่าเดิมของ training (สิทธิ์เดิมไม่เปลี่ยน · Admin ปรับแยกได้ภายหลัง)
+UPDATE roles SET perms = perms || jsonb_build_object('impl_training', perms -> 'training')
+WHERE NOT is_super AND NOT (perms ? 'impl_training') AND jsonb_typeof(perms -> 'training') = 'object';
 
 ALTER TABLE settings DROP COLUMN IF EXISTS admin;
 ALTER TABLE settings DROP COLUMN IF EXISTS pm;
@@ -1221,6 +1245,13 @@ ALTER TABLE settings ADD COLUMN IF NOT EXISTS helpdesk_status_overrides   JSONB 
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS helpdesk_urgency_overrides  JSONB DEFAULT '{}';
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS helpdesk_ai_auto_reply JSONB DEFAULT '{}';
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS worklog_categories JSONB DEFAULT '[]';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS worklog_reminders JSONB DEFAULT '[1440,60]';
+
+-- ── Migration: บันทึกงาน — เวลาประชุม + ลิงก์ประชุมออนไลน์ + เตือนก่อนเริ่ม (ดู WORKLOG REMINDERS ท้ายไฟล์) ──
+ALTER TABLE work_logs ADD COLUMN IF NOT EXISTS start_time  TEXT DEFAULT '';
+ALTER TABLE work_logs ADD COLUMN IF NOT EXISTS end_time    TEXT DEFAULT '';
+ALTER TABLE work_logs ADD COLUMN IF NOT EXISTS meeting_url TEXT DEFAULT '';
+ALTER TABLE work_logs ADD COLUMN IF NOT EXISTS reminders   JSONB;
 
 -- ── Migration: ปุ่ม "โทรด่วน" (Jitsi) — เก็บเวลาที่ลูกค้ากดเข้าห้องคุยสดสำเร็จจริง
 -- ใช้แยกแยะ "กดปุ่ม" กับ "เข้าห้องสำเร็จ" เพื่อยิง BMS Notify เฉพาะตอนเข้าห้องจริง ──
@@ -1460,12 +1491,14 @@ BEGIN
   WHERE id = p_id;
 END $$;
 
+-- แจ้งเตือนศูนย์ช่วยเหลือ → เฉพาะเครื่องของผู้ที่ดูเมนูศูนย์ช่วยเหลือได้ (ทุกคนเปิด Web Push ได้เพื่อรับเตือนประชุม)
 CREATE OR REPLACE FUNCTION web_push_worker_subscriptions(p_secret TEXT)
 RETURNS TABLE (id TEXT, endpoint TEXT, p256dh TEXT, auth TEXT)
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
 BEGIN
   PERFORM _web_push_worker_check(p_secret);
-  RETURN QUERY SELECT s.id, s.endpoint, s.p256dh, s.auth FROM web_push_subscriptions s WHERE s.active;
+  RETURN QUERY SELECT s.id, s.endpoint, s.p256dh, s.auth FROM web_push_subscriptions s
+    WHERE s.active AND EXISTS (SELECT 1 FROM users u WHERE u.id = s.user_id AND _bo_user_can(u, 'helpdesk', ARRAY['view']));
 END $$;
 
 -- ตัวส่ง: endpoint หมดอายุ (404/410) → ปิดไว้
@@ -2597,11 +2630,15 @@ END $$;
 -- ตั้ง token (ว่าง = ลบ · 'off' ใช้กับ site:<รหัส> = ไม่แจ้งเตือนโครงการนั้น)
 CREATE OR REPLACE FUNCTION bo_notify_token_set(p_token TEXT, p_key TEXT, p_value TEXT) RETURNS VOID
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE u users := _bo_session_user(p_token); v TEXT := btrim(COALESCE(p_value, ''));
+DECLARE u users := _bo_session_user(p_token); v TEXT := btrim(COALESCE(p_value, '')); ok BOOLEAN;
 BEGIN
   IF u.id IS NULL THEN RAISE EXCEPTION 'กรุณาเข้าสู่ระบบใหม่' USING ERRCODE = '42501'; END IF;
   IF NOT _notify_key_ok(p_key) THEN RAISE EXCEPTION 'ไม่รู้จักช่องแจ้งเตือน: %', p_key USING ERRCODE = '22023'; END IF;
-  IF NOT _bo_user_can(u, CASE WHEN p_key LIKE 'site:%' THEN 'training' ELSE 'admin' END, ARRAY['view', 'add', 'edit']) THEN
+  -- site:<รหัส> ตั้งจากแท็บอบรมของโครงการ — สิทธิ์ "ระบบอบรม" หรือ "ติดตามสถานะโครงการ › อบรม" อย่างใดอย่างหนึ่ง
+  IF p_key LIKE 'site:%' THEN ok := _bo_user_can(u, 'training', ARRAY['view', 'add', 'edit']) OR _bo_user_can(u, 'impl_training', ARRAY['view', 'add', 'edit']);
+  ELSE ok := _bo_user_can(u, 'admin', ARRAY['view', 'add', 'edit']);
+  END IF;
+  IF NOT ok THEN
     RAISE EXCEPTION 'ไม่มีสิทธิ์ตั้งค่าการแจ้งเตือน' USING ERRCODE = '42501';
   END IF;
   IF v = '' THEN
@@ -2638,13 +2675,121 @@ GRANT EXECUTE ON FUNCTION notify_worker_token(TEXT, TEXT, TEXT, TEXT) TO anon;
 
 NOTIFY pgrst, 'reload schema';
 
+-- ================================================================
+-- WORKLOG REMINDERS — เตือนก่อนประชุม/บันทึกงานที่ระบุเวลาเริ่ม ส่ง Web Push ถึงเครื่องของผู้ร่วมงานแต่ละคน
+-- • work_logs.reminders = นาทีก่อนเริ่ม เช่น [1440,60] · NULL = ใช้ settings.worklog_reminders · [] = ไม่เตือน
+-- • push-worker (ใน frontend container) เรียก worklog_reminder_worker_claim ทุก 30 วินาที → ได้รายการที่ถึงเวลา
+--   ช่วงเตือน 5 นาทีหลังเวลาที่ตั้ง (เลยกว่านั้น/ประชุมเริ่มแล้ว = ข้าม ไม่เตือนย้อนหลัง)
+-- • worklog_reminder_sent กันส่งซ้ำ — คีย์รวมเวลาเริ่ม แก้วัน/เวลาประชุม = รอบเตือนใหม่
+-- • ผู้รับ = users ที่ผูกกับ staff ในรายชื่อผู้ร่วมงาน · ไม่มีผู้ร่วมงาน = ผู้บันทึก (users.id)
+-- idempotent รันซ้ำได้
+-- ================================================================
+CREATE TABLE IF NOT EXISTS worklog_reminder_sent (
+  log_id      TEXT NOT NULL,
+  offset_min  INTEGER NOT NULL,
+  start_at    TIMESTAMPTZ NOT NULL,
+  sent_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (log_id, offset_min, start_at)
+);
+ALTER TABLE worklog_reminder_sent ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON worklog_reminder_sent FROM anon, authenticated;
+
+-- วันที่ + เวลา (เวลาไทย) → timestamptz · รูปแบบผิด/วันที่ไม่มีจริง = NULL (ไม่ทำให้ทั้งรอบล้ม)
+CREATE OR REPLACE FUNCTION _wl_start_at(p_date TEXT, p_time TEXT) RETURNS TIMESTAMPTZ
+LANGUAGE plpgsql STABLE AS $$
+BEGIN
+  IF COALESCE(p_date, '') !~ '^\d{4}-\d{2}-\d{2}$' OR COALESCE(p_time, '') !~ '^([01]\d|2[0-3]):[0-5]\d$' THEN RETURN NULL; END IF;
+  RETURN (p_date || ' ' || p_time)::timestamp AT TIME ZONE 'Asia/Bangkok';
+EXCEPTION WHEN others THEN RETURN NULL;
+END $$;
+
+-- ตัวส่ง: จองรอบเตือนที่ถึงเวลา (บันทึกลง worklog_reminder_sent ในคำสั่งเดียว — ตัวส่งหลายตัวไม่ส่งซ้ำ)
+CREATE OR REPLACE FUNCTION worklog_reminder_worker_claim(p_secret TEXT) RETURNS JSONB
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE def JSONB; res JSONB;
+BEGIN
+  PERFORM _web_push_worker_check(p_secret);
+  SELECT s.worklog_reminders INTO def FROM settings s WHERE s.id = 'app';
+  IF jsonb_typeof(def) IS DISTINCT FROM 'array' THEN def := '[1440,60]'::jsonb; END IF;
+
+  WITH w AS (
+    SELECT l.id, l.reminders,
+           _wl_start_at(CASE WHEN l.type = 'period' THEN l.start_date ELSE l.date END, l.start_time) AS start_at
+      FROM work_logs l
+     WHERE COALESCE(l.start_time, '') <> ''
+  ), offs AS (
+    SELECT w.id, w.start_at,
+           CASE WHEN o.v ~ '^\d{1,5}$' THEN o.v::int END AS off_min
+      FROM w CROSS JOIN LATERAL jsonb_array_elements_text(
+             CASE WHEN jsonb_typeof(w.reminders) = 'array' THEN w.reminders ELSE def END) AS o(v)
+     WHERE w.start_at > now() AND w.start_at < now() + INTERVAL '15 days'
+  ), due AS (
+    SELECT DISTINCT id, start_at, off_min FROM offs
+     WHERE off_min BETWEEN 1 AND 20160
+       AND now() >= start_at - make_interval(mins => off_min)
+       AND now() <  start_at - make_interval(mins => off_min) + INTERVAL '5 minutes'
+  ), ins AS (
+    INSERT INTO worklog_reminder_sent (log_id, offset_min, start_at)
+    SELECT id, off_min, start_at FROM due
+    ON CONFLICT DO NOTHING
+    RETURNING log_id, offset_min, start_at
+  )
+  SELECT jsonb_agg(jsonb_build_object(
+           'log_id', l.id, 'offset', i.offset_min, 'start_at', i.start_at,
+           'title', l.title, 'category', l.category,
+           'date', CASE WHEN l.type = 'period' THEN l.start_date ELSE l.date END,
+           'start_time', l.start_time, 'end_time', COALESCE(l.end_time, ''),
+           'url', COALESCE(l.meeting_url, ''),
+           'location_type', l.location_type, 'destination', COALESCE(l.destination, ''),
+           'users', CASE
+             WHEN jsonb_typeof(l.participants) = 'array' AND jsonb_array_length(l.participants) > 0 THEN
+               COALESCE((SELECT jsonb_agg(DISTINCT u.id) FROM users u
+                          WHERE u.is_active IS NOT FALSE AND COALESCE(u.staff_id, '') <> ''
+                            AND u.staff_id IN (SELECT p ->> 'sid' FROM jsonb_array_elements(l.participants) p
+                                                WHERE jsonb_typeof(p) = 'object')), '[]'::jsonb)
+             ELSE jsonb_build_array(l.uid) END))
+    INTO res
+    FROM ins i JOIN work_logs l ON l.id = i.log_id;
+
+  IF random() < 0.01 THEN DELETE FROM worklog_reminder_sent WHERE sent_at < now() - INTERVAL '30 days'; END IF;
+  RETURN COALESCE(res, '[]'::jsonb);
+END $$;
+
+-- ตัวส่ง: เครื่องที่เปิด Web Push ไว้ของผู้ใช้ตามรายการ (users.id)
+CREATE OR REPLACE FUNCTION web_push_worker_user_subscriptions(p_secret TEXT, p_users TEXT[])
+RETURNS TABLE (id TEXT, endpoint TEXT, p256dh TEXT, auth TEXT)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  PERFORM _web_push_worker_check(p_secret);
+  RETURN QUERY SELECT s.id, s.endpoint, s.p256dh, s.auth FROM web_push_subscriptions s
+    WHERE s.active AND s.user_id <> '' AND s.user_id = ANY(COALESCE(p_users, '{}'));
+END $$;
+
+REVOKE ALL ON FUNCTION _wl_start_at(TEXT, TEXT) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION worklog_reminder_worker_claim(TEXT), web_push_worker_user_subscriptions(TEXT, TEXT[]) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION worklog_reminder_worker_claim(TEXT), web_push_worker_user_subscriptions(TEXT, TEXT[]) TO anon;
+
+NOTIFY pgrst, 'reload schema';
+COMMIT; -- โปรแกรม SQL ที่ปิด auto-commit (เช่น Navicat) ต้องมีบรรทัดนี้ ไม่งั้นล็อกตารางค้างจนทั้งระบบโหลดไม่ขึ้น
+
 
 -- ################################################################
 -- ▼▼▼ ส่วนที่ต้องรัน (อัปเดตล่าสุด) — ไม่ต้องรันทั้งไฟล์ ▼▼▼
 -- ทุกครั้งที่ไฟล์นี้มีการแก้ จะคัดลอกเฉพาะส่วนที่เปลี่ยนมาไว้ตรงนี้ เป็นบล็อกแยกตามเวลา
---   → รันเฉพาะบล็อกที่ยังไม่เคยรัน (เรียงจากเก่าไปใหม่) · รันเสร็จแจ้ง Claude ให้ลบบล็อกนั้นออก
+--   → เลือกรันทั้งส่วนนี้ทีเดียว ตั้งแต่บรรทัด SET ด้านล่างจนถึง COMMIT ท้ายไฟล์ (ทุกบล็อกรันซ้ำได้) · รันเสร็จแจ้ง Claude ให้ลบบล็อกออก
+--   ห้ามตัด SET หัวส่วน / COMMIT ท้ายไฟล์ออก — ไม่งั้นถ้าโปรแกรมปิด auto-commit ตารางจะถูกล็อกค้างจนทั้งระบบโหลดไม่ขึ้น
 -- โค้ดด้านบนเป็นฉบับเต็ม (ใช้ตั้ง DB ใหม่) — ทุกบล็อกรันซ้ำได้ ไม่ทับข้อมูล
 -- ################################################################
+SET lock_timeout = '5s';
+SET idle_in_transaction_session_timeout = '15s';
+
+-- ── กันลืม commit จากทุกโปรแกรม (ตั้งที่ระดับฐานข้อมูล · มีผลกับการเชื่อมต่อใหม่) ──
+-- session ไหนเปิด transaction ค้างไว้เฉยๆ เกิน 1 นาที → ตัดทิ้ง ล็อกปลดเอง (บริการของระบบไม่มีตัวไหนค้างนานขนาดนี้)
+DO $$ BEGIN
+  EXECUTE format('ALTER DATABASE %I SET idle_in_transaction_session_timeout = %L', current_database(), '60s');
+EXCEPTION WHEN insufficient_privilege THEN
+  RAISE NOTICE 'ข้ามการตั้ง idle_in_transaction_session_timeout ระดับฐานข้อมูล (ต้องรันด้วยผู้ใช้ postgres)';
+END $$;
 
 -- ── [2026-10-11] แนะนำทีม: ตั้งค่าคำพูด AI ต่อทีม (คำทักทาย / แม่แบบแนะนำตัว / คำปิดท้าย) ──
 ALTER TABLE team_showcases ADD COLUMN IF NOT EXISTS voice JSONB DEFAULT '{}';
@@ -2667,3 +2812,132 @@ NOTIFY pgrst, 'reload schema';
 ALTER TABLE hospitals ADD COLUMN IF NOT EXISTS lat DOUBLE PRECISION;
 ALTER TABLE hospitals ADD COLUMN IF NOT EXISTS lng DOUBLE PRECISION;
 NOTIFY pgrst, 'reload schema';
+
+-- ── [2026-10-12 16:30] สิทธิ์แยก: แท็บ 🎓 อบรม ในติดตามสถานะโครงการ (impl_training) ไม่ผูกกับเมนูระบบอบรม (training) ──
+-- กลุ่มที่ยังไม่เคยตั้ง → ใช้ค่าเดิมของ training (ไม่มีใครเสียสิทธิ์) · ปรับแยกได้ที่ Admin Panel › สิทธิ์การใช้งาน
+UPDATE roles SET perms = perms || jsonb_build_object('impl_training', perms -> 'training')
+WHERE NOT is_super AND NOT (perms ? 'impl_training') AND jsonb_typeof(perms -> 'training') = 'object';
+CREATE OR REPLACE FUNCTION bo_notify_token_set(p_token TEXT, p_key TEXT, p_value TEXT) RETURNS VOID
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE u users := _bo_session_user(p_token); v TEXT := btrim(COALESCE(p_value, '')); ok BOOLEAN;
+BEGIN
+  IF u.id IS NULL THEN RAISE EXCEPTION 'กรุณาเข้าสู่ระบบใหม่' USING ERRCODE = '42501'; END IF;
+  IF NOT _notify_key_ok(p_key) THEN RAISE EXCEPTION 'ไม่รู้จักช่องแจ้งเตือน: %', p_key USING ERRCODE = '22023'; END IF;
+  IF p_key LIKE 'site:%' THEN ok := _bo_user_can(u, 'training', ARRAY['view', 'add', 'edit']) OR _bo_user_can(u, 'impl_training', ARRAY['view', 'add', 'edit']);
+  ELSE ok := _bo_user_can(u, 'admin', ARRAY['view', 'add', 'edit']);
+  END IF;
+  IF NOT ok THEN
+    RAISE EXCEPTION 'ไม่มีสิทธิ์ตั้งค่าการแจ้งเตือน' USING ERRCODE = '42501';
+  END IF;
+  IF v = '' THEN
+    DELETE FROM notify_tokens WHERE key = p_key;
+  ELSE
+    INSERT INTO notify_tokens (key, token, updated_at, updated_by) VALUES (p_key, v, now(), u.id)
+    ON CONFLICT (key) DO UPDATE SET token = EXCLUDED.token, updated_at = now(), updated_by = EXCLUDED.updated_by;
+  END IF;
+  PERFORM _bo_audit(u, 'notify_token_set', p_key);
+END $$;
+NOTIFY pgrst, 'reload schema';
+
+-- ── [2026-10-12 21:00] บันทึกงาน: เวลาประชุม + ลิงก์ Zoom + เตือนก่อนประชุม (Web Push รายคน · ตั้งได้กี่วัน/ชม.) ──
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS worklog_reminders JSONB DEFAULT '[1440,60]';
+ALTER TABLE work_logs ADD COLUMN IF NOT EXISTS start_time  TEXT DEFAULT '';
+ALTER TABLE work_logs ADD COLUMN IF NOT EXISTS end_time    TEXT DEFAULT '';
+ALTER TABLE work_logs ADD COLUMN IF NOT EXISTS meeting_url TEXT DEFAULT '';
+ALTER TABLE work_logs ADD COLUMN IF NOT EXISTS reminders   JSONB;
+-- แจ้งเตือนศูนย์ช่วยเหลือ → เฉพาะเครื่องของผู้ที่ดูเมนูศูนย์ช่วยเหลือได้ (ทุกคนเปิด Web Push ได้เพื่อรับเตือนประชุม)
+CREATE OR REPLACE FUNCTION web_push_worker_subscriptions(p_secret TEXT)
+RETURNS TABLE (id TEXT, endpoint TEXT, p256dh TEXT, auth TEXT)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  PERFORM _web_push_worker_check(p_secret);
+  RETURN QUERY SELECT s.id, s.endpoint, s.p256dh, s.auth FROM web_push_subscriptions s
+    WHERE s.active AND EXISTS (SELECT 1 FROM users u WHERE u.id = s.user_id AND _bo_user_can(u, 'helpdesk', ARRAY['view']));
+END $$;
+CREATE TABLE IF NOT EXISTS worklog_reminder_sent (
+  log_id      TEXT NOT NULL,
+  offset_min  INTEGER NOT NULL,
+  start_at    TIMESTAMPTZ NOT NULL,
+  sent_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (log_id, offset_min, start_at)
+);
+ALTER TABLE worklog_reminder_sent ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON worklog_reminder_sent FROM anon, authenticated;
+
+-- วันที่ + เวลา (เวลาไทย) → timestamptz · รูปแบบผิด/วันที่ไม่มีจริง = NULL (ไม่ทำให้ทั้งรอบล้ม)
+CREATE OR REPLACE FUNCTION _wl_start_at(p_date TEXT, p_time TEXT) RETURNS TIMESTAMPTZ
+LANGUAGE plpgsql STABLE AS $$
+BEGIN
+  IF COALESCE(p_date, '') !~ '^\d{4}-\d{2}-\d{2}$' OR COALESCE(p_time, '') !~ '^([01]\d|2[0-3]):[0-5]\d$' THEN RETURN NULL; END IF;
+  RETURN (p_date || ' ' || p_time)::timestamp AT TIME ZONE 'Asia/Bangkok';
+EXCEPTION WHEN others THEN RETURN NULL;
+END $$;
+
+-- ตัวส่ง: จองรอบเตือนที่ถึงเวลา (บันทึกลง worklog_reminder_sent ในคำสั่งเดียว — ตัวส่งหลายตัวไม่ส่งซ้ำ)
+CREATE OR REPLACE FUNCTION worklog_reminder_worker_claim(p_secret TEXT) RETURNS JSONB
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE def JSONB; res JSONB;
+BEGIN
+  PERFORM _web_push_worker_check(p_secret);
+  SELECT s.worklog_reminders INTO def FROM settings s WHERE s.id = 'app';
+  IF jsonb_typeof(def) IS DISTINCT FROM 'array' THEN def := '[1440,60]'::jsonb; END IF;
+
+  WITH w AS (
+    SELECT l.id, l.reminders,
+           _wl_start_at(CASE WHEN l.type = 'period' THEN l.start_date ELSE l.date END, l.start_time) AS start_at
+      FROM work_logs l
+     WHERE COALESCE(l.start_time, '') <> ''
+  ), offs AS (
+    SELECT w.id, w.start_at,
+           CASE WHEN o.v ~ '^\d{1,5}$' THEN o.v::int END AS off_min
+      FROM w CROSS JOIN LATERAL jsonb_array_elements_text(
+             CASE WHEN jsonb_typeof(w.reminders) = 'array' THEN w.reminders ELSE def END) AS o(v)
+     WHERE w.start_at > now() AND w.start_at < now() + INTERVAL '15 days'
+  ), due AS (
+    SELECT DISTINCT id, start_at, off_min FROM offs
+     WHERE off_min BETWEEN 1 AND 20160
+       AND now() >= start_at - make_interval(mins => off_min)
+       AND now() <  start_at - make_interval(mins => off_min) + INTERVAL '5 minutes'
+  ), ins AS (
+    INSERT INTO worklog_reminder_sent (log_id, offset_min, start_at)
+    SELECT id, off_min, start_at FROM due
+    ON CONFLICT DO NOTHING
+    RETURNING log_id, offset_min, start_at
+  )
+  SELECT jsonb_agg(jsonb_build_object(
+           'log_id', l.id, 'offset', i.offset_min, 'start_at', i.start_at,
+           'title', l.title, 'category', l.category,
+           'date', CASE WHEN l.type = 'period' THEN l.start_date ELSE l.date END,
+           'start_time', l.start_time, 'end_time', COALESCE(l.end_time, ''),
+           'url', COALESCE(l.meeting_url, ''),
+           'location_type', l.location_type, 'destination', COALESCE(l.destination, ''),
+           'users', CASE
+             WHEN jsonb_typeof(l.participants) = 'array' AND jsonb_array_length(l.participants) > 0 THEN
+               COALESCE((SELECT jsonb_agg(DISTINCT u.id) FROM users u
+                          WHERE u.is_active IS NOT FALSE AND COALESCE(u.staff_id, '') <> ''
+                            AND u.staff_id IN (SELECT p ->> 'sid' FROM jsonb_array_elements(l.participants) p
+                                                WHERE jsonb_typeof(p) = 'object')), '[]'::jsonb)
+             ELSE jsonb_build_array(l.uid) END))
+    INTO res
+    FROM ins i JOIN work_logs l ON l.id = i.log_id;
+
+  IF random() < 0.01 THEN DELETE FROM worklog_reminder_sent WHERE sent_at < now() - INTERVAL '30 days'; END IF;
+  RETURN COALESCE(res, '[]'::jsonb);
+END $$;
+
+-- ตัวส่ง: เครื่องที่เปิด Web Push ไว้ของผู้ใช้ตามรายการ (users.id)
+CREATE OR REPLACE FUNCTION web_push_worker_user_subscriptions(p_secret TEXT, p_users TEXT[])
+RETURNS TABLE (id TEXT, endpoint TEXT, p256dh TEXT, auth TEXT)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  PERFORM _web_push_worker_check(p_secret);
+  RETURN QUERY SELECT s.id, s.endpoint, s.p256dh, s.auth FROM web_push_subscriptions s
+    WHERE s.active AND s.user_id <> '' AND s.user_id = ANY(COALESCE(p_users, '{}'));
+END $$;
+
+REVOKE ALL ON FUNCTION _wl_start_at(TEXT, TEXT) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION worklog_reminder_worker_claim(TEXT), web_push_worker_user_subscriptions(TEXT, TEXT[]) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION worklog_reminder_worker_claim(TEXT), web_push_worker_user_subscriptions(TEXT, TEXT[]) TO anon;
+
+NOTIFY pgrst, 'reload schema';
+COMMIT; -- โปรแกรม SQL ที่ปิด auto-commit (เช่น Navicat) ต้องมีบรรทัดนี้ ไม่งั้นล็อกตารางค้างจนทั้งระบบโหลดไม่ขึ้น

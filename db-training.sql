@@ -5,6 +5,12 @@
 -- รันใน Supabase Studio › SQL Editor ครั้งเดียว (รันซ้ำได้ ไม่ลบข้อมูล)
 -- =============================================================
 
+-- ── กันระบบค้างตอนรันสคริปต์ (หัวไฟล์ + หัวส่วนที่ต้องรัน · ท้ายมี COMMIT) ──
+-- lock_timeout: รอล็อกตารางเกิน 5 วิ = ยกเลิก — ไม่ให้คำสั่งอ่านของผู้ใช้ต่อคิวหลัง ALTER จน statement timeout (57014)
+-- idle_in_transaction_session_timeout: ลืม commit / สคริปต์ error กลางทางแล้วค้างเกิน 15 วิ = ตัด session ทิ้ง ล็อกปลดเอง
+set lock_timeout = '5s';
+set idle_in_transaction_session_timeout = '15s';
+
 -- โรงพยาบาลของโครงการ — เลือกตอนเพิ่ม/แก้ไขโครงการ (เมนูโครงการ) ที่เดียว เปิดอบรมใช้ รพ. นี้เลย
 -- (อยู่ใน db-schema.sql ด้วย — ใส่ตรงนี้สำหรับฐานข้อมูลที่สร้างไว้ก่อนแล้ว)
 alter table projects add column if not exists hospital_id text default '';
@@ -384,8 +390,9 @@ grant select on trn_quizzes, trn_quiz_attempts, trn_quiz_certs to anon, authenti
 grant update (email_status, email_error, emailed_at) on trn_quiz_certs to anon, authenticated;
 
 -- ผู้ใช้ Backoffice ที่ Login อยู่ + มีสิทธิ์หน้าอบรม — p_sig = token ของ session (src/utils/session.util.js · ตาราง user_sessions ใน db-schema.sql)
--- สิทธิ์ตรงกับ src/services/bo-auth.service.js: กลุ่ม is_super = ทุกอย่าง · นอกนั้นกลุ่มใดกลุ่มหนึ่งของผู้ใช้ (users.roles) มี perms.training[p_need]
--- p_need: view = งานของโครงการ (ผลสอบ/ใบประกาศ) · edit = แก้คลังแบบทดสอบกลาง
+-- สิทธิ์ตรงกับ src/services/bo-auth.service.js: กลุ่ม is_super = ทุกอย่าง · นอกนั้นกลุ่มใดกลุ่มหนึ่งของผู้ใช้ (users.roles) มีสิทธิ์
+-- p_need: view = งานของโครงการ (ผลสอบ/ใบประกาศ) — perms.training หรือ perms.impl_training (แท็บอบรมของโครงการ)
+--         edit = แก้คลังแบบทดสอบกลาง — perms.training เท่านั้น
 drop function if exists trn_staff_ok(text, text);
 create or replace function trn_staff_ok(p_uid text, p_sig text, p_need text default 'view') returns boolean
 language plpgsql stable security definer set search_path = public as $$
@@ -393,7 +400,8 @@ declare
   u users := _bo_session_user(p_sig);
 begin
   if u.id is null or _bo_uid(u) <> coalesce(p_uid, '') then return false; end if;
-  return _bo_user_can(u, 'training', array[p_need]);
+  return _bo_user_can(u, 'training', array[p_need])
+      or (p_need = 'view' and _bo_user_can(u, 'impl_training', array['view']));
 end $$;
 revoke execute on function trn_staff_ok(text, text, text) from public, anon, authenticated;
 
@@ -603,10 +611,11 @@ begin
       if jsonb_typeof(ch) <> 'array' or jsonb_array_length(ch) < 2 then raise exception 'แต่ละข้อต้องมีอย่างน้อย 2 ตัวเลือก'; end if;
       if ans < 0 or ans >= jsonb_array_length(ch) then raise exception 'เฉลยไม่ตรงกับตัวเลือก: %', x ->> 'question'; end if;
       if x ? 'id' and x ->> 'id' is not null then
+        -- ข้อที่มีผู้สอบแล้ว: แก้ข้อความได้ (ผลสอบเก็บแค่ลำดับที่เลือก) · ห้ามเปลี่ยนเฉลย/จำนวนตัวเลือก (ผลสอบเก่าจะเพี้ยน)
         if exists (select 1 from trn_quiz_questions o where o.id = (x ->> 'id')::int
-                     and (o.question <> trim(x ->> 'question') or o.choices <> ch or o.answer <> ans))
+                     and (o.answer <> ans or jsonb_array_length(o.choices) <> jsonb_array_length(ch)))
            and exists (select 1 from trn_quiz_attempts t where t.quiz_id = qid and (x ->> 'id')::int = any(t.question_ids)) then
-          raise exception 'ข้อ "%" มีผู้สอบแล้ว แก้คำถาม/ตัวเลือก/เฉลยไม่ได้ — ปิดข้อนี้แล้วเพิ่มข้อใหม่แทน', left(x ->> 'question', 60);
+          raise exception 'ข้อ "%" มีผู้สอบแล้ว เปลี่ยนเฉลย/จำนวนตัวเลือกไม่ได้ — ปิดข้อนี้แล้วเพิ่มข้อใหม่แทน', left(x ->> 'question', 60);
         end if;
         update trn_quiz_questions set question = trim(x ->> 'question'), choices = ch, answer = ans,
           explanation = coalesce(x ->> 'explanation', ''), sort_order = coalesce((x ->> 'sort_order')::int, sort_order),
@@ -702,14 +711,141 @@ grant execute on function trn_category_usage()       to anon, authenticated;
 grant execute on function trn_quiz_usage()           to anon, authenticated;
 
 notify pgrst, 'reload schema';
+commit; -- โปรแกรม SQL ที่ปิด auto-commit (เช่น Navicat) ต้องมีบรรทัดนี้ ไม่งั้นล็อกตารางค้างจนทั้งระบบโหลดไม่ขึ้น
 
 
 -- ################################################################
 -- ▼▼▼ ส่วนที่ต้องรัน (อัปเดตล่าสุด) — ไม่ต้องรันทั้งไฟล์ ▼▼▼
 -- ทุกครั้งที่ไฟล์นี้มีการแก้ จะคัดลอกเฉพาะส่วนที่เปลี่ยนมาไว้ตรงนี้ เป็นบล็อกแยกตามเวลา
---   → รันเฉพาะบล็อกที่ยังไม่เคยรัน (เรียงจากเก่าไปใหม่) · รันเสร็จแจ้ง Claude ให้ลบบล็อกนั้นออก
+--   → เลือกรันทั้งส่วนนี้ทีเดียว ตั้งแต่บรรทัด SET ด้านล่างจนถึง COMMIT ท้ายไฟล์ (ทุกบล็อกรันซ้ำได้) · รันเสร็จแจ้ง Claude ให้ลบบล็อกออก
+--   ห้ามตัด SET หัวส่วน / COMMIT ท้ายไฟล์ออก — ไม่งั้นถ้าโปรแกรมปิด auto-commit ตารางจะถูกล็อกค้างจนทั้งระบบโหลดไม่ขึ้น
 -- โค้ดด้านบนเป็นฉบับเต็ม (ใช้ตั้ง DB ใหม่) — ทุกบล็อกรันซ้ำได้ ไม่ทับข้อมูล
 -- ลำดับ: ถ้า db-schema.sql มีส่วนรอรันด้วย → รันของ db-schema.sql ก่อน แล้วค่อยรันของไฟล์นี้
 -- ################################################################
+set lock_timeout = '5s';
+set idle_in_transaction_session_timeout = '15s';
 
--- (ไม่มีส่วนที่รอรัน — ตรวจล่าสุด 2026-10-11)
+-- ── [2026-10-12 15:00] คลังข้อสอบ: ข้อที่มีผู้สอบแล้วแก้ข้อความได้ (ห้ามแค่เปลี่ยนเฉลย/จำนวนตัวเลือก) ──
+create or replace function trn_quiz_admin(p_uid text, p_sig text, p_action text, p_data jsonb)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  x   jsonb;
+  n   int := 0;
+  k   int := 0;
+  ch  jsonb;
+  ans int;
+  qid int := (p_data ->> 'quiz_id')::int;
+  q   trn_quizzes;
+begin
+  if not trn_staff_ok(p_uid, p_sig) then raise exception 'ไม่มีสิทธิ์ — กรุณาเข้าสู่ระบบใหม่'; end if;
+  if p_action in ('save_quiz', 'copy_quiz', 'delete_quiz', 'save_questions') and not trn_staff_ok(p_uid, p_sig, 'edit') then
+    raise exception 'ไม่มีสิทธิ์แก้ไขคลังแบบทดสอบกลาง (ต้องมีสิทธิ์ "แก้ไข" ของเมนูอบรม)';
+  end if;
+
+  if p_action = 'save_quiz' then
+    if trim(coalesce(p_data ->> 'title', '')) = '' then raise exception 'กรุณาใส่ชื่อแบบทดสอบ'; end if;
+    if p_data ->> 'id' is null then
+      insert into trn_quizzes (title) values (trim(p_data ->> 'title')) returning * into q;
+    else
+      select * into q from trn_quizzes where id = (p_data ->> 'id')::int;
+      if not found then raise exception 'ไม่พบแบบทดสอบ'; end if;
+    end if;
+    update trn_quizzes set
+      title           = trim(p_data ->> 'title'),
+      questions_count = coalesce((p_data ->> 'questions_count')::int, questions_count),
+      pass_percent    = coalesce((p_data ->> 'pass_percent')::int,    pass_percent),
+      time_limit_min  = coalesce((p_data ->> 'time_limit_min')::int,  time_limit_min),
+      max_attempts    = coalesce((p_data ->> 'max_attempts')::int,    max_attempts),
+      is_active       = coalesce((p_data ->> 'is_active')::boolean,   is_active)
+      where id = q.id returning * into q;
+    return to_jsonb(q);
+
+  elsif p_action = 'copy_quiz' then
+    insert into trn_quizzes (title, pass_percent, questions_count, max_attempts, time_limit_min)
+      select coalesce(nullif(trim(p_data ->> 'title'), ''), s.title || ' (สำเนา)'), s.pass_percent, s.questions_count, s.max_attempts, s.time_limit_min
+      from trn_quizzes s where s.id = (p_data ->> 'id')::int
+      returning * into q;
+    if q.id is null then raise exception 'ไม่พบแบบทดสอบต้นฉบับ'; end if;
+    insert into trn_quiz_questions (quiz_id, question, choices, answer, explanation, sort_order)
+      select q.id, question, choices, answer, explanation, sort_order
+      from trn_quiz_questions where quiz_id = (p_data ->> 'id')::int and is_active;
+    return to_jsonb(q);
+
+  elsif p_action = 'delete_quiz' then
+    if exists (select 1 from trn_quiz_attempts where quiz_id = (p_data ->> 'id')::int) then
+      raise exception 'แบบทดสอบนี้มีผู้สอบแล้ว ลบไม่ได้ (ผลสอบและใบประกาศจะหาย) — ปิดใช้งานแทน';
+    end if;
+    delete from trn_quizzes where id = (p_data ->> 'id')::int;
+    return jsonb_build_object('ok', true);
+
+  elsif p_action = 'questions' then
+    return coalesce((select jsonb_agg(to_jsonb(qq) || jsonb_build_object('used',
+                       exists (select 1 from trn_quiz_attempts t where t.quiz_id = qq.quiz_id and qq.id = any(t.question_ids)))
+                     order by qq.sort_order, qq.id)
+                     from trn_quiz_questions qq where qq.quiz_id = qid), '[]');
+
+  elsif p_action = 'save_questions' then
+    -- ข้อที่มีคนสอบแล้ว → ปิดแทนลบ
+    update trn_quiz_questions qq set is_active = false
+      where qq.quiz_id = qid and qq.id in (select jsonb_array_elements_text(coalesce(p_data -> 'delete_ids', '[]'))::int)
+        and exists (select 1 from trn_quiz_attempts t where t.quiz_id = qid and qq.id = any(t.question_ids));
+    get diagnostics k = row_count;
+    delete from trn_quiz_questions qq where qq.quiz_id = qid
+      and qq.id in (select jsonb_array_elements_text(coalesce(p_data -> 'delete_ids', '[]'))::int)
+      and not exists (select 1 from trn_quiz_attempts t where t.quiz_id = qid and qq.id = any(t.question_ids));
+    for x in select * from jsonb_array_elements(coalesce(p_data -> 'rows', '[]')) loop
+      ch  := coalesce(x -> 'choices', '[]');
+      ans := coalesce((x ->> 'answer')::int, 0);
+      if trim(coalesce(x ->> 'question', '')) = '' then raise exception 'มีข้อที่ยังไม่ได้ใส่คำถาม'; end if;
+      if jsonb_typeof(ch) <> 'array' or jsonb_array_length(ch) < 2 then raise exception 'แต่ละข้อต้องมีอย่างน้อย 2 ตัวเลือก'; end if;
+      if ans < 0 or ans >= jsonb_array_length(ch) then raise exception 'เฉลยไม่ตรงกับตัวเลือก: %', x ->> 'question'; end if;
+      if x ? 'id' and x ->> 'id' is not null then
+        -- ข้อที่มีผู้สอบแล้ว: แก้ข้อความได้ (ผลสอบเก็บแค่ลำดับที่เลือก) · ห้ามเปลี่ยนเฉลย/จำนวนตัวเลือก (ผลสอบเก่าจะเพี้ยน)
+        if exists (select 1 from trn_quiz_questions o where o.id = (x ->> 'id')::int
+                     and (o.answer <> ans or jsonb_array_length(o.choices) <> jsonb_array_length(ch)))
+           and exists (select 1 from trn_quiz_attempts t where t.quiz_id = qid and (x ->> 'id')::int = any(t.question_ids)) then
+          raise exception 'ข้อ "%" มีผู้สอบแล้ว เปลี่ยนเฉลย/จำนวนตัวเลือกไม่ได้ — ปิดข้อนี้แล้วเพิ่มข้อใหม่แทน', left(x ->> 'question', 60);
+        end if;
+        update trn_quiz_questions set question = trim(x ->> 'question'), choices = ch, answer = ans,
+          explanation = coalesce(x ->> 'explanation', ''), sort_order = coalesce((x ->> 'sort_order')::int, sort_order),
+          is_active = coalesce((x ->> 'is_active')::boolean, is_active)
+          where id = (x ->> 'id')::int and quiz_id = qid;
+      else
+        insert into trn_quiz_questions (quiz_id, question, choices, answer, explanation, sort_order, is_active)
+          values (qid, trim(x ->> 'question'), ch, ans, coalesce(x ->> 'explanation', ''),
+                  coalesce((x ->> 'sort_order')::int, 0), coalesce((x ->> 'is_active')::boolean, true));
+      end if;
+      n := n + 1;
+    end loop;
+    return jsonb_build_object('saved', n, 'archived', k);
+
+  elsif p_action = 'delete_attempt' then
+    delete from trn_quiz_attempts where id = (p_data ->> 'id')::uuid;
+    return jsonb_build_object('ok', true);
+  elsif p_action = 'cert' then
+    update trn_quiz_certs set
+      is_revoked = coalesce((p_data ->> 'is_revoked')::boolean, is_revoked),
+      email = coalesce(nullif(lower(trim(p_data ->> 'email')), ''), email)
+      where cert_id = p_data ->> 'cert_id';
+    return jsonb_build_object('ok', true);
+  end if;
+  raise exception 'ไม่รู้จักคำสั่ง %', p_action;
+end $$;
+
+notify pgrst, 'reload schema';
+
+-- ── [2026-10-12 16:30] สิทธิ์แยก: แท็บอบรมของโครงการ (impl_training) ดูผลสอบ/ใบประกาศของโครงการได้ ไม่ต้องมีสิทธิ์เมนูระบบอบรม ──
+-- (รันบล็อก [2026-10-12 16:30] ของ db-schema.sql ก่อน)
+create or replace function trn_staff_ok(p_uid text, p_sig text, p_need text default 'view') returns boolean
+language plpgsql stable security definer set search_path = public as $$
+declare
+  u users := _bo_session_user(p_sig);
+begin
+  if u.id is null or _bo_uid(u) <> coalesce(p_uid, '') then return false; end if;
+  return _bo_user_can(u, 'training', array[p_need])
+      or (p_need = 'view' and _bo_user_can(u, 'impl_training', array['view']));
+end $$;
+revoke execute on function trn_staff_ok(text, text, text) from public, anon, authenticated;
+
+notify pgrst, 'reload schema';
+commit; -- โปรแกรม SQL ที่ปิด auto-commit (เช่น Navicat) ต้องมีบรรทัดนี้ ไม่งั้นล็อกตารางค้างจนทั้งระบบโหลดไม่ขึ้น

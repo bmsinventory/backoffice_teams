@@ -1,5 +1,5 @@
 /**
- * Browser Web Push registration.
+ * Browser Web Push registration — ศูนย์ช่วยเหลือ (เฉพาะผู้ดูเมนูนั้นได้) + เตือนก่อนประชุม (ทุกคน)
  * Public VAPID key มาจาก RPC get_web_push_public_key (ตัวส่งใน frontend container ประกาศไว้)
  * — private key อยู่ในตัวส่งเท่านั้น
  */
@@ -57,7 +57,8 @@
   }
 
   window.webPushMenuHtml = function () {
-    if (!window.cu || (window.canView && !window.canView('helpdesk'))) return '';
+    // ทุกคนเปิดได้ (เตือนก่อนประชุม) · แจ้งเตือนศูนย์ช่วยเหลือส่งเฉพาะผู้ที่ดูเมนูนั้นได้ — คัดที่ฝั่งตัวส่ง
+    if (!window.cu) return '';
     var on = supported() && Notification.permission === 'granted';
     var blocked = 'Notification' in window && Notification.permission === 'denied';
     var label = on ? 'ปิดแจ้งเตือนเมื่อปิด WebApp' : blocked ? 'เบราว์เซอร์บล็อกการแจ้งเตือน' : 'เปิดแจ้งเตือนเมื่อปิด WebApp';
@@ -135,10 +136,6 @@
   // This never opens the browser permission prompt by itself.
   window.syncWebPush = async function () {
     if (!supported() || Notification.permission !== 'granted' || !window.cu) return;
-    if (window.canView && !window.canView('helpdesk')) {
-      await window.disableWebPush(true);
-      return;
-    }
     try {
       var reg = await navigator.serviceWorker.ready;
       var sub = await reg.pushManager.getSubscription();

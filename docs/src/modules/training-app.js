@@ -610,7 +610,7 @@ function showPage(p){
 }
 /* ══════════════════ ADMIN LOGIN ══════════════════
    ใช้บัญชีของ Backoffice (src/services/bo-auth.service.js) — Login ที่นี่ = Login Backoffice ด้วย (session เดียวกัน) และกลับกัน
-   กลุ่มสิทธิ์ is_super ของ Backoffice = superadmin ที่นี่ · กลุ่มอื่นต้องมีสิทธิ์ "อบรม" ในหน้าสิทธิ์การใช้งานของ Backoffice */
+   กลุ่มสิทธิ์ is_super ของ Backoffice = superadmin ที่นี่ · กลุ่มอื่นต้องมีสิทธิ์ "ระบบอบรม" (เมนูภาพรวม) หรือ "ติดตามสถานะโครงการ › อบรม" (แท็บของโครงการ) — ดู PERM_MOD */
 function openAdminLogin(){
   document.getElementById('login-user').value='';
   document.getElementById('login-pass').value='';
@@ -629,9 +629,15 @@ function toggleLoginPass(){
   icon.className=hidden?'ti ti-eye-off':'ti ti-eye';
 }
 // ผู้ใช้ Backoffice → ผู้ดูแลของระบบอบรม (null = ไม่มีสิทธิ์อบรม)
+// สิทธิ์แยกตามที่เปิด: แท็บอบรมของโครงการ (?project=) ใช้แถว "ติดตามสถานะโครงการ › อบรม" (impl_training) · นอกนั้นใช้แถว "ระบบอบรม" (training)
+const PERM_MOD=PROJECT_ID?'impl_training':'training';
+const PERM_LABEL=PROJECT_ID?'ติดตามสถานะโครงการ › อบรม':'ระบบอบรม';
 function _boToAdmin(u){
-  if(!u||!u.perm||!u.perm.view)return null;
-  return{id:u.id,username:u.username,name:u.name,role:u.super?'superadmin':'user',staffId:u.staffId||'',perm:u.perm};
+  const perm=u&&u.perms&&u.perms[PERM_MOD];
+  if(!perm||!perm.view)return null;
+  // central = สิทธิ์เมนู "ระบบอบรม" (ตั้งค่ากลาง: หลักสูตร/คลังแบบทดสอบ/ใบประกาศ) — ใช้ทั้งสองแบบ ไม่ขึ้นกับ PERM_MOD
+  return{id:u.id,username:u.username,name:u.name,role:u.super?'superadmin':'user',staffId:u.staffId||'',perm,central:u.perms.training,
+    canImport:!!(u.perms.impl_training_import&&u.perms.impl_training_import.view)};
 }
 function _setAdmin(a){
   isAdminLoggedIn=true;
@@ -667,7 +673,7 @@ async function adminLogin(){
     return;
   }
   const a=_boToAdmin(user);
-  if(!a){showErr('บัญชีนี้ยังไม่มีสิทธิ์ "อบรม" — ติดต่อ Admin ของ Backoffice');return;}
+  if(!a){showErr(`บัญชีนี้ยังไม่มีสิทธิ์ "${PERM_LABEL}" — ติดต่อ Admin ของ Backoffice`);return;}
   _setAdmin(a);
   closeModal('modal-admin-login');
   await _applySiteScope();
@@ -697,6 +703,8 @@ const IMPORT_CFG={
 let _importRows=[];
 let _importPreviewFilter='all'; // 'all' | 'ok' | 'dup' | 'error' — คลิกป้ายสรุปเพื่อกรองดูเฉพาะแถวที่ซ้ำ/error
 function openImportModal(){
+  if(!hasAdminAction('action:import')){showToast('ไม่มีสิทธิ์นำเข้าข้อมูล — ตั้งที่แถว "ติดตามสถานะโครงการ › อบรม › นำเข้าข้อมูล"','warn');return;}
+  if(!hasAdminAction('action:import')){showToast('ไม่มีสิทธิ์นำเข้าข้อมูล (ต้องมีสิทธิ์ "เพิ่ม" ของติดตามสถานะโครงการ › อบรม)','warn');return;}
   document.getElementById('import-type').value='venue';
   document.getElementById('import-file-input').value='';
   document.getElementById('import-preview-area').style.display='none';
@@ -953,6 +961,7 @@ function _renderImportPreview(){
   document.getElementById('import-preview-table').innerHTML=html;
 }
 async function executeImport(){
+  if(!hasAdminAction('action:import')){showToast('ไม่มีสิทธิ์นำเข้าข้อมูล','warn');return;}
   const type=document.getElementById('import-type').value;
   const isReg=type==='registration';
   // "ผู้ลงทะเบียน" ไม่ใช้ checkbox ทั่วไป (ลบทั้งโครงการ) — มี checkbox แยกที่ลบเฉพาะรอบที่อยู่ในไฟล์นี้เท่านั้น (ปลอดภัยกว่า)
@@ -4218,15 +4227,20 @@ async function _openTraining(p,h,reuseCode){
 }
 
 /* ══ แท็บอบรมของโครงการ (?project=) ที่ยังไม่เปิดอบรม ══
-   เปิดได้เลยในหน้านี้: Admin ทุกโครงการ · PM/ทีมที่มีสิทธิ์ "เพิ่ม" ของอบรม เฉพาะโครงการที่ตัวเองอยู่ในทีม
-   รพ. มาจากโครงการ (เมนูโครงการ) — ไม่ต้องเลือกที่นี่ */
-async function _canOpenTraining(p){
+   เปิดได้เลยในหน้านี้: Admin ทุกโครงการ · PM/ทีมที่มีสิทธิ์ "เพิ่ม" ของแถว "ติดตามสถานะโครงการ › อบรม" เฉพาะโครงการที่ตัวเองอยู่ในทีม
+   (สิทธิ์เมนู "ระบบอบรม" ไม่เกี่ยว) · รพ. มาจากโครงการ (เมนูโครงการ) — ไม่ต้องเลือกที่นี่ */
+// → null = เปิดได้ · ข้อความ = เหตุที่เปิดไม่ได้ (บอกให้รู้ว่าต้องขอสิทธิ์/ทำอะไร)
+async function _openTrainingBlock(p){
   const a=currentAdminUser;
-  if(!a||!p)return false;
-  if(a.role==='superadmin')return true;
-  if(!a.perm?.add||!a.staffId)return false;
+  if(!p)return'ไม่พบโครงการนี้';
+  if(!a)return`บัญชีของคุณยังไม่มีสิทธิ์ "ดู" ของ "${PERM_LABEL}" — ติดต่อ Admin ให้เปิดสิทธิ์ที่หน้าสิทธิ์การใช้งาน`;
+  if(a.role==='superadmin')return null;
+  if(!a.perm?.add)return`การเปิดอบรมต้องมีสิทธิ์ "เพิ่ม" ของ "${PERM_LABEL}" — ติดต่อ Admin ให้เปิดสิทธิ์ที่หน้าสิทธิ์การใช้งาน`;
+  if(!a.staffId)return'บัญชีของคุณยังไม่ได้ผูกกับพนักงาน — ติดต่อ Admin ให้ผูกบัญชีกับพนักงานก่อน';
   const {data}=await _qProj();
-  return ProjectTeam.isMember(a.staffId,{sourceProjectId:p.source_project_id||''},_mapProjects(data));
+  if(!ProjectTeam.isMember(a.staffId,{sourceProjectId:p.source_project_id||''},_mapProjects(data)))
+    return'คุณไม่ได้เป็น PM หรืออยู่ในทีมของโครงการนี้ — ให้ PM เพิ่มคุณเข้าทีมโครงการก่อน';
+  return null;
 }
 async function renderUnopened(){
   const el=document.getElementById('unopened-content');
@@ -4244,8 +4258,9 @@ async function renderUnopened(){
     el.innerHTML=head('lock','คุณไม่อยู่ในทีมของโครงการนี้',`การอบรมของโครงการนี้เปิดแล้ว (รหัส ${_esc(sR.data.code)}) แต่บัญชีของคุณไม่ได้เป็น PM หรืออยู่ในทีมโครงการ<br>ติดต่อ PM หรือ Admin เพื่อเพิ่มเข้าทีม (บัญชีต้องผูกกับพนักงาน)`);
     return;
   }
-  if(!await _canOpenTraining(p)){
-    el.innerHTML=head('school','โครงการนี้ยังไม่เปิดอบรม','ให้ PM ของโครงการ หรือ Admin เปิดอบรมที่หน้านี้');
+  const block=await _openTrainingBlock(p);
+  if(block){
+    el.innerHTML=head('school','โครงการนี้ยังไม่เปิดอบรม',_esc(block));
     return;
   }
   const ph=await _projectHospital(p);
@@ -4305,7 +4320,7 @@ let _ovTab=_qs.get('tab')||'overview';
 // ตั้งค่ากลาง (หลักสูตรอบรม · คลังแบบทดสอบ · ใบประกาศ & อีเมล) กระทบทุกโครงการ — สิทธิ์ "ระบบอบรม" แค่ ดู = เห็นเฉพาะภาพรวม
 // มี เพิ่ม/แก้ไข/ลบ อย่างใดอย่างหนึ่ง (หรือ Admin) = เห็นทุกแท็บ · ตั้งในหน้าสิทธิ์การใช้งานของ Backoffice
 const OV_CENTRAL=['cats','quiz','cert'];
-const _canCentral=()=>{const a=currentAdminUser,p=a&&a.perm;return !!a&&(a.role==='superadmin'||!!(p&&(p.add||p.edit||p.del)));};
+const _canCentral=()=>{const a=currentAdminUser,p=a&&a.central;return !!a&&(a.role==='superadmin'||!!(p&&(p.add||p.edit||p.del)));};
 function ovTab(t){
   _ovTab=t;
   renderOverview();
@@ -4657,10 +4672,11 @@ async function closeTraining(){
 }
 
 /* ══════════════════ สิทธิ์ ══════════════════
-   ตั้งที่หน้าสิทธิ์การใช้งานของ Backoffice ที่เดียว (แถว "อบรม / แบบทดสอบ" — bo-auth.service.js อ่านมาเป็น currentAdminUser.perm)
+   ตั้งที่หน้าสิทธิ์การใช้งานของ Backoffice — แท็บอบรมของโครงการใช้แถว "ติดตามสถานะโครงการ › อบรม" · เมนูระบบอบรมใช้แถว "ระบบอบรม"
+   (bo-auth.service.js อ่านมา · _boToAdmin เลือกแถวตาม PERM_MOD เป็น currentAdminUser.perm)
    · ทุก Role ที่ "ดู" ได้ = ทุกแท็บของโครงการ (รวมตั้งค่าโครงการ) · Admin สลับโครงการได้ทุกโครงการ
-   · นำเข้าข้อมูล = "เพิ่ม" · เคลียร์ข้อมูลตามโครงการ / ปิดอบรม = "ลบ" */
-const ACTION_PERM={'action:import':'add','action:clear_regs':'del','action:clear_survey':'del'};
+   · นำเข้าข้อมูล = แถว "ติดตามสถานะโครงการ › อบรม › นำเข้าข้อมูล" (canImport) · เคลียร์ข้อมูลตามโครงการ / ปิดอบรม = "ลบ" */
+const ACTION_PERM={'action:clear_regs':'del','action:clear_survey':'del'};
 function getMyAllowedTabs(){
   const all=ADMIN_TABS.map(t=>t.id);
   // เมนูอบรม (ภาพรวม) ไม่มีหน้าผู้ดูแล — ทุกอย่างจัดการในแท็บอบรมของโครงการ
@@ -4669,6 +4685,7 @@ function getMyAllowedTabs(){
 function hasAdminAction(actionId){
   if(OVERVIEW)return false; // นำเข้า/เคลียร์ข้อมูลทำในแท็บอบรมของโครงการ
   if(!currentAdminUser||currentAdminUser.role==='superadmin')return true;
+  if(actionId==='action:import')return !!currentAdminUser.canImport;
   return !!(currentAdminUser.perm&&currentAdminUser.perm[ACTION_PERM[actionId]]);
 }
 

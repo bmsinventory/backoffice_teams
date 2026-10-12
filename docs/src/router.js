@@ -209,6 +209,8 @@
           }
           if (module === 'helpdesk' && itemId && window.hdOpen) window.hdOpen(decodeURIComponent(itemId));
           if (module === 'server_request' && itemId && window.srvOpen) window.srvOpen(decodeURIComponent(itemId));
+          // แจ้งเตือนก่อนประชุม (Web Push) → กล่องเตือน + อ่านออกเสียง (worklog-remind.js)
+          if (module === 'worklog' && itemId && params.remind && window.wlRemindOpen) window.wlRemindOpen(decodeURIComponent(itemId), params.remind);
         }, 350);
       }
     }

@@ -1,4 +1,4 @@
-// ตัวส่ง Web Push + แจ้งเตือน BMS Notify (notify-relay.js) — รันอยู่ใน frontend container เดียวกับ nginx (docker-entrypoint.sh สั่ง start)
+// ตัวส่ง Web Push (ศูนย์ช่วยเหลือ + เตือนก่อนประชุม) + แจ้งเตือน BMS Notify (notify-relay.js) — รันอยู่ใน frontend container เดียวกับ nginx (docker-entrypoint.sh สั่ง start)
 // ไม่ต้องตั้งค่าอะไรบน server เพิ่ม: ใช้ SUPABASE_ANON_KEY + API_UPSTREAM/SUPABASE_URL ที่ container มีอยู่แล้ว
 // VAPID key คำนวณจาก worker.secret (ฝังใน image ตอน build) — private key ไม่ถูกเก็บที่ไหนเลย
 // ฐานข้อมูลเก็บแค่ public key · RPC ของตัวส่งต้องแนบรหัสลับ (ดู WEB PUSH ใน db-schema.sql)
@@ -15,6 +15,7 @@ const anonKey = process.env.SUPABASE_ANON_KEY || '';
 const pollMs = Math.max(1000, Number(process.env.PUSH_POLL_MS) || 3000);
 const aiBase = (process.env.AI_BASE || 'https://vllm-gemma.bmscloud.in.th').replace(/\/+$/, '');
 const aiPollMs = Math.max(3000, Number(process.env.AI_REPLY_POLL_MS) || 5000);
+const remindPollMs = 30_000;
 
 const AI_DEFAULTS = {
   enabled: false, mode: 'all_hours', timezone: 'Asia/Bangkok',
@@ -307,8 +308,10 @@ function notification(job) {
 }
 
 async function deliver(job) {
-  const devices = await rpc('web_push_worker_subscriptions');
-  const payload = notification(job);
+  return sendTo(await rpc('web_push_worker_subscriptions'), notification(job));
+}
+
+async function sendTo(devices, payload) {
   let sent = 0;
   for (const d of devices || []) {
     try {
@@ -344,6 +347,60 @@ async function poll() {
     console.error('[push-worker] poll:', (e && e.message) || e);
   } finally {
     running = false;
+  }
+}
+
+// ── เตือนก่อนประชุม (บันทึกงานที่ระบุเวลาเริ่ม) — ดู WORKLOG REMINDERS ใน db-schema.sql ──
+// ส่งเฉพาะเครื่องของผู้ร่วมงาน · กดแจ้งเตือน → เปิดหน้าเว็บแล้วอ่านออกเสียง (sw.js / worklog-remind.js)
+function offsetLabel(min) {
+  if (min % 1440 === 0) return (min / 1440) + ' วัน';
+  if (min % 60 === 0) return (min / 60) + ' ชม.';
+  if (min > 60) return Math.floor(min / 60) + ' ชม. ' + (min % 60) + ' นาที';
+  return min + ' นาที';
+}
+function meetingVia(url) {
+  if (!url) return '';
+  if (/zoom\./i.test(url)) return 'Zoom';
+  if (/meet\.google\./i.test(url)) return 'Google Meet';
+  if (/teams\.(microsoft|live)\./i.test(url)) return 'Microsoft Teams';
+  return 'ลิงก์ออนไลน์';
+}
+function reminderPayload(r) {
+  const day = new Date(r.start_at).toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok', weekday: 'short', day: 'numeric', month: 'short' });
+  const time = r.start_time + (r.end_time ? '–' + r.end_time : '') + ' น.';
+  const where = r.url ? '🎥 ' + meetingVia(r.url) : (r.destination ? '📍 ' + r.destination : '');
+  return JSON.stringify({
+    kind: 'meeting', logId: r.log_id, offset: r.offset,
+    title: '⏰ อีก ' + offsetLabel(r.offset) + ' — ' + (r.title || 'มีนัดหมาย'),
+    body: '🗓 ' + day + ' · ' + time + (where ? '\n' + where : ''),
+    tag: 'meeting-' + r.log_id,
+    url: '/#worklog=' + encodeURIComponent(r.log_id) + '&remind=' + r.offset,
+  });
+}
+
+let remindRunning = false, remindReadyWarned = false;
+async function pollReminders() {
+  if (remindRunning) return;
+  remindRunning = true;
+  try {
+    const list = await rpc('worklog_reminder_worker_claim');
+    remindReadyWarned = false;
+    for (const r of list || []) {
+      try {
+        const users = (r.users || []).filter(Boolean);
+        const n = users.length ? await sendTo(await rpc('web_push_worker_user_subscriptions', { p_users: users }), reminderPayload(r)) : 0;
+        console.log(`[meeting-remind] ${r.log_id} ก่อน ${offsetLabel(r.offset)}: ส่งถึง ${n} เครื่อง (${users.length} คน)`);
+      } catch (e) {
+        console.error(`[meeting-remind] ${r.log_id}:`, e?.message || e);
+      }
+    }
+  } catch (e) {
+    if (!remindReadyWarned) {
+      console.warn('[meeting-remind] ยังเริ่มไม่ได้ — ตรวจว่ารันส่วน WORKLOG REMINDERS ใน db-schema.sql แล้ว:', e?.message || e);
+      remindReadyWarned = true;
+    }
+  } finally {
+    remindRunning = false;
   }
 }
 
@@ -398,6 +455,9 @@ async function start() {
   console.log(`[ai-auto-reply] พร้อมตรวจคิว · ทุก ${aiPollMs}ms · AI ${aiBase}`);
   pollAi();
   setInterval(pollAi, aiPollMs);
+  console.log('[meeting-remind] พร้อมตรวจเวลาเตือนประชุม · ทุก 30 วินาที');
+  pollReminders();
+  setInterval(pollReminders, remindPollMs);
 }
 
 start();
