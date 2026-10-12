@@ -1,5 +1,5 @@
-const CACHE      = 'bms-app-v1791795885';
-const IMG_CACHE  = 'bms-img-v1791795885';
+const CACHE      = 'bms-app-v1791796325';
+const IMG_CACHE  = 'bms-img-v1791796325';
 
 const IMG_EXTS = ['.png', '.jpg', '.jpeg', '.gif', '.ico', '.webp', '.woff', '.woff2'];
 

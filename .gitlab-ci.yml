@@ -1,58 +1,72 @@
-# build + push frontend image ขึ้น hub.hosxp.net ทุกครั้งที่ push เข้า branch หลัก
-# ต้องตั้ง CI/CD Variables (Settings → CI/CD → Variables, ติ๊ก Masked):
-#   DOCKER_USERNAME  ผู้ใช้ docker login hub.hosxp.net
-#   DOCKER_PASSWORD  รหัสผ่าน docker login hub.hosxp.net
-#   WORKER_SECRET    เนื้อหาไฟล์ push-worker/worker.secret (ไม่อยู่ใน git — ไม่มี = image ไม่ส่ง Web Push)
-# tag ที่ได้: :latest + :V1.xxx (อ่านจาก APP_VERSION ใน docs/src/config/changelog.config.js)
-# บน server: docker compose pull frontend && docker compose up -d frontend
+# CI ของ backoffice-teams — 2 ขั้น ทำงานเมื่อ push เข้า branch หลักเท่านั้น
+#   build  : build frontend image แล้ว push ขึ้น hub.hosxp.net
+#            tag = :<short-sha> (ใช้ deploy) + :V1.xxx (APP_VERSION ใน docs/src/config/changelog.config.js) + :latest
+#   deploy : บน server pull image ของ commit นี้ แล้ว restart container (อัตโนมัติต่อจาก build)
+#
+# runner: shell runner บนเครื่อง server, tag = backoffice-teams (ใช้ docker ของเครื่องนั้นตรง ๆ)
+#
+# CI/CD Variables (Settings → CI/CD → Variables):
+#   DOCKER_USERNAME / DOCKER_PASSWORD  ผู้ใช้ registry hub.hosxp.net
+#   WORKER_SECRET                      เนื้อหาไฟล์ push-worker/worker.secret (ไม่อยู่ใน git — ไม่มี = image ไม่ส่ง Web Push)
+#
+# ครั้งแรกต้องวาง deploy/docker-compose.yml ไว้ที่ $DEPLOY_PATH เอง (CI ไม่ได้ก๊อปให้)
+# deploy ปัก IMAGE_TAG=<short-sha> ลง $DEPLOY_PATH/.env → rollback = แก้ IMAGE_TAG เป็น sha/V1.xxx เดิม แล้ว docker compose up -d
 
-stages:
-  - build
+stages: [build, deploy]
+
+workflow:
+  rules:
+    - if: $CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH
 
 variables:
-  REGISTRY: hub.hosxp.net
   IMAGE: hub.hosxp.net/bms/backoffice-teams-frontend
+  DEPLOY_PATH: /home/bms/docker-compose-bms-backoffice-teams
 
-build-push:
+build:
   stage: build
-  tags:
-    - backoffice-teams
-  # docker executor: ใช้ docker.sock ของเครื่อง runner ถ้า mount ไว้ ไม่งั้นใช้ docker:dind (runner ต้อง privileged)
-  # shell executor ไม่สน image/services ใช้ docker ของเครื่อง runner
-  image: docker:27
-  services:
-    - name: docker:27-dind
-      command: ["--tls=false", "--host=tcp://0.0.0.0:2375"]
-  variables:
-    DOCKER_TLS_CERTDIR: ""
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-  before_script:
-    - |
-      if [ -z "${DOCKER_HOST:-}" ] && [ ! -S /var/run/docker.sock ]; then
-        export DOCKER_HOST=tcp://docker:2375
-      fi
-      for i in 1 2 3 4 5 6 7 8 9 10; do docker info >/dev/null 2>&1 && break; sleep 3; done
-      docker info >/dev/null 2>&1 || { echo "ต่อ Docker daemon ไม่ได้ (DOCKER_HOST=${DOCKER_HOST:-unix:///var/run/docker.sock})"; exit 1; }
-    - |
-      if [ -z "${DOCKER_USERNAME:-}" ] || [ -z "${DOCKER_PASSWORD:-}" ]; then
-        echo "ยังไม่ได้ตั้ง CI/CD Variables DOCKER_USERNAME / DOCKER_PASSWORD"; exit 1
-      fi
-      if [ -z "${WORKER_SECRET:-}" ]; then
-        echo "ยังไม่ได้ตั้ง CI/CD Variable WORKER_SECRET — image จะส่ง Web Push / แจ้งเตือนก่อนประชุมไม่ได้"; exit 1
-      fi
-    - printf '%s' "$WORKER_SECRET" > push-worker/worker.secret
-    - echo "$DOCKER_PASSWORD" | docker login "$REGISTRY" -u "$DOCKER_USERNAME" --password-stdin
+  tags: [backoffice-teams]
   script:
+    - '[ -n "$DOCKER_USERNAME" ] && [ -n "$DOCKER_PASSWORD" ] || { echo "ยังไม่ได้ตั้ง CI/CD Variables DOCKER_USERNAME / DOCKER_PASSWORD"; exit 1; }'
+    - '[ -n "$WORKER_SECRET" ] || { echo "ยังไม่ได้ตั้ง CI/CD Variable WORKER_SECRET — image จะส่ง Web Push / เตือนก่อนประชุมไม่ได้"; exit 1; }'
     - VERSION=$(sed -n "s/.*window\.APP_VERSION *= *'\(V[0-9.]*\)'.*/\1/p" docs/src/config/changelog.config.js | head -n 1)
-    - |
-      if [ -z "$VERSION" ]; then
-        echo "อ่าน APP_VERSION จาก docs/src/config/changelog.config.js ไม่ได้"; exit 1
-      fi
-    - echo "build $IMAGE:$VERSION (commit $CI_COMMIT_SHORT_SHA)"
-    - docker build --pull -t "$IMAGE:latest" -t "$IMAGE:$VERSION" .
-    - docker push "$IMAGE:$VERSION"
-    - docker push "$IMAGE:latest"
+    - '[ -n "$VERSION" ] || { echo "อ่าน APP_VERSION จาก docs/src/config/changelog.config.js ไม่ได้"; exit 1; }'
+    - echo "build $IMAGE — $VERSION / $CI_COMMIT_SHORT_SHA"
+    - printf '%s' "$WORKER_SECRET" > push-worker/worker.secret
+    - echo "$DOCKER_PASSWORD" | docker login hub.hosxp.net -u "$DOCKER_USERNAME" --password-stdin
+    - docker build --pull -t $IMAGE:$CI_COMMIT_SHORT_SHA -t $IMAGE:$VERSION -t $IMAGE:latest .
+    - docker push $IMAGE:$CI_COMMIT_SHORT_SHA
+    - docker push $IMAGE:$VERSION
+    - docker push $IMAGE:latest
   after_script:
+    # shell runner ใช้โฟลเดอร์งานซ้ำ — ไม่ทิ้งรหัสลับ/credential ไว้บนเครื่อง
     - rm -f push-worker/worker.secret
-    - docker logout "$REGISTRY" || true
+    - docker logout hub.hosxp.net || true
+
+deploy:
+  stage: deploy
+  tags: [backoffice-teams]
+  interruptible: false # ห้ามยกเลิกกลางทาง
+  timeout: 20m
+  resource_group: production # deploy ทีละรอบ ไม่แย่งกันเขียน .env / compose
+  environment:
+    name: production
+    url: https://backoffice-teams.bmscloud.in.th
+  script:
+    - echo "$DOCKER_PASSWORD" | docker login hub.hosxp.net -u "$DOCKER_USERNAME" --password-stdin
+    - cd $DEPLOY_PATH
+    # compose รุ่นแรกเขียน :latest ตายตัว → เปลี่ยนเป็น ${IMAGE_TAG:-latest} ให้ (รันซ้ำได้)
+    - |
+      if ! grep -q 'IMAGE_TAG' docker-compose.yml; then
+        sed -i 's#\(backoffice-teams-frontend\):latest#\1:${IMAGE_TAG:-latest}#' docker-compose.yml
+        echo "docker-compose.yml → image ใช้ \${IMAGE_TAG:-latest}"
+      fi
+    # ปักเวอร์ชันของ commit นี้ลง .env (compose อ่านตอนแทนค่า) — รู้เสมอว่ารันตัวไหนอยู่
+    - touch .env
+    - if grep -q '^IMAGE_TAG=' .env; then sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=$CI_COMMIT_SHORT_SHA|" .env; else echo "IMAGE_TAG=$CI_COMMIT_SHORT_SHA" >> .env; fi
+    # pull ก่อนขณะตัวเดิมยังให้บริการ — pull พัง = จบ job โดยระบบเดิมยังรันอยู่
+    - docker compose pull
+    # สร้างใหม่เฉพาะที่เปลี่ยน แล้วรอจน container ขึ้นจริง — ขึ้นไม่ได้ = job แดง
+    - docker compose up -d --remove-orphans --wait --wait-timeout 120
+    - docker image prune -f # ล้าง layer เก่าที่ไม่มี tag (ยังเก็บ :<sha> / :V1.xxx ไว้ rollback)
+  after_script:
+    - docker logout hub.hosxp.net || true

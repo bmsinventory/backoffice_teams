@@ -12,11 +12,11 @@
  */
 (function () {
 
-  window.APP_VERSION = 'V1.009';
+  window.APP_VERSION = 'V1.010';
 
   window.CHANGELOG = [
     {
-      version: 'V1.009',
+      version: 'V1.010',
       date: '2026-10-12',
       items: [
         {

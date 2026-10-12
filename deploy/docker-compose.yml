@@ -1,12 +1,11 @@
 # frontend container สำหรับ backoffice-teams
 # หมายเหตุ: บนเซิร์ฟเวอร์จริง (10.95.10.108) API ถูก proxy แบบ same-origin ผ่าน
 # Nginx Proxy Manager → SUPABASE_URL จึงเป็นโดเมนหน้าเว็บเอง ไม่ใช่ subdomain แยก
-version: "3.9"
 
 services:
   frontend:
-    # อย่าใช้ :latest อย่างเดียวบน production — pin เวอร์ชันวันที่ไว้ด้วยเพื่อ rollback
-    image: hub.hosxp.net/bms/backoffice-teams-frontend:latest
+    # IMAGE_TAG มาจาก .env ข้างไฟล์นี้ — CI (deploy) ปักเป็น sha ของ commit ทุกรอบ · rollback = แก้เป็น sha/V1.xxx เดิม แล้ว docker compose up -d
+    image: hub.hosxp.net/bms/backoffice-teams-frontend:${IMAGE_TAG:-latest}
     container_name: backoffice_teams_frontend
     restart: always
     environment:
